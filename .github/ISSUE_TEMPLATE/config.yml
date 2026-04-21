@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 問 maintainer
+    url: https://github.com/zyx1121
+    about: 不急的可以開 issue，急的直接敲 Loki

@@ -1,0 +1,16 @@
+name: Question
+description: 不確定是不是 bug，或單純想問
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 問題
+      placeholder: 我加新 app 時 PortalShell 應該包在 layout.tsx 還是 page.tsx?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 你已經試過 / 查過什麼
+      placeholder: 讀過 CLAUDE.md，看過 bento 的用法，但...

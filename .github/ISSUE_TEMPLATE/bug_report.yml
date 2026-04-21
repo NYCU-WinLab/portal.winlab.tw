@@ -1,0 +1,32 @@
+name: Bug
+description: 東西壞了或行為怪怪的
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 發生了什麼
+      description: 用一兩句話說。附 screenshot / console log 更好。
+      placeholder: 在 /bento 按「關閉訂單」後，訂單還在 active 狀態，要重整才消失
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟
+      placeholder: |
+        1. 登入
+        2. 進 /bento
+        3. 點一個進行中的訂單
+        4. 按「關閉訂單」
+        5. 看到...
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行為
+      placeholder: 訂單狀態立刻變 closed，按鈕消失
+  - type: input
+    id: env
+    attributes:
+      label: 環境
+      placeholder: macOS 14 / Chrome 132 / production

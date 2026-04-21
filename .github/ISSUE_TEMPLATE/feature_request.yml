@@ -1,0 +1,22 @@
+name: Feature
+description: 想要某個新功能 / 新 app / 新體驗
+labels: [feature]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解決什麼問題
+      description: 先講痛點，再講方案。方案可以留空讓大家一起想。
+      placeholder: 現在要結單得等人工，能不能到某個時間自動結
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案做法（可選）
+      placeholder: bento_orders 加 auto_close_at 欄位，cron 掃描到期的...
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 還想過什麼別的做法
+      placeholder: 純手動 / Slack bot 提醒 / ...

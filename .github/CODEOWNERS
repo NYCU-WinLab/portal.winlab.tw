@@ -1,0 +1,25 @@
+# 每個 PR 會自動 request 對應 owner 的 review。
+# 規則從下往上匹配，越下面越具體。
+#
+# 等團隊長大再按 app / 模組拆分。現在單人 repo 先全部 fallback。
+
+*                                         @zyx1121
+
+# === Shared infra（改動需特別小心，會影響所有 app） ===
+/apps/portal/middleware.ts                @zyx1121
+/apps/portal/lib/                         @zyx1121
+/apps/portal/components/                  @zyx1121
+/apps/portal/hooks/use-auth.ts            @zyx1121
+/apps/portal/app/layout.tsx               @zyx1121
+/packages/                                @zyx1121
+
+# === CI / repo 設定 ===
+/.github/                                 @zyx1121
+/CLAUDE.md                                @zyx1121
+/README.md                                @zyx1121
+/CONTRIBUTING.md                          @zyx1121
+
+# === 業務 app（未來分給對應維護者） ===
+/apps/portal/app/bento/                   @zyx1121
+/apps/portal/hooks/bento/                 @zyx1121
+/apps/portal/lib/bento/                   @zyx1121
