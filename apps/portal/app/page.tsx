@@ -4,6 +4,7 @@ import { Button } from "@workspace/ui/components/button"
 
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { UserCard } from "@/components/user-card"
 import { getCurrentUser } from "@/lib/user"
 
@@ -17,7 +18,7 @@ export default async function Page() {
   const user = (await getCurrentUser())!
 
   return (
-    <PortalShell appName="Portal">
+    <PortalShell appName="Portal" bottomLeft={<ThemeToggle />}>
       <div className="flex flex-col gap-10">
         <div className="flex flex-col gap-1">
           <h1 className="font-medium">portal.winlab.tw</h1>
