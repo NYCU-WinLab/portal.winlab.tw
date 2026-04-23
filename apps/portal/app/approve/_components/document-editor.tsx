@@ -145,6 +145,24 @@ export function DocumentEditor({
   }
 
   async function onSubmit() {
+    const { validateForSubmit } = await import("@/lib/approve/validation")
+    const v = validateForSubmit({
+      title: initialTitle,
+      filePath,
+      signers: signerIds.map((id) => ({
+        id: "",
+        document_id: documentId,
+        signer_id: id,
+        status: "pending" as const,
+        signed_at: null,
+        created_at: "",
+      })),
+      fields,
+    })
+    if (!v.ok) {
+      toast.error(v.reason)
+      return
+    }
     try {
       await submitDocument(documentId)
     } catch (e) {
