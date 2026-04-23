@@ -15,8 +15,7 @@ export function FieldPalette({
   onPick: (id: CategoryDef["id"] | null) => void
 }) {
   return (
-    <aside className="flex flex-col gap-1">
-      <div className="mb-1 text-xs text-muted-foreground">方塊</div>
+    <div className="flex flex-wrap gap-1">
       {FIELD_CATEGORIES.map((c) => {
         const Icon = c.icon
         const active = activeCategory === c.id
@@ -27,13 +26,12 @@ export function FieldPalette({
             variant={active ? "default" : "outline"}
             size="sm"
             onClick={() => onPick(active ? null : c.id)}
-            className="justify-start"
           >
             <Icon className="size-4" />
             {c.label}
           </Button>
         )
       })}
-    </aside>
+    </div>
   )
 }

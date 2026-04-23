@@ -35,7 +35,7 @@ export function PdfCanvas({
   }, [size, onPageSize])
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <div
         ref={pageRef}
         className="relative mx-auto w-fit rounded border bg-background"
@@ -46,7 +46,7 @@ export function PdfCanvas({
         >
           <Page
             pageNumber={page}
-            width={720}
+            width={600}
             onLoadSuccess={({ width, height }) => setSize({ width, height })}
           />
         </Document>

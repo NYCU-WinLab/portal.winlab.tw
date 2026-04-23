@@ -84,7 +84,7 @@ export function SigningView({
   }
 
   return (
-    <main className="space-y-4">
+    <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">{document.title}</h1>
       <p className="text-xs text-muted-foreground">
         進度：{filledCount}/{totalFields}
@@ -114,6 +114,6 @@ export function SigningView({
           送出簽核
         </Button>
       </div>
-    </main>
+    </div>
   )
 }

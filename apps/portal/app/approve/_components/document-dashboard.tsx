@@ -33,7 +33,7 @@ export function DocumentDashboard() {
   const sent = useSentDocuments(userId)
 
   return (
-    <main className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Approve</h1>
         <Button asChild>
@@ -58,7 +58,7 @@ export function DocumentDashboard() {
           <TabsTrigger value="sent">送簽</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="inbox" className="space-y-2">
+        <TabsContent value="inbox" className="flex flex-col gap-2">
           {(inbox.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">沒有待簽文件</p>
           )}
@@ -72,7 +72,7 @@ export function DocumentDashboard() {
           ))}
         </TabsContent>
 
-        <TabsContent value="signed" className="space-y-2">
+        <TabsContent value="signed" className="flex flex-col gap-2">
           {(signed.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">還沒簽過任何文件</p>
           )}
@@ -86,7 +86,7 @@ export function DocumentDashboard() {
           ))}
         </TabsContent>
 
-        <TabsContent value="sent" className="space-y-2">
+        <TabsContent value="sent" className="flex flex-col gap-2">
           {(sent.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">還沒送過任何文件</p>
           )}
@@ -105,6 +105,6 @@ export function DocumentDashboard() {
           ))}
         </TabsContent>
       </Tabs>
-    </main>
+    </div>
   )
 }

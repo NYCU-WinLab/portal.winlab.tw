@@ -53,53 +53,47 @@ export function DocumentView({
   )
 
   return (
-    <main className="space-y-4">
+    <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">{document.title}</h1>
-      <div className="flex gap-6">
-        <div className="flex-1">
-          {signedUrl && (
-            <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
-              {(size) => (
-                <>
-                  {onPage.map((f) => (
-                    <div
-                      key={f.id}
-                      className="absolute rounded border bg-background/70"
-                      style={{
-                        left: f.x * size.width,
-                        top: f.y * size.height,
-                        width: f.width * size.width,
-                        height: f.height * size.height,
-                        borderColor: signerColor(f.signer_id),
-                      }}
-                    >
-                      {f.value ? (
-                        f.category === "signature" ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={f.value}
-                            alt="signature"
-                            className="h-full w-full object-contain"
-                          />
-                        ) : (
-                          <span className="block px-1 text-xs">{f.value}</span>
-                        )
-                      ) : (
-                        <span className="block px-1 text-[10px] text-muted-foreground">
-                          待 {nameBySigner.get(f.signer_id)} 簽
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
-            </PdfCanvas>
+      <SignerProgress rows={signers} />
+      {signedUrl && (
+        <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
+          {(size) => (
+            <>
+              {onPage.map((f) => (
+                <div
+                  key={f.id}
+                  className="absolute rounded border bg-background/70"
+                  style={{
+                    left: f.x * size.width,
+                    top: f.y * size.height,
+                    width: f.width * size.width,
+                    height: f.height * size.height,
+                    borderColor: signerColor(f.signer_id),
+                  }}
+                >
+                  {f.value ? (
+                    f.category === "signature" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={f.value}
+                        alt="signature"
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <span className="block px-1 text-xs">{f.value}</span>
+                    )
+                  ) : (
+                    <span className="block px-1 text-[10px] text-muted-foreground">
+                      待 {nameBySigner.get(f.signer_id)} 簽
+                    </span>
+                  )}
+                </div>
+              ))}
+            </>
           )}
-        </div>
-        <div className="w-56">
-          <SignerProgress rows={signers} />
-        </div>
-      </div>
-    </main>
+        </PdfCanvas>
+      )}
+    </div>
   )
 }

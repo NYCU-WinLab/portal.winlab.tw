@@ -180,7 +180,7 @@ export function DocumentEditor({
   }
 
   return (
-    <main className="space-y-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <TitleInput documentId={documentId} initial={initialTitle} />
         <div className="flex items-center gap-2">
@@ -242,33 +242,31 @@ export function DocumentEditor({
       {!filePath ? (
         <UploadZone documentId={documentId} onUploaded={setFilePath} />
       ) : (
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-3">
           <FieldPalette activeCategory={palette} onPick={setPalette} />
-          <div className="flex-1">
-            {signedUrl ? (
-              <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
-                {(size) => (
-                  <div
-                    className="h-full w-full"
-                    onClick={(e) => onCanvasClick(e, size)}
-                    style={{ cursor: palette ? "crosshair" : "default" }}
-                  >
-                    <FieldOverlay
-                      fields={fieldsOnPage}
-                      pageSize={size}
-                      signers={signerProfiles}
-                      handlers={{ onMove, onReassign, onRemove }}
-                    />
-                  </div>
-                )}
-              </PdfCanvas>
-            ) : (
-              <p className="text-muted-foreground">載入 PDF...</p>
-            )}
-          </div>
+          {signedUrl ? (
+            <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
+              {(size) => (
+                <div
+                  className="h-full w-full"
+                  onClick={(e) => onCanvasClick(e, size)}
+                  style={{ cursor: palette ? "crosshair" : "default" }}
+                >
+                  <FieldOverlay
+                    fields={fieldsOnPage}
+                    pageSize={size}
+                    signers={signerProfiles}
+                    handlers={{ onMove, onReassign, onRemove }}
+                  />
+                </div>
+              )}
+            </PdfCanvas>
+          ) : (
+            <p className="text-muted-foreground">載入 PDF...</p>
+          )}
         </div>
       )}
-    </main>
+    </div>
   )
 }
 
