@@ -29,7 +29,7 @@ import {
 import { useInboxCount } from "@/hooks/approve/use-inbox-count"
 import { queryKeys } from "@/hooks/approve/query-keys"
 
-import { cancelDocument, deleteDocument } from "../actions"
+import { deleteDocument } from "../actions"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { DocumentCard } from "./document-card"
@@ -50,16 +50,6 @@ export function DocumentDashboard() {
       await deleteDocument(documentId)
       await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
       toast.success("已刪除")
-    } catch (e) {
-      toast.error((e as Error).message)
-    }
-  }
-
-  async function onCancel(documentId: string) {
-    try {
-      await cancelDocument(documentId)
-      await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
-      toast.success("已撤回")
     } catch (e) {
       toast.error((e as Error).message)
     }
@@ -134,14 +124,19 @@ export function DocumentDashboard() {
             </p>
           ) : (
             (sent.data ?? []).map((doc) => {
-              const canDelete = doc.status === "draft"
-              const canCancel = doc.status === "pending"
-              const hasAction = canDelete || canCancel
+              const isDraft = doc.status === "draft"
+              const isPending = doc.status === "pending"
+              const canRemove = isDraft || isPending
+              const label = isDraft ? "刪除草稿" : "撤回送簽"
+              const dialogTitle = isDraft ? "刪除草稿？" : "撤回送簽？"
+              const dialogDesc = isDraft
+                ? "刪了就沒了。"
+                : "文件會直接刪除，signer 的代簽會消失。"
               return (
                 <DocumentCard
                   key={doc.id}
                   href={
-                    doc.status === "draft"
+                    isDraft
                       ? `/approve/new/${doc.id}`
                       : `/approve/view/${doc.id}`
                   }
@@ -149,7 +144,7 @@ export function DocumentDashboard() {
                   subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
                   status={doc.status}
                   actions={
-                    hasAction ? (
+                    canRemove ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -162,40 +157,21 @@ export function DocumentDashboard() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {canDelete && (
-                            <ConfirmDialog
-                              trigger={
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={(e) => e.preventDefault()}
-                                >
-                                  刪除草稿
-                                </DropdownMenuItem>
-                              }
-                              title="刪除草稿？"
-                              description="刪了就沒了。"
-                              confirmText="刪除"
-                              variant="destructive"
-                              onConfirm={() => onDelete(doc.id)}
-                            />
-                          )}
-                          {canCancel && (
-                            <ConfirmDialog
-                              trigger={
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={(e) => e.preventDefault()}
-                                >
-                                  撤回送簽
-                                </DropdownMenuItem>
-                              }
-                              title="撤回送簽？"
-                              description="文件會標記為已取消，signer 的代簽會消失。"
-                              confirmText="撤回"
-                              variant="destructive"
-                              onConfirm={() => onCancel(doc.id)}
-                            />
-                          )}
+                          <ConfirmDialog
+                            trigger={
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                {label}
+                              </DropdownMenuItem>
+                            }
+                            title={dialogTitle}
+                            description={dialogDesc}
+                            confirmText="刪除"
+                            variant="destructive"
+                            onConfirm={() => onDelete(doc.id)}
+                          />
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : null

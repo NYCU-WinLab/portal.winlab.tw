@@ -346,19 +346,6 @@ export async function submitSignature(
   // Client navigates after this returns — same reason as submitDocument.
 }
 
-export async function cancelDocument(documentId: string): Promise<void> {
-  const user = await requireUser()
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from("approve_documents")
-    .update({ status: "cancelled" })
-    .eq("id", documentId)
-    .eq("created_by", user.id)
-    .eq("status", "pending")
-  if (error) throw new Error(error.message)
-  revalidatePath("/approve")
-}
-
 export async function deleteDocument(documentId: string): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
