@@ -232,7 +232,11 @@ export function DocumentEditor({
         <TitleInput documentId={documentId} initial={initialTitle} />
         <div className="flex items-center gap-2">
           <ConfirmDialog
-            trigger={<Button variant="outline">刪除草稿</Button>}
+            trigger={
+              <Button variant="outline" size="sm">
+                刪除草稿
+              </Button>
+            }
             title="刪除草稿？"
             description="刪了就沒了。"
             confirmText="刪除"
@@ -246,7 +250,7 @@ export function DocumentEditor({
               }
             }}
           />
-          <Button type="button" onClick={onSubmit}>
+          <Button type="button" size="sm" onClick={onSubmit}>
             送出
           </Button>
         </div>

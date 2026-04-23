@@ -96,11 +96,18 @@ export function SigningView({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">{document.title}</h1>
-      <p className="text-xs text-muted-foreground">
-        進度：{filledCount}/{totalFields}
-      </p>
+    <div className="flex flex-col gap-10">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-medium">{document.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            進度 {filledCount}/{totalFields}
+          </p>
+        </div>
+        <Button size="sm" type="button" onClick={onSubmit}>
+          送出簽核
+        </Button>
+      </div>
 
       {signedUrl && (
         <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
@@ -120,12 +127,6 @@ export function SigningView({
           )}
         </PdfCanvas>
       )}
-
-      <div className="flex justify-end">
-        <Button type="button" onClick={onSubmit}>
-          送出簽核
-        </Button>
-      </div>
     </div>
   )
 }

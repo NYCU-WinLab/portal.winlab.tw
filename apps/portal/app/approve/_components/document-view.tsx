@@ -61,8 +61,8 @@ export function DocumentView({
   )
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">{document.title}</h1>
+    <div className="flex flex-col gap-10">
+      <h1 className="font-medium">{document.title}</h1>
       <SignerProgress rows={signers} />
       {signedUrl && (
         <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
