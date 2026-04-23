@@ -1,5 +1,7 @@
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
+import { clearStaleSupabaseCookies } from "@/lib/auth/clear-stale-cookies"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
@@ -26,5 +28,15 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // Exchange failed (or no code). Most common cause: stale cross-subdomain
+  // Supabase cookies left behind by the previous portal at .winlab.tw. Clear
+  // them and send the user back to /auth/login so one extra click gets them
+  // through instead of a dead-end error page. First-failure users never see
+  // /auth/auth-code-error again.
+  const cookieStore = await cookies()
+  await clearStaleSupabaseCookies(cookieStore)
+
+  const retry = new URL("/auth/login", origin)
+  retry.searchParams.set("stale", "1")
+  return NextResponse.redirect(retry.toString())
 }
