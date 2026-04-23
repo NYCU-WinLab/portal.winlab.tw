@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -63,6 +64,7 @@ export function DocumentEditor({
   })
 
   const router = useRouter()
+  const queryClient = useQueryClient()
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const signedUrl = useSignedUrl(filePath, documentId)
 
@@ -240,6 +242,7 @@ export function DocumentEditor({
         )
       )
       await submitDocument(documentId)
+      await queryClient.invalidateQueries({ queryKey: ["approve"] })
       router.push("/approve")
     } catch (e) {
       toast.error((e as Error).message)

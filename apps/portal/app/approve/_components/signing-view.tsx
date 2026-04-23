@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -72,6 +73,7 @@ export function SigningView({
   )
 
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   const savedSignature =
     savedValues.find((v) => v.category === "signature")?.value ?? null
@@ -89,6 +91,7 @@ export function SigningView({
     }))
     try {
       await submitSignature(document.id, values)
+      await queryClient.invalidateQueries({ queryKey: ["approve"] })
       router.push("/approve")
     } catch (e) {
       toast.error((e as Error).message)
