@@ -16,21 +16,6 @@ async function requireUser() {
   return user
 }
 
-export async function createDraft(): Promise<never> {
-  const user = await requireUser()
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("approve_documents")
-    .insert({ title: "未命名", created_by: user.id })
-    .select("id")
-    .single()
-  if (error || !data) {
-    throw new Error(error?.message ?? "Failed to create draft")
-  }
-  revalidatePath("/approve")
-  redirect(`/approve/new/${data.id}`)
-}
-
 export async function uploadPdf(formData: FormData): Promise<void> {
   const user = await requireUser()
   const documentId = formData.get("documentId")
