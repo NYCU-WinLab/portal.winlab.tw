@@ -156,4 +156,122 @@ export function registerBentoTools(
       return ok({ removed: order_item_id })
     }
   )
+
+  // --- Menu management (admin / RLS-gated) ---
+  // Intended flow: user pastes a menu at the agent, agent calls
+  // bento_create_restaurant once, then bento_add_menu_items once with
+  // the parsed items. update/delete_menu_item cover parse corrections.
+
+  server.tool(
+    "bento_create_restaurant",
+    "Create a new bento restaurant (the row in bento_menus). Returns the new id. Use this before bento_add_menu_items when seeding a new restaurant's menu.",
+    {
+      name: z.string().min(1),
+      phone: z.string().min(1).describe("Digits only, no dashes."),
+      google_map_link: z.string().url().optional(),
+      additional: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Order-time options for every item, e.g. ['正常','半飯','不飯'] or ['不辣','小辣','中辣','大辣']."
+        ),
+    },
+    async ({ name, phone, google_map_link, additional }) => {
+      const { data, error } = await supabase
+        .from("bento_menus")
+        .insert({
+          name,
+          phone,
+          google_map_link: google_map_link ?? null,
+          additional: additional ?? null,
+        })
+        .select()
+        .single()
+      if (error) return err(error.message)
+      return ok(data)
+    }
+  )
+
+  server.tool(
+    "bento_add_menu_items",
+    "Bulk-insert menu items into an existing restaurant. One call for the whole menu. `type` is the category shown to diners (e.g. '炸類','烤類','飯類','水餃','湯品'); omit or null if the restaurant doesn't group items.",
+    {
+      restaurant_id: z
+        .string()
+        .uuid()
+        .describe(
+          "bento_menus.id — from bento_create_restaurant or bento_list_restaurants."
+        ),
+      items: z
+        .array(
+          z.object({
+            name: z.string().min(1),
+            price: z.number().int().nonnegative(),
+            type: z.string().optional(),
+          })
+        )
+        .min(1)
+        .max(200),
+    },
+    async ({ restaurant_id, items }) => {
+      const { data, error } = await supabase
+        .from("bento_menu_items")
+        .insert(
+          items.map((i) => ({
+            restaurant_id,
+            name: i.name,
+            price: i.price,
+            type: i.type ?? null,
+          }))
+        )
+        .select()
+      if (error) return err(error.message)
+      return ok({ inserted: data?.length ?? 0, items: data ?? [] })
+    }
+  )
+
+  server.tool(
+    "bento_update_menu_item",
+    "Patch a single menu item. Use when a parse was slightly wrong — fix name/price/type without deleting and re-adding.",
+    {
+      menu_item_id: z.string().uuid(),
+      name: z.string().min(1).optional(),
+      price: z.number().int().nonnegative().optional(),
+      type: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Pass null to clear the category."),
+    },
+    async ({ menu_item_id, name, price, type }) => {
+      const patch: Record<string, unknown> = {}
+      if (name !== undefined) patch.name = name
+      if (price !== undefined) patch.price = price
+      if (type !== undefined) patch.type = type
+      if (Object.keys(patch).length === 0) return err("No fields to update")
+
+      const { data, error } = await supabase
+        .from("bento_menu_items")
+        .update(patch)
+        .eq("id", menu_item_id)
+        .select()
+        .single()
+      if (error) return err(error.message)
+      return ok(data)
+    }
+  )
+
+  server.tool(
+    "bento_delete_menu_item",
+    "Delete a menu item. Use to drop duplicates or items that got hallucinated during parsing. Does NOT cascade to historical order_items.",
+    { menu_item_id: z.string().uuid() },
+    async ({ menu_item_id }) => {
+      const { error } = await supabase
+        .from("bento_menu_items")
+        .delete()
+        .eq("id", menu_item_id)
+      if (error) return err(error.message)
+      return ok({ removed: menu_item_id })
+    }
+  )
 }
