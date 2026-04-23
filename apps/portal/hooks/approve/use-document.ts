@@ -43,18 +43,31 @@ export function useDocument(id: string) {
 
       return {
         document: doc.data as ApproveDocument,
-        signers: (signers.data ?? []).map((row: any) => ({
-          ...row,
-          profile: row.profile
-            ? {
-                id: row.profile.id,
-                name: row.profile.name ?? row.profile.email ?? "Unknown",
-                email: row.profile.email ?? null,
-                avatar_url: row.profile.member?.avatar_url ?? null,
-                role: row.profile.member?.role ?? null,
-              }
-            : null,
-        })),
+        signers: (signers.data ?? []).map((row) => {
+          const typedRow = row as typeof row & {
+            profile?: {
+              id: string
+              name: string | null
+              email: string | null
+              member?: { avatar_url: string | null; role: string | null }
+            } | null
+          }
+          return {
+            ...row,
+            profile: typedRow.profile
+              ? {
+                  id: typedRow.profile.id,
+                  name:
+                    typedRow.profile.name ??
+                    typedRow.profile.email ??
+                    "Unknown",
+                  email: typedRow.profile.email ?? null,
+                  avatar_url: typedRow.profile.member?.avatar_url ?? null,
+                  role: typedRow.profile.member?.role ?? null,
+                }
+              : null,
+          }
+        }),
         fields: (fields.data ?? []) as ApproveField[],
       }
     },
