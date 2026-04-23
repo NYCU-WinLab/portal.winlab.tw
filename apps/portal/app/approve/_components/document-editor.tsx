@@ -55,6 +55,12 @@ export function DocumentEditor({
   const [fields, setFields] = useState(initialFields)
   const [page, setPage] = useState(1)
   const [candidates, setCandidates] = useState<SignerProfile[]>([])
+  // Remember the last signer the user assigned so new boxes auto-inherit it.
+  // Seed from existing fields so reopening a draft continues the flow.
+  const [lastSignerId, setLastSignerId] = useState<string | null>(() => {
+    const withSigner = initialFields.filter((f) => f.signer_id)
+    return withSigner.at(-1)?.signer_id ?? null
+  })
 
   const router = useRouter()
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
@@ -146,6 +152,7 @@ export function DocumentEditor({
     setFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, signer_id: signerId } : f))
     )
+    setLastSignerId(signerId)
     try {
       const current = fields.find((f) => f.id === id)
       if (!current) return
@@ -184,7 +191,7 @@ export function DocumentEditor({
     const newField: ApproveField = {
       id: crypto.randomUUID(),
       document_id: documentId,
-      signer_id: null,
+      signer_id: lastSignerId,
       page,
       x: clamp01(0.5 - def.defaultSize.width / 2),
       y: clamp01(0.5 - def.defaultSize.height / 2),
