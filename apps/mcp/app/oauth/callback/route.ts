@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { createAuthCode } from "@/lib/auth/auth-codes"
@@ -5,39 +6,53 @@ import { validateOAuthClientRequest } from "@/lib/auth/oauth-request"
 import { getMcpResourceUrl } from "@/lib/auth/urls"
 import { createClient } from "@/lib/supabase/ssr-server"
 
+import { MCP_OAUTH_STATE_COOKIE } from "@/app/oauth/prepare/route"
+
 // Lands here after the user finishes Keycloak login (via Supabase).
-// Supabase gives us ?code=<supabase-pkce-code>; MCP params piggyback as
-// mcp_* query params from the authorize step. We:
-//   1. Trade the Supabase code for a session (RFC 7636 PKCE via cookies).
-//   2. Re-validate the MCP client + redirect_uri.
-//   3. Mint a one-time MCP auth code that bundles the session tokens.
-//   4. Send the browser back to the MCP client's redirect_uri with our code.
+// Supabase gives us ?code=<supabase-pkce-code>; MCP params live in an
+// httpOnly cookie stashed by /oauth/prepare so the redirectTo URL stays
+// clean (Supabase's allowlist is picky about query strings).
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const supabaseCode = url.searchParams.get("code")
-  const mcpClientId = url.searchParams.get("mcp_client_id")
-  const mcpRedirectUri = url.searchParams.get("mcp_redirect_uri")
-  const mcpCodeChallenge = url.searchParams.get("mcp_code_challenge")
-  const mcpState = url.searchParams.get("mcp_state") ?? undefined
-  const mcpResource = url.searchParams.get("mcp_resource") ?? undefined
 
   if (!supabaseCode) {
     return errorPage("Missing authorization code from Supabase.")
   }
-  if (!mcpClientId || !mcpRedirectUri || !mcpCodeChallenge) {
-    return errorPage("Missing MCP authorization parameters.")
+
+  const cookieStore = await cookies()
+  const mcpStateRaw = cookieStore.get(MCP_OAUTH_STATE_COOKIE)?.value
+  if (!mcpStateRaw) {
+    return errorPage(
+      "Missing MCP request state. The cookie has expired or was blocked."
+    )
+  }
+
+  let mcp: {
+    client_id: string
+    redirect_uri: string
+    code_challenge: string
+    state?: string
+    resource?: string
+  }
+  try {
+    mcp = JSON.parse(mcpStateRaw)
+  } catch {
+    cookieStore.delete(MCP_OAUTH_STATE_COOKIE)
+    return errorPage("Corrupted MCP request state.")
   }
 
   try {
     await validateOAuthClientRequest(
       {
-        clientId: mcpClientId,
-        redirectUri: mcpRedirectUri,
-        resource: mcpResource,
+        clientId: mcp.client_id,
+        redirectUri: mcp.redirect_uri,
+        resource: mcp.resource,
       },
       { expectedResource: getMcpResourceUrl() }
     )
   } catch (error) {
+    cookieStore.delete(MCP_OAUTH_STATE_COOKIE)
     return errorPage(
       error instanceof Error ? error.message : "Invalid MCP client request"
     )
@@ -48,6 +63,7 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(supabaseCode)
 
   if (error || !data.session) {
+    cookieStore.delete(MCP_OAUTH_STATE_COOKIE)
     return errorPage(error?.message ?? "Supabase session exchange failed")
   }
 
@@ -55,15 +71,17 @@ export async function GET(request: Request) {
     accessToken: data.session.access_token,
     refreshToken: data.session.refresh_token,
     expiresIn: data.session.expires_in ?? null,
-    codeChallenge: mcpCodeChallenge,
-    redirectUri: mcpRedirectUri,
-    clientId: mcpClientId,
-    resource: mcpResource,
+    codeChallenge: mcp.code_challenge,
+    redirectUri: mcp.redirect_uri,
+    clientId: mcp.client_id,
+    resource: mcp.resource,
   })
 
-  const redirect = new URL(mcpRedirectUri)
+  cookieStore.delete(MCP_OAUTH_STATE_COOKIE)
+
+  const redirect = new URL(mcp.redirect_uri)
   redirect.searchParams.set("code", mcpCode)
-  if (mcpState) redirect.searchParams.set("state", mcpState)
+  if (mcp.state) redirect.searchParams.set("state", mcp.state)
 
   return NextResponse.redirect(redirect.toString())
 }
