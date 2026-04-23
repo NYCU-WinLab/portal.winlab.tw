@@ -1,15 +1,23 @@
 "use client"
 
 import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
-import { IconPlus } from "@tabler/icons-react"
+import { IconDots, IconPlus } from "@tabler/icons-react"
 import Link from "next/link"
 
 import { useAuth } from "@/hooks/use-auth"
@@ -19,18 +27,43 @@ import {
   useSignedDocuments,
 } from "@/hooks/approve/use-documents"
 import { useInboxCount } from "@/hooks/approve/use-inbox-count"
+import { queryKeys } from "@/hooks/approve/query-keys"
 
+import { cancelDocument, deleteDocument } from "../actions"
+
+import { ConfirmDialog } from "./confirm-dialog"
 import { DocumentCard } from "./document-card"
 
 export function DocumentDashboard() {
   const { user } = useAuth()
   const userId = user?.id ?? null
   const [tab, setTab] = useState("inbox")
+  const queryClient = useQueryClient()
 
   const inboxCount = useInboxCount(userId)
   const inbox = useInboxDocuments(userId)
   const signed = useSignedDocuments(userId)
   const sent = useSentDocuments(userId)
+
+  async function onDelete(documentId: string) {
+    try {
+      await deleteDocument(documentId)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
+      toast.success("已刪除")
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
+  async function onCancel(documentId: string) {
+    try {
+      await cancelDocument(documentId)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
+      toast.success("已撤回")
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,19 +123,76 @@ export function DocumentDashboard() {
           {(sent.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">還沒送過任何文件</p>
           )}
-          {(sent.data ?? []).map((doc) => (
-            <DocumentCard
-              key={doc.id}
-              href={
-                doc.status === "draft"
-                  ? `/approve/new/${doc.id}`
-                  : `/approve/view/${doc.id}`
-              }
-              title={doc.title}
-              subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
-              status={doc.status}
-            />
-          ))}
+          {(sent.data ?? []).map((doc) => {
+            const canDelete = doc.status === "draft"
+            const canCancel = doc.status === "pending"
+            const hasAction = canDelete || canCancel
+            return (
+              <DocumentCard
+                key={doc.id}
+                href={
+                  doc.status === "draft"
+                    ? `/approve/new/${doc.id}`
+                    : `/approve/view/${doc.id}`
+                }
+                title={doc.title}
+                subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
+                status={doc.status}
+                actions={
+                  hasAction ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0"
+                          aria-label="actions"
+                        >
+                          <IconDots className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canDelete && (
+                          <ConfirmDialog
+                            trigger={
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                刪除草稿
+                              </DropdownMenuItem>
+                            }
+                            title="刪除草稿？"
+                            description="刪了就沒了。"
+                            confirmText="刪除"
+                            variant="destructive"
+                            onConfirm={() => onDelete(doc.id)}
+                          />
+                        )}
+                        {canCancel && (
+                          <ConfirmDialog
+                            trigger={
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                撤回送簽
+                              </DropdownMenuItem>
+                            }
+                            title="撤回送簽？"
+                            description="文件會標記為已取消，signer 的代簽會消失。"
+                            confirmText="撤回"
+                            variant="destructive"
+                            onConfirm={() => onCancel(doc.id)}
+                          />
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null
+                }
+              />
+            )
+          })}
         </TabsContent>
       </Tabs>
     </div>

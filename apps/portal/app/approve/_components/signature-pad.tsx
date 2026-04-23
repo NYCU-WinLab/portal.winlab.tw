@@ -60,10 +60,14 @@ export function SignaturePad({
             <TabsTrigger value="upload">上傳</TabsTrigger>
           </TabsList>
           <TabsContent value="draw" className="space-y-2">
-            <div className="rounded border bg-background">
+            <div className="overflow-hidden rounded border bg-background">
               <SignatureCanvas
                 ref={canvasRef}
-                canvasProps={{ width: 480, height: 180, className: "block" }}
+                canvasProps={{
+                  width: 440,
+                  height: 180,
+                  className: "block max-w-full",
+                }}
               />
             </div>
             <Button

@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import type { ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { Card } from "@workspace/ui/components/card"
+
 import type { ApproveDocument, DocumentStatus } from "@/lib/approve/types"
 
 const STATUS_LABEL: Record<DocumentStatus, string> = {
@@ -18,21 +19,28 @@ export function DocumentCard({
   title,
   subtitle,
   status,
+  actions,
 }: {
   href: string
   title: string
   subtitle: string
   status?: ApproveDocument["status"]
+  actions?: ReactNode
 }) {
   return (
-    <Link href={href} className="block">
-      <Card className="group space-y-1 p-4 transition-colors hover:bg-muted/40">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium">{title}</h3>
-          {status && <Badge variant="secondary">{STATUS_LABEL[status]}</Badge>}
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent">
+      <Link href={href} className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{title}</span>
+          {status && (
+            <Badge variant="outline" className="text-xs">
+              {STATUS_LABEL[status]}
+            </Badge>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">{subtitle}</p>
-      </Card>
-    </Link>
+      </Link>
+      {actions}
+    </div>
   )
 }
