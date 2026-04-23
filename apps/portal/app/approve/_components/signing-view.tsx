@@ -8,14 +8,13 @@ import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 
-import { createClient } from "@/lib/supabase/client"
-import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import type {
   ApproveDocument,
   ApproveField,
   ApproveUserFieldValue,
 } from "@/lib/approve/types"
 import { isPredefined } from "@/lib/approve/field-categories"
+import { useApprovePdfUrl } from "@/hooks/approve/use-approve-pdf-url"
 
 import { submitSignature, type SignatureValue } from "../actions"
 
@@ -51,26 +50,10 @@ export function SigningView({
     return init
   })
   const [page, setPage] = useState(1)
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!document.file_path) {
-      setSignedUrl(null)
-      return
-    }
-    const supabase = createClient()
-    supabase.storage
-      .from(APPROVE_BUCKET)
-      .createSignedUrl(documentStoragePath(document.id), 60 * 30)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("[approve] createSignedUrl failed", error)
-          toast.error(error.message)
-          return
-        }
-        setSignedUrl(data?.signedUrl ?? null)
-      })
-  }, [document.file_path, document.id])
+  const { url: signedUrl, refresh: refreshSignedUrl } = useApprovePdfUrl(
+    document.id,
+    document.file_path
+  )
 
   const totalFields = fields.length
   const filledCount = Object.values(state).filter((v) => v.trim()).length
@@ -121,7 +104,12 @@ export function SigningView({
       </div>
 
       {signedUrl && (
-        <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
+        <PdfCanvas
+          fileUrl={signedUrl}
+          page={page}
+          onPageChange={setPage}
+          onLoadError={refreshSignedUrl}
+        >
           {(size) => (
             <>
               {fieldsOnPage.map((f) => (

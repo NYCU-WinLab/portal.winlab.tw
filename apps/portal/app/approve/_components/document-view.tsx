@@ -7,14 +7,13 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 import { IconDownload } from "@tabler/icons-react"
 
-import { createClient } from "@/lib/supabase/client"
-import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import type {
   ApproveDocument,
   ApproveField,
   ApproveSigner,
   SignerProfile,
 } from "@/lib/approve/types"
+import { useApprovePdfUrl } from "@/hooks/approve/use-approve-pdf-url"
 
 import { SignerProgress } from "./signer-progress"
 import { signerColor } from "./signer-badge"
@@ -41,27 +40,11 @@ export function DocumentView({
   viewerId: string
 }) {
   const [page, setPage] = useState(1)
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
-
-  useEffect(() => {
-    if (!document.file_path) {
-      setSignedUrl(null)
-      return
-    }
-    const supabase = createClient()
-    supabase.storage
-      .from(APPROVE_BUCKET)
-      .createSignedUrl(documentStoragePath(document.id), 60 * 30)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("[approve] createSignedUrl failed", error)
-          toast.error(error.message)
-          return
-        }
-        setSignedUrl(data?.signedUrl ?? null)
-      })
-  }, [document.file_path, document.id])
+  const { url: signedUrl, refresh: refreshSignedUrl } = useApprovePdfUrl(
+    document.id,
+    document.file_path
+  )
 
   async function onDownload() {
     if (!signedUrl) return
@@ -104,7 +87,12 @@ export function DocumentView({
       </div>
       <SignerProgress rows={signers} />
       {signedUrl && (
-        <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
+        <PdfCanvas
+          fileUrl={signedUrl}
+          page={page}
+          onPageChange={setPage}
+          onLoadError={refreshSignedUrl}
+        >
           {(size) => (
             <>
               {onPage.map((f) => (

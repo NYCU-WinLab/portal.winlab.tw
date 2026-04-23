@@ -15,35 +15,53 @@ export function PdfCanvas({
   page,
   onPageChange,
   onPageSize,
+  onLoadError,
   children,
 }: {
   fileUrl: string
   page: number
   onPageChange: (next: number) => void
   onPageSize?: (size: PageSize) => void
+  onLoadError?: (err: Error) => void
   children?: (size: PageSize) => ReactNode
 }) {
   const [numPages, setNumPages] = useState(0)
   const [size, setSize] = useState<PageSize | null>(null)
-  const pageRef = useRef<HTMLDivElement>(null)
+  const [pageWidth, setPageWidth] = useState(600)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (size) onPageSize?.(size)
   }, [size, onPageSize])
 
+  // Responsive width: track the outer container, cap at 900 for huge screens.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const update = () => {
+      const w = el.clientWidth
+      if (w > 0) setPageWidth(Math.min(Math.floor(w), 900))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={rootRef} className="flex flex-col gap-2">
       <div
-        ref={pageRef}
         className="relative mx-auto w-fit rounded border bg-background"
+        style={{ maxWidth: "100%" }}
       >
         <Document
           file={fileUrl}
           onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+          onLoadError={onLoadError}
         >
           <Page
             pageNumber={page}
-            width={600}
+            width={pageWidth}
             renderTextLayer={false}
             renderAnnotationLayer={false}
             onLoadSuccess={({ width, height }) => setSize({ width, height })}

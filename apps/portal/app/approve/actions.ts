@@ -7,7 +7,6 @@ import { getCurrentUser } from "@/lib/user"
 import type { FieldCategory } from "@/lib/approve/types"
 import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
-import { isPredefined } from "@/lib/approve/field-categories"
 
 async function requireUser() {
   const user = await getCurrentUser()
@@ -234,84 +233,16 @@ export async function submitSignature(
   documentId: string,
   values: SignatureValue[]
 ): Promise<void> {
-  const user = await requireUser()
+  await requireUser()
   const supabase = await createClient()
-
-  const { data: my, error: myErr } = await supabase
-    .from("approve_signers")
-    .select("id,status")
-    .eq("document_id", documentId)
-    .eq("signer_id", user.id)
-    .maybeSingle()
-  if (myErr) throw new Error(myErr.message)
-  if (!my) throw new Error("you are not a signer")
-  if (my.status === "signed") throw new Error("already signed")
-
-  const { data: myFields, error: myFieldsErr } = await supabase
-    .from("approve_fields")
-    .select("id,category")
-    .eq("document_id", documentId)
-    .eq("signer_id", user.id)
-  if (myFieldsErr) throw new Error(myFieldsErr.message)
-  if (!myFields || myFields.length === 0) {
-    throw new Error("no fields assigned to you")
-  }
-
-  const byId = new Map(values.map((v) => [v.fieldId, v.value]))
-  for (const f of myFields) {
-    const v = byId.get(f.id)
-    if (!v || !v.trim()) throw new Error("all fields must be filled")
-  }
-
-  const now = new Date().toISOString()
-  for (const f of myFields) {
-    const v = byId.get(f.id)!
-    const { error } = await supabase
-      .from("approve_fields")
-      .update({ value: v, signed_at: now })
-      .eq("id", f.id)
-      .eq("signer_id", user.id)
-    if (error) throw new Error(error.message)
-  }
-
-  // Persist predefined values for future pre-fill
-  const upserts = myFields
-    .filter((f) => isPredefined(f.category as FieldCategory))
-    .map((f) => ({
-      user_id: user.id,
-      category: f.category,
-      value: byId.get(f.id)!,
-      updated_at: now,
-    }))
-  if (upserts.length) {
-    const { error } = await supabase
-      .from("approve_user_field_values")
-      .upsert(upserts, { onConflict: "user_id,category" })
-    if (error) throw new Error(error.message)
-  }
-
-  const { error: signerUpdateErr } = await supabase
-    .from("approve_signers")
-    .update({ status: "signed", signed_at: now })
-    .eq("id", my.id)
-  if (signerUpdateErr) throw new Error(signerUpdateErr.message)
-
-  const { count, error: countErr } = await supabase
-    .from("approve_signers")
-    .select("id", { count: "exact", head: true })
-    .eq("document_id", documentId)
-    .eq("status", "pending")
-  if (countErr) throw new Error(countErr.message)
-  if ((count ?? 0) === 0) {
-    const { error: completeErr } = await supabase
-      .from("approve_documents")
-      .update({ status: "completed", completed_at: now })
-      .eq("id", documentId)
-    if (completeErr) throw new Error(completeErr.message)
-  }
-
+  // All writes (fields, user-values, signer status, maybe-complete doc) run
+  // inside the Postgres function — atomic via a single SQL transaction.
+  const { error } = await supabase.rpc("approve_submit_signature", {
+    p_document_id: documentId,
+    p_values: values.map((v) => ({ fieldId: v.fieldId, value: v.value })),
+  })
+  if (error) throw new Error(error.message)
   revalidatePath("/approve")
-  // Client navigates after this returns — same reason as submitDocument.
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
@@ -324,5 +255,16 @@ export async function deleteDocument(documentId: string): Promise<void> {
     .eq("created_by", user.id)
     .in("status", ["draft", "pending", "cancelled"])
   if (error) throw new Error(error.message)
+  // Best-effort storage cleanup. DB row is source of truth; an orphan PDF is
+  // recoverable via a janitor job, whereas a missing DB row is not.
+  const { error: storageErr } = await supabase.storage
+    .from(APPROVE_BUCKET)
+    .remove([documentStoragePath(documentId)])
+  if (storageErr) {
+    console.warn("[approve] storage cleanup failed", {
+      documentId,
+      storageErr,
+    })
+  }
   revalidatePath("/approve")
 }

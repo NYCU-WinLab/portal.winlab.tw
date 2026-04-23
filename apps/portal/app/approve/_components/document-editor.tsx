@@ -9,13 +9,13 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
-import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import type {
   ApproveField,
   FieldCategory,
   SignerProfile,
 } from "@/lib/approve/types"
 import { getCategoryDef } from "@/lib/approve/field-categories"
+import { useApprovePdfUrl } from "@/hooks/approve/use-approve-pdf-url"
 
 import {
   deleteDocument,
@@ -66,7 +66,10 @@ export function DocumentEditor({
   const router = useRouter()
   const queryClient = useQueryClient()
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
-  const signedUrl = useSignedUrl(filePath, documentId)
+  const { url: signedUrl, refresh: refreshSignedUrl } = useApprovePdfUrl(
+    documentId,
+    filePath
+  )
 
   // Load all users once for the SignerBadge popover.
   useEffect(() => {
@@ -294,7 +297,12 @@ export function DocumentEditor({
         <div className="flex flex-col gap-3">
           <FieldPalette onPlace={onPlaceField} />
           {signedUrl ? (
-            <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
+            <PdfCanvas
+              fileUrl={signedUrl}
+              page={page}
+              onPageChange={setPage}
+              onLoadError={refreshSignedUrl}
+            >
               {(size) => (
                 <FieldOverlay
                   fields={fieldsOnPage}
@@ -311,29 +319,6 @@ export function DocumentEditor({
       )}
     </div>
   )
-}
-
-function useSignedUrl(filePath: string | null, documentId: string) {
-  const [url, setUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (!filePath) {
-      setUrl(null)
-      return
-    }
-    const supabase = createClient()
-    supabase.storage
-      .from(APPROVE_BUCKET)
-      .createSignedUrl(documentStoragePath(documentId), 60 * 30)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("[approve] createSignedUrl failed", error)
-          toast.error(error.message)
-          return
-        }
-        setUrl(data?.signedUrl ?? null)
-      })
-  }, [filePath, documentId])
-  return url
 }
 
 function clamp01(n: number): number {
