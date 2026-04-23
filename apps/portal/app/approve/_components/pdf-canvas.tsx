@@ -3,9 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Document, Page } from "react-pdf"
 
-import "react-pdf/dist/Page/AnnotationLayer.css"
-import "react-pdf/dist/Page/TextLayer.css"
-
 import "@/lib/approve/pdf" // side-effect: worker registration
 
 import { Button } from "@workspace/ui/components/button"
@@ -47,15 +44,13 @@ export function PdfCanvas({
           <Page
             pageNumber={page}
             width={600}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
             onLoadSuccess={({ width, height }) => setSize({ width, height })}
           />
         </Document>
         {size && children ? (
-          <div className="pointer-events-none absolute inset-0">
-            <div className="pointer-events-auto h-full w-full">
-              {children(size)}
-            </div>
-          </div>
+          <div className="absolute inset-0 z-10">{children(size)}</div>
         ) : null}
       </div>
 
