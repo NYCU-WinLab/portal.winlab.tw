@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 import { registerBentoTools } from "@/lib/mcp/tools/bento"
+import { registerLeaveTools } from "@/lib/mcp/tools/leave"
 
 // One MCP server instance per request (stateless). The caller authenticates
 // the user and hands us a Supabase client scoped to that user's bearer
@@ -36,6 +37,7 @@ export function createMcpServer(supabase: SupabaseClient, userId: string) {
   )
 
   registerBentoTools(server, supabase, userId)
+  registerLeaveTools(server, supabase, userId)
 
   return server
 }
