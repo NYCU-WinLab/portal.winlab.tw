@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -274,7 +274,7 @@ export function DocumentEditor({
 
 function useSignedUrl(filePath: string | null, documentId: string) {
   const [url, setUrl] = useState<string | null>(null)
-  useMemo(() => {
+  useEffect(() => {
     if (!filePath) {
       setUrl(null)
       return
