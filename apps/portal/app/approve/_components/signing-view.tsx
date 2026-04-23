@@ -62,7 +62,14 @@ export function SigningView({
     supabase.storage
       .from(APPROVE_BUCKET)
       .createSignedUrl(documentStoragePath(document.id), 60 * 30)
-      .then(({ data }) => setSignedUrl(data?.signedUrl ?? null))
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[approve] createSignedUrl failed", error)
+          toast.error(error.message)
+          return
+        }
+        setSignedUrl(data?.signedUrl ?? null)
+      })
   }, [document.file_path, document.id])
 
   const totalFields = fields.length
@@ -94,6 +101,7 @@ export function SigningView({
       await queryClient.invalidateQueries({ queryKey: ["approve"] })
       router.push("/approve")
     } catch (e) {
+      console.error("[approve] submitSignature failed", e)
       toast.error((e as Error).message)
     }
   }

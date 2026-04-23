@@ -9,7 +9,7 @@ import { queryKeys } from "./query-keys"
 
 export function useUserValues(userId: string | null) {
   return useQuery({
-    queryKey: queryKeys.userValues.mine(),
+    queryKey: queryKeys.userValues.mine(userId ?? "anon"),
     enabled: !!userId,
     queryFn: async (): Promise<ApproveUserFieldValue[]> => {
       const supabase = createClient()

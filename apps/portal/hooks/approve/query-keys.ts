@@ -1,9 +1,12 @@
 export const queryKeys = {
   documents: {
     all: ["approve", "documents"] as const,
-    inbox: () => [...queryKeys.documents.all, "inbox"] as const,
-    signed: () => [...queryKeys.documents.all, "signed"] as const,
-    sent: () => [...queryKeys.documents.all, "sent"] as const,
+    inbox: (userId: string) =>
+      [...queryKeys.documents.all, "inbox", userId] as const,
+    signed: (userId: string) =>
+      [...queryKeys.documents.all, "signed", userId] as const,
+    sent: (userId: string) =>
+      [...queryKeys.documents.all, "sent", userId] as const,
     detail: (id: string) => [...queryKeys.documents.all, id] as const,
   },
   signers: {
@@ -16,7 +19,7 @@ export const queryKeys = {
   },
   userValues: {
     all: ["approve", "user-values"] as const,
-    mine: () => [...queryKeys.userValues.all, "me"] as const,
+    mine: (userId: string) => [...queryKeys.userValues.all, userId] as const,
   },
-  inboxCount: ["approve", "inbox-count"] as const,
+  inboxCount: (userId: string) => ["approve", "inbox-count", userId] as const,
 }

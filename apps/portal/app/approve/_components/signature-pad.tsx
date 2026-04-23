@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import SignatureCanvas from "react-signature-canvas"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -109,6 +110,10 @@ export function SignaturePad({
                 if (!f) return
                 const reader = new FileReader()
                 reader.onload = () => setUploaded(String(reader.result))
+                reader.onerror = () => {
+                  console.error("[approve] FileReader failed", reader.error)
+                  toast.error("檔案讀取失敗")
+                }
                 reader.readAsDataURL(f)
               }}
             />

@@ -51,6 +51,7 @@ export function DocumentDashboard() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
       toast.success("已刪除")
     } catch (e) {
+      console.error("[approve] deleteDocument failed", { documentId, e })
       toast.error((e as Error).message)
     }
   }

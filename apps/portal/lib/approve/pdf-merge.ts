@@ -11,7 +11,13 @@ export async function buildSignedPdf(
   pdfUrl: string,
   fields: ApproveField[]
 ): Promise<Uint8Array> {
-  const pdfBytes = await fetch(pdfUrl).then((r) => r.arrayBuffer())
+  const res = await fetch(pdfUrl)
+  if (!res.ok) {
+    throw new Error(
+      `PDF fetch failed (${res.status}); signed URL may have expired`
+    )
+  }
+  const pdfBytes = await res.arrayBuffer()
   const pdf = await PDFDocument.load(pdfBytes)
   const pages = pdf.getPages()
 
@@ -100,7 +106,9 @@ async function rasterizeDataUrl(url: string): Promise<Uint8Array> {
   const canvas = document.createElement("canvas")
   canvas.width = img.width || 400
   canvas.height = img.height || 200
-  canvas.getContext("2d")?.drawImage(img, 0, 0)
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("canvas 2d context unavailable")
+  ctx.drawImage(img, 0, 0)
   return canvasToPng(canvas)
 }
 

@@ -31,7 +31,8 @@ export async function uploadPdf(formData: FormData): Promise<void> {
     .eq("id", documentId)
     .eq("created_by", user.id)
     .maybeSingle()
-  if (docErr || !doc) throw new Error("document not found")
+  if (docErr) throw new Error(docErr.message)
+  if (!doc) throw new Error("document not found")
   if (doc.status !== "draft") throw new Error("only drafts can re-upload")
 
   const path = documentStoragePath(documentId)
@@ -65,57 +66,6 @@ export async function updateDocumentTitle(
   if (error) throw new Error(error.message)
 }
 
-export async function setSigners(
-  documentId: string,
-  signerIds: string[]
-): Promise<void> {
-  const user = await requireUser()
-  const supabase = await createClient()
-
-  const { data: doc } = await supabase
-    .from("approve_documents")
-    .select("id")
-    .eq("id", documentId)
-    .eq("created_by", user.id)
-    .eq("status", "draft")
-    .maybeSingle()
-  if (!doc) throw new Error("document not found or not editable")
-
-  const { data: existing } = await supabase
-    .from("approve_signers")
-    .select("signer_id")
-    .eq("document_id", documentId)
-  const existingIds = new Set((existing ?? []).map((r) => r.signer_id))
-  const desired = new Set(signerIds)
-
-  const toAdd = [...desired].filter((id) => !existingIds.has(id))
-  const toRemove = [...existingIds].filter((id) => !desired.has(id))
-
-  if (toRemove.length) {
-    await supabase
-      .from("approve_signers")
-      .delete()
-      .eq("document_id", documentId)
-      .in("signer_id", toRemove)
-    // Fields assigned to removed signers are orphaned until editor resolves;
-    // cascade by also deleting their fields to keep validation honest.
-    await supabase
-      .from("approve_fields")
-      .delete()
-      .eq("document_id", documentId)
-      .in("signer_id", toRemove)
-  }
-  if (toAdd.length) {
-    await supabase.from("approve_signers").insert(
-      toAdd.map((signer_id) => ({
-        document_id: documentId,
-        signer_id,
-      }))
-    )
-  }
-  revalidatePath(`/approve/new/${documentId}`)
-}
-
 export type UpsertFieldInput = {
   id: string
   documentId: string
@@ -132,14 +82,27 @@ export type UpsertFieldInput = {
 export async function upsertField(input: UpsertFieldInput): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
-  const { data: doc } = await supabase
+  const { data: doc, error: docErr } = await supabase
     .from("approve_documents")
     .select("id")
     .eq("id", input.documentId)
     .eq("created_by", user.id)
     .eq("status", "draft")
     .maybeSingle()
+  if (docErr) throw new Error(docErr.message)
   if (!doc) throw new Error("document not editable")
+
+  // Register the signer on the doc FIRST so a crash between the two writes
+  // never leaves a field referencing a signer that isn't in the inbox list.
+  if (input.signerId) {
+    const { error: signerErr } = await supabase
+      .from("approve_signers")
+      .upsert(
+        { document_id: input.documentId, signer_id: input.signerId },
+        { onConflict: "document_id,signer_id", ignoreDuplicates: true }
+      )
+    if (signerErr) throw new Error(signerErr.message)
+  }
 
   const { error } = await supabase.from("approve_fields").upsert({
     id: input.id,
@@ -154,17 +117,6 @@ export async function upsertField(input: UpsertFieldInput): Promise<void> {
     label: input.label ?? null,
   })
   if (error) throw new Error(error.message)
-
-  // If a signer just got assigned to a field, make sure they are registered
-  // on the document too (approve_signers is how inbox routing works).
-  if (input.signerId) {
-    await supabase
-      .from("approve_signers")
-      .upsert(
-        { document_id: input.documentId, signer_id: input.signerId },
-        { onConflict: "document_id,signer_id", ignoreDuplicates: true }
-      )
-  }
 }
 
 // Prune approve_signers rows that no longer have any field assigned to them.
@@ -172,39 +124,43 @@ export async function upsertField(input: UpsertFieldInput): Promise<void> {
 export async function syncSigners(documentId: string): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
-  const { data: doc } = await supabase
+  const { data: doc, error: docErr } = await supabase
     .from("approve_documents")
     .select("id")
     .eq("id", documentId)
     .eq("created_by", user.id)
     .eq("status", "draft")
     .maybeSingle()
+  if (docErr) throw new Error(docErr.message)
   if (!doc) return
 
-  const { data: fields } = await supabase
+  const { data: fields, error: fieldsErr } = await supabase
     .from("approve_fields")
     .select("signer_id")
     .eq("document_id", documentId)
     .not("signer_id", "is", null)
+  if (fieldsErr) throw new Error(fieldsErr.message)
   const stillUsed = new Set(
     (fields ?? []).map((f) => f.signer_id).filter((id): id is string => !!id)
   )
 
-  const { data: signers } = await supabase
+  const { data: signers, error: signersErr } = await supabase
     .from("approve_signers")
     .select("signer_id")
     .eq("document_id", documentId)
+  if (signersErr) throw new Error(signersErr.message)
 
   const toRemove = (signers ?? [])
     .map((s) => s.signer_id)
     .filter((id) => !stillUsed.has(id))
 
   if (toRemove.length) {
-    await supabase
+    const { error } = await supabase
       .from("approve_signers")
       .delete()
       .eq("document_id", documentId)
       .in("signer_id", toRemove)
+    if (error) throw new Error(error.message)
   }
 }
 
@@ -214,13 +170,14 @@ export async function deleteField(
 ): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
-  const { data: doc } = await supabase
+  const { data: doc, error: docErr } = await supabase
     .from("approve_documents")
     .select("id")
     .eq("id", documentId)
     .eq("created_by", user.id)
     .eq("status", "draft")
     .maybeSingle()
+  if (docErr) throw new Error(docErr.message)
   if (!doc) throw new Error("document not editable")
 
   const { error } = await supabase
@@ -234,7 +191,7 @@ export async function deleteField(
 export async function submitDocument(documentId: string): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
-  const [{ data: doc }, { data: fields }] = await Promise.all([
+  const [docRes, fieldsRes] = await Promise.all([
     supabase
       .from("approve_documents")
       .select("id,title,file_path,status,created_by")
@@ -243,6 +200,10 @@ export async function submitDocument(documentId: string): Promise<void> {
       .maybeSingle(),
     supabase.from("approve_fields").select("*").eq("document_id", documentId),
   ])
+  if (docRes.error) throw new Error(docRes.error.message)
+  if (fieldsRes.error) throw new Error(fieldsRes.error.message)
+  const doc = docRes.data
+  const fields = fieldsRes.data
   if (!doc) throw new Error("document not found")
   if (doc.status !== "draft") throw new Error("not a draft")
 
@@ -276,20 +237,22 @@ export async function submitSignature(
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { data: my } = await supabase
+  const { data: my, error: myErr } = await supabase
     .from("approve_signers")
     .select("id,status")
     .eq("document_id", documentId)
     .eq("signer_id", user.id)
     .maybeSingle()
+  if (myErr) throw new Error(myErr.message)
   if (!my) throw new Error("you are not a signer")
   if (my.status === "signed") throw new Error("already signed")
 
-  const { data: myFields } = await supabase
+  const { data: myFields, error: myFieldsErr } = await supabase
     .from("approve_fields")
     .select("id,category")
     .eq("document_id", documentId)
     .eq("signer_id", user.id)
+  if (myFieldsErr) throw new Error(myFieldsErr.message)
   if (!myFields || myFields.length === 0) {
     throw new Error("no fields assigned to you")
   }
@@ -303,11 +266,12 @@ export async function submitSignature(
   const now = new Date().toISOString()
   for (const f of myFields) {
     const v = byId.get(f.id)!
-    await supabase
+    const { error } = await supabase
       .from("approve_fields")
       .update({ value: v, signed_at: now })
       .eq("id", f.id)
       .eq("signer_id", user.id)
+    if (error) throw new Error(error.message)
   }
 
   // Persist predefined values for future pre-fill
@@ -320,26 +284,30 @@ export async function submitSignature(
       updated_at: now,
     }))
   if (upserts.length) {
-    await supabase
+    const { error } = await supabase
       .from("approve_user_field_values")
       .upsert(upserts, { onConflict: "user_id,category" })
+    if (error) throw new Error(error.message)
   }
 
-  await supabase
+  const { error: signerUpdateErr } = await supabase
     .from("approve_signers")
     .update({ status: "signed", signed_at: now })
     .eq("id", my.id)
+  if (signerUpdateErr) throw new Error(signerUpdateErr.message)
 
-  const { count } = await supabase
+  const { count, error: countErr } = await supabase
     .from("approve_signers")
     .select("id", { count: "exact", head: true })
     .eq("document_id", documentId)
     .eq("status", "pending")
+  if (countErr) throw new Error(countErr.message)
   if ((count ?? 0) === 0) {
-    await supabase
+    const { error: completeErr } = await supabase
       .from("approve_documents")
       .update({ status: "completed", completed_at: now })
       .eq("id", documentId)
+    if (completeErr) throw new Error(completeErr.message)
   }
 
   revalidatePath("/approve")

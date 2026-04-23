@@ -28,17 +28,16 @@ export default async function ViewPage({
   if (!doc) notFound()
 
   const isCreator = doc.created_by === user.id
-  let isSigner = false
   if (!isCreator) {
-    const { data: my } = await supabase
+    const { data: my, error: myErr } = await supabase
       .from("approve_signers")
       .select("status")
       .eq("document_id", id)
       .eq("signer_id", user.id)
       .maybeSingle()
+    if (myErr) throw new Error(myErr.message)
     if (!my) notFound()
     if (my.status === "pending") redirect(`/approve/sign/${id}`)
-    isSigner = true
   }
 
   const [{ data: signers }, { data: fields }] = await Promise.all([
@@ -91,7 +90,8 @@ export default async function ViewPage({
 
   const withProfile: (ApproveSigner & { profile: SignerProfile | null })[] =
     rows.map((row) => {
-      const m = enrich.get(row.profile?.email?.toLowerCase() ?? "")
+      const emailKey = row.profile?.email?.toLowerCase()
+      const m = emailKey ? enrich.get(emailKey) : undefined
       return {
         id: row.id,
         document_id: row.document_id,
@@ -116,7 +116,7 @@ export default async function ViewPage({
       document={doc as ApproveDocument}
       signers={withProfile}
       fields={(fields ?? []) as ApproveField[]}
-      viewerRole={isCreator ? "creator" : isSigner ? "signer" : "creator"}
+      viewerRole={isCreator ? "creator" : "signer"}
       viewerId={user.id}
     />
   )

@@ -53,7 +53,14 @@ export function DocumentView({
     supabase.storage
       .from(APPROVE_BUCKET)
       .createSignedUrl(documentStoragePath(document.id), 60 * 30)
-      .then(({ data }) => setSignedUrl(data?.signedUrl ?? null))
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[approve] createSignedUrl failed", error)
+          toast.error(error.message)
+          return
+        }
+        setSignedUrl(data?.signedUrl ?? null)
+      })
   }, [document.file_path, document.id])
 
   async function onDownload() {
@@ -65,6 +72,7 @@ export function DocumentView({
       const bytes = await buildSignedPdf(signedUrl, fields)
       downloadPdf(bytes, `${document.title || "approve"}.pdf`)
     } catch (e) {
+      console.error("[approve] download pdf failed", e)
       toast.error((e as Error).message)
     } finally {
       setDownloading(false)

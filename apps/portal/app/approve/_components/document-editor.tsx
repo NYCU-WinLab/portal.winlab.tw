@@ -133,6 +133,10 @@ export function DocumentEditor({
             label: field.label,
           })
         } catch (e) {
+          console.error("[approve] scheduleSave failed", {
+            fieldId: field.id,
+            e,
+          })
           toast.error((e as Error).message)
         }
       }, 500)
@@ -151,13 +155,14 @@ export function DocumentEditor({
   }
 
   async function onReassign(id: string, signerId: string) {
-    setFields((prev) =>
+    const prev = fields
+    const current = prev.find((f) => f.id === id)
+    if (!current) return
+    setFields(
       prev.map((f) => (f.id === id ? { ...f, signer_id: signerId } : f))
     )
     setLastSignerId(signerId)
     try {
-      const current = fields.find((f) => f.id === id)
-      if (!current) return
       await upsertField({
         id,
         documentId,
@@ -172,6 +177,8 @@ export function DocumentEditor({
       })
       await syncSigners(documentId)
     } catch (e) {
+      console.error("[approve] onReassign failed", { fieldId: id, e })
+      setFields(prev)
       toast.error((e as Error).message)
     }
   }
@@ -183,6 +190,7 @@ export function DocumentEditor({
       await deleteField(documentId, id)
       await syncSigners(documentId)
     } catch (e) {
+      console.error("[approve] deleteField failed", { fieldId: id, e })
       setFields(prev)
       toast.error((e as Error).message)
     }
@@ -245,6 +253,7 @@ export function DocumentEditor({
       await queryClient.invalidateQueries({ queryKey: ["approve"] })
       router.push("/approve")
     } catch (e) {
+      console.error("[approve] submitDocument failed", e)
       toast.error((e as Error).message)
     }
   }
@@ -315,7 +324,14 @@ function useSignedUrl(filePath: string | null, documentId: string) {
     supabase.storage
       .from(APPROVE_BUCKET)
       .createSignedUrl(documentStoragePath(documentId), 60 * 30)
-      .then(({ data }) => setUrl(data?.signedUrl ?? null))
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[approve] createSignedUrl failed", error)
+          toast.error(error.message)
+          return
+        }
+        setUrl(data?.signedUrl ?? null)
+      })
   }, [filePath, documentId])
   return url
 }

@@ -8,7 +8,7 @@ import { queryKeys } from "./query-keys"
 
 export function useInboxCount(userId: string | null) {
   return useQuery({
-    queryKey: queryKeys.inboxCount,
+    queryKey: queryKeys.inboxCount(userId ?? "anon"),
     enabled: !!userId,
     queryFn: async (): Promise<number> => {
       const supabase = createClient()

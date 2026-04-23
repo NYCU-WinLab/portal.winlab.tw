@@ -15,7 +15,7 @@ type InboxRow = ApproveSigner & {
 
 export function useInboxDocuments(userId: string | null) {
   return useQuery({
-    queryKey: queryKeys.documents.inbox(),
+    queryKey: queryKeys.documents.inbox(userId ?? "anon"),
     enabled: !!userId,
     queryFn: async (): Promise<InboxRow[]> => {
       const supabase = createClient()
@@ -39,7 +39,7 @@ export function useInboxDocuments(userId: string | null) {
 
 export function useSignedDocuments(userId: string | null) {
   return useQuery({
-    queryKey: queryKeys.documents.signed(),
+    queryKey: queryKeys.documents.signed(userId ?? "anon"),
     enabled: !!userId,
     queryFn: async (): Promise<InboxRow[]> => {
       const supabase = createClient()
@@ -63,7 +63,7 @@ export function useSignedDocuments(userId: string | null) {
 
 export function useSentDocuments(userId: string | null) {
   return useQuery({
-    queryKey: queryKeys.documents.sent(),
+    queryKey: queryKeys.documents.sent(userId ?? "anon"),
     enabled: !!userId,
     queryFn: async (): Promise<ApproveDocument[]> => {
       const supabase = createClient()
