@@ -60,7 +60,6 @@ export function DocumentEditor({
   const [signerProfiles, setSignerProfiles] = useState(initialSignerProfiles)
   const [fields, setFields] = useState(initialFields)
   const [page, setPage] = useState(1)
-  const [palette, setPalette] = useState<FieldCategory | null>(null)
 
   const router = useRouter()
 
@@ -131,30 +130,23 @@ export function DocumentEditor({
     }
   }
 
-  function onCanvasClick(
-    e: React.MouseEvent,
-    size: { width: number; height: number }
-  ) {
-    if (!palette) return
+  function onPlaceField(category: FieldCategory) {
     if (signerIds.length === 0) {
       toast.error("先加 signer")
       return
     }
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const def = getCategoryDef(palette)
-    const nx = (e.clientX - rect.left) / size.width
-    const ny = (e.clientY - rect.top) / size.height
+    const def = getCategoryDef(category)
     const newField: ApproveField = {
       id: crypto.randomUUID(),
       document_id: documentId,
       signer_id: signerIds[0]!,
       page,
-      x: clamp01(nx - def.defaultSize.width / 2),
-      y: clamp01(ny - def.defaultSize.height / 2),
+      x: clamp01(0.5 - def.defaultSize.width / 2),
+      y: clamp01(0.5 - def.defaultSize.height / 2),
       width: def.defaultSize.width,
       height: def.defaultSize.height,
-      category: palette,
-      label: palette === "other" ? "請填寫" : null,
+      category,
+      label: category === "other" ? "請填寫" : null,
       value: null,
       signed_at: null,
       created_at: new Date().toISOString(),
@@ -274,22 +266,16 @@ export function DocumentEditor({
         <UploadZone documentId={documentId} onUploaded={setFilePath} />
       ) : (
         <div className="flex flex-col gap-3">
-          <FieldPalette activeCategory={palette} onPick={setPalette} />
+          <FieldPalette onPlace={onPlaceField} />
           {signedUrl ? (
             <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
               {(size) => (
-                <div
-                  className="h-full w-full"
-                  onClick={(e) => onCanvasClick(e, size)}
-                  style={{ cursor: palette ? "crosshair" : "default" }}
-                >
-                  <FieldOverlay
-                    fields={fieldsOnPage}
-                    pageSize={size}
-                    signers={signerProfiles}
-                    handlers={{ onMove, onReassign, onRemove }}
-                  />
-                </div>
+                <FieldOverlay
+                  fields={fieldsOnPage}
+                  pageSize={size}
+                  signers={signerProfiles}
+                  handlers={{ onMove, onReassign, onRemove }}
+                />
               )}
             </PdfCanvas>
           ) : (

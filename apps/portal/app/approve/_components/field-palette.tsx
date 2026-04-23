@@ -8,24 +8,21 @@ import {
 } from "@/lib/approve/field-categories"
 
 export function FieldPalette({
-  activeCategory,
-  onPick,
+  onPlace,
 }: {
-  activeCategory: CategoryDef["id"] | null
-  onPick: (id: CategoryDef["id"] | null) => void
+  onPlace: (id: CategoryDef["id"]) => void
 }) {
   return (
     <div className="flex flex-wrap gap-1">
       {FIELD_CATEGORIES.map((c) => {
         const Icon = c.icon
-        const active = activeCategory === c.id
         return (
           <Button
             key={c.id}
             type="button"
-            variant={active ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => onPick(active ? null : c.id)}
+            onClick={() => onPlace(c.id)}
           >
             <Icon className="size-4" />
             {c.label}
