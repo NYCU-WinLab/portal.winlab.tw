@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -16,8 +17,15 @@ import { isPredefined } from "@/lib/approve/field-categories"
 
 import { submitSignature, type SignatureValue } from "../actions"
 
-import { PdfCanvas } from "./pdf-canvas"
 import { SigningField } from "./signing-field"
+
+const PdfCanvas = dynamic(
+  () => import("./pdf-canvas").then((m) => ({ default: m.PdfCanvas })),
+  {
+    ssr: false,
+    loading: () => <p className="text-muted-foreground">載入 PDF...</p>,
+  }
+)
 
 export function SigningView({
   document,

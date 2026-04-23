@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -24,11 +25,20 @@ import {
 
 import { FieldOverlay } from "./field-overlay"
 import { FieldPalette } from "./field-palette"
-import { PdfCanvas } from "./pdf-canvas"
 import { SignerPicker } from "./signer-picker"
 import { ConfirmDialog } from "./confirm-dialog"
 import { TitleInput } from "./title-input"
 import { UploadZone } from "./upload-zone"
+
+// pdfjs uses Promise.withResolvers (Node 22+). Loading client-side only so
+// SSR on Node 20 doesn't crash.
+const PdfCanvas = dynamic(
+  () => import("./pdf-canvas").then((m) => ({ default: m.PdfCanvas })),
+  {
+    ssr: false,
+    loading: () => <p className="text-muted-foreground">載入 PDF...</p>,
+  }
+)
 
 export function DocumentEditor({
   documentId,

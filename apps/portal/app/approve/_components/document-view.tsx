@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 
 import { createClient } from "@/lib/supabase/client"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
@@ -11,9 +12,16 @@ import type {
   SignerProfile,
 } from "@/lib/approve/types"
 
-import { PdfCanvas } from "./pdf-canvas"
 import { SignerProgress } from "./signer-progress"
 import { signerColor } from "./signer-badge"
+
+const PdfCanvas = dynamic(
+  () => import("./pdf-canvas").then((m) => ({ default: m.PdfCanvas })),
+  {
+    ssr: false,
+    loading: () => <p className="text-muted-foreground">載入 PDF...</p>,
+  }
+)
 
 export function DocumentView({
   document,
