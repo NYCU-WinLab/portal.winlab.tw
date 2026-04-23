@@ -22,12 +22,12 @@ export type FieldOverlayHandlers = {
 export function FieldOverlay({
   fields,
   pageSize,
-  signers,
+  candidates,
   handlers,
 }: {
   fields: ApproveField[]
   pageSize: PageSize
-  signers: SignerProfile[]
+  candidates: SignerProfile[]
   handlers: FieldOverlayHandlers
 }) {
   return (
@@ -37,7 +37,7 @@ export function FieldOverlay({
           key={f.id}
           field={f}
           pageSize={pageSize}
-          signers={signers}
+          candidates={candidates}
           handlers={handlers}
         />
       ))}
@@ -48,12 +48,12 @@ export function FieldOverlay({
 function FieldBox({
   field,
   pageSize,
-  signers,
+  candidates,
   handlers,
 }: {
   field: ApproveField
   pageSize: PageSize
-  signers: SignerProfile[]
+  candidates: SignerProfile[]
   handlers: FieldOverlayHandlers
 }) {
   const def = getCategoryDef(field.category)
@@ -69,6 +69,7 @@ function FieldBox({
         y: field.y * pageSize.height,
       }}
       bounds="parent"
+      cancel=".no-drag"
       onDragStop={(_e, d) => {
         handlers.onMove(field.id, {
           x: clamp01(d.x / pageSize.width),
@@ -87,12 +88,14 @@ function FieldBox({
       style={{ borderColor: signerColor(field.signer_id) }}
     >
       <div className="relative h-full w-full text-[10px]">
-        <span className="px-1">{def.label}</span>
-        <SignerBadge
-          signers={signers}
-          currentId={field.signer_id}
-          onChange={(id) => handlers.onReassign(field.id, id)}
-        />
+        <span className="px-1 select-none">{def.label}</span>
+        <div className="no-drag">
+          <SignerBadge
+            candidates={candidates}
+            currentId={field.signer_id}
+            onChange={(id) => handlers.onReassign(field.id, id)}
+          />
+        </div>
         <button
           type="button"
           aria-label="remove"
@@ -100,7 +103,7 @@ function FieldBox({
             e.stopPropagation()
             handlers.onRemove(field.id)
           }}
-          className="absolute -right-2 -bottom-2 rounded-full border bg-background p-0.5"
+          className="no-drag absolute -right-2 -bottom-2 rounded-full border bg-background p-0.5"
         >
           <IconX className="size-3" />
         </button>

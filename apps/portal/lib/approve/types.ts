@@ -34,7 +34,7 @@ export type ApproveSigner = {
 export type ApproveField = {
   id: string
   document_id: string
-  signer_id: string
+  signer_id: string | null
   page: number
   x: number
   y: number

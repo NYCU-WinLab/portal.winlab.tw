@@ -93,7 +93,7 @@ export function DocumentView({
                     )
                   ) : (
                     <span className="block px-1 text-[10px] text-muted-foreground">
-                      待 {nameBySigner.get(f.signer_id)} 簽
+                      待 {f.signer_id ? nameBySigner.get(f.signer_id) : "?"} 簽
                     </span>
                   )}
                 </div>

@@ -120,7 +120,7 @@ export async function setSigners(
 export type UpsertFieldInput = {
   id: string
   documentId: string
-  signerId: string
+  signerId: string | null
   page: number
   x: number
   y: number
@@ -155,6 +155,58 @@ export async function upsertField(input: UpsertFieldInput): Promise<void> {
     label: input.label ?? null,
   })
   if (error) throw new Error(error.message)
+
+  // If a signer just got assigned to a field, make sure they are registered
+  // on the document too (approve_signers is how inbox routing works).
+  if (input.signerId) {
+    await supabase
+      .from("approve_signers")
+      .upsert(
+        { document_id: input.documentId, signer_id: input.signerId },
+        { onConflict: "document_id,signer_id", ignoreDuplicates: true }
+      )
+  }
+}
+
+// Prune approve_signers rows that no longer have any field assigned to them.
+// Called after a field's signer is reassigned or a field is removed.
+export async function syncSigners(documentId: string): Promise<void> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { data: doc } = await supabase
+    .from("approve_documents")
+    .select("id")
+    .eq("id", documentId)
+    .eq("created_by", user.id)
+    .eq("status", "draft")
+    .maybeSingle()
+  if (!doc) return
+
+  const { data: fields } = await supabase
+    .from("approve_fields")
+    .select("signer_id")
+    .eq("document_id", documentId)
+    .not("signer_id", "is", null)
+  const stillUsed = new Set(
+    (fields ?? []).map((f) => f.signer_id).filter((id): id is string => !!id)
+  )
+
+  const { data: signers } = await supabase
+    .from("approve_signers")
+    .select("signer_id")
+    .eq("document_id", documentId)
+
+  const toRemove = (signers ?? [])
+    .map((s) => s.signer_id)
+    .filter((id) => !stillUsed.has(id))
+
+  if (toRemove.length) {
+    await supabase
+      .from("approve_signers")
+      .delete()
+      .eq("document_id", documentId)
+      .in("signer_id", toRemove)
+  }
 }
 
 export async function deleteField(
@@ -183,27 +235,21 @@ export async function deleteField(
 export async function submitDocument(documentId: string): Promise<void> {
   const user = await requireUser()
   const supabase = await createClient()
-  const [{ data: doc }, { data: signers }, { data: fields }] =
-    await Promise.all([
-      supabase
-        .from("approve_documents")
-        .select("id,title,file_path,status,created_by")
-        .eq("id", documentId)
-        .eq("created_by", user.id)
-        .maybeSingle(),
-      supabase
-        .from("approve_signers")
-        .select("*")
-        .eq("document_id", documentId),
-      supabase.from("approve_fields").select("*").eq("document_id", documentId),
-    ])
+  const [{ data: doc }, { data: fields }] = await Promise.all([
+    supabase
+      .from("approve_documents")
+      .select("id,title,file_path,status,created_by")
+      .eq("id", documentId)
+      .eq("created_by", user.id)
+      .maybeSingle(),
+    supabase.from("approve_fields").select("*").eq("document_id", documentId),
+  ])
   if (!doc) throw new Error("document not found")
   if (doc.status !== "draft") throw new Error("not a draft")
 
   const v = validateForSubmit({
     title: doc.title,
     filePath: doc.file_path,
-    signers: (signers ?? []) as never,
     fields: (fields ?? []) as never,
   })
   if (!v.ok) throw new Error(v.reason)

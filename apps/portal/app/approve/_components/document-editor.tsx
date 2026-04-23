@@ -17,16 +17,16 @@ import type {
 import { getCategoryDef } from "@/lib/approve/field-categories"
 
 import {
-  deleteField,
   deleteDocument,
+  deleteField,
   submitDocument,
+  syncSigners,
   upsertField,
 } from "../actions"
 
+import { ConfirmDialog } from "./confirm-dialog"
 import { FieldOverlay } from "./field-overlay"
 import { FieldPalette } from "./field-palette"
-import { SignerPicker } from "./signer-picker"
-import { ConfirmDialog } from "./confirm-dialog"
 import { TitleInput } from "./title-input"
 import { UploadZone } from "./upload-zone"
 
@@ -44,28 +44,62 @@ export function DocumentEditor({
   documentId,
   initialTitle,
   initialFilePath,
-  initialSignerIds,
   initialFields,
-  initialSignerProfiles,
 }: {
   documentId: string
   initialTitle: string
   initialFilePath: string | null
-  initialSignerIds: string[]
   initialFields: ApproveField[]
-  initialSignerProfiles: SignerProfile[]
 }) {
   const [filePath, setFilePath] = useState(initialFilePath)
-  const [signerIds, setSignerIds] = useState(initialSignerIds)
-  const [signerProfiles, setSignerProfiles] = useState(initialSignerProfiles)
   const [fields, setFields] = useState(initialFields)
   const [page, setPage] = useState(1)
+  const [candidates, setCandidates] = useState<SignerProfile[]>([])
 
   const router = useRouter()
-
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
-
   const signedUrl = useSignedUrl(filePath, documentId)
+
+  // Load all users once for the SignerBadge popover.
+  useEffect(() => {
+    ;(async () => {
+      const supabase = createClient()
+      const { data: profiles, error } = await supabase
+        .from("user_profiles")
+        .select("id, name, email")
+        .order("name", { ascending: true, nullsFirst: false })
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+      const emails = (profiles ?? [])
+        .map((p) => p.email?.toLowerCase())
+        .filter((e): e is string => !!e)
+      const avatarByEmail = new Map<string, string | null>()
+      const roleByEmail = new Map<string, string | null>()
+      if (emails.length) {
+        const { data: members } = await supabase
+          .from("members")
+          .select("email, avatar_url, role")
+          .in("email", emails)
+        for (const m of members ?? []) {
+          if (m.email) {
+            avatarByEmail.set(m.email.toLowerCase(), m.avatar_url)
+            roleByEmail.set(m.email.toLowerCase(), m.role)
+          }
+        }
+      }
+      setCandidates(
+        (profiles ?? []).map((p) => ({
+          id: p.id,
+          name: p.name ?? p.email ?? "Unknown",
+          email: p.email ?? null,
+          avatar_url: avatarByEmail.get(p.email?.toLowerCase() ?? "") ?? null,
+          role: roleByEmail.get(p.email?.toLowerCase() ?? "") ?? null,
+        }))
+      )
+    })()
+  }, [])
 
   const fieldsOnPage = useMemo(
     () => fields.filter((f) => f.page === page),
@@ -108,15 +142,29 @@ export function DocumentEditor({
     })
   }
 
-  function onReassign(id: string, signerId: string) {
-    setFields((prev) => {
-      const next = prev.map((f) =>
-        f.id === id ? { ...f, signer_id: signerId } : f
-      )
-      const moved = next.find((f) => f.id === id)
-      if (moved) scheduleSave(moved)
-      return next
-    })
+  async function onReassign(id: string, signerId: string) {
+    setFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, signer_id: signerId } : f))
+    )
+    try {
+      const current = fields.find((f) => f.id === id)
+      if (!current) return
+      await upsertField({
+        id,
+        documentId,
+        signerId,
+        page: current.page,
+        x: current.x,
+        y: current.y,
+        width: current.width,
+        height: current.height,
+        category: current.category,
+        label: current.label,
+      })
+      await syncSigners(documentId)
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
   }
 
   async function onRemove(id: string) {
@@ -124,6 +172,7 @@ export function DocumentEditor({
     setFields(prev.filter((f) => f.id !== id))
     try {
       await deleteField(documentId, id)
+      await syncSigners(documentId)
     } catch (e) {
       setFields(prev)
       toast.error((e as Error).message)
@@ -131,15 +180,11 @@ export function DocumentEditor({
   }
 
   function onPlaceField(category: FieldCategory) {
-    if (signerIds.length === 0) {
-      toast.error("先加 signer")
-      return
-    }
     const def = getCategoryDef(category)
     const newField: ApproveField = {
       id: crypto.randomUUID(),
       document_id: documentId,
-      signer_id: signerIds[0]!,
+      signer_id: null,
       page,
       x: clamp01(0.5 - def.defaultSize.width / 2),
       y: clamp01(0.5 - def.defaultSize.height / 2),
@@ -160,14 +205,6 @@ export function DocumentEditor({
     const v = validateForSubmit({
       title: initialTitle,
       filePath,
-      signers: signerIds.map((id) => ({
-        id: "",
-        document_id: documentId,
-        signer_id: id,
-        status: "pending" as const,
-        signed_at: null,
-        created_at: "",
-      })),
       fields,
     })
     if (!v.ok) {
@@ -207,61 +244,6 @@ export function DocumentEditor({
         </div>
       </div>
 
-      <div>
-        <div className="mb-1 text-xs text-muted-foreground">Signers</div>
-        <SignerPicker
-          documentId={documentId}
-          initialSignerIds={signerIds}
-          onChange={async (ids) => {
-            setSignerIds(ids)
-            if (ids.length === 0) {
-              setSignerProfiles([])
-              return
-            }
-            // Refresh profiles list for overlay badges. members ↔ user_profiles
-            // has no FK so we can't resource-embed; do two queries + left join
-            // by email in JS.
-            const supabase = createClient()
-            const { data: profiles } = await supabase
-              .from("user_profiles")
-              .select("id, name, email")
-              .in("id", ids)
-            const emails = (profiles ?? [])
-              .map((p) => p.email?.toLowerCase())
-              .filter((e): e is string => !!e)
-            const enrich = new Map<
-              string,
-              { avatar_url: string | null; role: string | null }
-            >()
-            if (emails.length) {
-              const { data: members } = await supabase
-                .from("members")
-                .select("email, avatar_url, role")
-                .in("email", emails)
-              for (const m of members ?? []) {
-                if (m.email)
-                  enrich.set(m.email.toLowerCase(), {
-                    avatar_url: m.avatar_url,
-                    role: m.role,
-                  })
-              }
-            }
-            setSignerProfiles(
-              (profiles ?? []).map((p) => {
-                const m = enrich.get(p.email?.toLowerCase() ?? "")
-                return {
-                  id: p.id,
-                  name: p.name ?? p.email ?? "Unknown",
-                  email: p.email ?? null,
-                  avatar_url: m?.avatar_url ?? null,
-                  role: m?.role ?? null,
-                }
-              })
-            )
-          }}
-        />
-      </div>
-
       {!filePath ? (
         <UploadZone documentId={documentId} onUploaded={setFilePath} />
       ) : (
@@ -273,7 +255,7 @@ export function DocumentEditor({
                 <FieldOverlay
                   fields={fieldsOnPage}
                   pageSize={size}
-                  signers={signerProfiles}
+                  candidates={candidates}
                   handlers={{ onMove, onReassign, onRemove }}
                 />
               )}
