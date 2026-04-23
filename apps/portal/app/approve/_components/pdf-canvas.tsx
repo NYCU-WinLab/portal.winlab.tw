@@ -1,0 +1,89 @@
+"use client"
+
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Document, Page } from "react-pdf"
+
+import "react-pdf/dist/Page/AnnotationLayer.css"
+import "react-pdf/dist/Page/TextLayer.css"
+
+import "@/lib/approve/pdf" // side-effect: worker registration
+
+import { Button } from "@workspace/ui/components/button"
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+
+export type PageSize = { width: number; height: number }
+
+export function PdfCanvas({
+  fileUrl,
+  page,
+  onPageChange,
+  onPageSize,
+  children,
+}: {
+  fileUrl: string
+  page: number
+  onPageChange: (next: number) => void
+  onPageSize?: (size: PageSize) => void
+  children?: (size: PageSize) => ReactNode
+}) {
+  const [numPages, setNumPages] = useState(0)
+  const [size, setSize] = useState<PageSize | null>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (size) onPageSize?.(size)
+  }, [size, onPageSize])
+
+  return (
+    <div className="space-y-2">
+      <div
+        ref={pageRef}
+        className="relative mx-auto w-fit rounded border bg-background"
+      >
+        <Document
+          file={fileUrl}
+          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+        >
+          <Page
+            pageNumber={page}
+            width={720}
+            onLoadSuccess={({ width, height }) => setSize({ width, height })}
+          />
+        </Document>
+        {size && children ? (
+          <div className="pointer-events-none absolute inset-0">
+            <div className="pointer-events-auto h-full w-full">
+              {children(size)}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-center gap-3 text-sm">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <IconChevronLeft className="size-4" />
+          上一頁
+        </Button>
+        <span className="text-muted-foreground tabular-nums">
+          {page} / {numPages || "—"}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={page >= numPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          下一頁
+          <IconChevronRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
