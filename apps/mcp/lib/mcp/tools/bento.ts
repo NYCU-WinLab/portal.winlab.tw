@@ -274,4 +274,60 @@ export function registerBentoTools(
       return ok({ removed: menu_item_id })
     }
   )
+
+  server.tool(
+    "bento_update_restaurant",
+    "Patch a restaurant (bento_menus) row. Use for fixing a typo in name / phone / google_map_link, or changing the additional options list. Pass only the fields you want to change.",
+    {
+      restaurant_id: z.string().uuid(),
+      name: z.string().min(1).optional(),
+      phone: z.string().min(1).optional().describe("Digits only, no dashes."),
+      google_map_link: z
+        .string()
+        .url()
+        .nullable()
+        .optional()
+        .describe("Pass null to clear."),
+      additional: z
+        .array(z.string())
+        .nullable()
+        .optional()
+        .describe(
+          "Order-time options for every item. Pass null or [] to clear."
+        ),
+    },
+    async ({ restaurant_id, name, phone, google_map_link, additional }) => {
+      const patch: Record<string, unknown> = {}
+      if (name !== undefined) patch.name = name
+      if (phone !== undefined) patch.phone = phone
+      if (google_map_link !== undefined) patch.google_map_link = google_map_link
+      if (additional !== undefined)
+        patch.additional =
+          additional && additional.length > 0 ? additional : null
+      if (Object.keys(patch).length === 0) return err("No fields to update")
+
+      const { data, error } = await supabase
+        .from("bento_menus")
+        .update(patch)
+        .eq("id", restaurant_id)
+        .select()
+        .single()
+      if (error) return err(error.message)
+      return ok(data)
+    }
+  )
+
+  server.tool(
+    "bento_delete_restaurant",
+    "Delete a restaurant (bento_menus row). WARNING: this cascades to menu items and historical orders depending on FK rules — verify with bento_get_order / bento_list_restaurants first. Intended for cleaning up mis-created restaurants, not for retiring ones with real order history.",
+    { restaurant_id: z.string().uuid() },
+    async ({ restaurant_id }) => {
+      const { error } = await supabase
+        .from("bento_menus")
+        .delete()
+        .eq("id", restaurant_id)
+      if (error) return err(error.message)
+      return ok({ removed: restaurant_id })
+    }
+  )
 }
