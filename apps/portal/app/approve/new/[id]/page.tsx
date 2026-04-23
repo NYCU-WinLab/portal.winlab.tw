@@ -13,20 +13,26 @@ export default async function EditDraftPage({
   const { id } = await params
   const user = (await getCurrentUser())!
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data: doc } = await supabase
     .from("approve_documents")
     .select("*")
     .eq("id", id)
     .eq("created_by", user.id)
     .maybeSingle()
-  if (!data) notFound()
-  if (data.status !== "draft") notFound()
+  if (!doc) notFound()
+  if (doc.status !== "draft") notFound()
+
+  const { data: signers } = await supabase
+    .from("approve_signers")
+    .select("signer_id")
+    .eq("document_id", id)
 
   return (
     <DocumentEditor
       documentId={id}
-      initialTitle={data.title}
-      initialFilePath={data.file_path}
+      initialTitle={doc.title}
+      initialFilePath={doc.file_path}
+      initialSignerIds={(signers ?? []).map((s) => s.signer_id)}
     />
   )
 }
