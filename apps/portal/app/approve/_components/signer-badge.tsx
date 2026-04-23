@@ -82,6 +82,7 @@ export function SignerBadge({
               {candidates.map((c) => (
                 <CommandItem
                   key={c.id}
+                  value={`${c.name} ${c.email ?? ""}`}
                   onSelect={() => {
                     onChange(c.id)
                     setOpen(false)
@@ -91,7 +92,14 @@ export function SignerBadge({
                     <AvatarImage src={c.avatar_url ?? undefined} />
                     <AvatarFallback>{c.name.slice(0, 1)}</AvatarFallback>
                   </Avatar>
-                  <span>{c.name}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{c.name}</span>
+                    {c.email && (
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        {c.email}
+                      </span>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
