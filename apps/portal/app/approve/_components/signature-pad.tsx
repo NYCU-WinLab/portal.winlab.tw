@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import SignatureCanvas from "react-signature-canvas"
 
 import { Button } from "@workspace/ui/components/button"
@@ -30,8 +30,25 @@ export function SignaturePad({
 }) {
   const [open, setOpen] = useState(false)
   const canvasRef = useRef<SignatureCanvas | null>(null)
+  const canvasBoxRef = useRef<HTMLDivElement | null>(null)
+  const [canvasWidth, setCanvasWidth] = useState(400)
   const [uploaded, setUploaded] = useState<string | null>(null)
   const [tab, setTab] = useState<"draw" | "upload">("draw")
+
+  // Canvas attribute width is a pixel buffer, not CSS. Sync to container
+  // width so it never overflows the dialog.
+  useEffect(() => {
+    if (!open || tab !== "draw") return
+    const el = canvasBoxRef.current
+    if (!el) return
+    setCanvasWidth(Math.max(100, Math.floor(el.clientWidth)))
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width
+      if (w) setCanvasWidth(Math.max(100, Math.floor(w)))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open, tab])
 
   function confirm() {
     let dataUrl: string | null = null
@@ -60,13 +77,17 @@ export function SignaturePad({
             <TabsTrigger value="upload">上傳</TabsTrigger>
           </TabsList>
           <TabsContent value="draw" className="space-y-2">
-            <div className="overflow-hidden rounded border bg-background">
+            <div
+              ref={canvasBoxRef}
+              className="overflow-hidden rounded border bg-background"
+            >
               <SignatureCanvas
+                key={canvasWidth}
                 ref={canvasRef}
                 canvasProps={{
-                  width: 440,
+                  width: canvasWidth,
                   height: 180,
-                  className: "block max-w-full",
+                  className: "block",
                 }}
               />
             </div>
