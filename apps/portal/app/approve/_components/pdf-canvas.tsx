@@ -35,12 +35,14 @@ export function PdfCanvas({
   }, [size, onPageSize])
 
   // Responsive width: track the outer container, cap at 900 for huge screens.
+  // Subtract 2 for the container's 1px border on each side so the PDF never
+  // paints over the right border.
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
     const update = () => {
       const w = el.clientWidth
-      if (w > 0) setPageWidth(Math.min(Math.floor(w), 900))
+      if (w > 0) setPageWidth(Math.max(100, Math.min(Math.floor(w) - 2, 900)))
     }
     update()
     const ro = new ResizeObserver(update)
@@ -51,8 +53,8 @@ export function PdfCanvas({
   return (
     <div ref={rootRef} className="flex flex-col gap-2">
       <div
-        className="relative mx-auto w-fit rounded border bg-background"
-        style={{ maxWidth: "100%" }}
+        className="relative mx-auto overflow-hidden rounded border bg-background"
+        style={{ width: pageWidth + 2, maxWidth: "100%" }}
       >
         <Document
           file={fileUrl}
