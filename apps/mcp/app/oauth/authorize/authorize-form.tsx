@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@workspace/ui/components/button"
+import { useState } from "react"
 
 import { createClient } from "@/lib/supabase/browser"
 
@@ -19,23 +20,41 @@ export function AuthorizeForm({
   resource,
   state,
 }: AuthorizeFormProps) {
-  async function onClick() {
-    const supabase = createClient()
-    // MCP params piggyback on the callback URL so they survive the Keycloak
-    // round-trip. PKCE verifier for the Supabase exchange is cookie-stored
-    // by the browser client.
-    const callback = new URL("/oauth/callback", window.location.origin)
-    callback.searchParams.set("mcp_client_id", clientId)
-    callback.searchParams.set("mcp_redirect_uri", redirectUri)
-    callback.searchParams.set("mcp_code_challenge", codeChallenge)
-    if (state) callback.searchParams.set("mcp_state", state)
-    if (resource) callback.searchParams.set("mcp_resource", resource)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
+  async function onClick() {
+    setLoading(true)
+    setError(null)
+
+    // Stash MCP params server-side first so redirectTo stays clean —
+    // Supabase rejects redirectTo URLs with query strings when they don't
+    // exactly match the allowlist entry.
+    const prepared = await fetch("/oauth/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        code_challenge: codeChallenge,
+        state,
+        resource,
+      }),
+    })
+
+    if (!prepared.ok) {
+      const body = await prepared.json().catch(() => ({}))
+      setError(body.error_description ?? "Failed to prepare authorization")
+      setLoading(false)
+      return
+    }
+
+    const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "keycloak",
       options: {
         scopes: "openid",
-        redirectTo: callback.toString(),
+        redirectTo: `${window.location.origin}/oauth/callback`,
       },
     })
   }
@@ -48,9 +67,15 @@ export function AuthorizeForm({
         portal data.
       </p>
 
-      <Button onClick={onClick} className="w-full">
-        Continue with Keycloak
+      <Button onClick={onClick} disabled={loading} className="w-full">
+        {loading ? "Redirecting…" : "Continue with Keycloak"}
       </Button>
+
+      {error ? (
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       <dl className="mt-8 space-y-1 text-xs text-muted-foreground">
         <div className="flex gap-2">
