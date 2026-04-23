@@ -6,7 +6,15 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"],
-      "env": ["NODE_ENV", "REDIS_URL"]
+      "env": [
+        "NODE_ENV",
+        "REDIS_URL",
+        "NEXT_PUBLIC_BASE_URL",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -20,7 +28,15 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["NODE_ENV", "REDIS_URL"]
+      "env": [
+        "NODE_ENV",
+        "REDIS_URL",
+        "NEXT_PUBLIC_BASE_URL",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
     }
   }
 }

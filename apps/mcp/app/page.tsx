@@ -4,19 +4,21 @@ export default function Home() {
       <h1 className="mb-4 text-2xl">WinLab MCP</h1>
       <p className="mb-8 text-sm text-muted-foreground">
         Model Context Protocol server — lets agents reach WinLab portal apps
-        (bento, leave, approve, profile) through a single endpoint.
+        (bento, leave, approve, profile) through one authenticated endpoint.
       </p>
       <div className="space-y-2 text-sm">
         <div>
-          <span className="text-muted-foreground">Streamable HTTP:</span>{" "}
-          <code>/mcp</code>
+          <span className="text-muted-foreground">MCP endpoint:</span>{" "}
+          <code>POST /mcp</code>
         </div>
         <div>
-          <span className="text-muted-foreground">SSE:</span> <code>/sse</code>
+          <span className="text-muted-foreground">Sign in via:</span> Keycloak
+          (through Supabase OIDC)
         </div>
       </div>
       <p className="mt-12 text-xs text-muted-foreground">
-        Status: scaffold only. Tools land in follow-up PRs.
+        Add this server in Claude Code, Cursor, or any MCP client. First use
+        kicks off an OAuth flow in your browser.
       </p>
     </main>
   )
