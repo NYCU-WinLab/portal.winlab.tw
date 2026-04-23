@@ -17,7 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
-import { IconDots, IconPlus } from "@tabler/icons-react"
+import { IconDots } from "@tabler/icons-react"
 import Link from "next/link"
 
 import { useAuth } from "@/hooks/use-auth"
@@ -66,18 +66,20 @@ export function DocumentDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Approve</h1>
-        <Button asChild>
-          <Link href="/approve/new">
-            <IconPlus className="size-4" />
-            送簽
-          </Link>
+        <div className="flex flex-col gap-1">
+          <h1 className="font-medium">Approve</h1>
+          <p className="text-sm text-muted-foreground">
+            文件簽核：上傳 PDF、指派 signer、追蹤進度。
+          </p>
+        </div>
+        <Button size="sm" asChild>
+          <Link href="/approve/new">送簽</Link>
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-4">
         <TabsList>
           <TabsTrigger value="inbox">
             代簽
@@ -91,108 +93,117 @@ export function DocumentDashboard() {
           <TabsTrigger value="sent">送簽</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="inbox" className="flex flex-col gap-2">
-          {(inbox.data ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">沒有待簽文件</p>
-          )}
-          {(inbox.data ?? []).map((row) => (
-            <DocumentCard
-              key={row.id}
-              href={`/approve/sign/${row.document_id}`}
-              title={row.document.title}
-              subtitle={`送簽：${row.document.creator?.name ?? "?"} · ${row.created_at.slice(0, 10)}`}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="signed" className="flex flex-col gap-2">
-          {(signed.data ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">還沒簽過任何文件</p>
-          )}
-          {(signed.data ?? []).map((row) => (
-            <DocumentCard
-              key={row.id}
-              href={`/approve/view/${row.document_id}`}
-              title={row.document.title}
-              subtitle={`簽於 ${row.signed_at?.slice(0, 10) ?? ""}`}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="sent" className="flex flex-col gap-2">
-          {(sent.data ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">還沒送過任何文件</p>
-          )}
-          {(sent.data ?? []).map((doc) => {
-            const canDelete = doc.status === "draft"
-            const canCancel = doc.status === "pending"
-            const hasAction = canDelete || canCancel
-            return (
+        <TabsContent value="inbox" className="flex flex-col gap-3">
+          {(inbox.data ?? []).length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              沒有待簽文件
+            </p>
+          ) : (
+            (inbox.data ?? []).map((row) => (
               <DocumentCard
-                key={doc.id}
-                href={
-                  doc.status === "draft"
-                    ? `/approve/new/${doc.id}`
-                    : `/approve/view/${doc.id}`
-                }
-                title={doc.title}
-                subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
-                status={doc.status}
-                actions={
-                  hasAction ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 shrink-0"
-                          aria-label="actions"
-                        >
-                          <IconDots className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canDelete && (
-                          <ConfirmDialog
-                            trigger={
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                刪除草稿
-                              </DropdownMenuItem>
-                            }
-                            title="刪除草稿？"
-                            description="刪了就沒了。"
-                            confirmText="刪除"
-                            variant="destructive"
-                            onConfirm={() => onDelete(doc.id)}
-                          />
-                        )}
-                        {canCancel && (
-                          <ConfirmDialog
-                            trigger={
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                撤回送簽
-                              </DropdownMenuItem>
-                            }
-                            title="撤回送簽？"
-                            description="文件會標記為已取消，signer 的代簽會消失。"
-                            confirmText="撤回"
-                            variant="destructive"
-                            onConfirm={() => onCancel(doc.id)}
-                          />
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null
-                }
+                key={row.id}
+                href={`/approve/sign/${row.document_id}`}
+                title={row.document.title}
+                subtitle={`送簽：${row.document.creator?.name ?? "?"} · ${row.created_at.slice(0, 10)}`}
               />
-            )
-          })}
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="signed" className="flex flex-col gap-3">
+          {(signed.data ?? []).length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              還沒簽過任何文件
+            </p>
+          ) : (
+            (signed.data ?? []).map((row) => (
+              <DocumentCard
+                key={row.id}
+                href={`/approve/view/${row.document_id}`}
+                title={row.document.title}
+                subtitle={`簽於 ${row.signed_at?.slice(0, 10) ?? ""}`}
+              />
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="sent" className="flex flex-col gap-3">
+          {(sent.data ?? []).length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              還沒送過任何文件
+            </p>
+          ) : (
+            (sent.data ?? []).map((doc) => {
+              const canDelete = doc.status === "draft"
+              const canCancel = doc.status === "pending"
+              const hasAction = canDelete || canCancel
+              return (
+                <DocumentCard
+                  key={doc.id}
+                  href={
+                    doc.status === "draft"
+                      ? `/approve/new/${doc.id}`
+                      : `/approve/view/${doc.id}`
+                  }
+                  title={doc.title}
+                  subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
+                  status={doc.status}
+                  actions={
+                    hasAction ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 shrink-0"
+                            aria-label="actions"
+                          >
+                            <IconDots className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canDelete && (
+                            <ConfirmDialog
+                              trigger={
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  刪除草稿
+                                </DropdownMenuItem>
+                              }
+                              title="刪除草稿？"
+                              description="刪了就沒了。"
+                              confirmText="刪除"
+                              variant="destructive"
+                              onConfirm={() => onDelete(doc.id)}
+                            />
+                          )}
+                          {canCancel && (
+                            <ConfirmDialog
+                              trigger={
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  撤回送簽
+                                </DropdownMenuItem>
+                              }
+                              title="撤回送簽？"
+                              description="文件會標記為已取消，signer 的代簽會消失。"
+                              confirmText="撤回"
+                              variant="destructive"
+                              onConfirm={() => onCancel(doc.id)}
+                            />
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null
+                  }
+                />
+              )
+            })
+          )}
         </TabsContent>
       </Tabs>
     </div>
