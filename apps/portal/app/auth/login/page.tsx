@@ -4,9 +4,15 @@ import { PortalShell } from "@/components/portal-shell"
 import { SignInButton } from "@/components/sign-in-button"
 import { getCurrentUser } from "@/lib/user"
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ stale?: string }>
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await getCurrentUser()
   if (user) redirect("/")
+
+  const { stale } = await searchParams
 
   return (
     <PortalShell appName="Sign in">
@@ -16,6 +22,12 @@ export default async function LoginPage() {
           <p className="text-sm text-muted-foreground">
             Continue with your WinLab SSO account.
           </p>
+          {stale === "1" ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Cleared a leftover session from the previous portal. Try signing
+              in again.
+            </p>
+          ) : null}
         </div>
         <SignInButton />
       </div>
