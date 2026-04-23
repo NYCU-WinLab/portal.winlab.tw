@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -14,12 +15,18 @@ import type {
 } from "@/lib/approve/types"
 import { getCategoryDef } from "@/lib/approve/field-categories"
 
-import { deleteField, submitDocument, upsertField } from "../actions"
+import {
+  deleteField,
+  deleteDocument,
+  submitDocument,
+  upsertField,
+} from "../actions"
 
 import { FieldOverlay } from "./field-overlay"
 import { FieldPalette } from "./field-palette"
 import { PdfCanvas } from "./pdf-canvas"
 import { SignerPicker } from "./signer-picker"
+import { ConfirmDialog } from "./confirm-dialog"
 import { TitleInput } from "./title-input"
 import { UploadZone } from "./upload-zone"
 
@@ -44,6 +51,8 @@ export function DocumentEditor({
   const [fields, setFields] = useState(initialFields)
   const [page, setPage] = useState(1)
   const [palette, setPalette] = useState<FieldCategory | null>(null)
+
+  const router = useRouter()
 
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
@@ -174,9 +183,26 @@ export function DocumentEditor({
     <main className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <TitleInput documentId={documentId} initial={initialTitle} />
-        <Button type="button" onClick={onSubmit}>
-          送出
-        </Button>
+        <div className="flex items-center gap-2">
+          <ConfirmDialog
+            trigger={<Button variant="outline">刪除草稿</Button>}
+            title="刪除草稿？"
+            description="刪了就沒了。"
+            confirmText="刪除"
+            variant="destructive"
+            onConfirm={async () => {
+              try {
+                await deleteDocument(documentId)
+                router.push("/approve")
+              } catch (e) {
+                toast.error((e as Error).message)
+              }
+            }}
+          />
+          <Button type="button" onClick={onSubmit}>
+            送出
+          </Button>
+        </div>
       </div>
 
       <div>
