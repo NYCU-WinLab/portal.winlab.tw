@@ -212,26 +212,47 @@ export function DocumentEditor({
           initialSignerIds={signerIds}
           onChange={async (ids) => {
             setSignerIds(ids)
-            // Refresh profiles list for overlay badges
+            if (ids.length === 0) {
+              setSignerProfiles([])
+              return
+            }
+            // Refresh profiles list for overlay badges. members ↔ user_profiles
+            // has no FK so we can't resource-embed; do two queries + left join
+            // by email in JS.
             const supabase = createClient()
-            const { data } = await supabase
+            const { data: profiles } = await supabase
               .from("user_profiles")
-              .select(`id, name, email, member:members!inner(avatar_url, role)`)
+              .select("id, name, email")
               .in("id", ids)
+            const emails = (profiles ?? [])
+              .map((p) => p.email?.toLowerCase())
+              .filter((e): e is string => !!e)
+            const enrich = new Map<
+              string,
+              { avatar_url: string | null; role: string | null }
+            >()
+            if (emails.length) {
+              const { data: members } = await supabase
+                .from("members")
+                .select("email, avatar_url, role")
+                .in("email", emails)
+              for (const m of members ?? []) {
+                if (m.email)
+                  enrich.set(m.email.toLowerCase(), {
+                    avatar_url: m.avatar_url,
+                    role: m.role,
+                  })
+              }
+            }
             setSignerProfiles(
-              (data ?? []).map((row) => {
-                const r = row as typeof row & {
-                  id: string
-                  name: string | null
-                  email: string | null
-                  member?: { avatar_url: string | null; role: string | null }
-                }
+              (profiles ?? []).map((p) => {
+                const m = enrich.get(p.email?.toLowerCase() ?? "")
                 return {
-                  id: r.id,
-                  name: r.name ?? r.email ?? "Unknown",
-                  email: r.email ?? null,
-                  avatar_url: r.member?.avatar_url ?? null,
-                  role: r.member?.role ?? null,
+                  id: p.id,
+                  name: p.name ?? p.email ?? "Unknown",
+                  email: p.email ?? null,
+                  avatar_url: m?.avatar_url ?? null,
+                  role: m?.role ?? null,
                 }
               })
             )

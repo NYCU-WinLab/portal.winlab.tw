@@ -46,18 +46,14 @@ export default async function ViewPage({
       .from("approve_signers")
       .select(
         `id, document_id, signer_id, status, signed_at, created_at,
-         profile:user_profiles!signer_id(
-           id, name, email, member:members!inner(avatar_url, role)
-         )`
+         profile:user_profiles!signer_id(id, name, email)`
       )
       .eq("document_id", id),
     supabase.from("approve_fields").select("*").eq("document_id", id),
   ])
 
-  const withProfile: (ApproveSigner & { profile: SignerProfile | null })[] = (
-    signers ?? []
-  ).map((s) => {
-    const row = s as typeof s & {
+  const rows = (signers ?? []).map((s) => {
+    return s as typeof s & {
       id: string
       document_id: string
       signer_id: string
@@ -68,27 +64,52 @@ export default async function ViewPage({
         id: string
         name: string | null
         email: string | null
-        member?: { avatar_url: string | null; role: string | null }
       } | null
     }
-    return {
-      id: row.id,
-      document_id: row.document_id,
-      signer_id: row.signer_id,
-      status: row.status,
-      signed_at: row.signed_at,
-      created_at: row.created_at,
-      profile: row.profile
-        ? {
-            id: row.profile.id,
-            name: row.profile.name ?? row.profile.email ?? "Unknown",
-            email: row.profile.email ?? null,
-            avatar_url: row.profile.member?.avatar_url ?? null,
-            role: row.profile.member?.role ?? null,
-          }
-        : null,
-    }
   })
+
+  const emails = rows
+    .map((r) => r.profile?.email?.toLowerCase())
+    .filter((e): e is string => !!e)
+  const enrich = new Map<
+    string,
+    { avatar_url: string | null; role: string | null }
+  >()
+  if (emails.length) {
+    const { data: members } = await supabase
+      .from("members")
+      .select("email, avatar_url, role")
+      .in("email", emails)
+    for (const m of members ?? []) {
+      if (m.email)
+        enrich.set(m.email.toLowerCase(), {
+          avatar_url: m.avatar_url,
+          role: m.role,
+        })
+    }
+  }
+
+  const withProfile: (ApproveSigner & { profile: SignerProfile | null })[] =
+    rows.map((row) => {
+      const m = enrich.get(row.profile?.email?.toLowerCase() ?? "")
+      return {
+        id: row.id,
+        document_id: row.document_id,
+        signer_id: row.signer_id,
+        status: row.status,
+        signed_at: row.signed_at,
+        created_at: row.created_at,
+        profile: row.profile
+          ? {
+              id: row.profile.id,
+              name: row.profile.name ?? row.profile.email ?? "Unknown",
+              email: row.profile.email ?? null,
+              avatar_url: m?.avatar_url ?? null,
+              role: m?.role ?? null,
+            }
+          : null,
+      }
+    })
 
   return (
     <DocumentView

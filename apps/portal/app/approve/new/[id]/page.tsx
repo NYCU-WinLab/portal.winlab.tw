@@ -28,34 +28,54 @@ export default async function EditDraftPage({
       .from("approve_signers")
       .select(
         `signer_id,
-         profile:user_profiles!signer_id(
-           id, name, email, member:members!inner(avatar_url, role)
-         )`
+         profile:user_profiles!signer_id(id, name, email)`
       )
       .eq("document_id", id),
     supabase.from("approve_fields").select("*").eq("document_id", id),
   ])
 
-  const signerIds = (signers ?? []).map((s) => {
-    const row = s as typeof s & { signer_id: string }
-    return row.signer_id
-  })
-  const profiles: SignerProfile[] = (signers ?? []).map((s) => {
+  const profileRows = (signers ?? []).map((s) => {
     const row = s as typeof s & {
       signer_id: string
       profile?: {
         id: string
         name: string | null
         email: string | null
-        member?: { avatar_url: string | null; role: string | null }
       } | null
     }
+    return row
+  })
+  const signerIds = profileRows.map((r) => r.signer_id)
+
+  const emails = profileRows
+    .map((r) => r.profile?.email?.toLowerCase())
+    .filter((e): e is string => !!e)
+  const enrich = new Map<
+    string,
+    { avatar_url: string | null; role: string | null }
+  >()
+  if (emails.length) {
+    const { data: members } = await supabase
+      .from("members")
+      .select("email, avatar_url, role")
+      .in("email", emails)
+    for (const m of members ?? []) {
+      if (m.email)
+        enrich.set(m.email.toLowerCase(), {
+          avatar_url: m.avatar_url,
+          role: m.role,
+        })
+    }
+  }
+
+  const profiles: SignerProfile[] = profileRows.map((r) => {
+    const m = enrich.get(r.profile?.email?.toLowerCase() ?? "")
     return {
-      id: row.profile?.id ?? row.signer_id,
-      name: row.profile?.name ?? row.profile?.email ?? "Unknown",
-      email: row.profile?.email ?? null,
-      avatar_url: row.profile?.member?.avatar_url ?? null,
-      role: row.profile?.member?.role ?? null,
+      id: r.profile?.id ?? r.signer_id,
+      name: r.profile?.name ?? r.profile?.email ?? "Unknown",
+      email: r.profile?.email ?? null,
+      avatar_url: m?.avatar_url ?? null,
+      role: m?.role ?? null,
     }
   })
 

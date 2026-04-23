@@ -50,25 +50,34 @@ export function SignerPicker({
   useEffect(() => {
     ;(async () => {
       const supabase = createClient()
-      const { data } = await supabase.from("user_profiles").select(
-        `id, name, email,
-           member:members!inner(avatar_url)`
-      )
+      const { data: profiles, error } = await supabase
+        .from("user_profiles")
+        .select("id, name, email")
+        .order("name", { ascending: true, nullsFirst: false })
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+      const emails = (profiles ?? [])
+        .map((p) => p.email?.toLowerCase())
+        .filter((e): e is string => !!e)
+      const avatarByEmail = new Map<string, string | null>()
+      if (emails.length) {
+        const { data: members } = await supabase
+          .from("members")
+          .select("email, avatar_url")
+          .in("email", emails)
+        for (const m of members ?? []) {
+          if (m.email) avatarByEmail.set(m.email.toLowerCase(), m.avatar_url)
+        }
+      }
       setCandidates(
-        (data ?? []).map((row) => {
-          const r = row as typeof row & {
-            id: string
-            name: string | null
-            email: string | null
-            member?: { avatar_url: string | null }
-          }
-          return {
-            id: r.id,
-            name: r.name ?? r.email ?? "Unknown",
-            email: r.email,
-            avatar_url: r.member?.avatar_url ?? null,
-          }
-        })
+        (profiles ?? []).map((p) => ({
+          id: p.id,
+          name: p.name ?? p.email ?? "Unknown",
+          email: p.email,
+          avatar_url: avatarByEmail.get(p.email?.toLowerCase() ?? "") ?? null,
+        }))
       )
     })()
   }, [])
