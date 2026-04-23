@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/user"
 const apps = [
   { href: "/bento", label: "Bento", note: "便當訂購" },
   { href: "/leave", label: "Leave", note: "請假登記" },
+  { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/profile", label: "Profile", note: "Your account" },
 ]
 
