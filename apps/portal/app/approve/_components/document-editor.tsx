@@ -219,6 +219,26 @@ export function DocumentEditor({
       return
     }
     try {
+      // Flush any pending debounced saves and re-sync every field so the
+      // server sees the latest signer assignments before it validates.
+      for (const timer of debounceRefs.current.values()) clearTimeout(timer)
+      debounceRefs.current.clear()
+      await Promise.all(
+        fields.map((f) =>
+          upsertField({
+            id: f.id,
+            documentId,
+            signerId: f.signer_id,
+            page: f.page,
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            category: f.category,
+            label: f.label,
+          })
+        )
+      )
       await submitDocument(documentId)
       router.push("/approve")
     } catch (e) {
