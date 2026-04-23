@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
+import { toast } from "sonner"
+
+import { Button } from "@workspace/ui/components/button"
+import { IconDownload } from "@tabler/icons-react"
 
 import { createClient } from "@/lib/supabase/client"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
@@ -38,6 +42,7 @@ export function DocumentView({
 }) {
   const [page, setPage] = useState(1)
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     if (!document.file_path) {
@@ -51,6 +56,21 @@ export function DocumentView({
       .then(({ data }) => setSignedUrl(data?.signedUrl ?? null))
   }, [document.file_path, document.id])
 
+  async function onDownload() {
+    if (!signedUrl) return
+    setDownloading(true)
+    try {
+      const { buildSignedPdf, downloadPdf } =
+        await import("@/lib/approve/pdf-merge")
+      const bytes = await buildSignedPdf(signedUrl, fields)
+      downloadPdf(bytes, `${document.title || "approve"}.pdf`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const visible =
     viewerRole === "creator"
       ? fields
@@ -62,7 +82,18 @@ export function DocumentView({
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-medium">{document.title}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-medium">{document.title}</h1>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onDownload}
+          disabled={!signedUrl || downloading}
+        >
+          <IconDownload className="size-4" />
+          {downloading ? "產生中..." : "下載 PDF"}
+        </Button>
+      </div>
       <SignerProgress rows={signers} />
       {signedUrl && (
         <PdfCanvas fileUrl={signedUrl} page={page} onPageChange={setPage}>
