@@ -1,7 +1,5 @@
 "use client"
 
-import { Button } from "@workspace/ui/components/button"
-
 import type { ApproveField } from "@/lib/approve/types"
 import { getCategoryDef } from "@/lib/approve/field-categories"
 
@@ -52,14 +50,12 @@ export function SigningField({
             savedSignature={savedSignature}
             onConfirm={onChange}
             trigger={
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="h-full w-full"
+                className="h-full w-full rounded-none text-xs text-muted-foreground hover:bg-muted/40"
               >
                 點擊簽名
-              </Button>
+              </button>
             }
           />
         )}
