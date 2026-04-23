@@ -62,6 +62,9 @@ export function SigningView({
     [fields, page]
   )
 
+  const savedSignature =
+    savedValues.find((v) => v.category === "signature")?.value ?? null
+
   async function onSubmit() {
     for (const f of fields) {
       if (!state[f.id]?.trim()) {
@@ -97,6 +100,7 @@ export function SigningView({
                   field={f}
                   pageSize={size}
                   value={state[f.id] ?? ""}
+                  savedSignature={savedSignature}
                   onChange={(v) => setState((s) => ({ ...s, [f.id]: v }))}
                 />
               ))}
