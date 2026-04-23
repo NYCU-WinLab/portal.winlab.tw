@@ -7,7 +7,6 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@workspace/ui/components/avatar"
-import { Button } from "@workspace/ui/components/button"
 import {
   Command,
   CommandEmpty,
@@ -47,10 +46,12 @@ export function signerColor(signerId: string | null): string {
 }
 
 export function SignerBadge({
+  label,
   candidates,
   currentId,
   onChange,
 }: {
+  label: string
   candidates: SignerProfile[]
   currentId: string | null
   onChange: (id: string) => void
@@ -67,22 +68,17 @@ export function SignerBadge({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={
-            "absolute -top-2 -right-2 size-5 rounded-full border " +
-            (currentId ? "" : "border-dashed")
-          }
-          style={{ background: signerColor(currentId) }}
-          aria-label="choose signer"
-        />
+          className="no-drag rounded bg-background/80 px-1.5 py-0.5 text-[10px] hover:bg-background"
+        >
+          {label} · {current?.name ?? "選 signer"}
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-0">
         <Command>
           <CommandInput placeholder="搜尋成員..." />
           <CommandList>
             <CommandEmpty>沒有符合</CommandEmpty>
-            <CommandGroup
-              heading={current ? `目前：${current.name}` : "未指派"}
-            >
+            <CommandGroup>
               {candidates.map((c) => (
                 <CommandItem
                   key={c.id}
@@ -105,6 +101,3 @@ export function SignerBadge({
     </Popover>
   )
 }
-
-// Expose the cancel marker so the draggable parent can skip this element.
-SignerBadge.cancelClass = "no-drag" as const

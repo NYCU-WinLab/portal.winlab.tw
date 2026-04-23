@@ -57,6 +57,7 @@ function FieldBox({
   handlers: FieldOverlayHandlers
 }) {
   const def = getCategoryDef(field.category)
+  const border = signerColor(field.signer_id)
 
   return (
     <Rnd
@@ -84,26 +85,27 @@ function FieldBox({
           height: clamp01(ref.offsetHeight / pageSize.height),
         })
       }}
-      className="rounded border-2 bg-background/40"
-      style={{ borderColor: signerColor(field.signer_id) }}
+      className={
+        "rounded bg-background/40 " +
+        (field.signer_id ? "border-2" : "border-2 border-dashed")
+      }
+      style={{ borderColor: border }}
     >
-      <div className="relative h-full w-full text-[10px]">
-        <span className="px-1 select-none">{def.label}</span>
-        <div className="no-drag">
-          <SignerBadge
-            candidates={candidates}
-            currentId={field.signer_id}
-            onChange={(id) => handlers.onReassign(field.id, id)}
-          />
-        </div>
+      <div className="relative flex h-full w-full items-start justify-between gap-1 p-0.5">
+        <SignerBadge
+          label={def.label}
+          candidates={candidates}
+          currentId={field.signer_id}
+          onChange={(id) => handlers.onReassign(field.id, id)}
+        />
         <button
           type="button"
           aria-label="remove"
+          className="no-drag flex size-4 items-center justify-center rounded bg-background/80 hover:bg-background"
           onClick={(e) => {
             e.stopPropagation()
             handlers.onRemove(field.id)
           }}
-          className="no-drag absolute -right-2 -bottom-2 rounded-full border bg-background p-0.5"
         >
           <IconX className="size-3" />
         </button>
