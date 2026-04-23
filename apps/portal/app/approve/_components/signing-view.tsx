@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -70,6 +71,8 @@ export function SigningView({
     [fields, page]
   )
 
+  const router = useRouter()
+
   const savedSignature =
     savedValues.find((v) => v.category === "signature")?.value ?? null
 
@@ -86,6 +89,7 @@ export function SigningView({
     }))
     try {
       await submitSignature(document.id, values)
+      router.push("/approve")
     } catch (e) {
       toast.error((e as Error).message)
     }

@@ -1,6 +1,5 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
@@ -264,7 +263,8 @@ export async function submitDocument(documentId: string): Promise<void> {
 
   revalidatePath("/approve")
   revalidatePath(`/approve/new/${documentId}`)
-  redirect("/approve")
+  // Client navigates after this returns — don't redirect here, otherwise
+  // the client's try/catch treats NEXT_REDIRECT as a real error.
 }
 
 export type SignatureValue = { fieldId: string; value: string }
@@ -343,7 +343,7 @@ export async function submitSignature(
   }
 
   revalidatePath("/approve")
-  redirect("/approve")
+  // Client navigates after this returns — same reason as submitDocument.
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {

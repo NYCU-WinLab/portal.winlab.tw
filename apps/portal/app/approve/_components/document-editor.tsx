@@ -220,6 +220,7 @@ export function DocumentEditor({
     }
     try {
       await submitDocument(documentId)
+      router.push("/approve")
     } catch (e) {
       toast.error((e as Error).message)
     }
