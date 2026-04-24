@@ -1,24 +1,30 @@
 "use client"
 
+import { useTransition } from "react"
+
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
 
 export function SignInButton() {
-  async function onClick() {
-    const supabase = createClient()
-    await supabase.auth.signInWithOAuth({
-      provider: "keycloak",
-      options: {
-        scopes: "openid",
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+  const [pending, startTransition] = useTransition()
+
+  function onClick() {
+    startTransition(async () => {
+      const supabase = createClient()
+      await supabase.auth.signInWithOAuth({
+        provider: "keycloak",
+        options: {
+          scopes: "openid",
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
     })
   }
 
   return (
-    <Button onClick={onClick} className="w-full">
-      Continue with Keycloak
+    <Button onClick={onClick} disabled={pending} className="w-full">
+      {pending ? "Redirecting..." : "Continue with Keycloak"}
     </Button>
   )
 }

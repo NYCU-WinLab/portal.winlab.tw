@@ -80,7 +80,7 @@ export function SignaturePad({
           <TabsContent value="draw" className="space-y-2">
             <div
               ref={canvasBoxRef}
-              className="overflow-hidden rounded border bg-background"
+              className="overflow-hidden rounded border bg-white"
             >
               <SignatureCanvas
                 key={canvasWidth}
@@ -122,7 +122,7 @@ export function SignaturePad({
               <img
                 src={uploaded}
                 alt="signature preview"
-                className="max-h-40 rounded border bg-background"
+                className="max-h-40 rounded border bg-white"
               />
             )}
           </TabsContent>
@@ -134,7 +134,7 @@ export function SignaturePad({
             <img
               src={savedSignature}
               alt="last signature"
-              className="h-12 bg-background"
+              className="h-12 bg-white"
             />
             <span className="text-xs text-muted-foreground">上次簽名</span>
             <Button

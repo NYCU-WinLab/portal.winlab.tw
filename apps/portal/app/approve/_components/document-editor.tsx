@@ -1,6 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
@@ -65,6 +72,7 @@ export function DocumentEditor({
 
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [submitPending, startSubmit] = useTransition()
   const debounceRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const { url: signedUrl, refresh: refreshSignedUrl } = useApprovePdfUrl(
     documentId,
@@ -285,8 +293,13 @@ export function DocumentEditor({
               }
             }}
           />
-          <Button type="button" size="sm" onClick={onSubmit}>
-            送出
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => startSubmit(onSubmit)}
+            disabled={submitPending}
+          >
+            {submitPending ? "送出中..." : "送出"}
           </Button>
         </div>
       </div>

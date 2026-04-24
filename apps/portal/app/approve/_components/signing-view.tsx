@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
@@ -64,6 +64,7 @@ export function SigningView({
 
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [submitPending, startSubmit] = useTransition()
 
   const savedSignature =
     savedValues.find((v) => v.category === "signature")?.value ?? null
@@ -98,8 +99,13 @@ export function SigningView({
             進度 {filledCount}/{totalFields}
           </p>
         </div>
-        <Button size="sm" type="button" onClick={onSubmit}>
-          送出簽核
+        <Button
+          size="sm"
+          type="button"
+          onClick={() => startSubmit(onSubmit)}
+          disabled={submitPending}
+        >
+          {submitPending ? "送出中..." : "送出簽核"}
         </Button>
       </div>
 
