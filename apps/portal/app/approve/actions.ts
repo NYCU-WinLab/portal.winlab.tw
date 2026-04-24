@@ -1,12 +1,28 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 import type { FieldCategory } from "@/lib/approve/types"
 import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
+import { drainOutboxBatch } from "@/lib/email/drain-outbox"
+
+// Fire the outbox drain after the response is sent to the browser. Using
+// `after()` keeps the submit flow fast (user doesn't wait on Resend) while
+// still getting mail out within seconds of the state transition. The daily
+// cron sweep is our safety net for anything this misses.
+function triggerEmailDrain() {
+  after(async () => {
+    try {
+      await drainOutboxBatch()
+    } catch (err) {
+      console.error("[approve] after() drain failed", err)
+    }
+  })
+}
 
 async function requireUser() {
   const user = await getCurrentUser()
@@ -221,6 +237,10 @@ export async function submitDocument(documentId: string): Promise<void> {
     .eq("status", "draft")
   if (error) throw new Error(error.message)
 
+  // The status change just fired the DB trigger which inserted signer-invited
+  // rows into the outbox. Drain them right after the response.
+  triggerEmailDrain()
+
   revalidatePath("/approve")
   revalidatePath(`/approve/new/${documentId}`)
   // Client navigates after this returns — don't redirect here, otherwise
@@ -242,6 +262,12 @@ export async function submitSignature(
     p_values: values.map((v) => ({ fieldId: v.fieldId, value: v.value })),
   })
   if (error) throw new Error(error.message)
+
+  // RPC may have completed the doc, which fires the trigger that enqueues a
+  // document-completed mail to the creator. Drain after response either way —
+  // a no-op if the signer wasn't the last one.
+  triggerEmailDrain()
+
   revalidatePath("/approve")
 }
 
