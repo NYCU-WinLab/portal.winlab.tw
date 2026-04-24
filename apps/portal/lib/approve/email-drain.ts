@@ -108,7 +108,7 @@ async function sendOne(
       html = await render(
         SignerInvited({
           documentTitle: doc.title,
-          creatorName: creator?.name ?? creator?.email ?? "Portal",
+          creatorName: creator?.name ?? creator?.email ?? "WinLab",
           signUrl: `${siteUrl()}/approve/sign/${doc.id}`,
         })
       )
