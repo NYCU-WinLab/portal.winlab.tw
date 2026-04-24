@@ -2,8 +2,8 @@ import { render } from "@react-email/render"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getResend, MAIL_FROM, siteUrl } from "@/lib/email/resend"
-import { SignerInvited } from "@/lib/email/templates/signer-invited"
-import { DocumentCompleted } from "@/lib/email/templates/document-completed"
+import { SignerInvited } from "@/emails/approve/signer-invited"
+import { DocumentCompleted } from "@/emails/approve/document-completed"
 
 // Drains approve_email_outbox in a single pass. Called from two places:
 //   1. Server Actions via next/server `after()` — fires right after the user's

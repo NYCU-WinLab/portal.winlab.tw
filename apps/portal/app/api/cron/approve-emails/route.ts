@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { drainOutboxBatch } from "@/lib/email/drain-outbox"
+import { drainOutboxBatch } from "@/lib/approve/email-drain"
 
 // Daily safety-net sweep for approve_email_outbox. The happy path goes through
 // `after()` in the submit Server Actions — this route only catches stragglers

@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/user"
 import type { FieldCategory } from "@/lib/approve/types"
 import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
-import { drainOutboxBatch } from "@/lib/email/drain-outbox"
+import { drainOutboxBatch } from "@/lib/approve/email-drain"
 
 // Fire the outbox drain after the response is sent to the browser. Using
 // `after()` keeps the submit flow fast (user doesn't wait on Resend) while
