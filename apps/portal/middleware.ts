@@ -8,6 +8,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // API routes handle their own auth (cron endpoints use CRON_SECRET, not
+    // Supabase cookies), so exclude /api to keep the middleware off the hot
+    // path for machine-to-machine requests.
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
