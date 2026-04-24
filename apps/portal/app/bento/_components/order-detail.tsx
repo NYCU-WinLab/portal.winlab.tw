@@ -75,8 +75,13 @@ export function OrderDetail({ orderId }: { orderId: string }) {
           <AddOrderItemDialog orderId={orderId} />
           {isAdmin && (
             <>
-              <Button variant="outline" size="sm" onClick={handleClose}>
-                關閉訂單
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClose}
+                disabled={closeOrder.isPending}
+              >
+                {closeOrder.isPending ? "關閉中..." : "關閉訂單"}
               </Button>
               <ConfirmDialog
                 trigger={

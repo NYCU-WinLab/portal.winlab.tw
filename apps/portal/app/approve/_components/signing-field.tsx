@@ -27,9 +27,12 @@ export function SigningField({
     height: field.height * pageSize.height,
   }
 
+  // Fields sit on top of a PDF (always white) so they must stay readable
+  // regardless of the portal's dark/light theme. Using `bg-background` would
+  // invert to near-black in dark mode and swallow the signature ink.
   if (field.category === "signature") {
     return (
-      <div className="absolute rounded border bg-background" style={style}>
+      <div className="absolute rounded border" style={style}>
         {value ? (
           <SignaturePad
             savedSignature={savedSignature}
@@ -52,7 +55,7 @@ export function SigningField({
             trigger={
               <button
                 type="button"
-                className="h-full w-full rounded-none text-xs text-muted-foreground hover:bg-muted/40"
+                className="h-full w-full rounded-none text-xs text-muted-foreground hover:bg-black/5"
               >
                 點擊簽名
               </button>
@@ -64,12 +67,12 @@ export function SigningField({
   }
 
   return (
-    <div className="absolute rounded border bg-background" style={style}>
+    <div className="absolute rounded border" style={style}>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.label ?? def.label}
-        className="h-full w-full bg-transparent px-1 text-xs outline-none"
+        className="h-full w-full bg-transparent px-1 text-xs text-black outline-none placeholder:text-neutral-400"
       />
     </div>
   )
