@@ -4,7 +4,7 @@ import { downloadZip } from "client-zip"
 
 export type ZipEntry = {
   name: string
-  url: string
+  blob: Blob
 }
 
 export async function saveZip(
@@ -14,17 +14,8 @@ export async function saveZip(
   if (entries.length === 0) {
     throw new Error("沒有可下載的檔案")
   }
-
-  const inputs = entries.map(async (entry) => {
-    const res = await fetch(entry.url)
-    if (!res.ok) {
-      throw new Error(`下載 ${entry.name} 失敗（${res.status}）`)
-    }
-    return { name: entry.name, input: res }
-  })
-
-  const resolved = await Promise.all(inputs)
-  const blob = await downloadZip(resolved).blob()
+  const inputs = entries.map((e) => ({ name: e.name, input: e.blob }))
+  const blob = await downloadZip(inputs).blob()
   triggerDownload(blob, filename)
 }
 

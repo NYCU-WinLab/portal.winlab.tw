@@ -2,6 +2,10 @@
 
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
+import { useSignPrefs } from "@/hooks/trip/use-sign-prefs"
+import type { SignConfig } from "@/hooks/trip/use-trip-files"
+import { useAuth } from "@/hooks/use-auth"
+import { useSavedSignature } from "@/hooks/use-saved-signature"
 import type { TripFileWithUser } from "@/lib/trip/types"
 
 import { FileCard } from "./file-card"
@@ -17,6 +21,13 @@ export function FileList({
   isLoading: boolean
   canEdit: boolean
 }) {
+  const { user } = useAuth()
+  const { signature } = useSavedSignature(user?.id)
+  const { prefs } = useSignPrefs(user?.id)
+
+  const sign: SignConfig =
+    prefs.enabled && signature ? { signature, corner: prefs.corner } : null
+
   if (isLoading && files.length === 0) {
     return (
       <section className="flex flex-col gap-4">
@@ -47,6 +58,7 @@ export function FileList({
               key={file.id}
               tripId={tripId}
               file={file}
+              sign={sign}
               canEdit={canEdit}
               canDelete={canEdit}
             />
