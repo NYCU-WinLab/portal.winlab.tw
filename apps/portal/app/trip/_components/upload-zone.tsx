@@ -1,13 +1,14 @@
 "use client"
 
 import { Pencil, Upload } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 
 import { SignaturePad } from "@/components/signature-pad"
+import { useSignPrefs, useUpdateSignPrefs } from "@/hooks/trip/use-sign-prefs"
 import { useUploadTripFiles } from "@/hooks/trip/use-trip-files"
 import {
   useSavedSignature,
@@ -15,10 +16,6 @@ import {
 } from "@/hooks/use-saved-signature"
 import { TRIP_FILE_ACCEPT } from "@/lib/trip/convert"
 import { SIGNATURE_POSITIONS, type SignaturePosition } from "@/lib/trip/sign"
-
-const LS_ENABLED = "trip:auto-sign:enabled"
-const LS_POSITION = "trip:auto-sign:position"
-const VALID_POSITIONS = new Set<SignaturePosition>(["tl", "tr", "bl", "br"])
 
 export function UploadZone({
   tripId,
@@ -35,49 +32,38 @@ export function UploadZone({
   } | null>(null)
   const upload = useUploadTripFiles(tripId)
 
-  const { signature, isLoading: sigLoading } = useSavedSignature(userId)
+  const { signature } = useSavedSignature(userId)
   const saveSignature = useSaveSignature(userId)
+  const { prefs } = useSignPrefs(userId)
+  const updatePrefs = useUpdateSignPrefs(userId)
 
-  const [autoSign, setAutoSign] = useState(false)
-  const [position, setPosition] = useState<SignaturePosition>("br")
-  const [hydrated, setHydrated] = useState(false)
-
-  // Load preferences from localStorage after mount, then default-enable when
-  // user has a signature on file. We only auto-enable on first ever visit
-  // (no stored value yet) so we don't fight the user's own off-toggle.
-  useEffect(() => {
-    const storedEnabled = localStorage.getItem(LS_ENABLED)
-    const storedPos = localStorage.getItem(LS_POSITION)
-    if (storedPos && VALID_POSITIONS.has(storedPos as SignaturePosition)) {
-      setPosition(storedPos as SignaturePosition)
+  const onAutoSignChange = async (next: boolean) => {
+    if (next && !signature) {
+      toast.error("還沒設定簽名 — 先按「設定簽名」")
+      return
     }
-    if (storedEnabled !== null) {
-      setAutoSign(storedEnabled === "1")
+    try {
+      await updatePrefs.mutateAsync({ enabled: next })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "儲存偏好失敗")
     }
-    setHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
-    if (localStorage.getItem(LS_ENABLED) === null && signature && !sigLoading) {
-      setAutoSign(true)
-    }
-  }, [hydrated, signature, sigLoading])
-
-  const onAutoSignChange = (next: boolean) => {
-    setAutoSign(next)
-    localStorage.setItem(LS_ENABLED, next ? "1" : "0")
   }
-  const onPositionChange = (next: SignaturePosition) => {
-    setPosition(next)
-    localStorage.setItem(LS_POSITION, next)
+
+  const onCornerChange = async (next: SignaturePosition) => {
+    try {
+      await updatePrefs.mutateAsync({ corner: next })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "儲存偏好失敗")
+    }
   }
 
   const handleSignatureConfirm = async (dataUrl: string) => {
     try {
       await saveSignature.mutateAsync(dataUrl)
       toast.success("簽名已儲存")
-      if (!autoSign) onAutoSignChange(true)
+      if (!prefs.enabled) {
+        await updatePrefs.mutateAsync({ enabled: true })
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "儲存簽名失敗")
     }
@@ -87,18 +73,11 @@ export function UploadZone({
     const files = fileList ? Array.from(fileList) : []
     if (files.length === 0) return
 
-    if (autoSign && !signature) {
-      toast.error("打勾自動簽名但還沒設定簽名 — 先按「編輯簽名」")
-      return
-    }
-
     setProgress({ done: 0, total: files.length })
     try {
       await upload.mutateAsync({
         userId,
         files,
-        signature:
-          autoSign && signature ? { dataUrl: signature, position } : null,
         onProgress: (done, total) => setProgress({ done, total }),
       })
       toast.success(
@@ -166,24 +145,24 @@ export function UploadZone({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-border bg-card p-4">
         <label className="flex items-center gap-2">
           <Checkbox
-            checked={autoSign}
+            checked={prefs.enabled}
             onCheckedChange={(v) => onAutoSignChange(v === true)}
-            disabled={isUploading}
+            disabled={updatePrefs.isPending}
           />
           <span className="text-sm">自動簽名（每頁）</span>
         </label>
 
-        {autoSign && (
+        {prefs.enabled && (
           <div className="flex items-center gap-1">
             {SIGNATURE_POSITIONS.map((p) => (
               <Button
                 key={p.id}
                 type="button"
                 size="sm"
-                variant={position === p.id ? "default" : "outline"}
+                variant={prefs.corner === p.id ? "default" : "outline"}
                 className="h-7 px-2 text-xs"
-                onClick={() => onPositionChange(p.id)}
-                disabled={isUploading}
+                onClick={() => onCornerChange(p.id)}
+                disabled={updatePrefs.isPending}
               >
                 {p.label}
               </Button>
@@ -198,7 +177,6 @@ export function UploadZone({
               size="sm"
               variant="ghost"
               className="ml-auto h-7 px-2 text-xs"
-              disabled={isUploading}
             >
               <Pencil className="size-3" />
               {signature ? "編輯簽名" : "設定簽名"}

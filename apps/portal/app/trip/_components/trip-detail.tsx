@@ -60,6 +60,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
 
       {isAdmin ? (
         <AdminFolderList
+          tripId={tripId}
           tripName={trip.name}
           files={files ?? []}
           isLoading={filesLoading}

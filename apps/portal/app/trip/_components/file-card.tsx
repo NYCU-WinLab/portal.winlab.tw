@@ -9,6 +9,7 @@ import {
   useDeleteTripFile,
   useDownloadSingleFile,
   useOpenTripFile,
+  type SignConfig,
 } from "@/hooks/trip/use-trip-files"
 import type { TripFileWithUser } from "@/lib/trip/types"
 
@@ -18,11 +19,14 @@ import { EditDescriptionDialog } from "./edit-description-dialog"
 export function FileCard({
   tripId,
   file,
+  sign,
   canEdit,
   canDelete,
 }: {
   tripId: string
   file: TripFileWithUser
+  // Resolved sign config for this file's owner. Null = render unsigned.
+  sign: SignConfig
   canEdit: boolean
   canDelete: boolean
 }) {
@@ -45,8 +49,8 @@ export function FileCard({
   const handleOpen = async () => {
     try {
       await openFile.mutateAsync({
-        storage_path: file.storage_path,
-        filename: file.filename,
+        file: { storage_path: file.storage_path, filename: file.filename },
+        sign,
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "開啟失敗")
@@ -56,8 +60,8 @@ export function FileCard({
   const handleDownload = async () => {
     try {
       await downloadFile.mutateAsync({
-        storage_path: file.storage_path,
-        filename: file.filename,
+        file: { storage_path: file.storage_path, filename: file.filename },
+        sign,
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "下載失敗")
@@ -84,6 +88,7 @@ export function FileCard({
         className="size-8 shrink-0 text-muted-foreground"
         aria-label="開啟"
         onClick={handleOpen}
+        disabled={openFile.isPending}
       >
         <ExternalLink className="size-4" />
       </Button>
@@ -93,6 +98,7 @@ export function FileCard({
         className="size-8 shrink-0 text-muted-foreground"
         aria-label="下載"
         onClick={handleDownload}
+        disabled={downloadFile.isPending}
       >
         <Download className="size-4" />
       </Button>

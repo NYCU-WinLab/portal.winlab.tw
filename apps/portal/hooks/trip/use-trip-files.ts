@@ -13,6 +13,14 @@ import { queryKeys } from "./query-keys"
 
 const SIGNED_URL_TTL_SECONDS = 60 * 10
 
+// Optional sign config passed by callers. If `signature` and `enabled` is
+// true, we stamp the corresponding corner. Otherwise the file is returned /
+// served exactly as it sits in storage.
+export type SignConfig = {
+  signature: string
+  corner: SignaturePosition
+} | null
+
 export function useTripFiles(tripId: string | undefined) {
   const supabase = createClient()
 
@@ -59,6 +67,8 @@ export function useTripFiles(tripId: string | undefined) {
   })
 }
 
+// Upload always stores the unsigned, converted PDF. Signing is now applied
+// at view / download time so that the toggle stays dynamic.
 export function useUploadTripFiles(tripId: string) {
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -67,7 +77,6 @@ export function useUploadTripFiles(tripId: string) {
     mutationFn: async (params: {
       userId: string
       files: File[]
-      signature?: { dataUrl: string; position: SignaturePosition } | null
       onProgress?: (done: number, total: number) => void
     }) => {
       const total = params.files.length
@@ -75,19 +84,12 @@ export function useUploadTripFiles(tripId: string) {
 
       for (const file of params.files) {
         const converted = await fileToPdf(file)
-        const blob = params.signature
-          ? await stampSignatureOnPdf(
-              converted.blob,
-              params.signature.dataUrl,
-              params.signature.position
-            )
-          : converted.blob
         const fileUuid = crypto.randomUUID()
         const path = tripFilePath(tripId, params.userId, fileUuid)
 
         const upload = await supabase.storage
           .from(TRIP_BUCKET)
-          .upload(path, blob, { contentType: "application/pdf" })
+          .upload(path, converted.blob, { contentType: "application/pdf" })
         if (upload.error) throw upload.error
 
         const insert = await supabase.from("trip_files").insert({
@@ -95,10 +97,9 @@ export function useUploadTripFiles(tripId: string) {
           user_id: params.userId,
           storage_path: path,
           filename: converted.filename,
-          size_bytes: blob.size,
+          size_bytes: converted.blob.size,
         })
         if (insert.error) {
-          // Best-effort cleanup of the orphaned object on DB failure.
           await supabase.storage.from(TRIP_BUCKET).remove([path])
           throw insert.error
         }
@@ -159,41 +160,73 @@ export function useDeleteTripFile(tripId: string) {
   })
 }
 
-// Open one file in a new tab via a short-lived signed URL.
+// --- Read sites: fetch + (optionally) stamp + open / save / zip --------
+
+async function fetchAndMaybeStamp(
+  supabase: ReturnType<typeof createClient>,
+  storagePath: string,
+  sign: SignConfig
+): Promise<Blob> {
+  const { data, error } = await supabase.storage
+    .from(TRIP_BUCKET)
+    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
+  if (error) throw error
+
+  const res = await fetch(data.signedUrl)
+  if (!res.ok) throw new Error(`下載失敗（${res.status}）`)
+  const raw = await res.blob()
+  if (!sign) return raw
+  return stampSignatureOnPdf(raw, sign.signature, sign.corner)
+}
+
+// Open in new tab. Always uses a blob URL since the bytes may have been
+// stamped client-side; revoke on next tick after the tab takes over.
 export function useOpenTripFile() {
   const supabase = createClient()
 
   return useMutation({
-    mutationFn: async (file: { storage_path: string; filename: string }) => {
-      const { data, error } = await supabase.storage
-        .from(TRIP_BUCKET)
-        .createSignedUrl(file.storage_path, SIGNED_URL_TTL_SECONDS, {
-          download: file.filename,
-        })
-      if (error) throw error
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer")
+    mutationFn: async (params: {
+      file: { storage_path: string; filename: string }
+      sign: SignConfig
+    }) => {
+      const blob = await fetchAndMaybeStamp(
+        supabase,
+        params.file.storage_path,
+        params.sign
+      )
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
     },
   })
 }
 
-// Bulk download helpers: build signed URLs, then stream into a zip.
+export function useDownloadSingleFile() {
+  const supabase = createClient()
 
-async function signMany(
-  supabase: ReturnType<typeof createClient>,
-  paths: string[]
-): Promise<Map<string, string>> {
-  const { data, error } = await supabase.storage
-    .from(TRIP_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS)
-  if (error) throw error
-  const map = new Map<string, string>()
-  for (const row of data ?? []) {
-    if (row.signedUrl && row.path) map.set(row.path, row.signedUrl)
-  }
-  return map
+  return useMutation({
+    mutationFn: async (params: {
+      file: { storage_path: string; filename: string }
+      sign: SignConfig
+    }) => {
+      const blob = await fetchAndMaybeStamp(
+        supabase,
+        params.file.storage_path,
+        params.sign
+      )
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = params.file.filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    },
+  })
 }
 
-// Admin: download every file uploaded by one user inside the trip.
+// Admin: zip every file from one member, stamping per the member's pref.
 export function useDownloadUserFiles() {
   const supabase = createClient()
 
@@ -202,17 +235,20 @@ export function useDownloadUserFiles() {
       tripName: string
       userName: string
       files: TripFileWithUser[]
+      memberSign: SignConfig // pre-resolved by caller from RPC
     }) => {
       if (params.files.length === 0) throw new Error("這位成員還沒有檔案")
-      const urlMap = await signMany(
-        supabase,
-        params.files.map((f) => f.storage_path)
-      )
       const used = new Set<string>()
-      const entries = params.files.map((f) => ({
-        name: uniquifyName(used, f.filename),
-        url: urlMap.get(f.storage_path) ?? "",
-      }))
+      const entries = await Promise.all(
+        params.files.map(async (f) => ({
+          name: uniquifyName(used, f.filename),
+          blob: await fetchAndMaybeStamp(
+            supabase,
+            f.storage_path,
+            params.memberSign
+          ),
+        }))
+      )
       await saveZip(
         `${safeFolderName(params.tripName)}_${safeFolderName(params.userName)}.zip`,
         entries
@@ -221,7 +257,9 @@ export function useDownloadUserFiles() {
   })
 }
 
-// Admin: download all files in trip, grouped into per-user folders.
+// Admin: zip every file in trip, stamping each according to its uploader's
+// pref. The caller passes a `Map<userId, SignConfig>` already resolved via
+// the RPC so we don't fan-out per-file lookups.
 export function useDownloadAllFiles() {
   const supabase = createClient()
 
@@ -229,47 +267,24 @@ export function useDownloadAllFiles() {
     mutationFn: async (params: {
       tripName: string
       files: TripFileWithUser[]
+      memberSigns: Map<string, SignConfig>
     }) => {
       if (params.files.length === 0) throw new Error("這個 trip 還沒有檔案")
-      const urlMap = await signMany(
-        supabase,
-        params.files.map((f) => f.storage_path)
-      )
       const usedPerFolder = new Map<string, Set<string>>()
-      const entries = params.files.map((f) => {
-        const folder = safeFolderName(f.user?.name ?? f.user_id ?? "unknown")
-        const used = usedPerFolder.get(folder) ?? new Set<string>()
-        usedPerFolder.set(folder, used)
-        const name = uniquifyName(used, f.filename)
-        return {
-          name: `${folder}/${name}`,
-          url: urlMap.get(f.storage_path) ?? "",
-        }
-      })
-      await saveZip(`${safeFolderName(params.tripName)}.zip`, entries)
-    },
-  })
-}
-
-// Member: single-file fallback when the user wants a local copy.
-export function useDownloadSingleFile() {
-  const supabase = createClient()
-
-  return useMutation({
-    mutationFn: async (file: { storage_path: string; filename: string }) => {
-      const { data, error } = await supabase.storage
-        .from(TRIP_BUCKET)
-        .createSignedUrl(file.storage_path, SIGNED_URL_TTL_SECONDS, {
-          download: file.filename,
+      const entries = await Promise.all(
+        params.files.map(async (f) => {
+          const folder = safeFolderName(f.user?.name ?? f.user_id ?? "unknown")
+          const used = usedPerFolder.get(folder) ?? new Set<string>()
+          usedPerFolder.set(folder, used)
+          const name = uniquifyName(used, f.filename)
+          const sign = (f.user_id && params.memberSigns.get(f.user_id)) || null
+          return {
+            name: `${folder}/${name}`,
+            blob: await fetchAndMaybeStamp(supabase, f.storage_path, sign),
+          }
         })
-      if (error) throw error
-      const a = document.createElement("a")
-      a.href = data.signedUrl
-      a.rel = "noopener noreferrer"
-      a.download = file.filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
+      )
+      await saveZip(`${safeFolderName(params.tripName)}.zip`, entries)
     },
   })
 }

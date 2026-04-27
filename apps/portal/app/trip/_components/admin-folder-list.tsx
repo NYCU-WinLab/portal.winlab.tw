@@ -8,8 +8,13 @@ import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import {
+  useTripMemberSignatures,
+  type MemberSignature,
+} from "@/hooks/trip/use-sign-prefs"
+import {
   useDownloadAllFiles,
   useDownloadUserFiles,
+  type SignConfig,
 } from "@/hooks/trip/use-trip-files"
 import type { TripFileWithUser } from "@/lib/trip/types"
 
@@ -38,23 +43,45 @@ function groupByUser(files: TripFileWithUser[]): Folder[] {
   )
 }
 
+// Build a map<userId, SignConfig> from the RPC result. A user appears only if
+// they have a signature AND have toggled signing on.
+function buildSignMap(
+  members: Map<string, MemberSignature> | undefined
+): Map<string, SignConfig> {
+  const out = new Map<string, SignConfig>()
+  if (!members) return out
+  for (const [userId, m] of members) {
+    if (m.enabled && m.signature) {
+      out.set(userId, { signature: m.signature, corner: m.corner })
+    }
+  }
+  return out
+}
+
 export function AdminFolderList({
+  tripId,
   tripName,
   files,
   isLoading,
   canDelete,
 }: {
+  tripId: string
   tripName: string
   files: TripFileWithUser[]
   isLoading: boolean
   canDelete: boolean
 }) {
   const folders = useMemo(() => groupByUser(files), [files])
+  const memberSigsQuery = useTripMemberSignatures(tripId)
+  const signMap = useMemo(
+    () => buildSignMap(memberSigsQuery.data),
+    [memberSigsQuery.data]
+  )
   const downloadAll = useDownloadAllFiles()
 
   const handleDownloadAll = async () => {
     try {
-      await downloadAll.mutateAsync({ tripName, files })
+      await downloadAll.mutateAsync({ tripName, files, memberSigns: signMap })
       toast.success("壓縮完成")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "下載失敗")
@@ -104,6 +131,7 @@ export function AdminFolderList({
               key={folder.userId}
               folder={folder}
               tripName={tripName}
+              memberSign={signMap.get(folder.userId) ?? null}
               canDelete={canDelete}
             />
           ))}
@@ -116,10 +144,12 @@ export function AdminFolderList({
 function AdminFolder({
   folder,
   tripName,
+  memberSign,
   canDelete,
 }: {
   folder: Folder
   tripName: string
+  memberSign: SignConfig
   canDelete: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -131,6 +161,7 @@ function AdminFolder({
         tripName,
         userName: folder.userName,
         files: folder.files,
+        memberSign,
       })
       toast.success("壓縮完成")
     } catch (error) {
@@ -177,6 +208,7 @@ function AdminFolder({
               key={file.id}
               tripId={file.trip_id}
               file={file}
+              sign={memberSign}
               canEdit={false}
               canDelete={canDelete}
             />
