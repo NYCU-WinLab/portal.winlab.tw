@@ -13,7 +13,7 @@ const apps = [
   { href: "/leave", label: "Leave", note: "請假登記" },
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/trip", label: "Trip", note: "出差文件" },
-  { href: "/profile", label: "Profile", note: "Your account" },
+  { href: "/profile", label: "Profile", note: "個人帳號" },
 ]
 
 export default async function Page() {
