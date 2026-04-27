@@ -17,7 +17,7 @@ export function useTripAdmin() {
       if (!user) return null
       const { data: profile } = await supabase
         .from("user_profiles")
-        .select("is_admin, roles")
+        .select("roles")
         .eq("id", user.id)
         .single()
       return profile
@@ -25,11 +25,13 @@ export function useTripAdmin() {
     enabled: !!user,
   })
 
+  // Trip admin is scoped to roles.trip only — the global is_admin flag does
+  // NOT confer trip admin, because signatures are personal data and we don't
+  // want app-level role bleed across the portal. Stays in lockstep with the
+  // SQL is_trip_admin() helper.
   const roles = data?.roles as Record<string, string[]> | undefined
   const tripRoles = roles?.trip
-  const isAdmin =
-    data?.is_admin === true ||
-    (Array.isArray(tripRoles) && tripRoles.includes("admin"))
+  const isAdmin = Array.isArray(tripRoles) && tripRoles.includes("admin")
 
   return { isAdmin, isLoading }
 }

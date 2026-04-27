@@ -100,7 +100,12 @@ export function useUploadTripFiles(tripId: string) {
           size_bytes: converted.blob.size,
         })
         if (insert.error) {
-          await supabase.storage.from(TRIP_BUCKET).remove([path])
+          const cleanup = await supabase.storage
+            .from(TRIP_BUCKET)
+            .remove([path])
+          if (cleanup.error) {
+            console.error("[trip] orphan storage cleanup failed", cleanup.error)
+          }
           throw insert.error
         }
 
@@ -142,15 +147,22 @@ export function useDeleteTripFile(tripId: string) {
 
   return useMutation({
     mutationFn: async (file: { id: string; storage_path: string }) => {
-      const { error: storageErr } = await supabase.storage
-        .from(TRIP_BUCKET)
-        .remove([file.storage_path])
-      if (storageErr) throw storageErr
+      // DB row is the source of truth — kill it first. If we removed the
+      // storage object first and then DB deletion failed (RLS, network),
+      // we'd leak a row pointing at nothing. The reverse case (DB row gone,
+      // storage object still around) is harmless: orphaned bytes get
+      // garbage-collected by a sweeper, RLS makes them unreadable anyway.
       const { error } = await supabase
         .from("trip_files")
         .delete()
         .eq("id", file.id)
       if (error) throw error
+      const cleanup = await supabase.storage
+        .from(TRIP_BUCKET)
+        .remove([file.storage_path])
+      if (cleanup.error) {
+        console.error("[trip] storage cleanup failed", cleanup.error)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
