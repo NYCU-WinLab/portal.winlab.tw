@@ -3,8 +3,9 @@
 import type { ApproveField } from "@/lib/approve/types"
 import { getCategoryDef } from "@/lib/approve/field-categories"
 
+import { SignaturePad } from "@/components/signature-pad"
+
 import type { PageSize } from "./pdf-canvas"
-import { SignaturePad } from "./signature-pad"
 
 export function SigningField({
   field,
