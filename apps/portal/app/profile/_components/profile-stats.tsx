@@ -33,7 +33,7 @@ export function ProfileStatsView({ stats }: { stats: ProfileStats }) {
               : `NT$ ${bento.total_spent}（≈ ${spendInReference(
                   bento.total_spent,
                   product
-                )} ${product.unit}${product.emoji} ${product.name}）`
+                )} ${product.unit} ${product.name}）`
           }
         />
         <FieldRow

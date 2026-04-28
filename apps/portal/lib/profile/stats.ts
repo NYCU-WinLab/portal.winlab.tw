@@ -38,14 +38,13 @@ export type ProfileStats = {
 export type ReferenceProduct = {
   name: string
   price: number
-  emoji: string
   unit: string
 }
 
 export const REFERENCE_PRODUCTS: ReferenceProduct[] = [
-  { name: "7-11 茶葉蛋", price: 10, emoji: "🥚", unit: "顆" },
-  { name: "大樂透", price: 50, emoji: "🎰", unit: "注" },
-  { name: "麥當勞大麥克", price: 75, emoji: "🍔", unit: "顆" },
+  { name: "7-11 茶葉蛋", price: 10, unit: "顆" },
+  { name: "大樂透", price: 50, unit: "注" },
+  { name: "麥當勞大麥克", price: 75, unit: "顆" },
 ]
 
 export function pickReferenceProduct(): ReferenceProduct {
