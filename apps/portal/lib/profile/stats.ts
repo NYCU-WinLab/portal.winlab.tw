@@ -5,7 +5,7 @@ export type BentoStats = {
   total_orders: number
   total_spent: number
   unique_items: number
-  top_items: Array<{ name: string; count: number }>
+  top_item: { name: string; restaurant_name: string; count: number } | null
 }
 
 export type LeaveStats = {
