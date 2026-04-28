@@ -11,6 +11,7 @@ import {
   useCloseOrder,
   useDeleteOrder,
   useOrder,
+  useReopenOrder,
 } from "@/hooks/bento/use-orders"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -26,6 +27,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
   const router = useRouter()
   const closeOrder = useCloseOrder()
   const deleteOrder = useDeleteOrder()
+  const reopenOrder = useReopenOrder()
 
   if (!order) {
     return (
@@ -66,6 +68,16 @@ export function OrderDetail({ orderId }: { orderId: string }) {
     }
   }
 
+  const handleReopen = async () => {
+    try {
+      await reopenOrder.mutateAsync(orderId)
+      toast.success("訂單已重新開啟")
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error("重新開啟失敗")
+      toast.error(err.message)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <OrderDetailHeader order={order} />
@@ -75,14 +87,17 @@ export function OrderDetail({ orderId }: { orderId: string }) {
           <AddOrderItemDialog orderId={orderId} />
           {isAdmin && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClose}
-                disabled={closeOrder.isPending}
-              >
-                {closeOrder.isPending ? "關閉中..." : "關閉訂單"}
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button variant="outline" size="sm">
+                    關閉訂單
+                  </Button>
+                }
+                title="確定要關閉訂單嗎？"
+                description="關閉後訂單將停止接受新增，可透過重新開啟恢復。"
+                confirmText="關閉"
+                onConfirm={handleClose}
+              />
               <ConfirmDialog
                 trigger={
                   <Button variant="ghost" size="sm">
@@ -97,6 +112,22 @@ export function OrderDetail({ orderId }: { orderId: string }) {
               />
             </>
           )}
+        </div>
+      )}
+
+      {!isActive && isAdmin && (
+        <div className="flex flex-wrap gap-2">
+          <ConfirmDialog
+            trigger={
+              <Button variant="outline" size="sm">
+                重新開啟訂單
+              </Button>
+            }
+            title="確定要重新開啟訂單嗎？"
+            description="重新開啟後，訂單將可以繼續接受訂餐。"
+            confirmText="開啟"
+            onConfirm={handleReopen}
+          />
         </div>
       )}
 
