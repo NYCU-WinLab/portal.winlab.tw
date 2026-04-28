@@ -15,7 +15,7 @@ export function ProfileStatsView({ stats }: { stats: ProfileStats }) {
   const product = pickReferenceProduct()
 
   const { bento, leave, approve, trip } = stats
-  const top = bento.top_items
+  const top = bento.top_item
   const variety =
     bento.total_orders > 0
       ? Math.round((bento.unique_items / bento.total_orders) * 100)
@@ -38,15 +38,11 @@ export function ProfileStatsView({ stats }: { stats: ProfileStats }) {
         />
         <FieldRow
           label="本命便當"
-          value={top[0] ? `${top[0].name} × ${top[0].count}` : "還沒有最愛"}
-        />
-        <FieldRow
-          label="第二名"
-          value={top[1] ? `${top[1].name} × ${top[1].count}` : "—"}
-        />
-        <FieldRow
-          label="第三名"
-          value={top[2] ? `${top[2].name} × ${top[2].count}` : "—"}
+          value={
+            top
+              ? `${top.restaurant_name} ${top.name} × ${top.count}`
+              : "還沒有最愛"
+          }
         />
         <FieldRow
           label="嚐鮮指數"
