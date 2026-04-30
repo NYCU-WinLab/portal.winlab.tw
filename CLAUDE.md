@@ -12,6 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 業務 app = `apps/portal/app/<name>/` 底下的 route segment，**不是** 獨立的 Turborepo workspace。要新增 app 就在 `apps/portal/app/` 下開資料夾，別去 `apps/*` 開新 Next.js。
 
+**例外**：若該 app 的 design system 跟 portal **明顯不同**（不同字體、不同版面 metaphor），才允許獨立 subdomain workspace。目前唯一一個是 `apps/gallery`（`gallery.winlab.tw`，Instrument Serif、拍立得錯落 layout）。新建獨立 workspace 前先問 maintainer，不要因為怕碰共用骨架就直接開新 workspace 偷懶 —— 這是 owner 意識問題。
+
 ## 技術棧
 
 - **Bun** 1.3+（`packageManager` 鎖定）— 一律 `bun` / `bunx`，不要 `npm` / `pnpm`
@@ -50,14 +52,16 @@ turbo run typecheck --filter=portal # 繞過 bun wrapper 直接下 turbo
 
 ### Monorepo 拓撲
 
-- `apps/portal` — 唯一消費端 Next.js app（workspace 名稱就叫 `portal`）。所有業務 route（`/bento`、`/invoice`、`/approval`、`/profile`…）都進這裡。
-- `packages/ui` — 設計系統 + shadcn 元件的**唯一真實源**。`shadcn add` 進來的東西住這裡，不是 `apps/portal`。
+- `apps/portal` — 主消費端 Next.js app（workspace 名稱就叫 `portal`，跑 :3000）。多數業務 route（`/bento`、`/approve`、`/leave`、`/profile`…）都進這裡。
+- `apps/gallery` — `gallery.winlab.tw`，獨立 subdomain workspace（跑 :3001）。Design system 跟 portal 不同（Instrument Serif、拍立得錯落 layout），但共用 `@workspace/ui` 的 `<PortalShell>` 四角骨架。
+- `apps/mcp` — MCP server，對外暴露 portal 資料的 MCP 介面。
+- `packages/ui` — 設計系統 + shadcn 元件的**唯一真實源**，所有 app 共用。`<PortalShell containerClassName=...>` 在這裡，gallery 與 portal 都從這裡 import。
 - `packages/eslint-config` — flat config 三個 preset：`base` / `next-js` / `react-internal`
 - `packages/typescript-config` — `base.json` / `nextjs.json` / `react-library.json`
 
 ### Path aliases
 
-- `@/*` → `apps/portal/*`（app-local）
+- `@/*` → 各 app 自己的 root（在 `apps/portal/tsconfig.json` 與 `apps/gallery/tsconfig.json` 各自指）
 - `@workspace/ui/*` → `packages/ui/src/*`（跨 workspace）
 
 ### Supabase 分層（住在 `apps/portal/lib/supabase/`）
