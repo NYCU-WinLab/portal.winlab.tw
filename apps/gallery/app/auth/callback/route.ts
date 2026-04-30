@@ -1,5 +1,7 @@
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
+import { clearStaleSupabaseCookiesOnResponse } from "@/lib/auth/clear-stale-cookies"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
@@ -31,5 +33,17 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // Failure path: most likely cause is a ghost `sb-*` cookie left over from
+  // portal at `.winlab.tw` scope poisoning @supabase/ssr's PKCE state.
+  // Clear every sb-* cookie (including code-verifier — the current
+  // round-trip has already failed, its verifier is worthless) on every
+  // plausible domain and send the user back to login with ?stale=1.
+  const retry = new URL("/auth/login", origin)
+  retry.searchParams.set("stale", "1")
+  const response = NextResponse.redirect(retry.toString())
+
+  const cookieStore = await cookies()
+  clearStaleSupabaseCookiesOnResponse(response, cookieStore)
+
+  return response
 }
