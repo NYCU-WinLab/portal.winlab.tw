@@ -5,6 +5,18 @@ import { NextResponse, type NextRequest } from "next/server"
 // and the page itself also gates redundantly. This middleware refreshes the
 // session token and bounces unauth users out of /upload to /auth/login.
 export async function updateSession(request: NextRequest) {
+  // OAuth fallback. If Supabase's "Redirect URLs" allow-list is missing our
+  // /auth/callback URL, Supabase quietly falls back to Site URL (root) and
+  // dumps the PKCE `code` query string there. Catch it and forward to the
+  // real callback so the exchange still finishes — user shouldn't have to
+  // care about a Dashboard misconfiguration.
+  const oauthCode = request.nextUrl.searchParams.get("code")
+  if (oauthCode && request.nextUrl.pathname !== "/auth/callback") {
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/callback"
+    return NextResponse.redirect(url)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
