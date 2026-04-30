@@ -14,6 +14,7 @@ const apps = [
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/trip", label: "Trip", note: "出差文件" },
   { href: "/profile", label: "Profile", note: "個人帳號" },
+  { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
 ]
 
 export default async function Page() {
