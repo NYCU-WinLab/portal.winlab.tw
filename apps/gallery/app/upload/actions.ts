@@ -13,6 +13,8 @@ const ALLOWED_MIME = new Set([
   "image/webp",
   "image/gif",
   "image/avif",
+  "image/heic",
+  "image/heif",
 ])
 
 export async function uploadGalleryImage(
@@ -116,6 +118,10 @@ function guessExtension(mime: string, filename: string): string {
       return "gif"
     case "image/avif":
       return "avif"
+    case "image/heic":
+      return "heic"
+    case "image/heif":
+      return "heif"
     default:
       return "bin"
   }
