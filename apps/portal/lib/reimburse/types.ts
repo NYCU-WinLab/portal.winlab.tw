@@ -101,9 +101,3 @@ export interface Ingress {
 export type Transaction =
   | ({ type: "egress" } & Reimbursement)
   | ({ type: "ingress" } & Ingress)
-
-export const REIMBURSE_BUCKETS = {
-  invoices: "reimburse-invoices",
-  signatures: "reimburse-signatures",
-  advances: "reimburse-advances",
-} as const
