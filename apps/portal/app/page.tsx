@@ -13,6 +13,7 @@ const apps = [
   { href: "/leave", label: "Leave", note: "請假登記" },
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/trip", label: "Trip", note: "出差文件" },
+  { href: "/debt", label: "Debt", note: "分帳記帳" },
   { href: "/profile", label: "Profile", note: "個人帳號" },
   { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
 ]
