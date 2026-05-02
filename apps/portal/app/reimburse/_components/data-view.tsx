@@ -8,7 +8,6 @@ import type { Ingress, Reimbursement, Transaction } from "@/lib/reimburse/types"
 
 import { AddEgressDialog } from "./add-egress-dialog"
 import { AddIngressDialog } from "./add-ingress-dialog"
-import { AddReimburseDialog } from "./add-reimburse-dialog"
 import { getUnifiedColumns } from "./unified-columns"
 import { UnifiedChart } from "./unified-chart"
 import { UnifiedTable } from "./unified-table"
@@ -62,7 +61,6 @@ export function DataView({ egressData, ingressData, isAdmin }: DataViewProps) {
         </Badge>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <AddReimburseDialog />
             <AddEgressDialog />
             <AddIngressDialog />
           </div>
