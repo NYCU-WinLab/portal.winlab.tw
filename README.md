@@ -39,6 +39,12 @@ bun run format                    # prettier --write
 
 目前最完整的範例是 [`apps/portal/app/bento/`](./apps/portal/app/bento)，新 app 照它的版型做即可。
 
+### 例外：獨立 subdomain workspace
+
+當 app 的 design system 跟 portal **明顯不同**（字體、版面 metaphor），才開新 workspace 在 `apps/<name>/`，跑 subdomain（如 `gallery.winlab.tw`）。骨架還是 `<PortalShell>`（住在 `@workspace/ui`），但字體、容器寬度、互動可以自己玩。
+
+目前的範例是 [`apps/gallery/`](./apps/gallery)（Instrument Serif、拍立得錯落 layout）。**先問 maintainer 才開新 workspace**，避免重複造輪子。
+
 ## 怎麼加 shadcn 元件
 
 ```bash

@@ -32,8 +32,14 @@
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
+    "next": "16.1.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19"
   },
   "exports": {
     "./globals.css": "./src/styles/globals.css",

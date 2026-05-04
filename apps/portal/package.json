@@ -17,6 +17,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "@tabler/icons-react": "^3.41.1",
+    "@tanstack/react-table": "^8.21.3",
     "@workspace/ui": "workspace:*",
     "client-zip": "^2.5.0",
     "next": "16.1.6",
@@ -27,6 +28,7 @@
     "react-pdf": "^9",
     "react-rnd": "^10.5.3",
     "react-signature-canvas": "^1",
+    "recharts": "^2.15.4",
     "resend": "^6.12.2"
   },
   "devDependencies": {
