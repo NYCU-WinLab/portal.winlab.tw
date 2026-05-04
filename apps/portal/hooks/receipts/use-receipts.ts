@@ -3,7 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { createClient } from "@/lib/supabase/client"
-
+import {
+  RECEIPT_FILE_EXT,
+  RECEIPT_MIME_PDF,
+  fileToReceiptPdf,
+  sanitizeFilename,
+} from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
   toReceipt,
@@ -15,8 +20,7 @@ import {
 import { queryKeys } from "./query-keys"
 
 const TABLE = "receipts"
-const SIGNED_URL_TTL = 60 * 60 // one hour — long enough that a tab open all
-// afternoon doesn't go stale
+const SIGNED_URL_TTL = 60 * 60 // one hour — covers the time a tab stays open
 
 export function useReceipts() {
   const supabase = createClient()
@@ -27,9 +31,13 @@ export function useReceipts() {
         .from(TABLE)
         .select("*")
         .order("created_at", { ascending: false })
-      if (error) throw error
+      if (error) {
+        console.error("[receipts] list query failed", error)
+        throw new Error(error.message || "讀取收據失敗")
+      }
       return (data as DatabaseReceipt[]).map(toReceipt)
     },
+    retry: 2,
   })
 }
 
@@ -56,14 +64,14 @@ export function useUploadReceipt() {
 
   return useMutation({
     mutationFn: async ({ name, file }: { name: string; file: File }) => {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin"
       const id = crypto.randomUUID()
-      const path = `${id}/${id}.${ext}`
+      const path = `${id}/${id}.${RECEIPT_FILE_EXT}`
+      const pdfBlob = await fileToReceiptPdf(file)
 
       const { error: uploadError } = await supabase.storage
         .from(RECEIPTS_BUCKET)
-        .upload(path, file, {
-          contentType: file.type || "application/octet-stream",
+        .upload(path, pdfBlob, {
+          contentType: RECEIPT_MIME_PDF,
           upsert: false,
         })
       if (uploadError) throw uploadError
@@ -74,7 +82,7 @@ export function useUploadReceipt() {
         .select()
         .single()
       if (error) {
-        // best-effort cleanup; orphaned object is preferable to a half-row
+        // best-effort cleanup; orphan object beats half a row
         await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
         throw error
       }
@@ -109,6 +117,27 @@ export function useUpdateReceiptStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
+    },
+  })
+}
+
+export function useDownloadReceipt() {
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({ name, path }: { name: string; path: string }) => {
+      const { data, error } = await supabase.storage
+        .from(RECEIPTS_BUCKET)
+        .download(path)
+      if (error) throw error
+      const url = URL.createObjectURL(data)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${sanitizeFilename(name)}.${RECEIPT_FILE_EXT}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
     },
   })
 }

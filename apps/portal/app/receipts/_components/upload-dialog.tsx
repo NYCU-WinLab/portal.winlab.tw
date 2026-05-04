@@ -18,6 +18,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 
 import { useUploadReceipt } from "@/hooks/receipts/use-receipts"
+import { isSupportedReceiptFile } from "@/lib/receipts/file"
 
 export function UploadDialog() {
   const [open, setOpen] = useState(false)
@@ -33,7 +34,11 @@ export function UploadDialog() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!file) {
-      toast.error("請選一張收據圖片")
+      toast.error("請選一張收據圖片或 PDF")
+      return
+    }
+    if (!isSupportedReceiptFile(file)) {
+      toast.error("只支援 JPG / PNG / WebP / PDF — HEIC 請先轉檔")
       return
     }
 
@@ -69,7 +74,7 @@ export function UploadDialog() {
           <DialogHeader>
             <DialogTitle>上傳收據</DialogTitle>
             <DialogDescription>
-              新增一筆收據記錄，預設狀態為「審核中」。
+              圖片會自動包成 PDF；PDF 直接保留。預設狀態為「審核中」。
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -87,15 +92,18 @@ export function UploadDialog() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="receipt-file">
-                收據圖片 <span className="text-destructive">*</span>
+                收據檔案 <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="receipt-file"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                JPG / PNG / WebP / PDF
+              </p>
             </div>
           </div>
           <DialogFooter>
