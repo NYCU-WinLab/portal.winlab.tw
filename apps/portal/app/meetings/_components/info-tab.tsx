@@ -18,7 +18,7 @@ const INFO = [
   {
     label: "請假系統",
     value: "leave.winlab.tw",
-    href: "https://leave.winlab.tw",
+    href: "https://portal.winlab.tw/leave",
   },
   {
     label: "便當系統",
