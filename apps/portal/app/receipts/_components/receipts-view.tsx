@@ -13,6 +13,7 @@ import {
 import { useReceipts } from "@/hooks/receipts/use-receipts"
 
 import { ReceiptPreviewDialog } from "./receipt-preview-dialog"
+import { ReceiptRowActions } from "./row-actions"
 import { StatusSelect } from "./status-select"
 import { UploadDialog } from "./upload-dialog"
 
@@ -39,6 +40,7 @@ export function ReceiptsView() {
               <TableHead>名稱</TableHead>
               <TableHead className="w-20">檔案</TableHead>
               <TableHead className="w-40">狀態</TableHead>
+              <TableHead className="w-12 text-right">動作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -47,7 +49,7 @@ export function ReceiptsView() {
             ) : !receipts || receipts.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={4}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   {error ? (
@@ -74,6 +76,13 @@ export function ReceiptsView() {
                   <TableCell>
                     <StatusSelect id={r.id} value={r.status} />
                   </TableCell>
+                  <TableCell className="text-right">
+                    <ReceiptRowActions
+                      id={r.id}
+                      name={r.name}
+                      path={r.imagePath}
+                    />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -97,6 +106,9 @@ function SkeletonRows() {
           </TableCell>
           <TableCell>
             <Skeleton className="h-9 w-32" />
+          </TableCell>
+          <TableCell className="text-right">
+            <Skeleton className="ml-auto size-9 rounded-md" />
           </TableCell>
         </TableRow>
       ))}
