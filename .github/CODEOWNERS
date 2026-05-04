@@ -1,9 +1,10 @@
 # 每個 PR 會自動 request 對應 owner 的 review。
 # 規則從下往上匹配，越下面越具體。
 #
-# 等團隊長大再按 app / 模組拆分。現在單人 repo 先全部 fallback。
+# Fallback 走 portal-maintainers team；team 成員可互審。
+# 敏感路徑（shared infra / CI / repo 設定）仍鎖個人 owner。
 
-*                                         @zyx1121
+*                                         @NYCU-WinLab/portal-maintainers
 
 # === Shared infra（改動需特別小心，會影響所有 app） ===
 /apps/portal/middleware.ts                @zyx1121
