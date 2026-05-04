@@ -1,77 +1,66 @@
 "use server"
 
-import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
+import { ALLOWED_MIME, inferMimeFromFilename } from "@/lib/gallery/mime"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
-const ALLOWED_MIME = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/avif",
-  "image/heic",
-  "image/heif",
-])
-
-export async function uploadGalleryImage(
-  formData: FormData
+/**
+ * Registers a gallery row after the browser uploads the file directly to
+ * Supabase Storage — avoids Vercel's ~4.5MB Server Action body limit (413).
+ */
+export async function registerGalleryImage(
+  name: string,
+  imagePath: string
 ): Promise<ActionResult> {
-  const name = (formData.get("name") as string | null)?.trim() ?? ""
-  const file = formData.get("file") as File | null
-
-  if (!name) return { ok: false, error: "Name is required." }
-  if (!file || !(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Pick an image file." }
-  }
-
-  const resolvedMime = resolveImageMimeType(file)
-  if (!resolvedMime) {
-    return {
-      ok: false,
-      error: `Unsupported file type: ${file.type || "unknown"}. Use JPEG, PNG, WebP, GIF, AVIF, or HEIC.`,
-    }
-  }
-  if (!ALLOWED_MIME.has(resolvedMime)) {
-    return { ok: false, error: `Unsupported file type: ${resolvedMime}` }
-  }
+  const trimmed = name.trim()
+  if (!trimmed) return { ok: false, error: "Name is required." }
+  if (!imagePath) return { ok: false, error: "Missing image path." }
 
   const supabase = await createClient()
-
-  // Confirm we're signed in — RLS will reject otherwise but we want a nice
-  // error message instead of a cryptic 403.
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Not signed in." }
 
-  const ext = guessExtension(resolvedMime, file.name)
-  // Path layout `{user_id}/{uuid}.{ext}` — first segment doubles as ownership
-  // for storage RLS (see migration's storage policies).
-  const objectPath = `${userId}/${randomUUID()}.${ext}`
+  if (!isValidClientObjectPath(imagePath, userId)) {
+    return { ok: false, error: "Invalid image path." }
+  }
 
-  const { error: uploadError } = await supabase.storage
-    .from("gallery")
-    .upload(objectPath, file, {
-      contentType: resolvedMime,
-      upsert: false,
-    })
+  const fileName = imagePath.slice(userId.length + 1)
+  let uploaded = false
+  for (let attempt = 0; attempt < 5 && !uploaded; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 120))
+    }
+    const { data: files, error: listError } = await supabase.storage
+      .from("gallery")
+      .list(userId, { limit: 1000 })
 
-  if (uploadError) {
-    return { ok: false, error: `Upload failed: ${uploadError.message}` }
+    if (listError) {
+      return {
+        ok: false,
+        error: `Could not verify upload: ${listError.message}`,
+      }
+    }
+    uploaded = files?.some((f) => f.name === fileName) ?? false
+  }
+  if (!uploaded) {
+    return {
+      ok: false,
+      error: "File not found in storage. Try uploading again.",
+    }
   }
 
   const { error: insertError } = await supabase.from("gallery_images").insert({
-    name,
-    image_path: objectPath,
+    name: trimmed,
+    image_path: imagePath,
     created_by: userId,
   })
 
   if (insertError) {
-    // Best-effort cleanup of the orphan object.
-    await supabase.storage.from("gallery").remove([objectPath])
+    await supabase.storage.from("gallery").remove([imagePath])
     return {
       ok: false,
       error: `Database insert failed: ${insertError.message}`,
@@ -140,63 +129,19 @@ export async function renameGalleryImage(
   return { ok: true }
 }
 
-/** Browsers / OS file pickers often send "" or application/octet-stream. */
-function resolveImageMimeType(file: File): string | null {
-  let t = file.type.trim().toLowerCase()
-  if (t === "image/jpg") t = "image/jpeg"
+const UUID_FILE_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.([a-z0-9]{2,5})$/i
 
-  if (t && t !== "application/octet-stream" && ALLOWED_MIME.has(t)) {
-    return t
-  }
+function isValidClientObjectPath(imagePath: string, userId: string): boolean {
+  if (!imagePath.startsWith(`${userId}/`)) return false
+  const rest = imagePath.slice(userId.length + 1)
+  if (!rest || rest.includes("/") || rest.includes("..")) return false
 
-  const inferred = inferMimeFromFilename(file.name)
-  if (inferred && ALLOWED_MIME.has(inferred)) return inferred
-
-  return null
-}
-
-function inferMimeFromFilename(filename: string): string | null {
-  const ext = filename.split(".").pop()?.toLowerCase()
-  switch (ext) {
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg"
-    case "png":
-      return "image/png"
-    case "webp":
-      return "image/webp"
-    case "gif":
-      return "image/gif"
-    case "avif":
-      return "image/avif"
-    case "heic":
-      return "image/heic"
-    case "heif":
-      return "image/heif"
-    default:
-      return null
-  }
-}
-
-function guessExtension(mime: string, filename: string): string {
-  const fromName = filename.split(".").pop()?.toLowerCase()
-  if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
-  switch (mime) {
-    case "image/jpeg":
-      return "jpg"
-    case "image/png":
-      return "png"
-    case "image/webp":
-      return "webp"
-    case "image/gif":
-      return "gif"
-    case "image/avif":
-      return "avif"
-    case "image/heic":
-      return "heic"
-    case "image/heif":
-      return "heif"
-    default:
-      return "bin"
-  }
+  const m = UUID_FILE_RE.exec(rest)
+  if (!m?.[1]) return false
+  const ext = m[1].toLowerCase()
+  const pseudoMime =
+    ext === "jpg" ? "image/jpeg" : inferMimeFromFilename(`x.${ext}`)
+  if (!pseudoMime || !ALLOWED_MIME.has(pseudoMime)) return false
+  return true
 }
