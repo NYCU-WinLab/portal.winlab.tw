@@ -13,16 +13,10 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
-
 import { useAddMeeting } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
+
+import { PresenterSelect } from "./presenter-select"
 
 interface Props {
   year: number
@@ -106,22 +100,11 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
           {!isHoliday && (
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
-              <Select
+              <PresenterSelect
+                users={users}
                 value={presenterUserId}
-                onValueChange={setPresenterUserId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇報告人" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">（未指定）</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name ?? u.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onSelect={setPresenterUserId}
+              />
             </div>
           )}
         </div>
