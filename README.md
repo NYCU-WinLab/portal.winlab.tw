@@ -1,98 +1,115 @@
 # portal.winlab.tw
 
-NYCU [WinLab](https://winlab.tw) 的內部入口。根域名 `portal.winlab.tw` 下掛多個業務 app（`/bento`、`/invoice`、`/approval`…），每個 app 由不同人維護、業務邏輯獨立，但共用：
+The internal portal for NYCU [WinLab](https://winlab.tw). The root domain hosts a handful of business apps under `portal.winlab.tw/<name>`, each owned by different people but sharing the same:
 
-- **Auth** — Supabase Auth + Keycloak OIDC
-- **Profile / session** — 一份 user state 跨整個 portal
-- **Design system** — 元件庫、顆粒度、feedback UX 規範
+- **Auth** — Supabase Auth fronted by Keycloak (OIDC)
+- **Profile / session** — one user state across the whole portal
+- **Design system** — components, spacing, feedback UX
 
-## 技術棧
+## Stack
 
-Bun 1.3 · Turborepo · Next.js 16（App Router + Turbopack）· React 19 · Tailwind v4 · shadcn/ui · Supabase（SSR cookies）· TanStack Query v5 · Keycloak（Supabase OIDC provider）
+Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tailwind v4 · shadcn/ui · Supabase (`@supabase/ssr`) · TanStack Query v5 · Keycloak (Supabase OIDC provider) · pdf-lib
 
-## 上手
+## Apps
+
+| Path         | What it is                                                      |
+| ------------ | --------------------------------------------------------------- |
+| `/`          | Home — welcome card + nav to every app                          |
+| `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`) |
+| `/approve`   | Document signing with PDF field placement + email outbox        |
+| `/bento`     | Lunch-ordering for the lab — orders, menus, realtime            |
+| `/debt`      | Bill-splitting + monthly settlement cron                        |
+| `/leave`     | Monday-meeting attendance sign-ups                              |
+| `/meetings`  | Lab-meeting weekly schedule + teacher papers                    |
+| `/profile`   | Personal account + bento / leave / approve / trip stats         |
+| `/receipts`  | Admin-only receipt review (PDF archive workflow)                |
+| `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
+| `/trip`      | Travel-document uploads with admin folder export                |
+
+Two apps live on their own subdomains because their design system diverges from portal:
+
+- [`apps/gallery`](./apps/gallery) — `gallery.winlab.tw`, the lab's art wall (Instrument Serif, polaroid layout)
+- [`apps/mcp`](./apps/mcp) — `mcp.winlab.tw`, an MCP server exposing portal data over OAuth 2.1
+
+## Get started
 
 ```bash
 bun install
-cp apps/portal/.env.example apps/portal/.env.local  # 填 Supabase 兩把 key
+cp apps/portal/.env.example apps/portal/.env.local   # fill the two Supabase keys
 bun run dev                                          # http://localhost:3000
 ```
 
-`.env.local` 需要的值找 [@zyx1121](https://github.com/zyx1121)。Keycloak 相關設定全在 Supabase / Keycloak Dashboard，不進 repo。
+`.env.local` values live with [@zyx1121](https://github.com/zyx1121). Keycloak setup happens entirely in the Supabase + Keycloak dashboards — never in code.
 
-## 常用指令
+## Common commands
 
 ```bash
-bun run dev                       # 全棧 dev
-bun run dev --filter=portal       # 只跑 portal
+bun run dev                       # everything (portal :3000)
+bun run dev --filter=portal       # just portal
 bun run build                     # turbo build
 bun run typecheck                 # tsc --noEmit
 bun run lint                      # eslint
 bun run format                    # prettier --write
 ```
 
-沒裝 test runner — 要加先討論。
+No test runner yet — bring it up in an issue before adding one.
 
-## 怎麼加新的 app
+## Adding a new app
 
-業務 app = `apps/portal/app/<name>/` 底下的 route segment，**不是** 獨立 Turborepo workspace。要新增 app 就在 `apps/portal/app/` 下開資料夾，包一層 `<PortalShell appName="..." appHref="/<name>">` 就有 portal 骨架了。
+A business app is a `apps/portal/app/<name>/` route segment, **not** a separate Turborepo workspace. To start a new one, drop a folder under `apps/portal/app/`, wrap it with `<PortalShell appName="..." appHref="/<name>">`, and you've got the chrome for free.
 
-目前最完整的範例是 [`apps/portal/app/bento/`](./apps/portal/app/bento)，新 app 照它的版型做即可。
+The most complete reference today is [`apps/portal/app/bento/`](./apps/portal/app/bento) — copy that layout for the next app.
 
-### 例外：獨立 subdomain workspace
+### When to break out into a subdomain workspace
 
-當 app 的 design system 跟 portal **明顯不同**（字體、版面 metaphor），才開新 workspace 在 `apps/<name>/`，跑 subdomain（如 `gallery.winlab.tw`）。骨架還是 `<PortalShell>`（住在 `@workspace/ui`），但字體、容器寬度、互動可以自己玩。
+Only when the app's design system genuinely diverges from portal — different fonts, different layout metaphor. Otherwise, keep it inside `apps/portal/app/`. Ask a maintainer before opening a new workspace; do not create one just to dodge the shared shell.
 
-目前的範例是 [`apps/gallery/`](./apps/gallery)（Instrument Serif、拍立得錯落 layout）。**先問 maintainer 才開新 workspace**，避免重複造輪子。
+The lone example is [`apps/gallery`](./apps/gallery), which earned its own subdomain because it uses Instrument Serif and a polaroid scatter layout.
 
-## 怎麼加 shadcn 元件
+## Adding shadcn components
 
 ```bash
 bunx shadcn@latest add <component> -c apps/portal
 ```
 
-儘管帶 `-c apps/portal`，檔案會寫到 `packages/ui/src/components/`（跨 workspace 共用）。別手動往 `apps/portal/components/` 丟原始 shadcn primitive。
+Even though the flag points at `apps/portal`, the file lands in `packages/ui/src/components/` (workspace-shared). Do not drop raw shadcn primitives directly into `apps/portal/components/`.
 
-## Design system 規範（重點摘要）
+## Design system at a glance
 
-- **Layout** 統一用 `<PortalShell>`：TL 當前 app、TR app 內 nav、BL 回 portal 首頁、BR ©
-- **Card 殼** `border + rounded-xl + bg-card`，無 shadow、無 ring
-- **間距顆粒度**：section 間 `gap-10`、section 內 `gap-4`、card list 間 `gap-3`、list card padding `p-4`
-- **Feedback**：notification 用 `toast`（sonner）、destructive 確認用 `ConfirmDialog`，**不要** `alert()` / `confirm()`
-- **SDK-first**：Server Component → Server Action → Client Component → Route Handler（最後才開）；非必要不寫 API route
+- **Layout** — every app uses `<PortalShell>`: TL = current app, TR = in-app nav, BL = back to portal home, BR = ©
+- **Cards** — `border + rounded-xl + bg-card`, no shadow, no ring
+- **Spacing rhythm** — `gap-10` between sections, `gap-4` inside a section, `gap-3` between list cards, `p-4` for list-card padding
+- **Feedback** — `toast` from sonner for messages; `AlertDialog` (or local `ConfirmDialog`) for destructive confirms. **No** `alert()`, **no** `confirm()`
+- **SDK-first** — Server Component → Server Action → Client Component → Route Handler (last resort). Avoid wrapping Supabase in API routes; trust RLS
 
-完整規範與架構細節：[`CLAUDE.md`](./CLAUDE.md)（給 Claude Code 讀的，但人類也看得懂）。
+The full spec lives in [`CLAUDE.md`](./CLAUDE.md). Written for Claude Code, but humans read it fine.
 
-## 開發流程
+## Workflow
 
-### Branch
+### Branches
 
-- 從 `main` 開 branch
-- 命名：`<type>/<short-description>`，例：`feat/profile-avatar-upload`、`fix/bento-order-close-race`
-- `main` 被鎖，不能直推
+- Branch off `main`. `main` is locked — direct pushes are rejected.
+- Naming: `<type>/<short-description>`, e.g. `feat/profile-avatar-upload`, `fix/bento-order-close-race`.
 
-### Commit
+### Commits
 
-Conventional Commits — description 用英文、有人味：
+Conventional Commits, English description, with personality:
 
 ```
 feat: add bento order auto-close timer
 fix: stop the infinite loop from eating all the RAM
 chore: feed dependencies their latest treats
-docs: ...
-refactor: ...
-test: ...
-perf: ...
-style: ...
 ```
 
-### PR
+A commit-msg hook rejects malformed messages, so you cannot land a bad header by accident.
 
-- 標題照 commit 風格
-- Body 講 **why** 和 **what changed**，別只貼 commit messages
-- 等 CI 綠 + review pass 才 merge
-- 自己先把 PR 走一遍再請人看，改完 conversation mark resolved
+### Pull requests
+
+- PR title follows the same Conventional Commits format
+- Body explains the **why** and **what changed** — not a copy of commit messages
+- Self-review before requesting one; resolve conversations as you address them
+- Wait for CI green; deployments to Vercel may need owner authorization for outside contributors (see `CONTRIBUTING.md`)
 
 ## Contributors
 
-- [@zyx1121](https://github.com/zyx1121)（Loki）— maintainer
+- [@zyx1121](https://github.com/zyx1121) — maintainer
