@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 
+import { IconPaperclip } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Table,
   TableBody,
@@ -34,6 +34,20 @@ function getCurrentWeekId(meetings: Meeting[]): string | null {
     return d >= today && !m.isHoliday
   })
   return upcoming[0]?.id ?? null
+}
+
+function FileCell({ link }: { link: string | null }) {
+  if (!link) return <span className="text-xs text-muted-foreground">—</span>
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex justify-center text-muted-foreground hover:text-foreground"
+    >
+      <IconPaperclip className="h-3.5 w-3.5" />
+    </a>
+  )
 }
 
 export function ScheduleTab({ year }: { year: number }) {
@@ -108,26 +122,28 @@ export function ScheduleTab({ year }: { year: number }) {
                     {m.presenter ?? "—"}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Checkbox checked={m.pptUploaded} disabled />
+                    <FileCell link={m.pptLink} />
                   </TableCell>
                   <TableCell className="text-center">
-                    <Checkbox checked={m.videoUploaded} disabled />
+                    <FileCell link={m.videoLink} />
                   </TableCell>
                   <TableCell className="max-w-xs overflow-hidden">
-                    {m.paperLink ? (
-                      <a
-                        href={m.paperLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="line-clamp-2 text-xs hover:underline"
-                      >
-                        {m.paperTitle ?? m.paperLink}
-                      </a>
-                    ) : (
-                      <span className="line-clamp-2 text-xs text-muted-foreground">
-                        {m.paperTitle ?? "—"}
-                      </span>
-                    )}
+                    <div className="max-w-xs overflow-hidden">
+                      {m.paperLink ? (
+                        <a
+                          href={m.paperLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="line-clamp-2 text-xs hover:underline"
+                        >
+                          {m.paperTitle ?? m.paperLink}
+                        </a>
+                      ) : (
+                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                          {m.paperTitle ?? "—"}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                     {m.notes ?? ""}
