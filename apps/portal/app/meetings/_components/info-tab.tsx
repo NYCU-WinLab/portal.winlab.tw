@@ -23,7 +23,7 @@ const INFO = [
   {
     label: "便當系統",
     value: "bento.winlab.tw",
-    href: "https://bento.winlab.tw",
+    href: "https://portal.winlab.tw/bento",
   },
 ]
 
