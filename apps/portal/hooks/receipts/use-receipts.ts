@@ -7,7 +7,6 @@ import {
   RECEIPT_FILE_EXT,
   RECEIPT_MIME_PDF,
   fileToReceiptPdf,
-  sanitizeFilename,
 } from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
@@ -117,27 +116,6 @@ export function useUpdateReceiptStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
-    },
-  })
-}
-
-export function useDownloadReceipt() {
-  const supabase = createClient()
-
-  return useMutation({
-    mutationFn: async ({ name, path }: { name: string; path: string }) => {
-      const { data, error } = await supabase.storage
-        .from(RECEIPTS_BUCKET)
-        .download(path)
-      if (error) throw error
-      const url = URL.createObjectURL(data)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${sanitizeFilename(name)}.${RECEIPT_FILE_EXT}`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
     },
   })
 }
