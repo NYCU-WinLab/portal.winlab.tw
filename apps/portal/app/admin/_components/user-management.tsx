@@ -123,13 +123,7 @@ export function UserManagement() {
   )
 }
 
-function UserRow({
-  user,
-  onEdit,
-}: {
-  user: AdminUser
-  onEdit: () => void
-}) {
+function UserRow({ user, onEdit }: { user: AdminUser; onEdit: () => void }) {
   const appAdminEntries = Object.entries(user.roles).filter(([, roles]) =>
     roles.includes("admin")
   )
@@ -146,9 +140,7 @@ function UserRow({
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1.5">
-          {user.is_admin && (
-            <Badge className="text-xs">Portal Admin</Badge>
-          )}
+          {user.is_admin && <Badge className="text-xs">Portal Admin</Badge>}
           {appAdminEntries.map(([app]) => (
             <Badge key={app} variant="secondary" className="text-xs">
               {app}

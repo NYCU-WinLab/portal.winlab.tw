@@ -63,8 +63,7 @@ export function RoleEditorDialog({
 
   const isSelf = currentUser?.id === user.id
 
-  const hasAppAdmin = (app: string) =>
-    (localRoles[app] ?? []).includes("admin")
+  const hasAppAdmin = (app: string) => (localRoles[app] ?? []).includes("admin")
 
   const toggleAppAdmin = (app: string, checked: boolean) => {
     setLocalRoles((prev) => {
@@ -111,7 +110,7 @@ export function RoleEditorDialog({
         <div className="flex flex-col gap-5 py-2">
           {/* Super admin toggle */}
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Portal 超級管理員
             </p>
             <div className="flex items-start gap-3 rounded-lg border border-border p-3">
@@ -119,13 +118,14 @@ export function RoleEditorDialog({
                 id="is-admin"
                 checked={localIsAdmin}
                 disabled={isSelf}
-                onCheckedChange={(checked) =>
-                  setLocalIsAdmin(checked === true)
-                }
+                onCheckedChange={(checked) => setLocalIsAdmin(checked === true)}
                 className="mt-0.5"
               />
               <div className="flex flex-col gap-1">
-                <Label htmlFor="is-admin" className="cursor-pointer font-medium">
+                <Label
+                  htmlFor="is-admin"
+                  className="cursor-pointer font-medium"
+                >
                   is_admin
                 </Label>
                 <p className="text-xs text-muted-foreground">
@@ -141,7 +141,7 @@ export function RoleEditorDialog({
 
           {/* Per-app role toggles */}
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               App 管理員
             </p>
             <div className="flex flex-col gap-2">
