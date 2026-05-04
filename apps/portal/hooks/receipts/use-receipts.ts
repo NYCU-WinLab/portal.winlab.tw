@@ -93,6 +93,48 @@ export function useUploadReceipt() {
   })
 }
 
+export function useUpdateReceiptName() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error("名稱不能空白")
+      const { data, error } = await supabase
+        .from(TABLE)
+        .update({ name: trimmed })
+        .eq("id", id)
+        .select()
+        .single()
+      if (error) throw error
+      return toReceipt(data as DatabaseReceipt)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
+    },
+  })
+}
+
+export function useDeleteReceipt() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, path }: { id: string; path: string }) => {
+      // Drop the row first — storage cleanup is best-effort because an orphan
+      // PDF beats a half-deleted record (RLS blocks reads anyway once the row
+      // is gone, so the orphan stays invisible to users).
+      const { error } = await supabase.from(TABLE).delete().eq("id", id)
+      if (error) throw error
+      await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
+    },
+  })
+}
+
 export function useUpdateReceiptStatus() {
   const supabase = createClient()
   const qc = useQueryClient()
