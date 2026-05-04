@@ -12,31 +12,32 @@
 
 ## File Map
 
-| Action | Path |
-|--------|------|
-| Create | `supabase/migrations/2026-05-04-meetings-app.sql` |
-| Create | `apps/portal/lib/meetings/types.ts` |
-| Create | `apps/portal/hooks/meetings/query-keys.ts` |
-| Create | `apps/portal/hooks/meetings/use-meetings-admin.ts` |
-| Create | `apps/portal/hooks/meetings/use-lab-users.ts` |
-| Create | `apps/portal/hooks/meetings/use-meetings.ts` |
-| Create | `apps/portal/hooks/meetings/use-teacher-papers.ts` |
-| Create | `apps/portal/app/meetings/_components/query-provider.tsx` |
-| Create | `apps/portal/app/meetings/layout.tsx` |
-| Create | `apps/portal/app/meetings/_components/info-tab.tsx` |
+| Action | Path                                                           |
+| ------ | -------------------------------------------------------------- |
+| Create | `supabase/migrations/2026-05-04-meetings-app.sql`              |
+| Create | `apps/portal/lib/meetings/types.ts`                            |
+| Create | `apps/portal/hooks/meetings/query-keys.ts`                     |
+| Create | `apps/portal/hooks/meetings/use-meetings-admin.ts`             |
+| Create | `apps/portal/hooks/meetings/use-lab-users.ts`                  |
+| Create | `apps/portal/hooks/meetings/use-meetings.ts`                   |
+| Create | `apps/portal/hooks/meetings/use-teacher-papers.ts`             |
+| Create | `apps/portal/app/meetings/_components/query-provider.tsx`      |
+| Create | `apps/portal/app/meetings/layout.tsx`                          |
+| Create | `apps/portal/app/meetings/_components/info-tab.tsx`            |
 | Create | `apps/portal/app/meetings/_components/meeting-edit-dialog.tsx` |
-| Create | `apps/portal/app/meetings/_components/add-meeting-dialog.tsx` |
-| Create | `apps/portal/app/meetings/_components/schedule-tab.tsx` |
-| Create | `apps/portal/app/meetings/_components/add-paper-dialog.tsx` |
-| Create | `apps/portal/app/meetings/_components/papers-tab.tsx` |
-| Create | `apps/portal/app/meetings/page.tsx` |
-| Modify | `apps/portal/app/page.tsx` |
+| Create | `apps/portal/app/meetings/_components/add-meeting-dialog.tsx`  |
+| Create | `apps/portal/app/meetings/_components/schedule-tab.tsx`        |
+| Create | `apps/portal/app/meetings/_components/add-paper-dialog.tsx`    |
+| Create | `apps/portal/app/meetings/_components/papers-tab.tsx`          |
+| Create | `apps/portal/app/meetings/page.tsx`                            |
+| Modify | `apps/portal/app/page.tsx`                                     |
 
 ---
 
 ## Task 1: Database Migration
 
 **Files:**
+
 - Create: `supabase/migrations/2026-05-04-meetings-app.sql`
 
 - [ ] **Step 1: Create the migration file**
@@ -244,6 +245,7 @@ git commit -m "feat(db): add meetings and teacher_papers tables with RLS"
 ## Task 2: TypeScript Types
 
 **Files:**
+
 - Create: `apps/portal/lib/meetings/types.ts`
 
 - [ ] **Step 1: Create types file**
@@ -344,6 +346,7 @@ git commit -m "feat(meetings): add TypeScript types"
 ## Task 3: Query Keys
 
 **Files:**
+
 - Create: `apps/portal/hooks/meetings/query-keys.ts`
 
 - [ ] **Step 1: Create query-keys file**
@@ -380,6 +383,7 @@ git commit -m "feat(meetings): add query keys"
 ## Task 4: Admin Hook
 
 **Files:**
+
 - Create: `apps/portal/hooks/meetings/use-meetings-admin.ts`
 
 - [ ] **Step 1: Create admin hook**
@@ -434,6 +438,7 @@ git commit -m "feat(meetings): add admin hook"
 ## Task 5: Lab Users Hook
 
 **Files:**
+
 - Create: `apps/portal/hooks/meetings/use-lab-users.ts`
 
 Used by `add-meeting-dialog` so admin can pick a presenter from the user list.
@@ -479,6 +484,7 @@ git commit -m "feat(meetings): add lab users hook"
 ## Task 6: Meetings Hook
 
 **Files:**
+
 - Create: `apps/portal/hooks/meetings/use-meetings.ts`
 
 - [ ] **Step 1: Create hook**
@@ -491,11 +497,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
-import {
-  toMeeting,
-  type DbMeeting,
-  type Meeting,
-} from "@/lib/meetings/types"
+import { toMeeting, type DbMeeting, type Meeting } from "@/lib/meetings/types"
 
 import { queryKeys } from "./query-keys"
 
@@ -678,6 +680,7 @@ git commit -m "feat(meetings): add meetings hook (list + CRUD)"
 ## Task 7: Teacher Papers Hook
 
 **Files:**
+
 - Create: `apps/portal/hooks/meetings/use-teacher-papers.ts`
 
 - [ ] **Step 1: Create hook**
@@ -773,6 +776,7 @@ git commit -m "feat(meetings): add teacher papers hook"
 ## Task 8: QueryProvider + Layout
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/query-provider.tsx`
 - Create: `apps/portal/app/meetings/layout.tsx`
 
@@ -859,6 +863,7 @@ git commit -m "feat(meetings): add layout and query provider"
 ## Task 9: Info Tab
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/info-tab.tsx`
 
 Static cards — no data fetching.
@@ -937,6 +942,7 @@ git commit -m "feat(meetings): add info tab (static meeting metadata)"
 A single dialog used by both the presenter (editing own row) and admin (editing any row). `isAdmin` controls which fields are editable.
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/meeting-edit-dialog.tsx`
 
 - [ ] **Step 1: Create component**
@@ -966,7 +972,10 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 
-import { useAdminUpdateMeeting, useUpdateOwnMeeting } from "@/hooks/meetings/use-meetings"
+import {
+  useAdminUpdateMeeting,
+  useUpdateOwnMeeting,
+} from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
 
@@ -1026,7 +1035,8 @@ export function MeetingEditDialog({
           scheduledDate: date,
           isHoliday,
           presenter: selectedUser?.name ?? null,
-          presenterUserId: presenterUserId === "__none__" ? null : presenterUserId,
+          presenterUserId:
+            presenterUserId === "__none__" ? null : presenterUserId,
           paperTitle: paperTitle || null,
           paperLink: paperLink || null,
           pptUploaded: ppt,
@@ -1056,9 +1066,7 @@ export function MeetingEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {isAdmin ? "編輯週次" : "更新報告資訊"}
-          </DialogTitle>
+          <DialogTitle>{isAdmin ? "編輯週次" : "更新報告資訊"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -1129,10 +1137,7 @@ export function MeetingEditDialog({
           </div>
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={ppt}
-                onCheckedChange={(v) => setPpt(!!v)}
-              />
+              <Checkbox checked={ppt} onCheckedChange={(v) => setPpt(!!v)} />
               PPT 已上傳
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -1183,6 +1188,7 @@ git commit -m "feat(meetings): add meeting edit dialog"
 ## Task 11: Add Meeting Dialog
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/add-meeting-dialog.tsx`
 
 Admin-only dialog to create a new meeting row.
@@ -1246,7 +1252,11 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
         scheduledDate: date,
         isHoliday,
         presenter: selectedUser?.name ?? null,
-        presenterUserId: isHoliday ? null : (presenterUserId === "__none__" ? null : presenterUserId),
+        presenterUserId: isHoliday
+          ? null
+          : presenterUserId === "__none__"
+            ? null
+            : presenterUserId,
       },
       {
         onSuccess: () => {
@@ -1323,10 +1333,7 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
           >
             取消
           </Button>
-          <Button
-            onClick={handleAdd}
-            disabled={!date || addMeeting.isPending}
-          >
+          <Button onClick={handleAdd} disabled={!date || addMeeting.isPending}>
             {addMeeting.isPending ? "新增中…" : "新增"}
           </Button>
         </DialogFooter>
@@ -1348,6 +1355,7 @@ git commit -m "feat(meetings): add meeting creation dialog"
 ## Task 12: Schedule Tab
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/schedule-tab.tsx`
 
 - [ ] **Step 1: Create component**
@@ -1438,10 +1446,10 @@ export function ScheduleTab({ year }: { year: number }) {
                     m.isHoliday
                       ? "opacity-40"
                       : isCurrent
-                      ? "bg-muted/60"
-                      : isOwn
-                      ? "bg-primary/5"
-                      : undefined
+                        ? "bg-muted/60"
+                        : isOwn
+                          ? "bg-primary/5"
+                          : undefined
                   }
                 >
                   <TableCell className="text-xs text-muted-foreground">
@@ -1547,6 +1555,7 @@ git commit -m "feat(meetings): add schedule tab with inline edit and admin contr
 ## Task 13: Add Paper Dialog + Papers Tab
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/_components/add-paper-dialog.tsx`
 - Create: `apps/portal/app/meetings/_components/papers-tab.tsx`
 
@@ -1775,9 +1784,7 @@ export function PapersTab() {
         </div>
       )}
 
-      {isAdmin && (
-        <AddPaperDialog open={addOpen} onOpenChange={setAddOpen} />
-      )}
+      {isAdmin && <AddPaperDialog open={addOpen} onOpenChange={setAddOpen} />}
     </div>
   )
 }
@@ -1796,6 +1803,7 @@ git commit -m "feat(meetings): add teacher papers tab and dialog"
 ## Task 14: Page (Tab Container)
 
 **Files:**
+
 - Create: `apps/portal/app/meetings/page.tsx`
 
 - [ ] **Step 1: Create page**
@@ -1860,6 +1868,7 @@ git commit -m "feat(meetings): add meetings page with three-tab layout"
 ## Task 15: Portal Home Update
 
 **Files:**
+
 - Modify: `apps/portal/app/page.tsx`
 
 - [ ] **Step 1: Add meetings to the app list**

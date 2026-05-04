@@ -12,8 +12,7 @@ const NEXT_STORAGE_KEY = "gallery:auth:next"
 // query string. Supabase matches redirect URLs *exactly* against the allow
 // list (query params included). Any extra `?next=...` makes the redirect_to
 // fail allow-list validation, and Supabase silently falls back to Site URL
-// (which is still http://localhost:3000 on this project, hence the famous
-// "I logged in on prod and ended up on localhost" head-scratcher).
+// (Dashboard setting — often prod or one localhost port — hence odd hops).
 //
 // The callback route reads the same key on success and resumes navigation.
 export function SignInButton({ next }: { next?: string }) {

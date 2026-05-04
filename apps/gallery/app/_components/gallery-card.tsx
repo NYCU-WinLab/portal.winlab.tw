@@ -1,6 +1,6 @@
 "use client"
 
-import Image from "next/image"
+import { useState } from "react"
 
 import {
   Dialog,
@@ -17,6 +17,8 @@ import { getGalleryImageUrl } from "@/lib/gallery/url"
 export function GalleryCard({ image }: { image: GalleryImage }) {
   const rotation = getRotation(image.id)
   const url = getGalleryImageUrl(image.image_path)
+  const [thumbFailed, setThumbFailed] = useState(false)
+  const [lightboxFailed, setLightboxFailed] = useState(false)
 
   return (
     <Dialog>
@@ -40,14 +42,22 @@ export function GalleryCard({ image }: { image: GalleryImage }) {
               "border border-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.18)]"
             )}
           >
-            <Image
-              src={url}
-              alt={image.name}
-              width={1200}
-              height={1500}
-              className="h-auto w-full object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            />
+            {thumbFailed ? (
+              <div className="flex aspect-[4/5] w-full items-center justify-center bg-muted px-4 text-center text-sm text-muted-foreground italic">
+                Preview unavailable (try Safari for HEIC, or export as JPEG)
+              </div>
+            ) : (
+              <img
+                src={url}
+                alt={image.name}
+                width={1200}
+                height={1500}
+                loading="lazy"
+                decoding="async"
+                className="h-auto w-full object-cover"
+                onError={() => setThumbFailed(true)}
+              />
+            )}
           </div>
           <figcaption
             className={cn(
@@ -66,11 +76,19 @@ export function GalleryCard({ image }: { image: GalleryImage }) {
         )}
       >
         <DialogTitle className="sr-only">{image.name}</DialogTitle>
-        <img
-          src={url}
-          alt={image.name}
-          className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-white object-contain shadow-2xl"
-        />
+        {lightboxFailed ? (
+          <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
+            This image cannot be previewed in your browser (common with HEIC).
+            Export as JPEG/PNG or open this page in Safari.
+          </div>
+        ) : (
+          <img
+            src={url}
+            alt={image.name}
+            className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-white object-contain shadow-2xl"
+            onError={() => setLightboxFailed(true)}
+          />
+        )}
         <p className="text-3xl text-white/90 italic md:text-4xl">
           {image.name}
         </p>

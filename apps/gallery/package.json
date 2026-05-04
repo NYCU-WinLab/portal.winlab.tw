@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3000",
+    "dev": "next dev --turbopack --port 3005",
+    "dev:webpack": "next dev --webpack --port 3005",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

@@ -40,11 +40,11 @@ apps/portal/lib/meetings/
 
 ## Tabs
 
-| Tab | Content |
-|-----|---------|
-| 排班表 | Year schedule table; current week auto-highlighted; presenter can inline-edit own row |
-| 老師 Papers | Admin can add/delete; everyone can view and open links |
-| Meeting 資訊 | Static info: location, time, Teams link, NextCloud link, leave system, bento system |
+| Tab          | Content                                                                               |
+| ------------ | ------------------------------------------------------------------------------------- |
+| 排班表       | Year schedule table; current week auto-highlighted; presenter can inline-edit own row |
+| 老師 Papers  | Admin can add/delete; everyone can view and open links                                |
+| Meeting 資訊 | Static info: location, time, Teams link, NextCloud link, leave system, bento system   |
 
 ---
 
@@ -82,14 +82,14 @@ create table teacher_papers (
 
 ## RLS Policy Summary
 
-| Table | Operation | Who |
-|-------|-----------|-----|
-| meetings | SELECT | All authenticated users |
-| meetings | UPDATE (own row) | `presenter_user_id = auth.uid()` |
-| meetings | UPDATE (any row) | Portal admin |
-| meetings | INSERT / DELETE | Portal admin |
-| teacher_papers | SELECT | All authenticated users |
-| teacher_papers | INSERT / DELETE / UPDATE | Portal admin |
+| Table          | Operation                | Who                              |
+| -------------- | ------------------------ | -------------------------------- |
+| meetings       | SELECT                   | All authenticated users          |
+| meetings       | UPDATE (own row)         | `presenter_user_id = auth.uid()` |
+| meetings       | UPDATE (any row)         | Portal admin                     |
+| meetings       | INSERT / DELETE          | Portal admin                     |
+| teacher_papers | SELECT                   | All authenticated users          |
+| teacher_papers | INSERT / DELETE / UPDATE | Portal admin                     |
 
 Portal admin is determined by `user_profiles.roles` (existing pattern from the admin app).
 
@@ -113,6 +113,7 @@ Portal admin is determined by `user_profiles.roles` (existing pattern from the a
 ### Meeting 資訊 Tab
 
 Static display cards (hardcoded constants; editing is out of scope):
+
 - 地點：EC 411
 - 時間：週一 16:30 – 18:30
 - Teams 會議連結

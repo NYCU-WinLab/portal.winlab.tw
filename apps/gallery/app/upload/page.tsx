@@ -1,4 +1,3 @@
-import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
@@ -6,6 +5,7 @@ import { PortalShell } from "@workspace/ui/components/portal-shell"
 
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { RenameButton } from "@/app/upload/_components/rename-button"
+import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
@@ -66,15 +66,10 @@ export default async function UploadPage() {
                   key={image.id}
                   className="flex items-center gap-6 border-b border-border/60 py-5 last:border-b-0"
                 >
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden">
-                    <Image
-                      src={getGalleryImageUrl(image.image_path)}
-                      alt={image.name}
-                      fill
-                      className="object-cover"
-                      sizes="80px"
-                    />
-                  </div>
+                  <UploadListThumb
+                    src={getGalleryImageUrl(image.image_path)}
+                    alt={image.name}
+                  />
                   <div className="flex flex-1 flex-col gap-1">
                     <p className="text-2xl italic">{image.name}</p>
                     <p className="text-sm text-muted-foreground">

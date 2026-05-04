@@ -27,8 +27,16 @@ export async function uploadGalleryImage(
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Pick an image file." }
   }
-  if (!ALLOWED_MIME.has(file.type)) {
-    return { ok: false, error: `Unsupported file type: ${file.type}` }
+
+  const resolvedMime = resolveImageMimeType(file)
+  if (!resolvedMime) {
+    return {
+      ok: false,
+      error: `Unsupported file type: ${file.type || "unknown"}. Use JPEG, PNG, WebP, GIF, AVIF, or HEIC.`,
+    }
+  }
+  if (!ALLOWED_MIME.has(resolvedMime)) {
+    return { ok: false, error: `Unsupported file type: ${resolvedMime}` }
   }
 
   const supabase = await createClient()
@@ -39,7 +47,7 @@ export async function uploadGalleryImage(
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Not signed in." }
 
-  const ext = guessExtension(file.type, file.name)
+  const ext = guessExtension(resolvedMime, file.name)
   // Path layout `{user_id}/{uuid}.{ext}` — first segment doubles as ownership
   // for storage RLS (see migration's storage policies).
   const objectPath = `${userId}/${randomUUID()}.${ext}`
@@ -47,7 +55,7 @@ export async function uploadGalleryImage(
   const { error: uploadError } = await supabase.storage
     .from("gallery")
     .upload(objectPath, file, {
-      contentType: file.type,
+      contentType: resolvedMime,
       upsert: false,
     })
 
@@ -130,6 +138,44 @@ export async function renameGalleryImage(
   revalidatePath("/")
   revalidatePath("/upload")
   return { ok: true }
+}
+
+/** Browsers / OS file pickers often send "" or application/octet-stream. */
+function resolveImageMimeType(file: File): string | null {
+  let t = file.type.trim().toLowerCase()
+  if (t === "image/jpg") t = "image/jpeg"
+
+  if (t && t !== "application/octet-stream" && ALLOWED_MIME.has(t)) {
+    return t
+  }
+
+  const inferred = inferMimeFromFilename(file.name)
+  if (inferred && ALLOWED_MIME.has(inferred)) return inferred
+
+  return null
+}
+
+function inferMimeFromFilename(filename: string): string | null {
+  const ext = filename.split(".").pop()?.toLowerCase()
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg"
+    case "png":
+      return "image/png"
+    case "webp":
+      return "image/webp"
+    case "gif":
+      return "image/gif"
+    case "avif":
+      return "image/avif"
+    case "heic":
+      return "image/heic"
+    case "heif":
+      return "image/heif"
+    default:
+      return null
+  }
 }
 
 function guessExtension(mime: string, filename: string): string {
