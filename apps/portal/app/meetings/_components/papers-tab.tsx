@@ -43,7 +43,7 @@ export function PapersTab() {
       {papers.length === 0 ? (
         <p className="text-sm text-muted-foreground">尚無老師提供的 papers。</p>
       ) : (
-        <div className="rounded-md border">
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>

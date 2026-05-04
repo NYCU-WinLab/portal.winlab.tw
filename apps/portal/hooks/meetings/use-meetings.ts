@@ -34,6 +34,8 @@ export function useUpdateOwnMeeting() {
   return useMutation({
     mutationFn: async ({
       id,
+      presenter,
+      presenterUserId,
       paperTitle,
       paperLink,
       pptUploaded,
@@ -41,6 +43,8 @@ export function useUpdateOwnMeeting() {
       notes,
     }: {
       id: string
+      presenter: string | null
+      presenterUserId: string | null
       paperTitle: string | null
       paperLink: string | null
       pptUploaded: boolean
@@ -50,6 +54,8 @@ export function useUpdateOwnMeeting() {
       const { error } = await supabase
         .from(TABLE)
         .update({
+          presenter,
+          presenter_user_id: presenterUserId,
           paper_title: paperTitle,
           paper_link: paperLink,
           ppt_uploaded: pptUploaded,
@@ -62,6 +68,34 @@ export function useUpdateOwnMeeting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       toast.success("已儲存")
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useClaimMeeting() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      presenter,
+      presenterUserId,
+    }: {
+      id: string
+      presenter: string
+      presenterUserId: string
+    }) => {
+      const { error } = await supabase
+        .from(TABLE)
+        .update({ presenter, presenter_user_id: presenterUserId })
+        .eq("id", id)
+      if (error) throw new Error(error.message || "認領失敗")
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      toast.success("已認領")
     },
     onError: (e: Error) => toast.error(e.message),
   })
