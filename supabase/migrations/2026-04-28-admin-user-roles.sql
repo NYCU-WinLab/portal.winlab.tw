@@ -81,6 +81,13 @@ begin
     raise exception 'cannot remove your own super admin status';
   end if;
 
+  -- Switch to service_role for the actual write so prevent_role_escalation
+  -- (BEFORE UPDATE on user_profiles) lets the role change through. The trigger
+  -- treats service_role as its escape hatch; SECURITY DEFINER alone wouldn't
+  -- flip current_setting('role'). Auth + self-demotion guards above already
+  -- ran as the caller, so this elevation only covers the write.
+  perform set_config('role', 'service_role', true);
+
   update public.user_profiles
   set
     roles    = p_roles,
