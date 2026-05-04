@@ -113,21 +113,23 @@ export function ScheduleTab({ year }: { year: number }) {
                   <TableCell className="text-center">
                     <Checkbox checked={m.videoUploaded} disabled />
                   </TableCell>
-                  <TableCell className="max-w-xs overflow-hidden">
-                    {m.paperLink ? (
-                      <a
-                        href={m.paperLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="line-clamp-2 text-xs hover:underline"
-                      >
-                        {m.paperTitle ?? m.paperLink}
-                      </a>
-                    ) : (
-                      <span className="line-clamp-2 text-xs text-muted-foreground">
-                        {m.paperTitle ?? "—"}
-                      </span>
-                    )}
+                  <TableCell>
+                    <div className="max-w-xs overflow-hidden">
+                      {m.paperLink ? (
+                        <a
+                          href={m.paperLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="line-clamp-2 text-xs hover:underline"
+                        >
+                          {m.paperTitle ?? m.paperLink}
+                        </a>
+                      ) : (
+                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                          {m.paperTitle ?? "—"}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                     {m.notes ?? ""}
