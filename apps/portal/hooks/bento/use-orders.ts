@@ -205,3 +205,24 @@ export function useDeleteOrder() {
     },
   })
 }
+
+export function useReopenOrder() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const { data, error } = await supabase
+        .from("bento_orders")
+        .update({ status: "active", closed_at: null })
+        .eq("id", orderId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}

@@ -27,6 +27,36 @@ export function AuthProvider({
     }
   }
 
+  // Self-heal for stale localStorage. If the server authoritatively says
+  // we're not signed in but there's still an `sb-*` shard in localStorage,
+  // the local state is dead weight — most likely a refresh_token the old
+  // portal left here that's been revoked/rotated since. Leaving it would
+  // kick off @supabase/ssr's auto-refresh timer, which hammers /token
+  // trying to revive a corpse and eventually hits rate-limit 429s.
+  //
+  // signOut({ scope: "local" }) clears storage and stops the timer
+  // without a network call — no rate-limit burn, no cross-device blast.
+  useEffect(() => {
+    if (initialUser) return
+    let hasStaleState = false
+    try {
+      hasStaleState = Object.keys(localStorage).some((k) => k.startsWith("sb-"))
+    } catch {
+      return // SSR or private mode — nothing to do
+    }
+    if (!hasStaleState) return
+
+    supabase.auth.signOut({ scope: "local" }).catch(() => {
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith("sb-"))
+          .forEach((k) => localStorage.removeItem(k))
+      } catch {
+        /* give up silently */
+      }
+    })
+  }, [initialUser, supabase])
+
   useEffect(() => {
     let mounted = true
 

@@ -54,27 +54,3 @@ export function FieldRow({
     </div>
   )
 }
-
-export function JsonBlock({ data }: { data: unknown }) {
-  return (
-    <pre className="max-h-80 overflow-auto rounded-lg bg-muted/50 p-4 font-mono text-xs leading-relaxed text-muted-foreground">
-      {JSON.stringify(data, null, 2)}
-    </pre>
-  )
-}
-
-export function maskToken(token: string | null | undefined): string {
-  if (!token) return ""
-  if (token.length <= 16) return "•".repeat(token.length)
-  return `${token.slice(0, 8)}…${token.slice(-4)}`
-}
-
-export function formatUnixSeconds(seconds: number | undefined): string {
-  if (!seconds) return ""
-  const date = new Date(seconds * 1000)
-  const now = Date.now()
-  const diffMs = date.getTime() - now
-  const mins = Math.round(diffMs / 60_000)
-  const rel = mins >= 0 ? `in ${mins} min` : `${Math.abs(mins)} min ago`
-  return `${date.toISOString()} (${rel})`
-}

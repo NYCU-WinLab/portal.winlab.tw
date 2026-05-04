@@ -1,0 +1,54 @@
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
+
+// Gallery is public — anyone can browse `/`. Only `/upload` requires auth,
+// and the page itself also gates redundantly. This middleware refreshes the
+// session token and bounces unauth users out of /upload to /auth/login.
+export async function updateSession(request: NextRequest) {
+  // OAuth fallback. If Supabase's "Redirect URLs" allow-list is missing our
+  // /auth/callback URL, Supabase quietly falls back to Site URL (root) and
+  // dumps the PKCE `code` query string there. Catch it and forward to the
+  // real callback so the exchange still finishes — user shouldn't have to
+  // care about a Dashboard misconfiguration.
+  const oauthCode = request.nextUrl.searchParams.get("code")
+  if (oauthCode && request.nextUrl.pathname !== "/auth/callback") {
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/callback"
+    return NextResponse.redirect(url)
+  }
+
+  let supabaseResponse = NextResponse.next({ request })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // Do not run code between createServerClient and supabase.auth.getClaims().
+  const { data } = await supabase.auth.getClaims()
+  const user = data?.claims
+
+  if (!user && request.nextUrl.pathname.startsWith("/upload")) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/login"
+    return NextResponse.redirect(url)
+  }
+
+  return supabaseResponse
+}

@@ -4,19 +4,26 @@ import { Button } from "@workspace/ui/components/button"
 
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { UserCard } from "@/components/user-card"
 import { getCurrentUser } from "@/lib/user"
 
 const apps = [
   { href: "/bento", label: "Bento", note: "便當訂購" },
-  { href: "/profile", label: "Profile", note: "Your account" },
+  { href: "/leave", label: "Leave", note: "請假登記" },
+  { href: "/approve", label: "Approve", note: "文件簽核" },
+  { href: "/trip", label: "Trip", note: "出差文件" },
+  { href: "/debt", label: "Debt", note: "分帳記帳" },
+  { href: "/reimburse", label: "Reimburse", note: "收支記帳" },
+  { href: "/profile", label: "Profile", note: "個人帳號" },
+  { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
 ]
 
 export default async function Page() {
   const user = (await getCurrentUser())!
 
   return (
-    <PortalShell appName="Portal">
+    <PortalShell appName="Portal" bottomLeft={<ThemeToggle />}>
       <div className="flex flex-col gap-10">
         <div className="flex flex-col gap-1">
           <h1 className="font-medium">portal.winlab.tw</h1>
