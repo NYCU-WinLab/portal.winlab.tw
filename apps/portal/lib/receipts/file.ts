@@ -71,15 +71,3 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.src = src
   })
 }
-
-// Strip characters that NTFS / HFS / common shells dislike, so the downloaded
-// filename actually opens in the user's OS.
-export function sanitizeFilename(name: string): string {
-  // Strip control bytes (\x00-\x1f) and shell-hostile punctuation.
-  // eslint-disable-next-line no-control-regex
-  const cleaned = name
-    .replace(/[\\/:*?"<>|\x00-\x1f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-  return cleaned.length > 0 ? cleaned : "receipt"
-}
