@@ -13,7 +13,7 @@ const INFO = [
   {
     label: "NextCloud",
     value: "開啟 NextCloud",
-    href: "https://nextcloud.winfra.cs.nycu.edu.tw/apps/files/files?dir=/winlab/meeting/2026",
+    href: "https://nextcloud.winlab.tw/apps/files/files/318788?dir=/winlab/Meeting/2026",
   },
   {
     label: "請假系統",
