@@ -21,17 +21,22 @@ export function ReceiptPreviewDialog({
 }) {
   const { data: url, isLoading } = useReceiptSignedUrl(path)
 
+  // #view=FitH tells the browser PDF viewer to fit the page width — without
+  // it landscape pages float at the bottom of the iframe with a tall black bar
+  // above them.
+  const iframeSrc = url ? `${url}#view=FitH` : null
+
   return (
     <Dialog>
       <DialogTrigger asChild>
         <button
           type="button"
           className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-wait disabled:opacity-50"
-          disabled={!url}
+          disabled={!iframeSrc}
           aria-label={`預覽 ${name}`}
           title={`預覽 ${name}`}
         >
-          {isLoading || !url ? (
+          {isLoading || !iframeSrc ? (
             <Skeleton className="size-4" />
           ) : (
             <FileText className="size-4" />
@@ -40,13 +45,17 @@ export function ReceiptPreviewDialog({
       </DialogTrigger>
       <DialogContent
         showCloseButton
-        className="h-[85vh] max-w-4xl gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        className="grid h-[85vh] max-w-4xl grid-rows-[auto_1fr] gap-0 overflow-hidden p-0 sm:max-w-4xl"
       >
         <DialogTitle className="border-b border-border px-6 py-3 text-sm font-medium">
           {name}
         </DialogTitle>
-        {url ? (
-          <iframe src={url} title={name} className="size-full border-0" />
+        {iframeSrc ? (
+          <iframe
+            src={iframeSrc}
+            title={name}
+            className="size-full min-h-0 border-0"
+          />
         ) : (
           <Skeleton className="size-full" />
         )}
