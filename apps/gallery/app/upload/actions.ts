@@ -104,6 +104,34 @@ export async function deleteGalleryImage(
   return { ok: true }
 }
 
+export async function renameGalleryImage(
+  id: string,
+  newName: string
+): Promise<ActionResult> {
+  const trimmed = newName.trim()
+  if (!trimmed) {
+    return { ok: false, error: "Name is required." }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("gallery_images")
+    .update({ name: trimmed })
+    .eq("id", id)
+    .select("id")
+
+  if (error) {
+    return { ok: false, error: `Rename failed: ${error.message}` }
+  }
+  if (!data?.length) {
+    return { ok: false, error: "Could not update this work." }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return { ok: true }
+}
+
 function guessExtension(mime: string, filename: string): string {
   const fromName = filename.split(".").pop()?.toLowerCase()
   if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
