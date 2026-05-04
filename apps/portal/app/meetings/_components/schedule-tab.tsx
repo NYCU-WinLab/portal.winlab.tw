@@ -14,8 +14,13 @@ import {
 } from "@workspace/ui/components/table"
 
 import { useAuth } from "@/hooks/use-auth"
-import { useMeetings, useDeleteMeeting } from "@/hooks/meetings/use-meetings"
+import {
+  useMeetings,
+  useDeleteMeeting,
+  useClaimMeeting,
+} from "@/hooks/meetings/use-meetings"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
+import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { AddMeetingDialog } from "./add-meeting-dialog"
@@ -35,7 +40,9 @@ export function ScheduleTab({ year }: { year: number }) {
   const { user } = useAuth()
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
+  const { data: labUsers = [] } = useLabUsers()
   const deleteMeeting = useDeleteMeeting()
+  const claimMeeting = useClaimMeeting()
 
   const [addOpen, setAddOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Meeting | null>(null)
@@ -106,7 +113,7 @@ export function ScheduleTab({ year }: { year: number }) {
                   <TableCell className="text-center">
                     <Checkbox checked={m.videoUploaded} disabled />
                   </TableCell>
-                  <TableCell className="max-w-xs">
+                  <TableCell className="max-w-xs overflow-hidden">
                     {m.paperLink ? (
                       <a
                         href={m.paperLink}
@@ -117,7 +124,7 @@ export function ScheduleTab({ year }: { year: number }) {
                         {m.paperTitle ?? m.paperLink}
                       </a>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="line-clamp-2 text-xs text-muted-foreground">
                         {m.paperTitle ?? "—"}
                       </span>
                     )}
@@ -127,6 +134,24 @@ export function ScheduleTab({ year }: { year: number }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      {user && !m.isHoliday && !m.presenterUserId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          disabled={claimMeeting.isPending}
+                          onClick={() => {
+                            const me = labUsers.find((u) => u.id === user.id)
+                            claimMeeting.mutate({
+                              id: m.id,
+                              presenter: me?.name ?? user.email ?? user.id,
+                              presenterUserId: user.id,
+                            })
+                          }}
+                        >
+                          認領
+                        </Button>
+                      )}
                       {(isAdmin || isOwn) && !m.isHoliday && (
                         <Button
                           size="sm"
