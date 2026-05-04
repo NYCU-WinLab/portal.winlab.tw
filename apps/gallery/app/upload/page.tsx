@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { PortalShell } from "@workspace/ui/components/portal-shell"
 
 import { DeleteButton } from "@/app/upload/_components/delete-button"
+import { RenameButton } from "@/app/upload/_components/rename-button"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
@@ -44,7 +45,7 @@ export default async function UploadPage() {
             Your works
           </h1>
           <p className="text-lg text-muted-foreground md:text-xl">
-            Upload your own. Delete what no longer fits.
+            Upload your own. Rename or delete what no longer fits.
           </p>
         </div>
 
@@ -80,11 +81,14 @@ export default async function UploadPage() {
                       {new Date(image.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <DeleteButton
-                    id={image.id}
-                    imagePath={image.image_path}
-                    name={image.name}
-                  />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <RenameButton id={image.id} name={image.name} />
+                    <DeleteButton
+                      id={image.id}
+                      imagePath={image.image_path}
+                      name={image.name}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
