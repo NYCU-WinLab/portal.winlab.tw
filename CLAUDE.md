@@ -70,18 +70,18 @@ turbo run typecheck --filter=portal # 繞過 bun wrapper 直接下 turbo
 | ----------------------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
 | `client.ts` → `createClient()`      | browser client                                             | Client Components（`"use client"`）、hooks        |
 | `server.ts` → `createClient()`      | server client，讀 `next/headers` cookies                   | Server Components、Route Handlers、Server Actions |
-| `middleware.ts` → `updateSession()` | request-level session refresh + 未登入時導向 `/auth/login` | 只給 root `middleware.ts` 使用                    |
+| `middleware.ts` → `updateSession()` | request-level session refresh + 未登入時導向 `/auth/login` | 只給 root `proxy.ts` 使用                         |
 
 > Fluid compute 警告（寫在 `server.ts` / `middleware.ts` 的註解）：**不要** 把 Supabase client 放全域變數，每次請求要新建一個。
 
-**路由級 auth gating 已啟用** — `apps/portal/middleware.ts` 呼叫 `updateSession()`，未登入自動導向 `/auth/login`。白名單走 pathname 前綴：`/login` 與 `/auth/*`（login、callback、auth-code-error）不擋。
+**路由級 auth gating 已啟用** — `apps/portal/proxy.ts`（Next.js 16 把 `middleware.ts` convention 改名為 `proxy.ts`）呼叫 `updateSession()`，未登入自動導向 `/auth/login`。白名單走 pathname 前綴：`/login` 與 `/auth/*`（login、callback、auth-code-error）不擋。
 
 ```ts
-// apps/portal/middleware.ts
+// apps/portal/proxy.ts
 import { type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request)
 }
 
@@ -92,7 +92,7 @@ export const config = {
 }
 ```
 
-因此 protected page 不用再自己 `redirect("/auth/login")` — middleware 擋下。Server Component 可以直接 `const user = (await getCurrentUser())!` 信任 non-null。例外：`/auth/login` 自己需要 `if (user) redirect("/")` 當「已登入就離開 login 頁」的 UX，這是業務邏輯不是 protection。
+因此 protected page 不用再自己 `redirect("/auth/login")` — proxy 擋下。Server Component 可以直接 `const user = (await getCurrentUser())!` 信任 non-null。例外：`/auth/login` 自己需要 `if (user) redirect("/")` 當「已登入就離開 login 頁」的 UX，這是業務邏輯不是 protection。
 
 ### Auth（Keycloak via Supabase OIDC）
 
