@@ -6,6 +6,7 @@ import "@workspace/ui/globals.css"
 import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { KonamiWinlabLogo } from "@/app/_components/konami-winlab-logo"
 import { AuthProvider } from "@/components/auth-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { getInitialAuthUser } from "@/lib/user"
@@ -42,6 +43,7 @@ export default async function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider initialUser={user}>{children}</AuthProvider>
+          <KonamiWinlabLogo />
           <Toaster />
         </ThemeProvider>
       </body>
