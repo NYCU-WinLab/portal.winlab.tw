@@ -10,9 +10,8 @@ const nextConfig = {
       },
     ],
   },
-  // Default Server Action body cap is 1 MB. Phone originals (HEIC ~3 MB,
-  // JPEG ~5–8 MB) blow right past it — desktop screenshots squeak under,
-  // hence the "works on laptop, dies on phone" mystery.
+  // Gallery uploads go to Supabase Storage from the browser (bypasses Vercel
+  // ~4.5MB request limit on Server Actions). Remaining actions are small JSON.
   experimental: {
     serverActions: {
       bodySizeLimit: "20mb",
