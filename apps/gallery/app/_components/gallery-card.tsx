@@ -8,6 +8,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
@@ -66,8 +73,9 @@ export function GalleryCard({
     })
   }
 
-  const votersPreview = voterNames.slice(0, 3).join(", ")
-  const votersExtra = voterNames.length > 3 ? ` +${voterNames.length - 3}` : ""
+  const previewNames = voterNames.slice(0, 2)
+  const votersPreview = previewNames.join(", ")
+  const votersExtraCount = Math.max(0, voterNames.length - previewNames.length)
 
   return (
     <figure
@@ -138,7 +146,7 @@ export function GalleryCard({
           {voterNames.length > 0 ? (
             <p className="text-sm text-white/70">
               Liked by {votersPreview}
-              {votersExtra}
+              {votersExtraCount > 0 ? ` +${votersExtraCount}` : ""}
             </p>
           ) : (
             <p className="text-sm text-white/60">No likes yet</p>
@@ -157,10 +165,38 @@ export function GalleryCard({
             by {image.uploader_name}
           </p>
           {voterNames.length > 0 ? (
-            <p className="mt-1 truncate text-xs text-muted-foreground not-italic md:text-sm">
-              Liked by {votersPreview}
-              {votersExtra}
-            </p>
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground not-italic md:text-sm">
+              <p className="min-w-0 truncate">Liked by {votersPreview}</p>
+              {votersExtraCount > 0 ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="shrink-0 underline decoration-dotted underline-offset-4 hover:text-foreground"
+                      aria-label="Show full like list"
+                    >
+                      +{votersExtraCount}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-64 rounded-xl p-3"
+                  >
+                    <PopoverHeader>
+                      <PopoverTitle className="text-sm">Liked by</PopoverTitle>
+                    </PopoverHeader>
+                    <ul className="max-h-52 space-y-1 overflow-y-auto text-sm">
+                      {voterNames.map((name, idx) => (
+                        <li key={`${name}-${idx}`} className="truncate">
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  </PopoverContent>
+                </Popover>
+              ) : null}
+            </div>
           ) : (
             <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
               No likes yet
