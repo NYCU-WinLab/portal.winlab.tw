@@ -19,9 +19,11 @@ import { getGalleryImageUrl } from "@/lib/gallery/url"
 export function GalleryCard({
   image,
   isSignedIn,
+  viewerName,
 }: {
   image: GalleryImage
   isSignedIn: boolean
+  viewerName: string
 }) {
   const rotation = getRotation(image.id)
   const url = getGalleryImageUrl(image.image_path)
@@ -30,6 +32,7 @@ export function GalleryCard({
   const [isPending, startTransition] = useTransition()
   const [votedByMe, setVotedByMe] = useState(image.voted_by_me)
   const [voteCount, setVoteCount] = useState(image.vote_count)
+  const [voterNames, setVoterNames] = useState(image.voter_names)
 
   const canToggleVote = isSignedIn && !isPending
 
@@ -50,14 +53,21 @@ export function GalleryCard({
       if (votedByMe) {
         setVotedByMe(false)
         setVoteCount((n) => Math.max(0, n - 1))
+        setVoterNames((names) => names.filter((name) => name !== viewerName))
         toast.success("Vote removed.")
       } else {
         setVotedByMe(true)
         setVoteCount((n) => n + 1)
+        setVoterNames((names) =>
+          names.includes(viewerName) ? names : [...names, viewerName]
+        )
         toast.success("Vote counted.")
       }
     })
   }
+
+  const votersPreview = voterNames.slice(0, 3).join(", ")
+  const votersExtra = voterNames.length > 3 ? ` +${voterNames.length - 3}` : ""
 
   return (
     <figure
@@ -125,6 +135,14 @@ export function GalleryCard({
           <p className="text-base text-white/70 italic md:text-lg">
             by {image.uploader_name}
           </p>
+          {voterNames.length > 0 ? (
+            <p className="text-sm text-white/70">
+              Liked by {votersPreview}
+              {votersExtra}
+            </p>
+          ) : (
+            <p className="text-sm text-white/60">No likes yet</p>
+          )}
         </DialogContent>
       </Dialog>
       <figcaption
@@ -138,6 +156,16 @@ export function GalleryCard({
           <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">
             by {image.uploader_name}
           </p>
+          {voterNames.length > 0 ? (
+            <p className="mt-1 truncate text-xs text-muted-foreground not-italic md:text-sm">
+              Liked by {votersPreview}
+              {votersExtra}
+            </p>
+          ) : (
+            <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
+              No likes yet
+            </p>
+          )}
         </div>
         <button
           type="button"
