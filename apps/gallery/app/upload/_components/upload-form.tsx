@@ -17,39 +17,30 @@ export function UploadForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState("")
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileNames, setFileNames] = useState<string[]>([])
+
+  function inferArtworkName(fileName: string): string {
+    const base = fileName.replace(/\.[^.]+$/, "").trim()
+    return base || "Untitled"
+  }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = formRef.current
     const fileInput = form?.querySelector<HTMLInputElement>("#gallery-file")
-    const file = fileInput?.files?.[0]
+    const files = Array.from(fileInput?.files ?? [])
     const trimmed = name.trim()
 
-    if (!trimmed) {
-      toast.error("Name is required.")
+    if (files.length === 0) {
+      toast.error("Pick an image file.")
       return
     }
-    if (!file || file.size === 0) {
-      toast.error("Pick an image file.")
+    if (files.some((file) => file.size === 0)) {
+      toast.error("One of the selected files is empty.")
       return
     }
 
     startTransition(async () => {
-      const resolvedMime = resolveImageMimeType(file)
-      if (!resolvedMime) {
-        toast.error(
-          `Unsupported file type: ${file.type || "unknown"}. Use JPEG, PNG, WebP, GIF, AVIF, or HEIC.`
-        )
-        return
-      }
-
-      const ext = guessExtension(resolvedMime, file.name)
-      if (ext === "bin") {
-        toast.error("Unsupported file type.")
-        return
-      }
-
       const supabase = createClient()
       const { data: claimsData } = await supabase.auth.getClaims()
       const userId = claimsData?.claims?.sub
@@ -58,29 +49,60 @@ export function UploadForm() {
         return
       }
 
-      const objectPath = `${userId}/${crypto.randomUUID()}.${ext}`
+      let successCount = 0
+      const failed: string[] = []
 
-      const { error: uploadError } = await supabase.storage
-        .from("gallery")
-        .upload(objectPath, file, {
-          contentType: resolvedMime,
-          upsert: false,
-        })
+      for (const file of files) {
+        const resolvedMime = resolveImageMimeType(file)
+        if (!resolvedMime) {
+          failed.push(
+            `${file.name} (unsupported type: ${file.type || "unknown"})`
+          )
+          continue
+        }
 
-      if (uploadError) {
-        toast.error(`Upload failed: ${uploadError.message}`)
-        return
+        const ext = guessExtension(resolvedMime, file.name)
+        if (ext === "bin") {
+          failed.push(`${file.name} (unsupported extension)`)
+          continue
+        }
+
+        const objectPath = `${userId}/${crypto.randomUUID()}.${ext}`
+        const artworkName =
+          files.length === 1 && trimmed ? trimmed : inferArtworkName(file.name)
+
+        const { error: uploadError } = await supabase.storage
+          .from("gallery")
+          .upload(objectPath, file, {
+            contentType: resolvedMime,
+            upsert: false,
+          })
+
+        if (uploadError) {
+          failed.push(`${file.name} (${uploadError.message})`)
+          continue
+        }
+
+        const result = await registerGalleryImage(artworkName, objectPath)
+        if (result.ok) {
+          successCount += 1
+        } else {
+          await supabase.storage.from("gallery").remove([objectPath])
+          failed.push(`${file.name} (${result.error})`)
+        }
       }
 
-      const result = await registerGalleryImage(trimmed, objectPath)
-      if (result.ok) {
-        toast.success(`Uploaded "${trimmed}"`)
+      if (successCount > 0) {
+        const suffix = successCount > 1 ? "s" : ""
+        toast.success(`Uploaded ${successCount} work${suffix}.`)
         form?.reset()
         setName("")
-        setFileName(null)
-      } else {
-        await supabase.storage.from("gallery").remove([objectPath])
-        toast.error(result.error)
+        setFileNames([])
+      }
+      if (failed.length > 0) {
+        const preview = failed.slice(0, 3).join("; ")
+        const hidden = failed.length > 3 ? ` (+${failed.length - 3} more)` : ""
+        toast.error(`Failed ${failed.length}: ${preview}${hidden}`)
       }
     })
   }
@@ -89,12 +111,11 @@ export function UploadForm() {
     <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <Label htmlFor="gallery-name" className="text-xl italic">
-          Name
+          Name (single upload only)
         </Label>
         <Input
           id="gallery-name"
           name="name"
-          required
           placeholder="Untitled, 2026"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -104,7 +125,7 @@ export function UploadForm() {
       </div>
       <div className="flex flex-col gap-3">
         <Label htmlFor="gallery-file" className="text-xl italic">
-          Image
+          Images
         </Label>
         <Input
           id="gallery-file"
@@ -112,12 +133,18 @@ export function UploadForm() {
           type="file"
           accept="image/*"
           required
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          multiple
+          onChange={(e) =>
+            setFileNames(Array.from(e.target.files ?? []).map((f) => f.name))
+          }
           disabled={pending}
           className="h-12 rounded-none border-0 border-b border-border bg-transparent px-0 !text-lg file:mr-4 file:!text-base focus-visible:border-foreground focus-visible:ring-0"
         />
-        {fileName ? (
-          <p className="text-base text-muted-foreground italic">{fileName}</p>
+        {fileNames.length > 0 ? (
+          <p className="text-base text-muted-foreground italic">
+            {fileNames.length} selected: {fileNames.slice(0, 3).join(", ")}
+            {fileNames.length > 3 ? ` (+${fileNames.length - 3} more)` : ""}
+          </p>
         ) : null}
       </div>
       <Button
@@ -126,7 +153,7 @@ export function UploadForm() {
         disabled={pending}
         className="mt-4 h-14 !text-lg italic"
       >
-        {pending ? "Uploading…" : "Upload"}
+        {pending ? "Uploading…" : "Upload selected"}
       </Button>
     </form>
   )

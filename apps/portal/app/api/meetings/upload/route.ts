@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const davBase = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USERNAME}`
 
-  // winlab/meetings/{year} and optionally /Recordings — create each level
+  // Create each path level before uploading
   const folders =
     type === "video"
       ? [
@@ -59,13 +59,13 @@ export async function POST(request: NextRequest) {
       Authorization: authHeader,
       "Content-Type": "application/octet-stream",
     },
-    body: new Uint8Array(buffer),
+    body: buffer,
   })
 
   if (!res.ok) {
     return NextResponse.json(
       { error: `NextCloud upload failed: ${res.status} ${res.statusText}` },
-      { status: 502 }
+      { status: res.status }
     )
   }
 
