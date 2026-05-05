@@ -3,6 +3,7 @@ import Link from "next/link"
 import { PortalShell } from "@workspace/ui/components/portal-shell"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { SignOutButton } from "@/components/sign-out-button"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
 import { getCurrentUser } from "@/lib/user"
@@ -70,12 +71,24 @@ export default async function GalleryHomePage() {
       containerClassName="mx-auto w-full max-w-7xl px-6 py-24"
       cornerClassName="text-lg"
       topRight={
-        <Link
-          href={user ? "/upload" : "/auth/login?next=/upload"}
-          className="transition-colors hover:text-foreground"
-        >
-          {user ? "Upload" : "Sign in"}
-        </Link>
+        user ? (
+          <div className="flex items-center gap-4">
+            <Link
+              href="/upload"
+              className="transition-colors hover:text-foreground"
+            >
+              Manage
+            </Link>
+            <SignOutButton />
+          </div>
+        ) : (
+          <Link
+            href="/auth/login?next=/upload"
+            className="transition-colors hover:text-foreground"
+          >
+            Sign in
+          </Link>
+        )
       }
     >
       <GalleryGrid images={images} isSignedIn={Boolean(user)} />
