@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
+import { IconPaperclip, IconUpload, IconX } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -13,7 +14,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { PresenterSelect } from "./presenter-select"
+import { toast } from "sonner"
 
 import {
   useAdminUpdateMeeting,
@@ -22,11 +23,82 @@ import {
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
 
+import { PresenterSelect } from "./presenter-select"
+
 interface Props {
   meeting: Meeting
   isAdmin: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+function FileUploadField({
+  label,
+  link,
+  uploading,
+  onUpload,
+  onRemove,
+}: {
+  label: string
+  link: string | null
+  uploading: boolean
+  onUpload: (file: File) => void
+  onRemove: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-sm">{label}</span>
+      {link ? (
+        <div className="flex items-center gap-1">
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs hover:underline"
+          >
+            <IconPaperclip className="h-3.5 w-3.5" />
+            已上傳
+          </a>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground"
+            onClick={onRemove}
+          >
+            <IconX className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept=".ppt,.pptx,.pdf,.key"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) onUpload(f)
+              e.target.value = ""
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 px-2 text-xs"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            <IconUpload className="h-3.5 w-3.5" />
+            {uploading ? "上傳中…" : "上傳"}
+          </Button>
+        </>
+      )}
+    </div>
+  )
 }
 
 export function MeetingEditDialog({
@@ -47,9 +119,11 @@ export function MeetingEditDialog({
   )
   const [paperTitle, setPaperTitle] = useState(meeting.paperTitle ?? "")
   const [paperLink, setPaperLink] = useState(meeting.paperLink ?? "")
-  const [ppt, setPpt] = useState(meeting.pptUploaded)
-  const [video, setVideo] = useState(meeting.videoUploaded)
+  const [pptLink, setPptLink] = useState<string | null>(meeting.pptLink)
+  const [videoLink, setVideoLink] = useState<string | null>(meeting.videoLink)
   const [notes, setNotes] = useState(meeting.notes ?? "")
+  const [pptUploading, setPptUploading] = useState(false)
+  const [videoUploading, setVideoUploading] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -59,54 +133,66 @@ export function MeetingEditDialog({
       setPresenterUserId(meeting.presenterUserId ?? "__none__")
       setPaperTitle(meeting.paperTitle ?? "")
       setPaperLink(meeting.paperLink ?? "")
-      setPpt(meeting.pptUploaded)
-      setVideo(meeting.videoUploaded)
+      setPptLink(meeting.pptLink)
+      setVideoLink(meeting.videoLink)
       setNotes(meeting.notes ?? "")
     }
   }, [open, meeting])
 
+  async function uploadFile(
+    file: File,
+    type: "ppt" | "video",
+    setUploading: (v: boolean) => void,
+    setLink: (url: string) => void
+  ) {
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("year", String(meeting.year))
+      fd.append("type", type)
+      const res = await fetch("/api/meetings/upload", { method: "POST", body: fd })
+      if (!res.ok) throw new Error("上傳失敗")
+      const { url } = await res.json()
+      setLink(url)
+      toast.success("上傳成功")
+    } catch {
+      toast.error("上傳失敗，請稍後再試")
+    } finally {
+      setUploading(false)
+    }
+  }
+
   function handleSave() {
+    const selectedUser =
+      presenterUserId === "__none__"
+        ? null
+        : users.find((u) => u.id === presenterUserId)
+    const common = {
+      id: meeting.id,
+      presenter: selectedUser?.name ?? null,
+      presenterUserId: presenterUserId === "__none__" ? null : presenterUserId,
+      paperTitle: paperTitle || null,
+      paperLink: paperLink || null,
+      pptUploaded: !!pptLink,
+      pptLink,
+      videoUploaded: !!videoLink,
+      videoLink,
+      notes: notes || null,
+    }
+
     if (isAdmin) {
-      const selectedUser =
-        presenterUserId === "__none__"
-          ? null
-          : users.find((u) => u.id === presenterUserId)
       updateAdmin.mutate(
         {
-          id: meeting.id,
+          ...common,
           weekLabel: weekLabel || null,
           scheduledDate: date,
           isHoliday,
-          presenter: selectedUser?.name ?? null,
-          presenterUserId:
-            presenterUserId === "__none__" ? null : presenterUserId,
-          paperTitle: paperTitle || null,
-          paperLink: paperLink || null,
-          pptUploaded: ppt,
-          videoUploaded: video,
-          notes: notes || null,
         },
         { onSuccess: () => onOpenChange(false) }
       )
     } else {
-      const selectedUser =
-        presenterUserId === "__none__"
-          ? null
-          : users.find((u) => u.id === presenterUserId)
-      updateOwn.mutate(
-        {
-          id: meeting.id,
-          presenter: selectedUser?.name ?? null,
-          presenterUserId:
-            presenterUserId === "__none__" ? null : presenterUserId,
-          paperTitle: paperTitle || null,
-          paperLink: paperLink || null,
-          pptUploaded: ppt,
-          videoUploaded: video,
-          notes: notes || null,
-        },
-        { onSuccess: () => onOpenChange(false) }
-      )
+      updateOwn.mutate(common, { onSuccess: () => onOpenChange(false) })
     }
   }
 
@@ -174,19 +260,28 @@ export function MeetingEditDialog({
               placeholder="https://..."
             />
           </div>
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={ppt} onCheckedChange={(v) => setPpt(!!v)} />
-              PPT 已上傳
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={video}
-                onCheckedChange={(v) => setVideo(!!v)}
-              />
-              錄影已上傳
-            </label>
+
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <FileUploadField
+              label="PPT"
+              link={pptLink}
+              uploading={pptUploading}
+              onUpload={(f) =>
+                uploadFile(f, "ppt", setPptUploading, (url) => setPptLink(url))
+              }
+              onRemove={() => setPptLink(null)}
+            />
+            <FileUploadField
+              label="錄影"
+              link={videoLink}
+              uploading={videoUploading}
+              onUpload={(f) =>
+                uploadFile(f, "video", setVideoUploading, (url) => setVideoLink(url))
+              }
+              onRemove={() => setVideoLink(null)}
+            />
           </div>
+
           <div className="flex flex-col gap-1.5">
             <Label>備註</Label>
             <Input
@@ -205,7 +300,10 @@ export function MeetingEditDialog({
           >
             取消
           </Button>
-          <Button onClick={handleSave} disabled={isPending}>
+          <Button
+            onClick={handleSave}
+            disabled={isPending || pptUploading || videoUploading}
+          >
             {isPending ? "儲存中…" : "儲存"}
           </Button>
         </DialogFooter>

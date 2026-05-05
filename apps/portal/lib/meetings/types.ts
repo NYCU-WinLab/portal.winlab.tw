@@ -7,7 +7,9 @@ export interface Meeting {
   presenter: string | null
   presenterUserId: string | null
   pptUploaded: boolean
+  pptLink: string | null
   videoUploaded: boolean
+  videoLink: string | null
   paperTitle: string | null
   paperLink: string | null
   notes: string | null
@@ -32,7 +34,9 @@ export interface DbMeeting {
   presenter: string | null
   presenter_user_id: string | null
   ppt_uploaded: boolean
+  ppt_link: string | null
   video_uploaded: boolean
+  video_link: string | null
   paper_title: string | null
   paper_link: string | null
   notes: string | null
@@ -58,7 +62,9 @@ export function toMeeting(row: DbMeeting): Meeting {
     presenter: row.presenter,
     presenterUserId: row.presenter_user_id,
     pptUploaded: row.ppt_uploaded,
+    pptLink: row.ppt_link,
     videoUploaded: row.video_uploaded,
+    videoLink: row.video_link,
     paperTitle: row.paper_title,
     paperLink: row.paper_link,
     notes: row.notes,

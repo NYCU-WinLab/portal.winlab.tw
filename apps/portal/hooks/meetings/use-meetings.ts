@@ -39,7 +39,9 @@ export function useUpdateOwnMeeting() {
       paperTitle,
       paperLink,
       pptUploaded,
+      pptLink,
       videoUploaded,
+      videoLink,
       notes,
     }: {
       id: string
@@ -48,7 +50,9 @@ export function useUpdateOwnMeeting() {
       paperTitle: string | null
       paperLink: string | null
       pptUploaded: boolean
+      pptLink: string | null
       videoUploaded: boolean
+      videoLink: string | null
       notes: string | null
     }) => {
       const { error } = await supabase
@@ -59,7 +63,9 @@ export function useUpdateOwnMeeting() {
           paper_title: paperTitle,
           paper_link: paperLink,
           ppt_uploaded: pptUploaded,
+          ppt_link: pptLink,
           video_uploaded: videoUploaded,
+          video_link: videoLink,
           notes,
         })
         .eq("id", id)
@@ -116,7 +122,9 @@ export function useAdminUpdateMeeting() {
       paperTitle,
       paperLink,
       pptUploaded,
+      pptLink,
       videoUploaded,
+      videoLink,
       notes,
     }: {
       id: string
@@ -128,7 +136,9 @@ export function useAdminUpdateMeeting() {
       paperTitle: string | null
       paperLink: string | null
       pptUploaded: boolean
+      pptLink: string | null
       videoUploaded: boolean
+      videoLink: string | null
       notes: string | null
     }) => {
       const { error } = await supabase
@@ -142,7 +152,9 @@ export function useAdminUpdateMeeting() {
           paper_title: paperTitle,
           paper_link: paperLink,
           ppt_uploaded: pptUploaded,
+          ppt_link: pptLink,
           video_uploaded: videoUploaded,
+          video_link: videoLink,
           notes,
         })
         .eq("id", id)
