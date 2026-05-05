@@ -34,14 +34,7 @@ export default async function UploadPage() {
       appHref="/"
       containerClassName="mx-auto w-full max-w-3xl px-6 py-24"
       cornerClassName="text-lg"
-      topRight={
-        <div className="flex items-center gap-4">
-          <Link href="/" className="transition-colors hover:text-foreground">
-            Gallery
-          </Link>
-          <SignOutButton />
-        </div>
-      }
+      topRight={<SignOutButton />}
       bottomLeft={
         <Link href="/" className="transition-colors hover:text-foreground">
           Back
