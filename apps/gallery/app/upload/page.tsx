@@ -7,6 +7,7 @@ import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { RenameButton } from "@/app/upload/_components/rename-button"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { UploadForm } from "@/app/upload/_components/upload-form"
+import { SignOutButton } from "@/components/sign-out-button"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
@@ -33,6 +34,7 @@ export default async function UploadPage() {
       appHref="/"
       containerClassName="mx-auto w-full max-w-3xl px-6 py-24"
       cornerClassName="text-lg"
+      topRight={<SignOutButton />}
       bottomLeft={
         <Link href="/" className="transition-colors hover:text-foreground">
           Back
@@ -42,10 +44,10 @@ export default async function UploadPage() {
       <div className="flex flex-col gap-16">
         <div className="flex flex-col gap-3">
           <h1 className="text-6xl tracking-tight italic md:text-7xl">
-            Your works
+            Manage works
           </h1>
           <p className="text-lg text-muted-foreground md:text-xl">
-            Upload your own. Rename or delete what no longer fits.
+            Upload your own. Edit names, delete, and keep your wall tidy.
           </p>
         </div>
 
