@@ -1,6 +1,7 @@
 export type GalleryImage = {
   id: string
   name: string
+  uploader_name: string
   image_path: string
   created_by: string | null
   created_at: string

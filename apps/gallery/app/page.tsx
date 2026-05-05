@@ -24,6 +24,32 @@ export default async function GalleryHomePage() {
 
   const baseImages = data ?? []
   const imageIds = baseImages.map((image) => image.id)
+  const creatorIds = Array.from(
+    new Set(baseImages.map((image) => image.created_by).filter(Boolean))
+  ) as string[]
+
+  let uploaderNameById = new Map<string, string>()
+  if (creatorIds.length > 0) {
+    const { data: profileRows, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("id, name, email")
+      .in("id", creatorIds)
+
+    if (profileError) {
+      console.error("[gallery] failed to load uploader profiles", profileError)
+    } else {
+      uploaderNameById = (profileRows ?? []).reduce((map, row) => {
+        const fallback =
+          typeof row.email === "string" ? row.email.split("@")[0] : null
+        const name =
+          (typeof row.name === "string" && row.name.trim()) ||
+          fallback ||
+          "Unknown"
+        map.set(row.id, name)
+        return map
+      }, new Map<string, string>())
+    }
+  }
 
   let voteCountsByImage = new Map<string, number>()
   if (imageIds.length > 0) {
@@ -60,6 +86,9 @@ export default async function GalleryHomePage() {
 
   const images: GalleryImage[] = baseImages.map((image) => ({
     ...image,
+    uploader_name: image.created_by
+      ? (uploaderNameById.get(image.created_by) ?? "Unknown")
+      : "Unknown",
     vote_count: voteCountsByImage.get(image.id) ?? 0,
     voted_by_me: votedImageSet.has(image.id),
   }))

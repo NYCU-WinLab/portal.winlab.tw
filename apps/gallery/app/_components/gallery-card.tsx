@@ -122,6 +122,9 @@ export function GalleryCard({
           <p className="text-3xl text-white/90 italic md:text-4xl">
             {image.name}
           </p>
+          <p className="text-base text-white/70 italic md:text-lg">
+            by {image.uploader_name}
+          </p>
         </DialogContent>
       </Dialog>
       <figcaption
@@ -130,7 +133,12 @@ export function GalleryCard({
           "italic md:text-3xl"
         )}
       >
-        <span className="truncate">{image.name}</span>
+        <div className="min-w-0">
+          <p className="truncate">{image.name}</p>
+          <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">
+            by {image.uploader_name}
+          </p>
+        </div>
         <button
           type="button"
           onClick={onVote}
