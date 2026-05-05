@@ -5,6 +5,13 @@ const NEXTCLOUD_USERNAME = process.env.NEXTCLOUD_USERNAME!
 const NEXTCLOUD_APP_PASSWORD = process.env.NEXTCLOUD_APP_PASSWORD!
 
 export async function POST(request: NextRequest) {
+  if (!NEXTCLOUD_URL || !NEXTCLOUD_USERNAME || !NEXTCLOUD_APP_PASSWORD) {
+    return NextResponse.json(
+      { error: "NextCloud 環境變數未設定，請聯絡管理員" },
+      { status: 503 }
+    )
+  }
+
   const formData = await request.formData()
   const file = formData.get("file") as File | null
   const year = formData.get("year") as string | null
@@ -21,7 +28,9 @@ export async function POST(request: NextRequest) {
   const authHeader = `Basic ${credentials}`
 
   const subFolder =
-    type === "video" ? `winlab/Meeting/${year}/Recordings` : `winlab/Meeting/${year}`
+    type === "video"
+      ? `winlab/Meeting/${year}/Recordings`
+      : `winlab/Meeting/${year}`
 
   // Ensure target folder exists
   const folderUrl = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USERNAME}/${subFolder}`
