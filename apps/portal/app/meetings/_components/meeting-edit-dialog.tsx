@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 
-import { IconPaperclip, IconUpload, IconX } from "@tabler/icons-react"
+import {
+  IconPaperclip,
+  IconRefresh,
+  IconUpload,
+  IconX,
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -125,20 +130,33 @@ export function MeetingEditDialog({
   const [videoLink, setVideoLink] = useState<string | null>(meeting.videoLink)
   const [notes, setNotes] = useState(meeting.notes ?? "")
   const [pptUploading, setPptUploading] = useState(false)
-  const [videoUploading, setVideoUploading] = useState(false)
+  const [videoChecking, setVideoChecking] = useState(false)
+
+  function checkVideo() {
+    setVideoChecking(true)
+    fetch(
+      `/api/meetings/check-video?year=${meeting.year}&date=${encodeURIComponent(meeting.scheduledDate)}`
+    )
+      .then((r) => r.json())
+      .then(({ videoLink: found }: { videoLink: string | null }) => {
+        if (found) setVideoLink(found)
+      })
+      .catch(() => {})
+      .finally(() => setVideoChecking(false))
+  }
 
   useEffect(() => {
-    if (open) {
-      setWeekLabel(meeting.weekLabel ?? "")
-      setDate(meeting.scheduledDate)
-      setIsHoliday(meeting.isHoliday)
-      setPresenterUserId(meeting.presenterUserId ?? "__none__")
-      setPaperTitle(meeting.paperTitle ?? "")
-      setPaperLink(meeting.paperLink ?? "")
-      setPptLink(meeting.pptLink)
-      setVideoLink(meeting.videoLink)
-      setNotes(meeting.notes ?? "")
-    }
+    if (!open) return
+    setWeekLabel(meeting.weekLabel ?? "")
+    setDate(meeting.scheduledDate)
+    setIsHoliday(meeting.isHoliday)
+    setPresenterUserId(meeting.presenterUserId ?? "__none__")
+    setPaperTitle(meeting.paperTitle ?? "")
+    setPaperLink(meeting.paperLink ?? "")
+    setPptLink(meeting.pptLink)
+    setVideoLink(meeting.videoLink)
+    setNotes(meeting.notes ?? "")
+    checkVideo()
   }, [open, meeting])
 
   async function uploadFile(
@@ -277,18 +295,40 @@ export function MeetingEditDialog({
               }
               onRemove={() => setPptLink(null)}
             />
-            <FileUploadField
-              label="錄影"
-              link={videoLink}
-              uploading={videoUploading}
-              accept=".mp4,.mov,.avi,.mkv,.webm"
-              onUpload={(f) =>
-                uploadFile(f, "video", setVideoUploading, (url) =>
-                  setVideoLink(url)
-                )
-              }
-              onRemove={() => setVideoLink(null)}
-            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">錄影</span>
+              <div className="flex items-center gap-2">
+                {videoChecking ? (
+                  <span className="text-xs text-muted-foreground">檢查中…</span>
+                ) : (
+                  <label className="flex cursor-default items-center gap-1.5 text-xs">
+                    <Checkbox checked={!!videoLink} disabled />
+                    {videoLink ? (
+                      <a
+                        href={videoLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                      >
+                        已上傳
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">未上傳</span>
+                    )}
+                  </label>
+                )}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground"
+                  onClick={checkVideo}
+                  disabled={videoChecking}
+                >
+                  <IconRefresh className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -311,7 +351,7 @@ export function MeetingEditDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isPending || pptUploading || videoUploading}
+            disabled={isPending || pptUploading || videoChecking}
           >
             {isPending ? "儲存中…" : "儲存"}
           </Button>

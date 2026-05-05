@@ -33,11 +33,11 @@ export async function POST(request: NextRequest) {
   const folders =
     type === "video"
       ? [
-          `winlab/meetings`,
-          `winlab/meetings/${year}`,
-          `winlab/meetings/${year}/Recordings`,
+          `winlab/Meeting`,
+          `winlab/Meeting/${year}`,
+          `winlab/Meeting/${year}/Recordings`,
         ]
-      : [`winlab/meetings`, `winlab/meetings/${year}`]
+      : [`winlab/Meeting`, `winlab/Meeting/${year}`]
 
   for (const folder of folders) {
     await fetch(`${davBase}/${folder}`, {
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
 
   const subFolder =
     type === "video"
-      ? `winlab/meetings/${year}/Recordings`
-      : `winlab/meetings/${year}`
+      ? `winlab/Meeting/${year}/Recordings`
+      : `winlab/Meeting/${year}`
 
   const folderUrl = `${davBase}/${subFolder}`
   const fileUrl = `${folderUrl}/${file.name}`
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   const rawFileId = res.headers.get("OC-FileId")
   const viewUrl = rawFileId
     ? `${NEXTCLOUD_URL}/f/${parseInt(rawFileId, 10)}`
-    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/meetings/${year}`
+    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/Meeting/${year}`
 
   return NextResponse.json({ url: viewUrl })
 }
