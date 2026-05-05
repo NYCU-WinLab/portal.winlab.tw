@@ -36,12 +36,14 @@ function FileUploadField({
   label,
   link,
   uploading,
+  accept,
   onUpload,
   onRemove,
 }: {
   label: string
   link: string | null
   uploading: boolean
+  accept: string
   onUpload: (file: File) => void
   onRemove: () => void
 }) {
@@ -77,7 +79,7 @@ function FileUploadField({
             ref={inputRef}
             type="file"
             className="hidden"
-            accept=".ppt,.pptx,.pdf,.key"
+            accept={accept}
             onChange={(e) => {
               const f = e.target.files?.[0]
               if (f) onUpload(f)
@@ -151,7 +153,10 @@ export function MeetingEditDialog({
       fd.append("file", file)
       fd.append("year", String(meeting.year))
       fd.append("type", type)
-      const res = await fetch("/api/meetings/upload", { method: "POST", body: fd })
+      const res = await fetch("/api/meetings/upload", {
+        method: "POST",
+        body: fd,
+      })
       if (!res.ok) throw new Error("上傳失敗")
       const { url } = await res.json()
       setLink(url)
@@ -266,6 +271,7 @@ export function MeetingEditDialog({
               label="PPT"
               link={pptLink}
               uploading={pptUploading}
+              accept=".ppt,.pptx,.pdf,.key"
               onUpload={(f) =>
                 uploadFile(f, "ppt", setPptUploading, (url) => setPptLink(url))
               }
@@ -275,8 +281,11 @@ export function MeetingEditDialog({
               label="錄影"
               link={videoLink}
               uploading={videoUploading}
+              accept=".mp4,.mov,.avi,.mkv,.webm"
               onUpload={(f) =>
-                uploadFile(f, "video", setVideoUploading, (url) => setVideoLink(url))
+                uploadFile(f, "video", setVideoUploading, (url) =>
+                  setVideoLink(url)
+                )
               }
               onRemove={() => setVideoLink(null)}
             />

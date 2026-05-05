@@ -27,18 +27,31 @@ export async function POST(request: NextRequest) {
   ).toString("base64")
   const authHeader = `Basic ${credentials}`
 
+  const davBase = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USERNAME}`
+
+  // winlab/meetings/{year} and optionally /Recordings — create each level
+  const folders =
+    type === "video"
+      ? [
+          `winlab/meetings`,
+          `winlab/meetings/${year}`,
+          `winlab/meetings/${year}/Recordings`,
+        ]
+      : [`winlab/meetings`, `winlab/meetings/${year}`]
+
+  for (const folder of folders) {
+    await fetch(`${davBase}/${folder}`, {
+      method: "MKCOL",
+      headers: { Authorization: authHeader },
+    })
+  }
+
   const subFolder =
     type === "video"
-      ? `winlab/Meeting/${year}/Recordings`
-      : `winlab/Meeting/${year}`
+      ? `winlab/meetings/${year}/Recordings`
+      : `winlab/meetings/${year}`
 
-  // Ensure target folder exists
-  const folderUrl = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USERNAME}/${subFolder}`
-  await fetch(folderUrl, {
-    method: "MKCOL",
-    headers: { Authorization: authHeader },
-  })
-
+  const folderUrl = `${davBase}/${subFolder}`
   const fileUrl = `${folderUrl}/${file.name}`
   const res = await fetch(fileUrl, {
     method: "PUT",
@@ -46,20 +59,20 @@ export async function POST(request: NextRequest) {
       Authorization: authHeader,
       "Content-Type": "application/octet-stream",
     },
-    body: buffer,
+    body: new Uint8Array(buffer),
   })
 
   if (!res.ok) {
     return NextResponse.json(
-      { error: `NextCloud upload failed: ${res.statusText}` },
-      { status: res.status }
+      { error: `NextCloud upload failed: ${res.status} ${res.statusText}` },
+      { status: 502 }
     )
   }
 
   const rawFileId = res.headers.get("OC-FileId")
   const viewUrl = rawFileId
     ? `${NEXTCLOUD_URL}/f/${parseInt(rawFileId, 10)}`
-    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/Meeting/${year}`
+    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/meetings/${year}`
 
   return NextResponse.json({ url: viewUrl })
 }
