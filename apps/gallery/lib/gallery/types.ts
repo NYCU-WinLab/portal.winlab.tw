@@ -4,4 +4,6 @@ export type GalleryImage = {
   image_path: string
   created_by: string | null
   created_at: string
+  vote_count: number
+  voted_by_me: boolean
 }

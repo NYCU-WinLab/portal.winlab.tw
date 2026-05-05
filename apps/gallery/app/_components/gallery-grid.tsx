@@ -16,7 +16,13 @@ function pickCols(width: number): number {
   return 1
 }
 
-export function GalleryGrid({ images }: { images: GalleryImage[] }) {
+export function GalleryGrid({
+  images,
+  isSignedIn,
+}: {
+  images: GalleryImage[]
+  isSignedIn: boolean
+}) {
   // SSR seeds with 3-col layout (desktop default). useEffect rebuckets on
   // mount and on resize. The seed shape stays stable so React doesn't blow
   // up hydration: same number of buckets, same DOM shape.
@@ -51,7 +57,7 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
       {buckets.map((bucket, i) => (
         <div key={i} className="flex min-w-0 flex-1 flex-col gap-12">
           {bucket.map((image) => (
-            <GalleryCard key={image.id} image={image} />
+            <GalleryCard key={image.id} image={image} isSignedIn={isSignedIn} />
           ))}
         </div>
       ))}
