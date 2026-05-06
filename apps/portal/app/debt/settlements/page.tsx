@@ -2,7 +2,7 @@ import { SettlementsList } from "../_components/settlements-list"
 
 export default function DebtSettlementsPage() {
   return (
-    <div className="grid gap-6">
+    <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-1">
         <h1 className="font-medium">結算單</h1>
         <p className="text-sm text-muted-foreground">

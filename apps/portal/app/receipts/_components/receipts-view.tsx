@@ -58,7 +58,7 @@ export function ReceiptsView() {
     !!search.trim() || selectedStatuses.size > 0 || selectedTagIds.size > 0
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="font-medium">收據</h1>
@@ -79,7 +79,7 @@ export function ReceiptsView() {
         />
       </div>
 
-      <div className="rounded-2xl border border-border">
+      <div className="rounded-xl border border-border">
         <Table>
           <TableHeader>
             <TableRow>

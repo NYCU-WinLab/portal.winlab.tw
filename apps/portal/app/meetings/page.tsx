@@ -15,6 +15,7 @@ import {
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 
 import { AddMeetingDialog } from "./_components/add-meeting-dialog"
+import { AddPaperDialog } from "./_components/add-paper-dialog"
 import { InfoTab } from "./_components/info-tab"
 import { PapersTab } from "./_components/papers-tab"
 import { ScheduleTab } from "./_components/schedule-tab"
@@ -28,7 +29,8 @@ export default function MeetingsPage() {
   const { isAdmin } = useMeetingsAdmin()
 
   const [activeTab, setActiveTab] = useState("schedule")
-  const [addOpen, setAddOpen] = useState(false)
+  const [addMeetingOpen, setAddMeetingOpen] = useState(false)
+  const [addPaperOpen, setAddPaperOpen] = useState(false)
 
   function setYear(y: number) {
     const params = new URLSearchParams(searchParams.toString())
@@ -36,18 +38,21 @@ export default function MeetingsPage() {
     router.push(`?${params.toString()}`)
   }
 
-  const showAddButton = isAdmin && activeTab === "schedule"
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="font-medium">Lab Meetings</h1>
           <p className="text-sm text-muted-foreground">WinLab 每週報告排班</p>
         </div>
-        {showAddButton && (
-          <Button size="sm" onClick={() => setAddOpen(true)}>
+        {isAdmin && activeTab === "schedule" && (
+          <Button size="sm" onClick={() => setAddMeetingOpen(true)}>
             新增週次
+          </Button>
+        )}
+        {isAdmin && activeTab === "papers" && (
+          <Button size="sm" onClick={() => setAddPaperOpen(true)}>
+            新增 Paper
           </Button>
         )}
       </div>
@@ -94,11 +99,14 @@ export default function MeetingsPage() {
       </Tabs>
 
       {isAdmin && (
-        <AddMeetingDialog
-          year={year}
-          open={addOpen}
-          onOpenChange={setAddOpen}
-        />
+        <>
+          <AddMeetingDialog
+            year={year}
+            open={addMeetingOpen}
+            onOpenChange={setAddMeetingOpen}
+          />
+          <AddPaperDialog open={addPaperOpen} onOpenChange={setAddPaperOpen} />
+        </>
       )}
     </div>
   )
