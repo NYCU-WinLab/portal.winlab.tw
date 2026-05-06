@@ -9,6 +9,17 @@ import { UserCard } from "@/components/user-card"
 import { isReceiptsAdmin } from "@/lib/receipts/admin"
 import { getCurrentUser } from "@/lib/user"
 
+const externalServices = [
+  {
+    href: "https://nextcloud.winlab.tw",
+    label: "NextCloud",
+    note: "NextCloud",
+  },
+  { href: "https://harbor.winlab.tw", label: "Harbor", note: "Harbor" },
+  { href: "https://gitlab.winlab.tw", label: "GitLab", note: "Gitlab" },
+  { href: "https://wiki.winlab.tw", label: "Wiki", note: "Wiki" },
+]
+
 const baseApps = [
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/bento", label: "Bento", note: "便當訂購" },
@@ -66,6 +77,24 @@ export default async function Page() {
             </Button>
           ))}
         </nav>
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground">WinLab 服務</p>
+          {externalServices.map((svc) => (
+            <Button
+              key={svc.href}
+              asChild
+              variant="outline"
+              className="justify-between"
+            >
+              <a href={svc.href} target="_blank" rel="noopener noreferrer">
+                <span>{svc.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {svc.note}
+                </span>
+              </a>
+            </Button>
+          ))}
+        </div>
         <SignOutButton />
       </div>
     </PortalShell>
