@@ -23,7 +23,7 @@ export function ReceiptsFilterChips({
   const { data: tags, isLoading } = useTags()
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 pl-3">
       <FilterRow label="狀態">
         {STATUSES.map((s) => (
           <Chip
