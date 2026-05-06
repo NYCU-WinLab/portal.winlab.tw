@@ -99,7 +99,7 @@ export function TagPickerPopover({
             )}
           </div>
           <div className="border-t border-border" />
-          <CreateTagInline />
+          <CreateTagInline receiptId={receiptId} />
         </div>
       </PopoverContent>
     </Popover>
@@ -141,10 +141,12 @@ function TagRow({
   )
 }
 
-function CreateTagInline() {
+function CreateTagInline({ receiptId }: { receiptId: string }) {
   const [name, setName] = useState("")
   const [variant, setVariant] = useState<TagVariant>("secondary")
   const create = useCreateTag()
+  const toggle = useToggleTag()
+  const pending = create.isPending || toggle.isPending
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -152,8 +154,19 @@ function CreateTagInline() {
       { name, variant },
       {
         onSuccess: (tag) => {
-          toast.success(`已新增「${tag.name}」`)
-          setName("")
+          // Auto-attach: opening the picker on a row already implies intent
+          // to label that row. Saves the second click.
+          toggle.mutate(
+            { receiptId, tagId: tag.id, attached: false },
+            {
+              onSuccess: () => {
+                toast.success(`已新增並附加「${tag.name}」`)
+                setName("")
+              },
+              onError: (err) =>
+                toast.error(`已新增「${tag.name}」但附加失敗：${err.message}`),
+            }
+          )
         },
         onError: (err) => toast.error(`新增失敗：${err.message}`),
       }
@@ -175,13 +188,13 @@ function CreateTagInline() {
         onChange={(e) => setName(e.target.value)}
         placeholder="標籤名稱"
         className="h-8 text-sm"
-        disabled={create.isPending}
+        disabled={pending}
       />
       <div className="flex gap-2">
         <Select
           value={variant}
           onValueChange={(v) => setVariant(v as TagVariant)}
-          disabled={create.isPending}
+          disabled={pending}
         >
           <SelectTrigger className="h-8 flex-1 text-xs">
             <SelectValue />
@@ -197,7 +210,7 @@ function CreateTagInline() {
         <Button
           type="submit"
           size="sm"
-          disabled={create.isPending || !name.trim()}
+          disabled={pending || !name.trim()}
           className="h-8"
         >
           <Plus className="size-3.5" />
