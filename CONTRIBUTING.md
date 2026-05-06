@@ -68,6 +68,31 @@ bunx shadcn@latest add <name> -c apps/portal
 
 The file lands in `packages/ui/src/components/`. Don't manually copy primitives into `apps/portal/components/`.
 
+## Turborepo Remote Cache
+
+Builds (CI + your local machine) push and pull from a Vercel Remote Cache so
+unchanged packages don't rebuild twice. `.turbo/config.json` (local-only) holds
+your personal link — it's gitignored on purpose; everyone picks their own scope.
+
+**First-time setup** (per machine):
+
+```bash
+bunx turbo login   # opens browser, authorize Vercel
+bunx turbo link    # arrow keys → pick a Vercel scope (your account or a team)
+```
+
+After that, `bun run build` prints `Remote Caching enabled` and pulls cached
+artefacts when the inputs hash matches. Re-running an unchanged build prints
+`>>> FULL TURBO`.
+
+**CI side** runs against the maintainer's scope through `TURBO_TOKEN` (repo
+secret) and `TURBO_TEAM` (repo variable) in `.github/workflows/ci.yml`. Vercel
+preview/production deployments auto-inject the token via the git integration —
+no extra config there.
+
+> If your CI run says `Remote Caching disabled` and you didn't expect it, the
+> `TURBO_TOKEN` secret has probably been rotated or revoked. Ping `@zyx1121`.
+
 ## Reviewing pull requests
 
 **On your own PR**:
