@@ -14,11 +14,13 @@ import {
 import { useUpdateReceiptStatus } from "@/hooks/receipts/use-receipts"
 import type { ReceiptStatus } from "@/lib/receipts/types"
 
-const LABELS: Record<ReceiptStatus, string> = {
+export const STATUS_LABELS: Record<ReceiptStatus, string> = {
   pending: "審核中",
   approved: "審核完成",
   rejected: "已拒絕",
 }
+
+const LABELS = STATUS_LABELS
 
 const VARIANTS: Record<ReceiptStatus, "secondary" | "default" | "destructive"> =
   {
