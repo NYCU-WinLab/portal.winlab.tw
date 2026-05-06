@@ -59,8 +59,13 @@ export function ReceiptsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-medium">收據</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-medium">收據</h1>
+          <p className="text-sm text-muted-foreground">
+            報帳憑證管理。上傳、加標籤、追蹤狀態。
+          </p>
+        </div>
         <UploadDialog />
       </div>
 
