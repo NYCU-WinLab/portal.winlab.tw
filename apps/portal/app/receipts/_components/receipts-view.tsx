@@ -14,8 +14,9 @@ import {
 } from "@workspace/ui/components/table"
 
 import { useReceipts } from "@/hooks/receipts/use-receipts"
-import type { Receipt } from "@/lib/receipts/types"
+import type { Receipt, ReceiptStatus } from "@/lib/receipts/types"
 
+import { ReceiptsFilterChips } from "./filter-chips"
 import { ReceiptPreviewDialog } from "./receipt-preview-dialog"
 import { ReceiptRowActions } from "./row-actions"
 import { ReceiptsSearchBar } from "./search-bar"
@@ -33,11 +34,28 @@ export function ReceiptsView() {
     isRefetching,
   } = useReceipts()
   const [search, setSearch] = useState("")
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<ReceiptStatus>>(
+    new Set()
+  )
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
 
   const filtered = useMemo(
-    () => filterReceipts(receipts ?? [], search),
-    [receipts, search]
+    () =>
+      filterReceipts(receipts ?? [], {
+        search,
+        selectedStatuses,
+        selectedTagIds,
+      }),
+    [receipts, search, selectedStatuses, selectedTagIds]
   )
+
+  const toggleStatus = (s: ReceiptStatus) =>
+    setSelectedStatuses((prev) => toggleSet(prev, s))
+  const toggleTag = (id: string) =>
+    setSelectedTagIds((prev) => toggleSet(prev, id))
+
+  const hasActiveFilter =
+    !!search.trim() || selectedStatuses.size > 0 || selectedTagIds.size > 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,7 +64,15 @@ export function ReceiptsView() {
         <UploadDialog />
       </div>
 
-      <ReceiptsSearchBar value={search} onChange={setSearch} />
+      <div className="flex flex-col gap-3">
+        <ReceiptsSearchBar value={search} onChange={setSearch} />
+        <ReceiptsFilterChips
+          selectedStatuses={selectedStatuses}
+          onToggleStatus={toggleStatus}
+          selectedTagIds={selectedTagIds}
+          onToggleTag={toggleTag}
+        />
+      </div>
 
       <div className="rounded-2xl border border-border">
         <Table>
@@ -88,7 +114,9 @@ export function ReceiptsView() {
                   colSpan={5}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
-                  找不到符合「{search}」的收據。
+                  {hasActiveFilter
+                    ? "找不到符合篩選條件的收據。"
+                    : "（沒有資料。）"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -142,10 +170,28 @@ export function ReceiptsView() {
   )
 }
 
-function filterReceipts(receipts: Receipt[], search: string): Receipt[] {
+function filterReceipts(
+  receipts: Receipt[],
+  {
+    search,
+    selectedStatuses,
+    selectedTagIds,
+  }: {
+    search: string
+    selectedStatuses: Set<ReceiptStatus>
+    selectedTagIds: Set<string>
+  }
+): Receipt[] {
   const q = search.trim().toLowerCase()
-  if (!q) return receipts
   return receipts.filter((r) => {
+    if (selectedStatuses.size > 0 && !selectedStatuses.has(r.status))
+      return false
+    if (selectedTagIds.size > 0) {
+      const owned = new Set(r.tags.map((t) => t.id))
+      const anyHit = [...selectedTagIds].some((id) => owned.has(id))
+      if (!anyHit) return false
+    }
+    if (!q) return true
     const haystack = [
       r.name,
       STATUS_LABELS[r.status],
@@ -156,6 +202,13 @@ function filterReceipts(receipts: Receipt[], search: string): Receipt[] {
       .toLowerCase()
     return haystack.includes(q)
   })
+}
+
+function toggleSet<T>(prev: Set<T>, value: T): Set<T> {
+  const next = new Set(prev)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
 }
 
 function SkeletonRows() {
