@@ -2,6 +2,9 @@ export const queryKeys = {
   receipts: {
     all: ["receipts", "list"] as const,
   },
+  tags: {
+    all: ["receipts", "tags"] as const,
+  },
   admin: {
     status: ["receipts", "admin"] as const,
   },

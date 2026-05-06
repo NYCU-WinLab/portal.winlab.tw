@@ -11,7 +11,7 @@ import {
 import {
   RECEIPTS_BUCKET,
   toReceipt,
-  type DatabaseReceipt,
+  type DatabaseReceiptWithTags,
   type Receipt,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
@@ -21,6 +21,15 @@ import { queryKeys } from "./query-keys"
 const TABLE = "receipts"
 const SIGNED_URL_TTL = 60 * 60 // one hour — covers the time a tab stays open
 
+// Embed tags via the assignments join table; PostgREST returns
+// { receipt_tag_assignments: [{ receipt_tags: {...} }, ...] }
+const RECEIPT_WITH_TAGS_SELECT = `
+  *,
+  receipt_tag_assignments (
+    receipt_tags ( id, name, variant, created_by, created_at )
+  )
+`
+
 export function useReceipts() {
   const supabase = createClient()
   return useQuery({
@@ -28,13 +37,13 @@ export function useReceipts() {
     queryFn: async (): Promise<Receipt[]> => {
       const { data, error } = await supabase
         .from(TABLE)
-        .select("*")
+        .select(RECEIPT_WITH_TAGS_SELECT)
         .order("created_at", { ascending: false })
       if (error) {
         console.error("[receipts] list query failed", error)
         throw new Error(error.message || "讀取收據失敗")
       }
-      return (data as DatabaseReceipt[]).map(toReceipt)
+      return (data as unknown as DatabaseReceiptWithTags[]).map(toReceipt)
     },
     retry: 2,
   })
@@ -85,7 +94,7 @@ export function useUploadReceipt() {
         await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
         throw error
       }
-      return toReceipt(data as DatabaseReceipt)
+      return toReceipt(data as unknown as DatabaseReceiptWithTags)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
@@ -108,7 +117,7 @@ export function useUpdateReceiptName() {
         .select()
         .single()
       if (error) throw error
-      return toReceipt(data as DatabaseReceipt)
+      return toReceipt(data as unknown as DatabaseReceiptWithTags)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
@@ -154,7 +163,7 @@ export function useUpdateReceiptStatus() {
         .select()
         .single()
       if (error) throw error
-      return toReceipt(data as DatabaseReceipt)
+      return toReceipt(data as unknown as DatabaseReceiptWithTags)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
