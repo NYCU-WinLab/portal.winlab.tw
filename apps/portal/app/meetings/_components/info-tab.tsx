@@ -17,12 +17,12 @@ const INFO = [
   },
   {
     label: "請假系統",
-    value: "leave.winlab.tw",
+    value: "前往請假",
     href: "https://portal.winlab.tw/leave",
   },
   {
     label: "便當系統",
-    value: "bento.winlab.tw",
+    value: "訂便當",
     href: "https://portal.winlab.tw/bento",
   },
 ]
