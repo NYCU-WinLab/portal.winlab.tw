@@ -66,6 +66,34 @@ export function useCreateTrip() {
   })
 }
 
+export function useUpdateTrip() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      id: string
+      name: string
+      description?: string | null
+    }) => {
+      const { data, error } = await supabase
+        .from("trips")
+        .update({
+          name: params.name,
+          description: params.description ?? null,
+        })
+        .eq("id", params.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Trip
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.trips.all })
+    },
+  })
+}
+
 export function useSetTripStatus() {
   const supabase = createClient()
   const queryClient = useQueryClient()

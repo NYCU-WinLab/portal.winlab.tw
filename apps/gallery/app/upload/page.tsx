@@ -22,11 +22,24 @@ export default async function UploadPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from("gallery_images")
-    .select("id, name, image_path, created_by, created_at")
+    .select(
+      "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at"
+    )
     .eq("created_by", user.id)
     .order("created_at", { ascending: false })
 
-  const myImages = (data ?? []) as GalleryImage[]
+  const myImages = (data ?? []) as Array<
+    Pick<
+      GalleryImage,
+      | "id"
+      | "name"
+      | "image_path"
+      | "media_type"
+      | "poster_path"
+      | "duration_seconds"
+      | "created_at"
+    >
+  >
 
   return (
     <PortalShell
@@ -63,31 +76,43 @@ export default async function UploadPage() {
             </p>
           ) : (
             <ul className="flex flex-col">
-              {myImages.map((image) => (
-                <li
-                  key={image.id}
-                  className="flex items-center gap-6 border-b border-border/60 py-5 last:border-b-0"
-                >
-                  <UploadListThumb
-                    src={getGalleryImageUrl(image.image_path)}
-                    alt={image.name}
-                  />
-                  <div className="flex flex-1 flex-col gap-1">
-                    <p className="text-2xl italic">{image.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(image.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <RenameButton id={image.id} name={image.name} />
-                    <DeleteButton
-                      id={image.id}
-                      imagePath={image.image_path}
-                      name={image.name}
+              {myImages.map((image) => {
+                const isVideo = image.media_type === "video"
+                const thumbPath =
+                  isVideo && image.poster_path
+                    ? image.poster_path
+                    : image.image_path
+                return (
+                  <li
+                    key={image.id}
+                    className="flex items-center gap-6 border-b border-border/60 py-5 last:border-b-0"
+                  >
+                    <UploadListThumb
+                      src={getGalleryImageUrl(thumbPath)}
+                      alt={image.name}
+                      isVideo={isVideo}
                     />
-                  </div>
-                </li>
-              ))}
+                    <div className="flex flex-1 flex-col gap-1">
+                      <p className="text-2xl italic">{image.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(image.created_at).toLocaleDateString()}
+                        {isVideo && image.duration_seconds
+                          ? ` · ${image.duration_seconds}s video`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <RenameButton id={image.id} name={image.name} />
+                      <DeleteButton
+                        id={image.id}
+                        imagePath={image.image_path}
+                        posterPath={image.poster_path}
+                        name={image.name}
+                      />
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>

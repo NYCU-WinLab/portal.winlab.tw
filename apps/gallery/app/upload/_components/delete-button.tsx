@@ -21,17 +21,19 @@ import { deleteGalleryImage } from "@/app/upload/actions"
 export function DeleteButton({
   id,
   imagePath,
+  posterPath,
   name,
 }: {
   id: string
   imagePath: string
+  posterPath?: string | null
   name: string
 }) {
   const [pending, startTransition] = useTransition()
 
   function onConfirm() {
     startTransition(async () => {
-      const result = await deleteGalleryImage(id, imagePath)
+      const result = await deleteGalleryImage(id, imagePath, posterPath)
       if (result.ok) {
         toast.success(`Deleted "${name}"`)
       } else {
@@ -55,7 +57,7 @@ export function DeleteButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{name}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
-            This removes the image from the gallery and the storage bucket.
+            This removes the work from the gallery and the storage bucket.
             Cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
+import { useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -11,6 +12,10 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
 
+import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
+
+import { AddMeetingDialog } from "./_components/add-meeting-dialog"
+import { AddPaperDialog } from "./_components/add-paper-dialog"
 import { InfoTab } from "./_components/info-tab"
 import { PapersTab } from "./_components/papers-tab"
 import { ScheduleTab } from "./_components/schedule-tab"
@@ -21,6 +26,11 @@ export default function MeetingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const year = Number(searchParams.get("year")) || CURRENT_YEAR
+  const { isAdmin } = useMeetingsAdmin()
+
+  const [activeTab, setActiveTab] = useState("schedule")
+  const [addMeetingOpen, setAddMeetingOpen] = useState(false)
+  const [addPaperOpen, setAddPaperOpen] = useState(false)
 
   function setYear(y: number) {
     const params = new URLSearchParams(searchParams.toString())
@@ -29,13 +39,25 @@ export default function MeetingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-medium">Lab Meetings</h1>
-        <p className="text-sm text-muted-foreground">WinLab 每週報告排班</p>
+    <div className="flex flex-col gap-10">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-medium">Lab Meetings</h1>
+          <p className="text-sm text-muted-foreground">WinLab 每週報告排班</p>
+        </div>
+        {isAdmin && activeTab === "schedule" && (
+          <Button size="sm" onClick={() => setAddMeetingOpen(true)}>
+            新增週次
+          </Button>
+        )}
+        {isAdmin && activeTab === "papers" && (
+          <Button size="sm" onClick={() => setAddPaperOpen(true)}>
+            新增 Paper
+          </Button>
+        )}
       </div>
 
-      <Tabs defaultValue="schedule">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="schedule">排班表</TabsTrigger>
           <TabsTrigger value="papers">老師 Papers</TabsTrigger>
@@ -75,6 +97,17 @@ export default function MeetingsPage() {
           <InfoTab />
         </TabsContent>
       </Tabs>
+
+      {isAdmin && (
+        <>
+          <AddMeetingDialog
+            year={year}
+            open={addMeetingOpen}
+            onOpenChange={setAddMeetingOpen}
+          />
+          <AddPaperDialog open={addPaperOpen} onOpenChange={setAddPaperOpen} />
+        </>
+      )}
     </div>
   )
 }

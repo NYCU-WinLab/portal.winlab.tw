@@ -23,7 +23,6 @@ import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
 
-import { AddMeetingDialog } from "./add-meeting-dialog"
 import { MeetingEditDialog } from "./meeting-edit-dialog"
 
 function getCurrentWeekId(meetings: Meeting[]): string | null {
@@ -58,7 +57,6 @@ export function ScheduleTab({ year }: { year: number }) {
   const deleteMeeting = useDeleteMeeting()
   const claimMeeting = useClaimMeeting()
 
-  const [addOpen, setAddOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Meeting | null>(null)
 
   const currentWeekId = getCurrentWeekId(meetings)
@@ -69,14 +67,6 @@ export function ScheduleTab({ year }: { year: number }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {isAdmin && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            新增週次
-          </Button>
-        </div>
-      )}
-
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
@@ -198,14 +188,6 @@ export function ScheduleTab({ year }: { year: number }) {
           </TableBody>
         </Table>
       </div>
-
-      {isAdmin && (
-        <AddMeetingDialog
-          year={year}
-          open={addOpen}
-          onOpenChange={setAddOpen}
-        />
-      )}
 
       {editTarget && (
         <MeetingEditDialog

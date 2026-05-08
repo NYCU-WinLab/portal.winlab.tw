@@ -2,12 +2,22 @@
 
 import { useState, useTransition } from "react"
 
+import { IconX } from "@tabler/icons-react"
+
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
@@ -26,7 +36,13 @@ export function GalleryCard({
   viewerName: string
 }) {
   const rotation = getRotation(image.id)
-  const url = getGalleryImageUrl(image.image_path)
+  const isVideo = image.media_type === "video"
+  const mediaUrl = getGalleryImageUrl(image.image_path)
+  // Videos always have a poster (DB constraint). Images render directly.
+  const thumbUrl =
+    isVideo && image.poster_path
+      ? getGalleryImageUrl(image.poster_path)
+      : mediaUrl
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -66,8 +82,9 @@ export function GalleryCard({
     })
   }
 
-  const votersPreview = voterNames.slice(0, 3).join(", ")
-  const votersExtra = voterNames.length > 3 ? ` +${voterNames.length - 3}` : ""
+  const previewNames = voterNames.slice(0, 2)
+  const votersPreview = previewNames.join(", ")
+  const votersExtraCount = Math.max(0, voterNames.length - previewNames.length)
 
   return (
     <figure
@@ -96,52 +113,69 @@ export function GalleryCard({
                 Preview unavailable (try Safari for HEIC, or export as JPEG)
               </div>
             ) : (
-              <img
-                src={url}
-                alt={image.name}
-                width={1200}
-                height={1500}
-                loading="lazy"
-                decoding="async"
-                className="h-auto w-full object-cover"
-                onError={() => setThumbFailed(true)}
-              />
+              <>
+                <img
+                  src={thumbUrl}
+                  alt={image.name}
+                  width={1200}
+                  height={1500}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-auto w-full object-cover"
+                  onError={() => setThumbFailed(true)}
+                />
+                {isVideo ? <PlayBadge /> : null}
+              </>
             )}
           </div>
         </DialogTrigger>
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "flex max-h-[95vh] w-auto max-w-[95vw] flex-col items-center justify-center gap-6 overflow-visible !rounded-none border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-[95vw]"
+            "flex h-[100dvh] w-screen max-w-none items-center justify-center !rounded-none border-0 bg-transparent p-4 shadow-none ring-0",
+            "sm:h-auto sm:max-h-[95vh] sm:w-auto sm:max-w-[95vw]"
           )}
         >
           <DialogTitle className="sr-only">{image.name}</DialogTitle>
+          <DialogClose
+            aria-label="Close"
+            className={cn(
+              "fixed top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-[60]",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full",
+              "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+              "transition-colors hover:bg-white",
+              "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+            )}
+          >
+            <IconX className="h-5 w-5" />
+          </DialogClose>
           {lightboxFailed ? (
             <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-              This image cannot be previewed in your browser (common with HEIC).
-              Export as JPEG/PNG or open this page in Safari.
+              This {isVideo ? "video" : "image"} cannot be previewed in your
+              browser.
             </div>
-          ) : (
-            <img
-              src={url}
-              alt={image.name}
-              className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-white object-contain shadow-2xl"
+          ) : isVideo ? (
+            <video
+              src={mediaUrl}
+              poster={
+                image.poster_path
+                  ? getGalleryImageUrl(image.poster_path)
+                  : undefined
+              }
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="block h-auto max-h-full w-auto max-w-full bg-black object-contain shadow-2xl"
               onError={() => setLightboxFailed(true)}
             />
-          )}
-          <p className="text-3xl text-white/90 italic md:text-4xl">
-            {image.name}
-          </p>
-          <p className="text-base text-white/70 italic md:text-lg">
-            by {image.uploader_name}
-          </p>
-          {voterNames.length > 0 ? (
-            <p className="text-sm text-white/70">
-              Liked by {votersPreview}
-              {votersExtra}
-            </p>
           ) : (
-            <p className="text-sm text-white/60">No likes yet</p>
+            <img
+              src={mediaUrl}
+              alt={image.name}
+              className="block h-auto max-h-full w-auto max-w-full bg-white object-contain shadow-2xl"
+              onError={() => setLightboxFailed(true)}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -157,10 +191,38 @@ export function GalleryCard({
             by {image.uploader_name}
           </p>
           {voterNames.length > 0 ? (
-            <p className="mt-1 truncate text-xs text-muted-foreground not-italic md:text-sm">
-              Liked by {votersPreview}
-              {votersExtra}
-            </p>
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground not-italic md:text-sm">
+              <p className="min-w-0 truncate">Liked by {votersPreview}</p>
+              {votersExtraCount > 0 ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="shrink-0 underline decoration-dotted underline-offset-4 hover:text-foreground"
+                      aria-label="Show full like list"
+                    >
+                      +{votersExtraCount}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-64 rounded-xl p-3"
+                  >
+                    <PopoverHeader>
+                      <PopoverTitle className="text-sm">Liked by</PopoverTitle>
+                    </PopoverHeader>
+                    <ul className="max-h-52 space-y-1 overflow-y-auto text-sm">
+                      {voterNames.map((name, idx) => (
+                        <li key={`${name}-${idx}`} className="truncate">
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  </PopoverContent>
+                </Popover>
+              ) : null}
+            </div>
           ) : (
             <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
               No likes yet
@@ -185,5 +247,29 @@ export function GalleryCard({
         </button>
       </figcaption>
     </figure>
+  )
+}
+
+function PlayBadge() {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-0 flex items-center justify-center",
+        "bg-gradient-to-t from-black/30 via-transparent to-transparent"
+      )}
+    >
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </div>
+    </div>
   )
 }
