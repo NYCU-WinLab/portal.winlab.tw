@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   check:
-    name: typecheck · lint · test · build
+    name: typecheck · lint · build
     runs-on: ubuntu-latest
     env:
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
