@@ -34,10 +34,14 @@ function purgeCorruptedAuthStorage() {
             parsed?.access_token ?? parsed?.currentSession?.access_token
           if (typeof token !== "string") return
           const parts = token.split(".")
+          const header = parts[0]
+          const payload = parts[1]
           if (
             parts.length !== 3 ||
-            !isValidB64Utf8(parts[0]) ||
-            !isValidB64Utf8(parts[1])
+            !header ||
+            !payload ||
+            !isValidB64Utf8(header) ||
+            !isValidB64Utf8(payload)
           ) {
             localStorage.removeItem(k)
           }
