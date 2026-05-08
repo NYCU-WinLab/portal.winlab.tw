@@ -15,7 +15,9 @@ export default async function GalleryHomePage() {
   const user = await getCurrentUser()
   const { data, error } = await supabase
     .from("gallery_images")
-    .select("id, name, image_path, created_by, created_at")
+    .select(
+      "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at"
+    )
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -125,7 +127,14 @@ export default async function GalleryHomePage() {
   }
 
   const images: GalleryImage[] = baseImages.map((image) => ({
-    ...image,
+    id: image.id,
+    name: image.name,
+    image_path: image.image_path,
+    media_type: image.media_type === "video" ? "video" : "image",
+    poster_path: image.poster_path ?? null,
+    duration_seconds: image.duration_seconds ?? null,
+    created_by: image.created_by,
+    created_at: image.created_at,
     uploader_name: image.created_by
       ? (uploaderNameById.get(image.created_by) ?? "Unknown")
       : "Unknown",

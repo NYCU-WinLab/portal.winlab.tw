@@ -7,28 +7,56 @@ import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
+export type RegisterMediaInput = {
+  name: string
+  imagePath: string
+  mediaType: "image" | "video"
+  posterPath?: string | null
+  durationSeconds?: number | null
+}
+
 /**
  * Registers a gallery row after the browser uploads the file directly to
  * Supabase Storage — avoids Vercel's ~4.5MB Server Action body limit (413).
  */
 export async function registerGalleryImage(
-  name: string,
-  imagePath: string
+  input: RegisterMediaInput
 ): Promise<ActionResult> {
-  const trimmed = name.trim()
+  const trimmed = input.name.trim()
   if (!trimmed) return { ok: false, error: "Name is required." }
-  if (!imagePath) return { ok: false, error: "Missing image path." }
+  if (!input.imagePath) return { ok: false, error: "Missing media path." }
+  if (input.mediaType !== "image" && input.mediaType !== "video") {
+    return { ok: false, error: "Invalid media type." }
+  }
+  if (input.mediaType === "video" && !input.posterPath) {
+    return { ok: false, error: "Video uploads require a poster image." }
+  }
+  if (input.mediaType === "image" && input.posterPath) {
+    return { ok: false, error: "Images must not have a poster path." }
+  }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Not signed in." }
 
-  if (!isValidClientObjectPath(imagePath, userId)) {
-    return { ok: false, error: "Invalid image path." }
+  if (!isValidClientObjectPath(input.imagePath, userId)) {
+    return { ok: false, error: "Invalid media path." }
+  }
+  if (
+    input.posterPath &&
+    !isValidClientObjectPath(input.posterPath, userId, { imageOnly: true })
+  ) {
+    return { ok: false, error: "Invalid poster path." }
   }
 
-  const fileName = imagePath.slice(userId.length + 1)
+  const expectedPaths = [input.imagePath]
+  if (input.posterPath) expectedPaths.push(input.posterPath)
+
+  const expectedNames = new Set(
+    expectedPaths.map((p) => p.slice(userId.length + 1))
+  )
+
   let uploaded = false
   for (let attempt = 0; attempt < 5 && !uploaded; attempt++) {
     if (attempt > 0) {
@@ -44,7 +72,8 @@ export async function registerGalleryImage(
         error: `Could not verify upload: ${listError.message}`,
       }
     }
-    uploaded = files?.some((f) => f.name === fileName) ?? false
+    const present = new Set((files ?? []).map((f) => f.name))
+    uploaded = [...expectedNames].every((n) => present.has(n))
   }
   if (!uploaded) {
     return {
@@ -53,14 +82,24 @@ export async function registerGalleryImage(
     }
   }
 
-  const { error: insertError } = await supabase.from("gallery_images").insert({
+  const insertPayload: Record<string, unknown> = {
     name: trimmed,
-    image_path: imagePath,
+    image_path: input.imagePath,
+    media_type: input.mediaType,
+    poster_path: input.posterPath ?? null,
+    duration_seconds:
+      input.mediaType === "video" && input.durationSeconds
+        ? Math.max(1, Math.round(input.durationSeconds))
+        : null,
     created_by: userId,
-  })
+  }
+
+  const { error: insertError } = await supabase
+    .from("gallery_images")
+    .insert(insertPayload)
 
   if (insertError) {
-    await supabase.storage.from("gallery").remove([imagePath])
+    await supabase.storage.from("gallery").remove(expectedPaths)
     return {
       ok: false,
       error: `Database insert failed: ${insertError.message}`,
@@ -74,7 +113,8 @@ export async function registerGalleryImage(
 
 export async function deleteGalleryImage(
   id: string,
-  imagePath: string
+  imagePath: string,
+  posterPath?: string | null
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
@@ -87,11 +127,11 @@ export async function deleteGalleryImage(
     return { ok: false, error: `Delete failed: ${deleteError.message}` }
   }
 
-  // Storage cleanup. Best-effort — RLS already gated the row delete, so if
-  // this somehow fails we still log and move on; orphan objects are cheap.
+  const targets = [imagePath]
+  if (posterPath) targets.push(posterPath)
   const { error: storageError } = await supabase.storage
     .from("gallery")
-    .remove([imagePath])
+    .remove(targets)
   if (storageError) {
     console.error("[gallery] storage delete failed", storageError)
   }
@@ -132,16 +172,21 @@ export async function renameGalleryImage(
 const UUID_FILE_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.([a-z0-9]{2,5})$/i
 
-function isValidClientObjectPath(imagePath: string, userId: string): boolean {
-  if (!imagePath.startsWith(`${userId}/`)) return false
-  const rest = imagePath.slice(userId.length + 1)
+function isValidClientObjectPath(
+  path: string,
+  userId: string,
+  opts: { imageOnly?: boolean } = {}
+): boolean {
+  if (!path.startsWith(`${userId}/`)) return false
+  const rest = path.slice(userId.length + 1)
   if (!rest || rest.includes("/") || rest.includes("..")) return false
 
-  const m = UUID_FILE_RE.exec(rest)
+  const m = rest.match(UUID_FILE_RE)
   if (!m?.[1]) return false
   const ext = m[1].toLowerCase()
   const pseudoMime =
     ext === "jpg" ? "image/jpeg" : inferMimeFromFilename(`x.${ext}`)
   if (!pseudoMime || !ALLOWED_MIME.has(pseudoMime)) return false
+  if (opts.imageOnly && !pseudoMime.startsWith("image/")) return false
   return true
 }

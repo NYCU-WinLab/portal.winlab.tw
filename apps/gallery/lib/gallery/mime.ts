@@ -1,6 +1,6 @@
-/** Shared client + server validation for gallery image uploads. */
+/** Shared client + server validation for gallery media uploads. */
 
-export const ALLOWED_MIME = new Set([
+export const ALLOWED_IMAGE_MIME = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
@@ -10,19 +10,46 @@ export const ALLOWED_MIME = new Set([
   "image/heif",
 ])
 
+export const ALLOWED_VIDEO_MIME = new Set([
+  "video/webm",
+  "video/mp4",
+  "video/quicktime",
+])
+
+/** Kept as the union of both — the storage bucket policy mirrors this. */
+export const ALLOWED_MIME = new Set<string>([
+  ...ALLOWED_IMAGE_MIME,
+  ...ALLOWED_VIDEO_MIME,
+])
+
+export type MediaKind = "image" | "video"
+
+export type ResolvedMime = {
+  kind: MediaKind
+  mime: string
+}
+
 /** Browsers / OS file pickers often send "" or application/octet-stream. */
-export function resolveImageMimeType(file: File): string | null {
+export function resolveMediaMimeType(file: File): ResolvedMime | null {
   let t = file.type.trim().toLowerCase()
   if (t === "image/jpg") t = "image/jpeg"
 
-  if (t && t !== "application/octet-stream" && ALLOWED_MIME.has(t)) {
-    return t
+  if (t && t !== "application/octet-stream") {
+    if (ALLOWED_IMAGE_MIME.has(t)) return { kind: "image", mime: t }
+    if (ALLOWED_VIDEO_MIME.has(t)) return { kind: "video", mime: t }
   }
 
   const inferred = inferMimeFromFilename(file.name)
-  if (inferred && ALLOWED_MIME.has(inferred)) return inferred
-
+  if (!inferred) return null
+  if (ALLOWED_IMAGE_MIME.has(inferred)) return { kind: "image", mime: inferred }
+  if (ALLOWED_VIDEO_MIME.has(inferred)) return { kind: "video", mime: inferred }
   return null
+}
+
+/** Backwards-compat shim used by server-side validation paths. */
+export function resolveImageMimeType(file: File): string | null {
+  const resolved = resolveMediaMimeType(file)
+  return resolved?.kind === "image" ? resolved.mime : null
 }
 
 export function inferMimeFromFilename(filename: string): string | null {
@@ -43,6 +70,13 @@ export function inferMimeFromFilename(filename: string): string | null {
       return "image/heic"
     case "heif":
       return "image/heif"
+    case "webm":
+      return "video/webm"
+    case "mp4":
+    case "m4v":
+      return "video/mp4"
+    case "mov":
+      return "video/quicktime"
     default:
       return null
   }
@@ -66,6 +100,12 @@ export function guessExtension(mime: string, filename: string): string {
       return "heic"
     case "image/heif":
       return "heif"
+    case "video/webm":
+      return "webm"
+    case "video/mp4":
+      return "mp4"
+    case "video/quicktime":
+      return "mov"
     default:
       return "bin"
   }

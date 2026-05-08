@@ -33,7 +33,13 @@ export function GalleryCard({
   viewerName: string
 }) {
   const rotation = getRotation(image.id)
-  const url = getGalleryImageUrl(image.image_path)
+  const isVideo = image.media_type === "video"
+  const mediaUrl = getGalleryImageUrl(image.image_path)
+  // Videos always have a poster (DB constraint). Images render directly.
+  const thumbUrl =
+    isVideo && image.poster_path
+      ? getGalleryImageUrl(image.poster_path)
+      : mediaUrl
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -104,16 +110,19 @@ export function GalleryCard({
                 Preview unavailable (try Safari for HEIC, or export as JPEG)
               </div>
             ) : (
-              <img
-                src={url}
-                alt={image.name}
-                width={1200}
-                height={1500}
-                loading="lazy"
-                decoding="async"
-                className="h-auto w-full object-cover"
-                onError={() => setThumbFailed(true)}
-              />
+              <>
+                <img
+                  src={thumbUrl}
+                  alt={image.name}
+                  width={1200}
+                  height={1500}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-auto w-full object-cover"
+                  onError={() => setThumbFailed(true)}
+                />
+                {isVideo ? <PlayBadge /> : null}
+              </>
             )}
           </div>
         </DialogTrigger>
@@ -126,12 +135,27 @@ export function GalleryCard({
           <DialogTitle className="sr-only">{image.name}</DialogTitle>
           {lightboxFailed ? (
             <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-              This image cannot be previewed in your browser (common with HEIC).
-              Export as JPEG/PNG or open this page in Safari.
+              This {isVideo ? "video" : "image"} cannot be previewed in your
+              browser.
             </div>
+          ) : isVideo ? (
+            <video
+              src={mediaUrl}
+              poster={
+                image.poster_path
+                  ? getGalleryImageUrl(image.poster_path)
+                  : undefined
+              }
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-black object-contain shadow-2xl"
+              onError={() => setLightboxFailed(true)}
+            />
           ) : (
             <img
-              src={url}
+              src={mediaUrl}
               alt={image.name}
               className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-white object-contain shadow-2xl"
               onError={() => setLightboxFailed(true)}
@@ -221,5 +245,29 @@ export function GalleryCard({
         </button>
       </figcaption>
     </figure>
+  )
+}
+
+function PlayBadge() {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-0 flex items-center justify-center",
+        "bg-gradient-to-t from-black/30 via-transparent to-transparent"
+      )}
+    >
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </div>
+    </div>
   )
 }
