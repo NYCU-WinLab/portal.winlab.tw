@@ -117,23 +117,25 @@ export function ScheduleTab({ year }: { year: number }) {
                   <TableCell className="text-center">
                     <FileCell link={m.videoLink} />
                   </TableCell>
-                  <TableCell className="max-w-xs overflow-hidden">
-                    <div className="max-w-xs overflow-hidden">
-                      {m.paperLink ? (
-                        <a
-                          href={m.paperLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="line-clamp-2 text-xs hover:underline"
-                        >
-                          {m.paperTitle ?? m.paperLink}
-                        </a>
-                      ) : (
-                        <span className="line-clamp-2 text-xs text-muted-foreground">
-                          {m.paperTitle ?? "—"}
-                        </span>
-                      )}
-                    </div>
+                  <TableCell className="max-w-xs">
+                    {m.paperLink ? (
+                      <a
+                        href={m.paperLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={m.paperTitle ?? m.paperLink}
+                        className="block truncate text-xs hover:underline"
+                      >
+                        {m.paperTitle ?? m.paperLink}
+                      </a>
+                    ) : (
+                      <span
+                        title={m.paperTitle ?? undefined}
+                        className="block truncate text-xs text-muted-foreground"
+                      >
+                        {m.paperTitle ?? "—"}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                     {m.notes ?? ""}
