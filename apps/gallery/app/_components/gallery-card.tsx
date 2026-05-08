@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from "react"
 
+import { IconX } from "@tabler/icons-react"
+
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogTitle,
   DialogTrigger,
@@ -129,10 +132,23 @@ export function GalleryCard({
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "flex max-h-[95vh] w-auto max-w-[95vw] flex-col items-center justify-center gap-6 overflow-visible !rounded-none border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-[95vw]"
+            "flex h-[100dvh] w-screen max-w-none items-center justify-center !rounded-none border-0 bg-transparent p-4 shadow-none ring-0",
+            "sm:h-auto sm:max-h-[95vh] sm:w-auto sm:max-w-[95vw]"
           )}
         >
           <DialogTitle className="sr-only">{image.name}</DialogTitle>
+          <DialogClose
+            aria-label="Close"
+            className={cn(
+              "fixed top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-[60]",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full",
+              "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+              "transition-colors hover:bg-white",
+              "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+            )}
+          >
+            <IconX className="h-5 w-5" />
+          </DialogClose>
           {lightboxFailed ? (
             <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
               This {isVideo ? "video" : "image"} cannot be previewed in your
@@ -150,30 +166,16 @@ export function GalleryCard({
               autoPlay
               playsInline
               preload="metadata"
-              className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-black object-contain shadow-2xl"
+              className="block h-auto max-h-full w-auto max-w-full bg-black object-contain shadow-2xl"
               onError={() => setLightboxFailed(true)}
             />
           ) : (
             <img
               src={mediaUrl}
               alt={image.name}
-              className="block h-auto max-h-[85vh] w-auto max-w-[95vw] bg-white object-contain shadow-2xl"
+              className="block h-auto max-h-full w-auto max-w-full bg-white object-contain shadow-2xl"
               onError={() => setLightboxFailed(true)}
             />
-          )}
-          <p className="text-3xl text-white/90 italic md:text-4xl">
-            {image.name}
-          </p>
-          <p className="text-base text-white/70 italic md:text-lg">
-            by {image.uploader_name}
-          </p>
-          {voterNames.length > 0 ? (
-            <p className="text-sm text-white/70">
-              Liked by {votersPreview}
-              {votersExtraCount > 0 ? ` +${votersExtraCount}` : ""}
-            </p>
-          ) : (
-            <p className="text-sm text-white/60">No likes yet</p>
           )}
         </DialogContent>
       </Dialog>
