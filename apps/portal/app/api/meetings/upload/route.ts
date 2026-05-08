@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
   const file = formData.get("file") as File | null
   const year = formData.get("year") as string | null
   const type = (formData.get("type") as string | null) ?? "ppt"
+  const paperTitle = (formData.get("paperTitle") as string | null) ?? ""
+  const date = (formData.get("date") as string | null) ?? ""
 
   if (!file || !year) {
     return NextResponse.json({ error: "Missing file or year" }, { status: 400 })
@@ -33,11 +35,11 @@ export async function POST(request: NextRequest) {
   const folders =
     type === "video"
       ? [
-          `winlab/Meeting`,
-          `winlab/Meeting/${year}`,
-          `winlab/Meeting/${year}/Recordings`,
+          `winlab/Meetings`,
+          `winlab/Meetings/${year}`,
+          `winlab/Meetings/${year}/Recordings`,
         ]
-      : [`winlab/Meeting`, `winlab/Meeting/${year}`]
+      : [`winlab/Meetings`, `winlab/Meetings/${year}`]
 
   for (const folder of folders) {
     await fetch(`${davBase}/${folder}`, {
@@ -48,11 +50,19 @@ export async function POST(request: NextRequest) {
 
   const subFolder =
     type === "video"
-      ? `winlab/Meeting/${year}/Recordings`
-      : `winlab/Meeting/${year}`
+      ? `winlab/Meetings/${year}/Recordings`
+      : `winlab/Meetings/${year}`
+
+  // Rename PPT: "{date} {paperTitle}.{ext}"
+  const ext = file.name.split(".").pop() ?? "pptx"
+  const safeTitle = paperTitle.replace(/[\\/:*?"<>|]/g, "").trim()
+  const fileName =
+    type === "ppt" && date && safeTitle
+      ? `${date} ${safeTitle}.${ext}`
+      : file.name
 
   const folderUrl = `${davBase}/${subFolder}`
-  const fileUrl = `${folderUrl}/${file.name}`
+  const fileUrl = `${folderUrl}/${fileName}`
   const res = await fetch(fileUrl, {
     method: "PUT",
     headers: {
@@ -72,7 +82,7 @@ export async function POST(request: NextRequest) {
   const rawFileId = res.headers.get("OC-FileId")
   const viewUrl = rawFileId
     ? `${NEXTCLOUD_URL}/f/${parseInt(rawFileId, 10)}`
-    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/Meeting/${year}`
+    : `${NEXTCLOUD_URL}/apps/files/?dir=/winlab/Meetings/${year}`
 
   return NextResponse.json({ url: viewUrl })
 }

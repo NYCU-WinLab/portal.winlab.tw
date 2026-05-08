@@ -171,6 +171,10 @@ export function MeetingEditDialog({
       fd.append("file", file)
       fd.append("year", String(meeting.year))
       fd.append("type", type)
+      if (type === "ppt") {
+        fd.append("paperTitle", paperTitle)
+        fd.append("date", date)
+      }
       const res = await fetch("/api/meetings/upload", {
         method: "POST",
         body: fd,
