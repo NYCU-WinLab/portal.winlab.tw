@@ -32,7 +32,9 @@ export async function GET(request: NextRequest) {
       headers: {
         Authorization: authHeader,
         Depth: "1",
+        "Content-Type": "application/xml",
       },
+      body: `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:prop><d:displayname/><oc:fileid/></d:prop></d:propfind>`,
     })
 
     if (!res.ok) {
