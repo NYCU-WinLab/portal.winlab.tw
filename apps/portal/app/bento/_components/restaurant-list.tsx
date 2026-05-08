@@ -12,6 +12,13 @@ import { useMenus } from "@/hooks/bento/use-menus"
 import { CreateRestaurantDialog } from "./create-restaurant-dialog"
 import { RestaurantCard } from "./restaurant-card"
 
+type MenuItemRow = {
+  id: string
+  name: string
+  price: number
+  type?: string | null
+}
+
 type RestaurantRow = {
   id: string
   name: string
@@ -19,6 +26,7 @@ type RestaurantRow = {
   google_map_link?: string | null
   created_at: string
   additional?: string[] | null
+  menu_items: MenuItemRow[]
 }
 
 export function RestaurantList() {
@@ -70,6 +78,7 @@ export function RestaurantList() {
             <RestaurantCard
               key={restaurant.id}
               restaurant={restaurant}
+              menuItems={restaurant.menu_items ?? []}
               isAdmin={isAdmin}
             />
           ))}

@@ -6,11 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
-import {
-  useDeleteMenu,
-  useMenu,
-  useMenuItemCounts,
-} from "@/hooks/bento/use-menus"
+import { useDeleteMenu, useMenuItemCounts } from "@/hooks/bento/use-menus"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { EditRestaurantDialog } from "./edit-restaurant-dialog"
@@ -38,21 +34,19 @@ type StatsItem = {
 
 export function RestaurantCard({
   restaurant,
+  menuItems,
   isAdmin,
 }: {
   restaurant: Restaurant
+  menuItems: MenuItemRow[]
   isAdmin: boolean
 }) {
-  const { data: restaurantData, isLoading: menuLoading } = useMenu(
-    restaurant.id
-  )
   const { data: stats, isLoading: statsLoading } = useMenuItemCounts(
     restaurant.id
   )
   const deleteMenu = useDeleteMenu(restaurant.id)
 
-  const menuItems = (restaurantData?.menu_items || []) as MenuItemRow[]
-  const loading = menuLoading || statsLoading
+  const loading = statsLoading
 
   const handleDelete = async () => {
     try {
