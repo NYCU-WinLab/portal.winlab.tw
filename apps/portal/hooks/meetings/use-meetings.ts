@@ -215,3 +215,29 @@ export function useDeleteMeeting() {
     onError: (e: Error) => toast.error(e.message),
   })
 }
+
+export function useSyncMeetingFiles() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (year: number) => {
+      const res = await fetch("/api/meetings/sync-files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json()
+        throw new Error(error || "掃描失敗")
+      }
+      return res.json() as Promise<{ pptUpdated: number; videoUpdated: number }>
+    },
+    onSuccess: ({ pptUpdated, videoUpdated }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      toast.success(
+        `掃描完成：PPT ${pptUpdated} 筆、錄影 ${videoUpdated} 筆已連結`
+      )
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}

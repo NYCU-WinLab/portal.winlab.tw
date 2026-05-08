@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components/tabs"
 
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
+import { useSyncMeetingFiles } from "@/hooks/meetings/use-meetings"
 
 import { AddMeetingDialog } from "./_components/add-meeting-dialog"
 import { AddPaperDialog } from "./_components/add-paper-dialog"
@@ -27,6 +28,8 @@ export default function MeetingsPage() {
   const searchParams = useSearchParams()
   const year = Number(searchParams.get("year")) || CURRENT_YEAR
   const { isAdmin } = useMeetingsAdmin()
+
+  const syncFiles = useSyncMeetingFiles()
 
   const [activeTab, setActiveTab] = useState("schedule")
   const [addMeetingOpen, setAddMeetingOpen] = useState(false)
@@ -46,9 +49,19 @@ export default function MeetingsPage() {
           <p className="text-sm text-muted-foreground">WinLab 每週報告排班</p>
         </div>
         {isAdmin && activeTab === "schedule" && (
-          <Button size="sm" onClick={() => setAddMeetingOpen(true)}>
-            新增週次
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={syncFiles.isPending}
+              onClick={() => syncFiles.mutate(year)}
+            >
+              {syncFiles.isPending ? "掃描中…" : "掃描檔案"}
+            </Button>
+            <Button size="sm" onClick={() => setAddMeetingOpen(true)}>
+              新增週次
+            </Button>
+          </div>
         )}
         {isAdmin && activeTab === "papers" && (
           <Button size="sm" onClick={() => setAddPaperOpen(true)}>
