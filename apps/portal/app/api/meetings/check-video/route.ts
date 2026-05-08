@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   ).toString("base64")
   const authHeader = `Basic ${credentials}`
   const davBase = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USERNAME}`
-  const recordingsPath = `winlab/Meeting/${year}/Recordings`
+  const recordingsPath = `winlab/Meetings/${year}/Recordings`
 
   try {
     const res = await fetch(`${davBase}/${recordingsPath}`, {
