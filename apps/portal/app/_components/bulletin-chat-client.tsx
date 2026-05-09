@@ -1,6 +1,6 @@
 "use client"
 
-import { Megaphone, Send } from "lucide-react"
+import { ChevronDown, ChevronUp, Megaphone, Send } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -37,8 +37,13 @@ export function BulletinChatClient({
   const [broadcast, setBroadcast] = useState(false)
   const [sending, setSending] = useState(false)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  // IME composition flag — Safari sometimes gets `e.nativeEvent.isComposing`
+  // wrong, so track it ourselves via the composition events.
+  const isComposingRef = useRef(false)
 
   // ---------------------------------------------------------------------------
   // Realtime subscription — listen for new messages and refetch full row
@@ -98,9 +103,17 @@ export function BulletinChatClient({
               .map((x) => x.user_profiles)
               .filter((m): m is BulletinChatMember => Boolean(m)),
           }
-          setMessages((prev) =>
-            prev.some((m) => m.id === hydrated.id) ? prev : [...prev, hydrated]
-          )
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === hydrated.id)) return prev
+            return [...prev, hydrated]
+          })
+          // Bump unread when collapsed and the new message isn't ours
+          if (hydrated.author.id !== currentUserId) {
+            setExpanded((wasExpanded) => {
+              if (!wasExpanded) setUnreadCount((c) => c + 1)
+              return wasExpanded
+            })
+          }
         }
       )
       .subscribe()
@@ -180,7 +193,11 @@ export function BulletinChatClient({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // Block Enter while IME composition is active (Chinese/Japanese/Korean
+    // input). Check both our own ref (most reliable) and the standard flags.
+    const composing =
+      isComposingRef.current || e.nativeEvent.isComposing || e.keyCode === 229
+    if (e.key === "Enter" && !e.shiftKey && !composing) {
       e.preventDefault()
       handleSend()
     }
@@ -192,92 +209,142 @@ export function BulletinChatClient({
   const broadcasts = messages.filter((m) => m.isBroadcast)
   const regular = messages.filter((m) => !m.isBroadcast)
 
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev
+      if (next) setUnreadCount(0)
+      return next
+    })
+  }
+
   return (
     <section className="flex flex-col gap-3">
-      <p className="text-xs text-muted-foreground">聊天室</p>
-
-      <div
-        ref={listRef}
-        className="flex max-h-[480px] flex-col gap-3 overflow-y-auto rounded-xl border border-border p-3"
+      <button
+        type="button"
+        onClick={toggleExpanded}
+        className="flex items-center justify-between gap-2 rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
-        {broadcasts.map((m) => (
-          <BroadcastBanner key={m.id} message={m} />
-        ))}
-
-        {regular.length === 0 && broadcasts.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
-            還沒有人發言。第一個說話吧。
-          </p>
-        ) : (
-          regular.map((m) => (
-            <ChatBubble
-              key={m.id}
-              message={m}
-              isOwn={m.author.id === currentUserId}
-            />
-          ))
-        )}
-      </div>
-
-      <div className="relative flex flex-col gap-2 rounded-xl border border-border p-2">
-        {filteredMembers.length > 0 && (
-          <div className="absolute right-0 bottom-full left-0 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
-            {filteredMembers.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => applyMention(m)}
-                className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-              >
-                <Avatar className="size-5">
-                  <AvatarFallback className="text-[10px]">
-                    {(m.name ?? "?").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate">{m.name ?? m.email}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          rows={2}
-          placeholder={
-            broadcast
-              ? "輸入廣播公告（會寄信給全體成員）…"
-              : "說點什麼…  輸入 @ 提到別人會寄信通知"
-          }
-          onChange={(e) => handleDraftChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="resize-none border-0 px-2 shadow-none focus-visible:ring-0"
-        />
-        <div className="flex items-center justify-between gap-2">
-          {isAdmin ? (
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={broadcast}
-                onChange={(e) => setBroadcast(e.target.checked)}
-                className="size-3.5"
-              />
-              <Megaphone className="size-3" />
-              廣播（寄信給全部人）
-            </label>
-          ) : (
-            <span />
+        <span className="flex items-center gap-2">
+          聊天室
+          {broadcasts.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+              <Megaphone className="size-2.5" />
+              {broadcasts.length} 則公告
+            </span>
           )}
-          <Button
-            size="sm"
-            disabled={sending || !draft.trim()}
-            onClick={handleSend}
-            className="gap-1"
-          >
-            <Send className="size-3" />
-            送出
-          </Button>
+          {!expanded && unreadCount > 0 && (
+            <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+              {unreadCount} 則新訊息
+            </span>
+          )}
+        </span>
+        {expanded ? (
+          <ChevronUp className="size-3" />
+        ) : (
+          <ChevronDown className="size-3" />
+        )}
+      </button>
+
+      {!expanded && broadcasts.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {broadcasts.slice(-2).map((m) => (
+            <BroadcastBanner key={m.id} message={m} />
+          ))}
         </div>
-      </div>
+      )}
+
+      {expanded && (
+        <>
+          <div
+            ref={listRef}
+            className="flex max-h-[480px] flex-col gap-3 overflow-y-auto rounded-xl border border-border p-3"
+          >
+            {broadcasts.map((m) => (
+              <BroadcastBanner key={m.id} message={m} />
+            ))}
+
+            {regular.length === 0 && broadcasts.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                還沒有人發言。第一個說話吧。
+              </p>
+            ) : (
+              regular.map((m) => (
+                <ChatBubble
+                  key={m.id}
+                  message={m}
+                  isOwn={m.author.id === currentUserId}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="relative flex flex-col gap-2 rounded-xl border border-border p-2">
+            {filteredMembers.length > 0 && (
+              <div className="absolute right-0 bottom-full left-0 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+                {filteredMembers.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => applyMention(m)}
+                    className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    <Avatar className="size-5">
+                      <AvatarFallback className="text-[10px]">
+                        {(m.name ?? "?").slice(0, 1).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{m.name ?? m.email}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <Textarea
+              ref={textareaRef}
+              value={draft}
+              rows={2}
+              placeholder={
+                broadcast
+                  ? "輸入廣播公告（會寄信給全體成員）…"
+                  : "說點什麼…  輸入 @ 提到別人會寄信通知"
+              }
+              onChange={(e) => handleDraftChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={() => {
+                isComposingRef.current = true
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false
+              }}
+              className="resize-none border-0 px-2 shadow-none focus-visible:ring-0"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {isAdmin ? (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={broadcast}
+                    onChange={(e) => setBroadcast(e.target.checked)}
+                    className="size-3.5"
+                  />
+                  <Megaphone className="size-3" />
+                  廣播（寄信給全部人）
+                </label>
+              ) : (
+                <span />
+              )}
+              <Button
+                size="sm"
+                disabled={sending || !draft.trim()}
+                onClick={handleSend}
+                className="gap-1"
+              >
+                <Send className="size-3" />
+                送出
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   )
 }
