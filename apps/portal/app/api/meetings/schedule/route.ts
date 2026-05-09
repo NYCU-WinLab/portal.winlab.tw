@@ -35,22 +35,29 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const [{ data: meetingData, error }, { data: upcomingData }] =
-    await Promise.all([
-      supabase
-        .from("meetings")
-        .select("*")
-        .eq("scheduled_date", date)
-        .maybeSingle(),
-      supabase
-        .from("meetings")
-        .select("presenter, scheduled_date")
-        .gt("scheduled_date", date)
-        .eq("is_holiday", false)
-        .not("presenter", "is", null)
-        .order("scheduled_date", { ascending: true })
-        .limit(12),
-    ])
+  const [
+    { data: meetingData, error },
+    { data: upcomingData },
+    { data: allGroupsData },
+  ] = await Promise.all([
+    supabase
+      .from("meetings")
+      .select("*")
+      .eq("scheduled_date", date)
+      .maybeSingle(),
+    supabase
+      .from("meetings")
+      .select("presenter, scheduled_date")
+      .gt("scheduled_date", date)
+      .eq("is_holiday", false)
+      .not("presenter", "is", null)
+      .order("scheduled_date", { ascending: true })
+      .limit(12),
+    supabase
+      .from("meeting_groups")
+      .select("group_number, members")
+      .order("group_number"),
+  ])
 
   if (error || !meetingData || (meetingData as DbMeeting).is_holiday) {
     return NextResponse.json(
@@ -100,6 +107,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const questionGroups = (
+    (allGroupsData ?? []) as Pick<DbMeetingGroup, "group_number" | "members">[]
+  )
+    .sort((a, b) => a.group_number - b.group_number)
+    .map((g) => g.members)
+
   return NextResponse.json(
     {
       date: m.scheduled_date,
@@ -110,6 +123,7 @@ export async function GET(request: NextRequest) {
       location: m.location,
       start_time: m.start_time,
       question_group: questionGroup,
+      question_groups: questionGroups,
       next_presenter: presenterOrder[0] ?? null,
       presenter_order: presenterOrder,
     },
