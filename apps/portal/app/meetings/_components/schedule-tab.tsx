@@ -19,6 +19,7 @@ import {
   useDeleteMeeting,
   useClaimMeeting,
 } from "@/hooks/meetings/use-meetings"
+import { useMeetingGroups } from "@/hooks/meetings/use-meeting-groups"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
@@ -54,6 +55,7 @@ export function ScheduleTab({ year }: { year: number }) {
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
   const { data: labUsers = [] } = useLabUsers()
+  const { data: groups = [] } = useMeetingGroups()
   const deleteMeeting = useDeleteMeeting()
   const claimMeeting = useClaimMeeting()
 
@@ -68,18 +70,18 @@ export function ScheduleTab({ year }: { year: number }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="overflow-x-auto rounded-md border">
-        <Table>
+        <Table className="min-w-[860px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-20">週次</TableHead>
               <TableHead className="w-24">日期</TableHead>
-              <TableHead>報告人</TableHead>
-              <TableHead className="w-10 text-center">PPT</TableHead>
-              <TableHead className="w-10 text-center">錄影</TableHead>
-              <TableHead>Paper</TableHead>
-              <TableHead className="w-16 text-center">小組</TableHead>
-              <TableHead className="hidden md:table-cell">備註</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24">報告人</TableHead>
+              <TableHead className="w-12 text-center">PPT</TableHead>
+              <TableHead className="w-12 text-center">錄影</TableHead>
+              <TableHead className="min-w-[200px]">Paper</TableHead>
+              <TableHead className="min-w-[120px]">小組</TableHead>
+              <TableHead className="w-32">備註</TableHead>
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -138,16 +140,25 @@ export function ScheduleTab({ year }: { year: number }) {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell>
                     {m.questionGroupNumber ? (
-                      <span className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-xs text-muted-foreground tabular-nums">
-                        G{m.questionGroupNumber}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          G{m.questionGroupNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {groups
+                            .find(
+                              (g) => g.groupNumber === m.questionGroupNumber
+                            )
+                            ?.members.join("　") ?? ""}
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+                  <TableCell className="text-xs text-muted-foreground">
                     {m.notes ?? ""}
                   </TableCell>
                   <TableCell>

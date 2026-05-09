@@ -51,3 +51,41 @@ export function useUpdateMeetingGroup() {
     onError: (e: Error) => toast.error(e.message),
   })
 }
+
+export function useAddMeetingGroup() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (nextNumber: number) => {
+      const { error } = await supabase
+        .from("meeting_groups")
+        .insert({ group_number: nextNumber, members: [] })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meeting_groups"] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useDeleteMeetingGroup() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (groupNumber: number) => {
+      const { error } = await supabase
+        .from("meeting_groups")
+        .delete()
+        .eq("group_number", groupNumber)
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meeting_groups"] })
+      toast.success("小組已刪除")
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
