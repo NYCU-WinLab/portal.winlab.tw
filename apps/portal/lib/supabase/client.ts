@@ -12,9 +12,8 @@ function purgeCorruptedAuthStorage() {
 
     function isValidB64Utf8(b64url: string): boolean {
       try {
-        const padded =
-          b64url.replace(/-/g, "+").replace(/_/g, "/") +
-          "==".slice((b64url.length + 3) % 4)
+        const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/")
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4)
         const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
         decoder.decode(bytes)
         return true
