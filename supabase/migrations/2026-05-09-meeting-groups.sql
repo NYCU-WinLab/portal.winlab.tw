@@ -19,10 +19,9 @@ ALTER TABLE public.meetings
 
 -- Seed initial groups
 INSERT INTO public.meeting_groups (group_number, members) VALUES
-  (1, ARRAY['洺玄', '岱廷', '翊婕']),
-  (2, ARRAY['昱宏', '詠翔', '翰成']),
-  (3, ARRAY['胤翔', '朝福', '睿丞']),
-  (4, ARRAY['洺玄', '昱宏', '岱廷'])
+  (1, ARRAY['廖洺玄', '洪翊婕', '謝岱廷']),
+  (2, ARRAY['沈昱宏', '詹詠翔', '劉翰成']),
+  (3, ARRAY['蘇胤翔', '覃朝福', '葉睿丞'])
 ON CONFLICT (group_number) DO NOTHING;
 
 -- RLS
