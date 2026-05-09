@@ -27,34 +27,65 @@ export function AuthProvider({
     }
   }
 
-  // Self-heal for stale localStorage. If the server authoritatively says
-  // we're not signed in but there's still an `sb-*` shard in localStorage,
-  // the local state is dead weight — most likely a refresh_token the old
-  // portal left here that's been revoked/rotated since. Leaving it would
-  // kick off @supabase/ssr's auto-refresh timer, which hammers /token
-  // trying to revive a corpse and eventually hits rate-limit 429s.
+  // Self-heal for stale localStorage in two shapes:
   //
-  // signOut({ scope: "local" }) clears storage and stops the timer
-  // without a network call — no rate-limit burn, no cross-device blast.
+  //   1. Server says "not signed in" but localStorage still has `sb-*`
+  //      shards — most likely a revoked/rotated refresh_token the SDK's
+  //      auto-refresh timer would otherwise hammer /token to revive,
+  //      eventually hitting 429s.
+  //
+  //   2. Server says "signed in as B" but localStorage has `sb-*` whose
+  //      embedded `user.id` is A — happens after a Keycloak account
+  //      switch on a shared machine. The SDK's userStorage path can pick
+  //      up A's revoked token and produce the same 429 storm.
+  //
+  // Case 1: signOut({ scope: "local" }) clears storage and stops the
+  // timer without a network call. Case 2: surgically remove only the
+  // mismatched key — don't touch the live session.
   useEffect(() => {
-    if (initialUser) return
-    let hasStaleState = false
+    const stale: string[] = []
     try {
-      hasStaleState = Object.keys(localStorage).some((k) => k.startsWith("sb-"))
+      for (const key of Object.keys(localStorage)) {
+        if (!key.startsWith("sb-")) continue
+        if (!initialUser) {
+          stale.push(key)
+          continue
+        }
+        try {
+          const raw = localStorage.getItem(key)
+          if (!raw) continue
+          const parsed = JSON.parse(raw)
+          const sub: unknown =
+            parsed?.user?.id ?? parsed?.currentSession?.user?.id
+          if (typeof sub === "string" && sub !== initialUser.id) {
+            stale.push(key)
+          }
+        } catch {
+          // Unparseable blob — leave it for client.ts's purge to handle.
+        }
+      }
     } catch {
       return // SSR or private mode — nothing to do
     }
-    if (!hasStaleState) return
 
-    supabase.auth.signOut({ scope: "local" }).catch(() => {
-      try {
-        Object.keys(localStorage)
-          .filter((k) => k.startsWith("sb-"))
-          .forEach((k) => localStorage.removeItem(k))
-      } catch {
-        /* give up silently */
-      }
-    })
+    if (stale.length === 0) return
+
+    if (!initialUser) {
+      supabase.auth.signOut({ scope: "local" }).catch(() => {
+        try {
+          stale.forEach((k) => localStorage.removeItem(k))
+        } catch {
+          /* give up silently */
+        }
+      })
+      return
+    }
+
+    try {
+      stale.forEach((k) => localStorage.removeItem(k))
+    } catch {
+      /* give up silently */
+    }
   }, [initialUser, supabase])
 
   useEffect(() => {
