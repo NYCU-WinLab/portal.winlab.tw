@@ -5,7 +5,14 @@ import { createBrowserClient } from "@supabase/ssr"
 // check the SDK throws "Invalid UTF-8 sequence" and the auth client is left
 // in a broken state. We remove the offending keys before the SDK ever sees
 // them so the user gets a clean login instead of a silent crash.
-function purgeCorruptedAuthStorage() {
+//
+// Runs once per page load — `createBrowserClient` itself is a singleton, so
+// the SDK side already dedupes. Re-scanning localStorage on every hook
+// re-render is just wasted CPU.
+let purged = false
+function purgeCorruptedAuthStorageOnce() {
+  if (purged) return
+  purged = true
   if (typeof localStorage === "undefined") return
   try {
     const decoder = new TextDecoder("utf-8", { fatal: true })
@@ -54,7 +61,7 @@ function purgeCorruptedAuthStorage() {
 }
 
 export function createClient() {
-  purgeCorruptedAuthStorage()
+  purgeCorruptedAuthStorageOnce()
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
