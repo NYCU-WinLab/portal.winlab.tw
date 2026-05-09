@@ -62,6 +62,7 @@ export default async function Page() {
           email={currentUser.email}
           avatarUrl={currentUser.avatarUrl}
         />
+        <BulletinBoard />
         <nav className="flex flex-col gap-3">
           {apps.map((app) => (
             <Button
@@ -97,7 +98,6 @@ export default async function Page() {
             </Button>
           ))}
         </div>
-        <BulletinBoard />
         <SignOutButton />
       </div>
     </PortalShell>
