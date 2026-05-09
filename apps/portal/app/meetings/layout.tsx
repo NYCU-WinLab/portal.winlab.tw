@@ -22,6 +22,7 @@ export default function MeetingsLayout({
       <PortalShell
         appName="Meetings"
         appHref="/meetings"
+        containerClassName="max-w-6xl"
         bottomLeft={
           <Link href="/" className="transition-colors hover:text-foreground">
             Portal
