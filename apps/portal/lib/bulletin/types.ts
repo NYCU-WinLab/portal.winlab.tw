@@ -6,6 +6,7 @@ export interface Announcement {
   pinned: boolean
   createdAt: string
   updatedAt: string
+  notifiedAt: string | null
 }
 
 export interface DbAnnouncement {
@@ -18,6 +19,7 @@ export interface DbAnnouncement {
   created_by: string | null
   created_at: string
   updated_at: string
+  notified_at: string | null
 }
 
 export function toAnnouncement(row: DbAnnouncement): Announcement {
@@ -29,5 +31,6 @@ export function toAnnouncement(row: DbAnnouncement): Announcement {
     pinned: row.pinned,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    notifiedAt: row.notified_at,
   }
 }
