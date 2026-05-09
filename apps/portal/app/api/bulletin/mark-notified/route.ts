@@ -57,11 +57,10 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const { error, count } = await supabase
+  const { error } = await supabase
     .from("announcements")
     .update({ notified_at: new Date().toISOString() })
     .in("id", ids)
-    .select("id", { count: "exact", head: true })
 
   if (error) {
     return NextResponse.json(
@@ -70,5 +69,5 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({ updated: count ?? ids.length }, { headers: CORS })
+  return NextResponse.json({ updated: ids.length }, { headers: CORS })
 }
