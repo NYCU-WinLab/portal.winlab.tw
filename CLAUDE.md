@@ -50,6 +50,42 @@ No test runner. Don't add one without asking.
 
 Write commits as `<type>: description`, English, written like a person. Full branch / PR / review rules live in `CONTRIBUTING.md`.
 
+### GitHub issue + PR workflow
+
+**Before pushing and opening a PR**, always follow these steps:
+
+1. **Check for an existing issue** — search with `gh issue list` or `gh issue list --search "<keyword>"`. If one already tracks the bug or feature, note its number.
+
+2. **If no issue exists, create one first**:
+
+```bash
+gh issue create \
+  --title "<concise title>" \
+  --body "<what, why, and how to reproduce if a bug>" \
+  --label "bug"         # or "enhancement", "documentation", etc. \
+  --assignee "JaeggerJose"   # assign to the relevant person
+```
+
+Available labels: `bug`, `enhancement`, `documentation`, `duplicate`, `question`, `help wanted`, `good first issue`, `invalid`, `wontfix`, `dependencies`, `javascript`, `github_actions`.  
+Known collaborators: `beenson`, `Tim7179`, `stanleyshen2003`, `N0Ball`, `JaeggerJose`, `zyx1121`, `Metabolism2003`, `qqqqq4545`.
+
+3. **Reference the issue in the PR body** using `Closes #<number>` so GitHub auto-closes it on merge.
+
+```bash
+gh pr create --title "..." --body "$(cat <<'EOF'
+Closes #<issue-number>
+
+## Summary
+...
+
+## Test plan
+- [ ] ...
+EOF
+)"
+```
+
+Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps, and trivial chores where an issue would be pure overhead.
+
 ## Architecture
 
 ### Monorepo topology
