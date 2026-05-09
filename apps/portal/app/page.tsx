@@ -4,6 +4,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Toaster } from "@workspace/ui/components/sonner"
 
 import { BulletinBoard } from "@/app/_components/bulletin-board"
+import { BulletinChat } from "@/app/_components/bulletin-chat"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -63,6 +64,7 @@ export default async function Page() {
           avatarUrl={currentUser.avatarUrl}
         />
         <BulletinBoard />
+        <BulletinChat />
         <nav className="flex flex-col gap-3">
           {apps.map((app) => (
             <Button
@@ -100,6 +102,7 @@ export default async function Page() {
         </div>
         <SignOutButton />
       </div>
+      <Toaster />
     </PortalShell>
   )
 }
