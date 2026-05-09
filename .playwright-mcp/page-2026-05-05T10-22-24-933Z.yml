@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+    - link "Meetings" [ref=e3] [cursor=pointer]:
+        - /url: /meetings
+    - link "Portal" [ref=e5] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e6]: © 2026
+    - main [ref=e7]:
+        - generic [ref=e8]:
+            - generic [ref=e9]:
+                - heading "Lab Meetings" [level=1] [ref=e10]
+                - paragraph [ref=e11]: WinLab 每週報告排班
+            - generic [ref=e12]:
+                - tablist [ref=e13]:
+                    - tab "排班表" [selected] [ref=e14]
+                    - tab "老師 Papers" [ref=e15]
+                    - tab "Meeting 資訊" [ref=e16]
+                - tabpanel "排班表" [ref=e17]:
+                    - generic [ref=e18]:
+                        - generic [ref=e19]:
+                            - button [ref=e20]:
+                                - img
+                            - generic [ref=e21]: "2026"
+                            - button [disabled]:
+                                - img
+                        - paragraph [ref=e22]: 載入中…
+    - region "Notifications alt+T"
+    - alert [ref=e23]

@@ -1,0 +1,594 @@
+- generic:
+    - generic:
+        - link:
+            - /url: /meetings
+            - text: Meetings
+    - generic:
+        - link:
+            - /url: /
+            - text: Portal
+    - generic: © 2026
+    - main:
+        - generic:
+            - generic:
+                - heading [level=1]: Lab Meetings
+                - paragraph: WinLab 每週報告排班
+            - generic:
+                - tablist:
+                    - tab [selected]: 排班表
+                    - tab: 老師 Papers
+                    - tab: Meeting 資訊
+                - tabpanel:
+                    - generic:
+                        - generic:
+                            - button:
+                                - img
+                            - generic: "2026"
+                            - button [disabled]:
+                                - img
+                        - generic:
+                            - generic:
+                                - button: 新增週次
+                            - generic:
+                                - generic:
+                                    - table:
+                                        - rowgroup:
+                                            - row:
+                                                - columnheader: 週次
+                                                - columnheader: 日期
+                                                - columnheader: 報告人
+                                                - columnheader: PPT
+                                                - columnheader: 錄影
+                                                - columnheader: Paper
+                                                - columnheader: 備註
+                                                - columnheader
+                                        - rowgroup:
+                                            - row:
+                                                - cell: 寒假
+                                                - cell: 1/5
+                                                - cell: 張永義
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: A CI/CD Framework for Zero Downtime Deployment in Wi-Fi Mesh Networks
+                                                - cell: 碩論
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 1/12
+                                                - cell: 洪翊婕
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://dl.acm.org/doi/10.1145/3718958.3750537
+                                                            - text: "Intent-Driven Network Management with Multi-Agent LLMs: The Confucius Framework"
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 1/19
+                                                - cell: 蔣汶儒
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell: Meeting 時間延至 16.30
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 1/26
+                                                - cell: 金則禹
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://dl.acm.org/doi/full/10.1145/3649307
+                                                            - text: Queuing Network Models of Multiservice RANs
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 2/2
+                                                - cell: 何明曦
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://aclanthology.org/2025.findings-emnlp.419/
+                                                            - text: Adaptive Schema-aware Event Extraction with Retrieval-Augmented Generation
+                                                - cell: 會後進行 Winfra 簡報
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 2/9
+                                                - cell: 惠品嘉
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://ieeexplore.ieee.org/document/11080566
+                                                            - text: "AirXDP: A Flexible and Efficient User-Space Data Plane for WiFi Access Points"
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 2/16
+                                                - cell: 春節
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第1週
+                                                - cell: 2/23
+                                                - cell: 黃琮閔
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://ieeexplore.ieee.org/document/11161355
+                                                            - text: "PDCA: Practical Dynamic Client Association in Wi-Fi Mesh Networks using EasyMesh"
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第2週
+                                                - cell: 3/2
+                                                - cell: 劉承遠
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://arxiv.org/abs/2409.05092
+                                                            - text: "Towards an AI/ML-driven SMO Framework in O-RAN: Scenarios, Solutions, and Challenges"
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第3週
+                                                - cell: 3/9
+                                                - cell: 吳景文
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://ieeexplore.ieee.org/document/10122608
+                                                            - text: IMT to Satellite Stochastic Interference Modeling and Coexistence Analysis of Upper 6 GHz Band Service
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第4週
+                                                - cell: 3/16
+                                                - cell: 詹詠翔
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第5週
+                                                - cell: 3/23
+                                                - cell: 劉翰成
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第6週
+                                                - cell: 3/30
+                                                - cell: 蘇胤翔
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://doi.org/10.23919/JCC.ja.2022-0460
+                                                            - text: 5G advanced network supporting LEO satellite with user plane function
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第7週
+                                                - cell: 4/6
+                                                - cell: 清明連假
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第8週
+                                                - cell: 4/13
+                                                - cell: 月考週
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第9週
+                                                - cell: 4/20
+                                                - cell: 覃朝福
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://arxiv.org/abs/2512.16381
+                                                            - text: A Network Arena for Benchmarking AI Agents on Network Troubleshooting
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第10週
+                                                - cell: 4/27
+                                                - cell: 葉睿丞
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: Harness Engineering
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第11週
+                                                - cell: 5/4
+                                                - cell: 廖洺玄
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - link:
+                                                            - /url: https://ai.nejm.org/doi/full/10.1056/AIdbp2500144
+                                                            - text: "MedAgentBench: Benchmarking LLM Agents in Virtual EHR Environments"
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第12週
+                                                - cell: 5/11
+                                                - cell: 沈昱宏
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第13週
+                                                - cell: 5/18
+                                                - cell: 謝岱廷
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 大掃除
+                                                - cell: 5/25
+                                                - cell: —
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第15週
+                                                - cell: 6/1
+                                                - cell: 洪翊婕
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 第16週
+                                                - cell: 6/8
+                                                - cell: 月考週
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: 暑假
+                                                - cell: 6/15
+                                                - cell: 詹詠翔
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 6/22
+                                                - cell: 劉翰成
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 6/29
+                                                - cell: 蘇胤翔
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 7/6
+                                                - cell: 覃朝福
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 7/13
+                                                - cell: 葉睿丞
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 7/20
+                                                - cell: 廖洺玄
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 7/27
+                                                - cell: 沈昱宏
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 8/3
+                                                - cell: 謝岱廷
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 8/10
+                                                - cell: 洪翊婕
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 8/17
+                                                - cell: —
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 認領
+                                                        - button: 編輯
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 8/24
+                                                - cell: —
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+                                            - row:
+                                                - cell: —
+                                                - cell: 8/31
+                                                - cell: —
+                                                - cell: —
+                                                - cell: —
+                                                - cell:
+                                                    - generic:
+                                                        - generic: —
+                                                - cell
+                                                - cell:
+                                                    - generic:
+                                                        - button: 刪除
+    - region "Notifications alt+T"
+    - alert
+    - dialog "編輯週次" [ref=e526]:
+        - heading "編輯週次" [level=2] [ref=e528]
+        - generic [ref=e529]:
+            - generic [ref=e530]:
+                - generic [ref=e531]: 週次標籤
+                - textbox "第1週 / 寒假 / 春節" [active] [ref=e532]: 第11週
+            - generic [ref=e533]:
+                - generic [ref=e534]: 日期
+                - textbox [ref=e535]: 2026-05-04
+            - generic [ref=e536]:
+                - checkbox "假日 / 暫停（不需要報告人）" [ref=e537]
+                - text: 假日 / 暫停（不需要報告人）
+            - generic [ref=e538]:
+                - generic [ref=e539]: 報告人
+                - combobox [ref=e540]:
+                    - generic [ref=e541]: 廖洺玄
+                    - img
+            - generic [ref=e542]:
+                - generic [ref=e543]: Paper 標題
+                - textbox "論文名稱" [ref=e544]: "MedAgentBench: Benchmarking LLM Agents in Virtual EHR Environments"
+            - generic [ref=e545]:
+                - generic [ref=e546]: 論文連結
+                - textbox "https://..." [ref=e547]: https://ai.nejm.org/doi/full/10.1056/AIdbp2500144
+            - generic [ref=e548]:
+                - generic [ref=e549]:
+                    - generic [ref=e550]: PPT
+                    - button "上傳" [ref=e551]:
+                        - img
+                        - text: 上傳
+                - generic [ref=e552]:
+                    - generic [ref=e553]: 錄影
+                    - button "上傳" [ref=e554]:
+                        - img
+                        - text: 上傳
+            - generic [ref=e555]:
+                - generic [ref=e556]: 備註
+                - textbox "備註" [ref=e557]
+        - generic [ref=e558]:
+            - button "取消" [ref=e559]
+            - button "儲存" [ref=e560]
+        - button "Close" [ref=e561]:
+            - img
+            - generic [ref=e562]: Close

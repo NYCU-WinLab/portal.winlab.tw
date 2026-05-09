@@ -1,7 +1,9 @@
 import Link from "next/link"
 
 import { Button } from "@workspace/ui/components/button"
+import { Toaster } from "@workspace/ui/components/sonner"
 
+import { BulletinBoard } from "@/app/_components/bulletin-board"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -95,6 +97,7 @@ export default async function Page() {
             </Button>
           ))}
         </div>
+        <BulletinBoard />
         <SignOutButton />
       </div>
     </PortalShell>
