@@ -11,6 +11,13 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -121,6 +128,11 @@ export function MeetingEditDialog({
   const [weekLabel, setWeekLabel] = useState(meeting.weekLabel ?? "")
   const [date, setDate] = useState(meeting.scheduledDate)
   const [isHoliday, setIsHoliday] = useState(meeting.isHoliday)
+  const [location, setLocation] = useState(meeting.location)
+  const [startTime, setStartTime] = useState(meeting.startTime)
+  const [questionGroupNumber, setQuestionGroupNumber] = useState<number | null>(
+    meeting.questionGroupNumber
+  )
   const [presenterUserId, setPresenterUserId] = useState(
     meeting.presenterUserId ?? "__none__"
   )
@@ -150,6 +162,9 @@ export function MeetingEditDialog({
     setWeekLabel(meeting.weekLabel ?? "")
     setDate(meeting.scheduledDate)
     setIsHoliday(meeting.isHoliday)
+    setLocation(meeting.location)
+    setStartTime(meeting.startTime)
+    setQuestionGroupNumber(meeting.questionGroupNumber)
     setPresenterUserId(meeting.presenterUserId ?? "__none__")
     setPaperTitle(meeting.paperTitle ?? "")
     setPaperLink(meeting.paperLink ?? "")
@@ -215,6 +230,9 @@ export function MeetingEditDialog({
           weekLabel: weekLabel || null,
           scheduledDate: date,
           isHoliday,
+          location: location || "EC 411",
+          startTime: startTime || "15:30",
+          questionGroupNumber,
         },
         { onSuccess: () => onOpenChange(false) }
       )
@@ -258,6 +276,45 @@ export function MeetingEditDialog({
                 />
                 假日 / 暫停（不需要報告人）
               </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label>地點</Label>
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="EC 411"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>時間</Label>
+                  <Input
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    placeholder="15:30"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>提問小組</Label>
+                <Select
+                  value={questionGroupNumber?.toString() ?? "none"}
+                  onValueChange={(v) =>
+                    setQuestionGroupNumber(v === "none" ? null : Number(v))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="未指定" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未指定</SelectItem>
+                    {[1, 2, 3, 4].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        小組 {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           )}
           {!isHoliday && (
