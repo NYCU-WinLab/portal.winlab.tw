@@ -100,16 +100,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let presenterEmail: string | null = null
-  if (m.presenter_user_id) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("email")
-      .eq("id", m.presenter_user_id)
-      .maybeSingle()
-    presenterEmail = profile?.email ?? null
-  }
-
   return NextResponse.json(
     {
       date: m.scheduled_date,
