@@ -46,8 +46,61 @@ export function BulletinChatClient({
   const isComposingRef = useRef(false)
 
   // ---------------------------------------------------------------------------
-  // Realtime subscription — listen for new messages and refetch full row
-  // (RLS already gates visibility, so we trust whatever the channel hands us)
+  // Hydrate-and-append helper used by BOTH the realtime handler and the
+  // post-send path so the sender sees their own message even if the realtime
+  // channel hiccups.
+  // ---------------------------------------------------------------------------
+  async function hydrateAndAppend(id: string) {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("bulletin_messages")
+      .select(
+        `
+        id,
+        content,
+        is_broadcast,
+        created_at,
+        user_profiles!bulletin_messages_author_id_fkey(id, name, email),
+        bulletin_message_mentions(
+          user_profiles!bulletin_message_mentions_mentioned_user_id_fkey(id, name, email)
+        )
+      `
+      )
+      .eq("id", id)
+      .maybeSingle()
+    if (!data) return null
+    interface Row {
+      id: string
+      content: string
+      is_broadcast: boolean
+      created_at: string
+      user_profiles: BulletinChatMember | null
+      bulletin_message_mentions: Array<{
+        user_profiles: BulletinChatMember | null
+      }>
+    }
+    const r = data as unknown as Row
+    const hydrated: ChatMessage = {
+      id: r.id,
+      content: r.content,
+      isBroadcast: r.is_broadcast,
+      createdAt: r.created_at,
+      author: r.user_profiles ?? { id: "", name: null, email: null },
+      mentions: r.bulletin_message_mentions
+        .map((x) => x.user_profiles)
+        .filter((m): m is BulletinChatMember => Boolean(m)),
+    }
+    let added = false
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === hydrated.id)) return prev
+      added = true
+      return [...prev, hydrated]
+    })
+    return { hydrated, added }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Realtime subscription — listen for new messages from other clients
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const supabase = createClient()
@@ -62,53 +115,10 @@ export function BulletinChatClient({
         },
         async (payload) => {
           const newId = (payload.new as { id: string }).id
-          if (messages.some((m) => m.id === newId)) return
-          // Hydrate author + mentions in one query (Realtime payload doesn't
-          // include joined rows).
-          const { data } = await supabase
-            .from("bulletin_messages")
-            .select(
-              `
-              id,
-              content,
-              is_broadcast,
-              created_at,
-              user_profiles!bulletin_messages_author_id_fkey(id, name, email),
-              bulletin_message_mentions(
-                user_profiles!bulletin_message_mentions_mentioned_user_id_fkey(id, name, email)
-              )
-            `
-            )
-            .eq("id", newId)
-            .maybeSingle()
-          if (!data) return
-          interface Row {
-            id: string
-            content: string
-            is_broadcast: boolean
-            created_at: string
-            user_profiles: BulletinChatMember | null
-            bulletin_message_mentions: Array<{
-              user_profiles: BulletinChatMember | null
-            }>
-          }
-          const r = data as unknown as Row
-          const hydrated: ChatMessage = {
-            id: r.id,
-            content: r.content,
-            isBroadcast: r.is_broadcast,
-            createdAt: r.created_at,
-            author: r.user_profiles ?? { id: "", name: null, email: null },
-            mentions: r.bulletin_message_mentions
-              .map((x) => x.user_profiles)
-              .filter((m): m is BulletinChatMember => Boolean(m)),
-          }
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === hydrated.id)) return prev
-            return [...prev, hydrated]
-          })
+          const result = await hydrateAndAppend(newId)
+          if (!result || !result.added) return
           // Bump unread when collapsed and the new message isn't ours
-          if (hydrated.author.id !== currentUserId) {
+          if (result.hydrated.author.id !== currentUserId) {
             setExpanded((wasExpanded) => {
               if (!wasExpanded) setUnreadCount((c) => c + 1)
               return wasExpanded
@@ -120,7 +130,7 @@ export function BulletinChatClient({
     return () => {
       supabase.removeChannel(channel)
     }
-    // Intentionally only subscribe once; messages access uses functional updates.
+    // Intentionally only subscribe once; access via functional updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -182,9 +192,18 @@ export function BulletinChatClient({
         const body = await res.json().catch(() => null)
         throw new Error(body?.error ?? `HTTP ${res.status}`)
       }
+      const body = (await res.json()) as { id?: string }
       setDraft("")
       setBroadcast(false)
       setMentionQuery(null)
+      // Optimistically render our own message right away — realtime
+      // sometimes lags or drops the local echo. hydrateAndAppend dedups
+      // against any later realtime event for the same id.
+      if (body.id) {
+        await hydrateAndAppend(body.id)
+        // Auto-expand so the sender sees what they just posted
+        setExpanded(true)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "送出失敗")
     } finally {
