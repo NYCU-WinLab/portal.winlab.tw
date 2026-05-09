@@ -13,6 +13,9 @@ export interface Meeting {
   paperTitle: string | null
   paperLink: string | null
   notes: string | null
+  location: string
+  startTime: string
+  questionGroupNumber: number | null
   createdAt: string
 }
 
@@ -23,6 +26,11 @@ export interface TeacherPaper {
   fileLink: string | null
   source: string | null
   createdAt: string
+}
+
+export interface MeetingGroup {
+  groupNumber: number
+  members: string[]
 }
 
 export interface DbMeeting {
@@ -40,6 +48,9 @@ export interface DbMeeting {
   paper_title: string | null
   paper_link: string | null
   notes: string | null
+  location: string
+  start_time: string
+  question_group_number: number | null
   created_at: string
 }
 
@@ -50,6 +61,12 @@ export interface DbTeacherPaper {
   file_link: string | null
   source: string | null
   created_at: string
+}
+
+export interface DbMeetingGroup {
+  group_number: number
+  members: string[]
+  updated_at: string
 }
 
 export function toMeeting(row: DbMeeting): Meeting {
@@ -68,6 +85,9 @@ export function toMeeting(row: DbMeeting): Meeting {
     paperTitle: row.paper_title,
     paperLink: row.paper_link,
     notes: row.notes,
+    location: row.location,
+    startTime: row.start_time,
+    questionGroupNumber: row.question_group_number,
     createdAt: row.created_at,
   }
 }
@@ -80,5 +100,12 @@ export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
     fileLink: row.file_link,
     source: row.source,
     createdAt: row.created_at,
+  }
+}
+
+export function toMeetingGroup(row: DbMeetingGroup): MeetingGroup {
+  return {
+    groupNumber: row.group_number,
+    members: row.members,
   }
 }

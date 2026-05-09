@@ -126,6 +126,9 @@ export function useAdminUpdateMeeting() {
       videoUploaded,
       videoLink,
       notes,
+      location,
+      startTime,
+      questionGroupNumber,
     }: {
       id: string
       weekLabel: string | null
@@ -140,6 +143,9 @@ export function useAdminUpdateMeeting() {
       videoUploaded: boolean
       videoLink: string | null
       notes: string | null
+      location: string
+      startTime: string
+      questionGroupNumber: number | null
     }) => {
       const { error } = await supabase
         .from(TABLE)
@@ -156,6 +162,9 @@ export function useAdminUpdateMeeting() {
           video_uploaded: videoUploaded,
           video_link: videoLink,
           notes,
+          location,
+          start_time: startTime,
+          question_group_number: questionGroupNumber,
         })
         .eq("id", id)
       if (error) throw new Error(error.message || "更新失敗")

@@ -77,6 +77,7 @@ export function ScheduleTab({ year }: { year: number }) {
               <TableHead className="w-10 text-center">PPT</TableHead>
               <TableHead className="w-10 text-center">錄影</TableHead>
               <TableHead>Paper</TableHead>
+              <TableHead className="w-16 text-center">小組</TableHead>
               <TableHead className="hidden md:table-cell">備註</TableHead>
               <TableHead className="w-16" />
             </TableRow>
@@ -135,6 +136,15 @@ export function ScheduleTab({ year }: { year: number }) {
                       >
                         {m.paperTitle ?? "—"}
                       </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {m.questionGroupNumber ? (
+                      <span className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-xs text-muted-foreground tabular-nums">
+                        G{m.questionGroupNumber}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground md:table-cell">

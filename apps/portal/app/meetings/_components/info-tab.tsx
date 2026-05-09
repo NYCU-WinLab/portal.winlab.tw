@@ -2,9 +2,11 @@ import Link from "next/link"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
+import { GroupsPanel } from "./groups-panel"
+
 const INFO = [
   { label: "地點", value: "EC 411" },
-  { label: "時間", value: "週一 16:30 – 18:30" },
+  { label: "時間", value: "週一 15:30" },
   {
     label: "Teams 會議",
     value: "加入 Teams",
@@ -27,28 +29,33 @@ const INFO = [
   },
 ]
 
-export function InfoTab() {
+export function InfoTab({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <div className="flex flex-col gap-3">
-      {INFO.map((item) => (
-        <Card key={item.label}>
-          <CardContent className="flex items-center justify-between py-4">
-            <span className="text-sm text-muted-foreground">{item.label}</span>
-            {item.href ? (
-              <Link
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm transition-colors hover:text-foreground"
-              >
-                {item.value}
-              </Link>
-            ) : (
-              <span className="text-sm font-medium">{item.value}</span>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        {INFO.map((item) => (
+          <Card key={item.label}>
+            <CardContent className="flex items-center justify-between py-4">
+              <span className="text-sm text-muted-foreground">
+                {item.label}
+              </span>
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm transition-colors hover:text-foreground"
+                >
+                  {item.value}
+                </Link>
+              ) : (
+                <span className="text-sm font-medium">{item.value}</span>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <GroupsPanel isAdmin={isAdmin} />
     </div>
   )
 }

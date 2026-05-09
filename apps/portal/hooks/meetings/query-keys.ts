@@ -12,4 +12,7 @@ export const queryKeys = {
   users: {
     all: ["meetings", "users"] as const,
   },
+  groups: {
+    all: ["meeting_groups"] as const,
+  },
 }

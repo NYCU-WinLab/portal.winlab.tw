@@ -107,7 +107,7 @@ export default function MeetingsPage() {
           <PapersTab />
         </TabsContent>
         <TabsContent value="info" className="mt-4">
-          <InfoTab />
+          <InfoTab isAdmin={isAdmin} />
         </TabsContent>
       </Tabs>
 
