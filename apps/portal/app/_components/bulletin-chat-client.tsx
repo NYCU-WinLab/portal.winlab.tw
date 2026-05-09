@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, ChevronUp, Megaphone, Send } from "lucide-react"
+import { MessageSquare, Megaphone, Send, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -134,12 +134,16 @@ export function BulletinChatClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom: when messages arrive AND when the panel opens.
+  // On open the list element is freshly mounted, so wait one frame for layout.
   useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight
-    }
-  }, [messages.length])
+    if (!expanded) return
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        listRef.current.scrollTop = listRef.current.scrollHeight
+      }
+    })
+  }, [expanded, messages.length])
 
   // ---------------------------------------------------------------------------
   // @mention autocomplete — track the token under the cursor
@@ -237,46 +241,53 @@ export function BulletinChatClient({
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <button
-        type="button"
-        onClick={toggleExpanded}
-        className="flex items-center justify-between gap-2 rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <span className="flex items-center gap-2">
-          聊天室
-          {broadcasts.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-              <Megaphone className="size-2.5" />
-              {broadcasts.length} 則公告
+    <div className="fixed top-3 right-3 z-50 flex flex-col items-end gap-2">
+      {!expanded && (
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          aria-label="開啟聊天室"
+          className="relative flex size-11 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-colors hover:bg-muted"
+        >
+          <MessageSquare className="size-5" />
+          {unreadCount > 0 ? (
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
-          )}
-          {!expanded && unreadCount > 0 && (
-            <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-              {unreadCount} 則新訊息
+          ) : broadcasts.length > 0 ? (
+            <span className="absolute -top-1 -right-1 flex size-3 items-center justify-center rounded-full bg-amber-500 text-white">
+              <Megaphone className="size-2" />
             </span>
-          )}
-        </span>
-        {expanded ? (
-          <ChevronUp className="size-3" />
-        ) : (
-          <ChevronDown className="size-3" />
-        )}
-      </button>
-
-      {!expanded && broadcasts.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {broadcasts.slice(-2).map((m) => (
-            <BroadcastBanner key={m.id} message={m} />
-          ))}
-        </div>
+          ) : null}
+        </button>
       )}
 
       {expanded && (
-        <>
+        <div className="flex h-[min(560px,calc(100vh-2rem))] w-[min(380px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+          <header className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="size-4 text-muted-foreground" />
+              <span className="text-sm font-medium">聊天室</span>
+              {broadcasts.length > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                  <Megaphone className="size-2.5" />
+                  {broadcasts.length}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              aria-label="收起聊天室"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </header>
+
           <div
             ref={listRef}
-            className="flex max-h-[480px] flex-col gap-3 overflow-y-auto rounded-xl border border-border p-3"
+            className="flex flex-1 flex-col gap-3 overflow-y-auto p-3"
           >
             {broadcasts.map((m) => (
               <BroadcastBanner key={m.id} message={m} />
@@ -297,9 +308,9 @@ export function BulletinChatClient({
             )}
           </div>
 
-          <div className="relative flex flex-col gap-2 rounded-xl border border-border p-2">
+          <div className="relative flex flex-col gap-2 border-t border-border p-2">
             {filteredMembers.length > 0 && (
-              <div className="absolute right-0 bottom-full left-0 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+              <div className="absolute right-2 bottom-full left-2 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
                 {filteredMembers.map((m) => (
                   <button
                     key={m.id}
@@ -324,7 +335,7 @@ export function BulletinChatClient({
               placeholder={
                 broadcast
                   ? "輸入廣播公告（會寄信給全體成員）…"
-                  : "說點什麼…  輸入 @ 提到別人會寄信通知"
+                  : "說點什麼… 輸入 @ 提到別人會寄信"
               }
               onChange={(e) => handleDraftChange(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -334,7 +345,7 @@ export function BulletinChatClient({
               onCompositionEnd={() => {
                 isComposingRef.current = false
               }}
-              className="resize-none border-0 px-2 shadow-none focus-visible:ring-0"
+              className="min-h-[52px] resize-none border-0 px-2 shadow-none focus-visible:ring-0"
             />
             <div className="flex items-center justify-between gap-2">
               {isAdmin ? (
@@ -346,7 +357,7 @@ export function BulletinChatClient({
                     className="size-3.5"
                   />
                   <Megaphone className="size-3" />
-                  廣播（寄信給全部人）
+                  廣播
                 </label>
               ) : (
                 <span />
@@ -362,9 +373,9 @@ export function BulletinChatClient({
               </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
-    </section>
+    </div>
   )
 }
 
