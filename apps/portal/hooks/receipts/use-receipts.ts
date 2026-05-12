@@ -10,6 +10,7 @@ import {
 } from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
+  STATUS_ORDER,
   toReceipt,
   type DatabaseReceiptWithTags,
   type Receipt,
@@ -43,7 +44,13 @@ export function useReceipts() {
         console.error("[receipts] list query failed", error)
         throw new Error(error.message || "讀取收據失敗")
       }
-      return (data as unknown as DatabaseReceiptWithTags[]).map(toReceipt)
+      return (data as unknown as DatabaseReceiptWithTags[])
+        .map(toReceipt)
+        .sort((a, b) => {
+          const byStatus = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+          if (byStatus !== 0) return byStatus
+          return b.createdAt.localeCompare(a.createdAt)
+        })
     },
     retry: 2,
   })
