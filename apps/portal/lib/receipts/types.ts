@@ -1,5 +1,13 @@
 export type ReceiptStatus = "pending" | "approved" | "rejected"
 
+// Display order: pending first (still needs eyes on it), then approved, then
+// rejected. Same status falls back to newer-first by created_at.
+export const STATUS_ORDER: Record<ReceiptStatus, number> = {
+  pending: 0,
+  approved: 1,
+  rejected: 2,
+}
+
 export type TagVariant = "default" | "secondary" | "outline"
 
 export const TAG_VARIANTS: TagVariant[] = ["default", "secondary", "outline"]
