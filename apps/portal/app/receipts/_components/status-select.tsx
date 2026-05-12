@@ -12,15 +12,7 @@ import {
 } from "@workspace/ui/components/select"
 
 import { useUpdateReceiptStatus } from "@/hooks/receipts/use-receipts"
-import type { ReceiptStatus } from "@/lib/receipts/types"
-
-export const STATUS_LABELS: Record<ReceiptStatus, string> = {
-  pending: "審核中",
-  approved: "審核完成",
-  rejected: "已拒絕",
-}
-
-const LABELS = STATUS_LABELS
+import { STATUS_LABELS, type ReceiptStatus } from "@/lib/receipts/types"
 
 const VARIANTS: Record<ReceiptStatus, "secondary" | "default" | "destructive"> =
   {
@@ -30,7 +22,7 @@ const VARIANTS: Record<ReceiptStatus, "secondary" | "default" | "destructive"> =
   }
 
 export function ReceiptStatusBadge({ status }: { status: ReceiptStatus }) {
-  return <Badge variant={VARIANTS[status]}>{LABELS[status]}</Badge>
+  return <Badge variant={VARIANTS[status]}>{STATUS_LABELS[status]}</Badge>
 }
 
 export function StatusSelect({
@@ -48,7 +40,7 @@ export function StatusSelect({
       { id, status: next as ReceiptStatus },
       {
         onSuccess: () =>
-          toast.success(`狀態改為「${LABELS[next as ReceiptStatus]}」`),
+          toast.success(`狀態改為「${STATUS_LABELS[next as ReceiptStatus]}」`),
         onError: (err) => toast.error(`改狀態失敗：${err.message}`),
       }
     )
@@ -66,7 +58,7 @@ export function StatusSelect({
       <SelectContent>
         {(["pending", "approved", "rejected"] as ReceiptStatus[]).map((s) => (
           <SelectItem key={s} value={s}>
-            {LABELS[s]}
+            {STATUS_LABELS[s]}
           </SelectItem>
         ))}
       </SelectContent>

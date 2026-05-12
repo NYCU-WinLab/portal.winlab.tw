@@ -14,13 +14,17 @@ import {
 } from "@workspace/ui/components/table"
 
 import { useReceipts } from "@/hooks/receipts/use-receipts"
-import type { Receipt, ReceiptStatus } from "@/lib/receipts/types"
+import {
+  STATUS_LABELS,
+  type Receipt,
+  type ReceiptStatus,
+} from "@/lib/receipts/types"
 
 import { ReceiptsFilterChips } from "./filter-chips"
 import { ReceiptPreviewDialog } from "./receipt-preview-dialog"
 import { ReceiptRowActions } from "./row-actions"
 import { ReceiptsSearchBar } from "./search-bar"
-import { STATUS_LABELS, StatusSelect } from "./status-select"
+import { StatusSelect } from "./status-select"
 import { TagBadge } from "./tag-badge"
 import { TagPickerPopover } from "./tag-picker-popover"
 import { UploadDialog } from "./upload-dialog"
