@@ -3,9 +3,11 @@
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import { useTags } from "@/hooks/receipts/use-tags"
-import type { ReceiptStatus, Tag } from "@/lib/receipts/types"
-
-import { STATUS_LABELS } from "./status-select"
+import {
+  STATUS_LABELS,
+  type ReceiptStatus,
+  type Tag,
+} from "@/lib/receipts/types"
 
 const STATUSES: ReceiptStatus[] = ["pending", "approved", "rejected"]
 

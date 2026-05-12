@@ -8,6 +8,12 @@ export const STATUS_ORDER: Record<ReceiptStatus, number> = {
   rejected: 2,
 }
 
+export const STATUS_LABELS: Record<ReceiptStatus, string> = {
+  pending: "審核中",
+  approved: "審核完成",
+  rejected: "已拒絕",
+}
+
 export type TagVariant = "default" | "secondary" | "outline"
 
 export const TAG_VARIANTS: TagVariant[] = ["default", "secondary", "outline"]
