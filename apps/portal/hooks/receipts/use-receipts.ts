@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { triggerReceiptEmailDrain } from "@/app/receipts/actions"
 import { createClient } from "@/lib/supabase/client"
 import {
   RECEIPT_FILE_EXT,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
+  STATUS_ORDER,
   toReceipt,
   type DatabaseReceiptWithTags,
   type Receipt,
@@ -43,7 +45,13 @@ export function useReceipts() {
         console.error("[receipts] list query failed", error)
         throw new Error(error.message || "讀取收據失敗")
       }
-      return (data as unknown as DatabaseReceiptWithTags[]).map(toReceipt)
+      return (data as unknown as DatabaseReceiptWithTags[])
+        .map(toReceipt)
+        .sort((a, b) => {
+          const byStatus = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+          if (byStatus !== 0) return byStatus
+          return b.createdAt.localeCompare(a.createdAt)
+        })
     },
     retry: 2,
   })
@@ -94,6 +102,19 @@ export function useUploadReceipt() {
         await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
         throw error
       }
+
+      // Fire-and-forget — the server action defers the actual drain to
+      // `after()` so this await only costs one round-trip to kick it off.
+      // A notification failure must not surface as an upload failure.
+      try {
+        await triggerReceiptEmailDrain()
+      } catch (err) {
+        console.warn(
+          "[receipts] notify trigger failed (upload still succeeded)",
+          err
+        )
+      }
+
       return toReceipt(data as unknown as DatabaseReceiptWithTags)
     },
     onSuccess: () => {

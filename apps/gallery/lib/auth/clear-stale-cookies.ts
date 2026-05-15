@@ -26,7 +26,13 @@ export function clearStaleSupabaseCookiesOnResponse(
   const staleNames = cookieStore
     .getAll()
     .map((c) => c.name)
-    .filter((name) => name.startsWith("sb-"))
+    .filter(
+      (name) =>
+        name.startsWith("sb-") ||
+        name === "gallery" ||
+        name.startsWith("gallery.") ||
+        name.startsWith("gallery-")
+    )
 
   for (const name of staleNames) {
     for (const domain of DOMAINS_TO_CLEAR) {

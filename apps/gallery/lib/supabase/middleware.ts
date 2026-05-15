@@ -23,6 +23,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions: { name: "gallery" },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -41,13 +42,36 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Do not run code between createServerClient and supabase.auth.getClaims().
-  const { data } = await supabase.auth.getClaims()
-  const user = data?.claims
+
+  // getClaims() may throw (not just return error) when a ghost cookie's value
+  // is in an old/unexpected format. Without this try-catch, the exception
+  // propagates through middleware and Next.js returns a 500.
+  let user
+  try {
+    const { data } = await supabase.auth.getClaims()
+    user = data?.claims
+  } catch {
+    // Treat any parse failure as unauthenticated.
+  }
 
   if (!user && request.nextUrl.pathname.startsWith("/upload")) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
+  }
+
+  // Proactively sweep ghost .winlab.tw-scoped sb-* cookies on every response.
+  // gallery.winlab.tw can only clear .winlab.tw (parent) and its own host —
+  // portal.winlab.tw cookies are host-only there and are never sent here.
+  for (const { name } of request.cookies.getAll()) {
+    if (!name.startsWith("sb-")) continue
+    for (const domain of [".winlab.tw", "gallery.winlab.tw"]) {
+      supabaseResponse.cookies.set(name, "", {
+        maxAge: 0,
+        path: "/",
+        domain,
+      })
+    }
   }
 
   return supabaseResponse

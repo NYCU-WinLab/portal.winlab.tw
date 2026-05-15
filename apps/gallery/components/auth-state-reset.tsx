@@ -45,7 +45,12 @@ export function AuthStateReset() {
     ]
     for (const entry of document.cookie.split("; ")) {
       const name = entry.split("=")[0]
-      if (!name?.startsWith("sb-")) continue
+      const isSupabaseCookie =
+        name?.startsWith("sb-") ||
+        name === "gallery" ||
+        name?.startsWith("gallery.") ||
+        name?.startsWith("gallery-")
+      if (!isSupabaseCookie) continue
       for (const domain of domains) {
         const domainPart = domain ? `; domain=${domain}` : ""
         document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domainPart}`
