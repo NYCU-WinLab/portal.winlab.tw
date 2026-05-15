@@ -30,7 +30,10 @@ function purgeCorruptedAuthStorageOnce() {
     }
 
     Object.keys(localStorage)
-      .filter((k) => k.startsWith("sb-"))
+      .filter(
+        (k) =>
+          k.startsWith("sb-") || k === "portal" || k === "portal-auth-token"
+      )
       .forEach((k) => {
         try {
           const raw = localStorage.getItem(k)
@@ -64,6 +67,7 @@ export function createClient() {
   purgeCorruptedAuthStorageOnce()
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    { cookieOptions: { name: "portal" } }
   )
 }

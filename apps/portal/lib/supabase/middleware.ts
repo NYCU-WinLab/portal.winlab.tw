@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+// Ghost cookies from the old portal (domain=.winlab.tw) are sent by the
+// browser to every *.winlab.tw subdomain alongside the correct host-only
+// cookies. @supabase/ssr receives duplicate cookie names from getAll() and
+// may pick the ghost value, producing a malformed JWT that can throw instead
+// of returning a graceful error. Clear these on every response so they
+// disappear after the user's first page load on any *.winlab.tw service.
+const GHOST_COOKIE_DOMAINS = [".winlab.tw", "portal.winlab.tw"]
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -12,6 +20,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions: { name: "portal" },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -37,8 +46,20 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: If you remove getClaims() and you use server-side rendering
   // with the Supabase client, your users may be randomly logged out.
-  const { data } = await supabase.auth.getClaims()
-  const user = data?.claims
+
+  // getClaims() may throw (not just return error) when a ghost cookie's value
+  // is in an old/unexpected format that @supabase/ssr can't parse. Without
+  // this try-catch, that exception propagates through the middleware and Next.js
+  // returns a 500 instead of redirecting to login.
+  let user
+  try {
+    const { data } = await supabase.auth.getClaims()
+    user = data?.claims
+  } catch {
+    // Treat any parse failure as unauthenticated — the /auth/login page and
+    // the callback failure path both run clearStaleSupabaseCookiesOnResponse
+    // which will finish the cleanup.
+  }
 
   if (
     !user &&
@@ -63,6 +84,21 @@ export async function updateSession(request: NextRequest) {
   //    return myNewResponse
   // If this is not done, you may be causing the browser and server to go out
   // of sync and terminate the user's session prematurely!
+
+  // Proactively sweep ghost cookies from every response. Users who haven't
+  // visited /auth/login since the old portal was retired still carry
+  // .winlab.tw-scoped sb-* cookies; clearing them here means they're gone
+  // after the first successful page load rather than after the first login.
+  for (const { name } of request.cookies.getAll()) {
+    if (!name.startsWith("sb-")) continue
+    for (const domain of GHOST_COOKIE_DOMAINS) {
+      supabaseResponse.cookies.set(name, "", {
+        maxAge: 0,
+        path: "/",
+        domain,
+      })
+    }
+  }
 
   return supabaseResponse
 }
