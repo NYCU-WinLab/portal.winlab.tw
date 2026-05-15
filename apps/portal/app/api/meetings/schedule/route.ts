@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       .order("group_number"),
   ])
 
-  if (error || !meetingData || (meetingData as DbMeeting).is_holiday) {
+  if (error || !meetingData) {
     return NextResponse.json(
       { error: "No schedule found for this date" },
       { status: 404, headers: CORS }
@@ -67,6 +67,18 @@ export async function GET(request: NextRequest) {
   }
 
   const m = meetingData as DbMeeting
+
+  if (m.is_holiday) {
+    return NextResponse.json(
+      {
+        is_holiday: true,
+        date: m.scheduled_date,
+        week_label: m.week_label ?? null,
+        notes: m.notes ?? null,
+      },
+      { headers: CORS }
+    )
+  }
 
   // Fetch presenter email
   let presenterEmail: string | null = null
