@@ -1,3 +1,5 @@
+"use client"
+
 import { GameCard } from "./_components/game-card"
 import { GAME_META, GAME_ORDER } from "@/lib/games/constants"
 
