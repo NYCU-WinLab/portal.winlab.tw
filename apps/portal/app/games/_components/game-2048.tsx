@@ -95,7 +95,7 @@ function hasMovesLeft(grid: Grid): boolean {
 }
 
 const TILE_COLORS: Record<number, string> = {
-  0: "bg-muted",
+  0: "bg-background/40 dark:bg-background/20",
   2: "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100",
   4: "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100",
   8: "bg-orange-200 text-orange-900",
@@ -122,6 +122,7 @@ export function Game2048({ onComplete }: Game2048Props) {
   const [state, setState] = useState<GameState>("idle")
   const startRef = useRef<number | null>(null)
   const completedRef = useRef(false)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
   const start = useCallback(() => {
     completedRef.current = false
@@ -158,6 +159,7 @@ export function Game2048({ onComplete }: Game2048Props) {
   )
 
   useEffect(() => {
+    if (state !== "playing") return
     const handler = (e: KeyboardEvent) => {
       const map: Record<string, Dir> = {
         ArrowUp: "up",
@@ -173,7 +175,7 @@ export function Game2048({ onComplete }: Game2048Props) {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [handleMove])
+  }, [state, handleMove])
 
   const maxTile = Math.max(...grid.flat())
 
@@ -188,7 +190,33 @@ export function Game2048({ onComplete }: Game2048Props) {
         </Button>
       </div>
 
-      <div className="grid w-full max-w-xs grid-cols-4 gap-2 rounded-xl bg-muted p-3">
+      <div
+        className="grid w-full max-w-xs touch-none grid-cols-4 gap-2 rounded-xl bg-muted/60 p-3"
+        onTouchStart={(e) => {
+          const t = e.touches[0]
+          if (!t) return
+          touchStartRef.current = { x: t.clientX, y: t.clientY }
+        }}
+        onTouchEnd={(e) => {
+          const startTouch = touchStartRef.current
+          if (!startTouch || state !== "playing") return
+          const t = e.changedTouches[0]
+          if (!t) return
+          const dx = t.clientX - startTouch.x
+          const dy = t.clientY - startTouch.y
+          if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return
+          handleMove(
+            Math.abs(dx) > Math.abs(dy)
+              ? dx > 0
+                ? "right"
+                : "left"
+              : dy > 0
+                ? "down"
+                : "up"
+          )
+          touchStartRef.current = null
+        }}
+      >
         {grid.flat().map((v, i) => (
           <div
             key={i}

@@ -76,7 +76,7 @@ const REGION_COLORS = [
   "bg-yellow-200 dark:bg-yellow-900/60",
 ]
 
-function checkViolation(
+function checkAdjacent(
   placement: boolean[][],
   r: number,
   c: number,
@@ -94,31 +94,57 @@ function checkViolation(
   return false
 }
 
+function computeViolations(
+  placement: boolean[][],
+  regions: number[][],
+  size: number
+): Set<string> {
+  const set = new Set<string>()
+  if (!placement.length) return set
+
+  const byRow = new Map<number, string[]>()
+  const byCol = new Map<number, string[]>()
+  const byRegion = new Map<number, string[]>()
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (!placement[r]?.[c]) continue
+      const key = `${r},${c}`
+      const region = regions[r]![c]!
+      if (!byRow.has(r)) byRow.set(r, [])
+      byRow.get(r)!.push(key)
+      if (!byCol.has(c)) byCol.set(c, [])
+      byCol.get(c)!.push(key)
+      if (!byRegion.has(region)) byRegion.set(region, [])
+      byRegion.get(region)!.push(key)
+
+      if (checkAdjacent(placement, r, c, size)) set.add(key)
+    }
+  }
+
+  for (const group of [byRow, byCol, byRegion]) {
+    for (const keys of group.values()) {
+      if (keys.length > 1) for (const k of keys) set.add(k)
+    }
+  }
+  return set
+}
+
 function isComplete(
   placement: boolean[][],
   regions: number[][],
   size: number
 ): boolean {
-  let total = 0
-  const regionSet = new Set<number>()
-  const rows = new Set<number>()
-  const cols = new Set<number>()
+  const numRegions = new Set(regions.flat()).size
+  if (computeViolations(placement, regions, size).size > 0) return false
 
+  let total = 0
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
-      if (!placement[r]?.[c]) continue
-      total++
-      if (checkViolation(placement, r, c, size)) return false
-      if (regionSet.has(regions[r]![c]!)) return false
-      regionSet.add(regions[r]![c]!)
-      if (rows.has(r) || cols.has(c)) return false
-      rows.add(r)
-      cols.add(c)
+      if (placement[r]?.[c]) total++
     }
   }
-
-  const numRegions = new Set(regions.flat()).size
-  return total === numRegions && regionSet.size === numRegions
+  return total === numRegions
 }
 
 interface GameQueensProps {
@@ -156,18 +182,10 @@ export function GameQueens({ onComplete }: GameQueensProps) {
     [gameState]
   )
 
-  const violations = useMemo(() => {
-    const set = new Set<string>()
-    if (!placement.length) return set
-    for (let r = 0; r < puzzle.size; r++) {
-      for (let c = 0; c < puzzle.size; c++) {
-        if (placement[r]?.[c] && checkViolation(placement, r, c, puzzle.size)) {
-          set.add(`${r},${c}`)
-        }
-      }
-    }
-    return set
-  }, [placement, puzzle.size])
+  const violations = useMemo(
+    () => computeViolations(placement, puzzle.regions, puzzle.size),
+    [placement, puzzle]
+  )
 
   const won = useMemo(
     () =>
@@ -216,13 +234,15 @@ export function GameQueens({ onComplete }: GameQueensProps) {
 
       <div className="flex w-full max-w-xs items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {gameState === "playing"
-            ? `已放 ${queenCount} / ${numRegions} 個皇后`
-            : "選擇難度開始"}
+          {gameState === "won"
+            ? `已完成 ${queenCount} / ${numRegions} 個皇后`
+            : gameState === "playing"
+              ? `已放 ${queenCount} / ${numRegions} 個皇后`
+              : "選擇難度開始"}
         </p>
         {gameState !== "idle" && (
           <Button size="sm" variant="outline" onClick={() => start(puzzleIdx)}>
-            重置
+            重新開始
           </Button>
         )}
       </div>
@@ -260,14 +280,23 @@ export function GameQueens({ onComplete }: GameQueensProps) {
                 <button
                   key={`${r},${c}`}
                   onClick={() => handleCellClick(r, c)}
-                  className={`flex cursor-pointer items-center justify-center transition-colors select-none ${colorClass} ${borderTop} ${borderLeft} ${
+                  aria-label={`第 ${r + 1} 行第 ${c + 1} 列，區域 ${regionId + 1}${hasQueen ? "，已放皇后" : ""}${isViolation ? "（違規）" : ""}`}
+                  aria-pressed={hasQueen}
+                  disabled={gameState !== "playing"}
+                  className={`relative flex cursor-pointer items-center justify-center transition-colors select-none ${colorClass} ${borderTop} ${borderLeft} ${
                     isViolation ? "ring-2 ring-destructive ring-inset" : ""
-                  }`}
+                  } disabled:cursor-default`}
                   style={{
                     width: puzzle.size === 6 ? 52 : 62,
                     height: puzzle.size === 6 ? 52 : 62,
                   }}
                 >
+                  <span
+                    aria-hidden
+                    className="absolute top-0.5 left-1 text-[10px] font-semibold text-foreground/40 tabular-nums"
+                  >
+                    {regionId + 1}
+                  </span>
                   {hasQueen && (
                     <span
                       className={`text-2xl leading-none select-none ${isViolation ? "opacity-50" : ""}`}

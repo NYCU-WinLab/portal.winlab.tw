@@ -47,6 +47,7 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
   const foodRef = useRef<Pos>({ r: 5, c: 15 })
   const startRef = useRef<number | null>(null)
   const completedRef = useRef(false)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
   const start = useCallback(() => {
     const initSnake = [
@@ -89,7 +90,10 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
           const ms = Date.now() - (startRef.current ?? Date.now())
           const finalScore = snakeRef.current.length - 3
           setState("dead")
-          onComplete({ score: finalScore, finishTimeMs: ms })
+          // Skip leaderboard submission for trivial runs (0 食物 or < 1s)
+          if (finalScore > 0 && ms >= 1000) {
+            onComplete({ score: finalScore, finishTimeMs: ms })
+          }
         }
         return
       }
@@ -112,7 +116,21 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
     return () => clearInterval(interval)
   }, [state, onComplete])
 
+  const applyDir = useCallback((next: Dir) => {
+    const opposite: Record<Dir, Dir> = {
+      up: "down",
+      down: "up",
+      left: "right",
+      right: "left",
+    }
+    if (next !== opposite[dirRef.current]) {
+      dirRef.current = next
+      setDir(next)
+    }
+  }, [])
+
   useEffect(() => {
+    if (state !== "playing") return
     const handler = (e: KeyboardEvent) => {
       const map: Record<string, Dir> = {
         ArrowUp: "up",
@@ -123,20 +141,11 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
       const next = map[e.key]
       if (!next) return
       e.preventDefault()
-      const opposite: Record<Dir, Dir> = {
-        up: "down",
-        down: "up",
-        left: "right",
-        right: "left",
-      }
-      if (next !== opposite[dirRef.current]) {
-        dirRef.current = next
-        setDir(next)
-      }
+      applyDir(next)
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [])
+  }, [state, applyDir])
 
   const snakeSet = new Set(snake.map((p) => `${p.r},${p.c}`))
   const isHead = (r: number, c: number) =>
@@ -155,8 +164,28 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
       </div>
 
       <div
-        className="overflow-hidden rounded-xl border"
+        className="max-w-full touch-none overflow-hidden rounded-xl border"
         style={{ width: COLS * 18, height: ROWS * 18 }}
+        onTouchStart={(e) => {
+          const t = e.touches[0]
+          if (!t) return
+          touchStartRef.current = { x: t.clientX, y: t.clientY }
+        }}
+        onTouchEnd={(e) => {
+          const start = touchStartRef.current
+          if (!start || state !== "playing") return
+          const t = e.changedTouches[0]
+          if (!t) return
+          const dx = t.clientX - start.x
+          const dy = t.clientY - start.y
+          if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return
+          if (Math.abs(dx) > Math.abs(dy)) {
+            applyDir(dx > 0 ? "right" : "left")
+          } else {
+            applyDir(dy > 0 ? "down" : "up")
+          }
+          touchStartRef.current = null
+        }}
       >
         <div
           className="relative"

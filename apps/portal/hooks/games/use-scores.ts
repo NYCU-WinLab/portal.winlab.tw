@@ -34,6 +34,17 @@ export function useSubmitScore(gameType: GameType) {
       score: number
       finishTimeMs: number
     }) => {
+      if (
+        !Number.isFinite(score) ||
+        !Number.isFinite(finishTimeMs) ||
+        score < 0 ||
+        score > 1_000_000 ||
+        finishTimeMs < 1 ||
+        finishTimeMs > 24 * 60 * 60 * 1000
+      ) {
+        throw new Error("Invalid score")
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -42,8 +53,8 @@ export function useSubmitScore(gameType: GameType) {
       const { error } = await supabase.from("game_scores").insert({
         user_id: user.id,
         game_type: gameType,
-        score,
-        finish_time_ms: finishTimeMs,
+        score: Math.floor(score),
+        finish_time_ms: Math.floor(finishTimeMs),
       })
       if (error) throw error
     },
