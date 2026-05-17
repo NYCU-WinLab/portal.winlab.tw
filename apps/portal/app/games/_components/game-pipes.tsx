@@ -111,13 +111,15 @@ function PipeSVG({
   const numConn = [TOP, RIGHT, BOTTOM, LEFT].filter((b) => mask & b).length
   const isEndpoint = numConn === 1
 
+  // Endpoint dot sits on the closed end of the pipe (opposite the open side),
+  // so the cell reads as "pipe terminates here" instead of overlapping the line.
   let ex = 20,
     ey = 20
   if (isEndpoint) {
-    if (mask & TOP) ey = 4
-    else if (mask & RIGHT) ex = 36
-    else if (mask & BOTTOM) ey = 36
-    else ex = 4
+    if (mask & TOP) ey = 36
+    else if (mask & RIGHT) ex = 4
+    else if (mask & BOTTOM) ey = 4
+    else ex = 36
   }
 
   return (
