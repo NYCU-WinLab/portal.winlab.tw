@@ -4,7 +4,7 @@ export type GameType =
   | "typing"
   | "snake"
   | "pipes"
-  | "kings"
+  | "queens"
 
 export interface GameScore {
   user_id: string

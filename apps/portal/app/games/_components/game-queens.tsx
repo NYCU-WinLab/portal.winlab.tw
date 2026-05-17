@@ -5,8 +5,8 @@ import { Button } from "@workspace/ui/components/button"
 import type { GameResult } from "@/lib/games/types"
 
 // --- Puzzle definitions ---
-// regions[r][c] = region id; solution[r][c] = true if king placed here
-// All puzzles verified: 1 king/row, 1/col, 1/region, no adjacency
+// regions[r][c] = region id; solution[r][c] = true if queen placed here
+// All puzzles verified: 1 queen/row, 1/col, 1/region, no adjacency
 
 const PUZZLES = [
   {
@@ -19,7 +19,6 @@ const PUZZLES = [
       [4, 4, 3, 3, 3],
       [4, 4, 4, 3, 3],
     ],
-    // Kings at: (0,2) R0  (1,4) R1  (2,1) R2  (3,3) R3  (4,0) R4
     solution: [
       [false, false, true, false, false],
       [false, false, false, false, true],
@@ -38,7 +37,6 @@ const PUZZLES = [
       [3, 4, 4, 2, 2],
       [3, 3, 4, 4, 2],
     ],
-    // Kings at: (0,4) R0  (1,1) R1  (2,3) R2  (3,0) R3  (4,2) R4
     solution: [
       [false, false, false, false, true],
       [false, true, false, false, false],
@@ -58,7 +56,6 @@ const PUZZLES = [
       [5, 5, 5, 3, 3, 4],
       [5, 5, 5, 3, 4, 4],
     ],
-    // Kings at: (0,1) R0  (1,4) R1  (2,0) R2  (3,3) R3  (4,5) R4  (5,2) R5
     solution: [
       [false, true, false, false, false, false],
       [false, false, false, false, true, false],
@@ -124,11 +121,11 @@ function isComplete(
   return total === numRegions && regionSet.size === numRegions
 }
 
-interface GameKingsProps {
+interface GameQueensProps {
   onComplete: (result: GameResult) => void
 }
 
-export function GameKings({ onComplete }: GameKingsProps) {
+export function GameQueens({ onComplete }: GameQueensProps) {
   const [puzzleIdx, setPuzzleIdx] = useState(0)
   const [placement, setPlacement] = useState<boolean[][]>([])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
@@ -183,7 +180,7 @@ export function GameKings({ onComplete }: GameKingsProps) {
   useEffect(() => {
     if (won && !completedRef.current) {
       completedRef.current = true
-      const ms = Date.now() - (startRef.current ?? Date.now())
+      const ms = Date.now() - startRef.current!
       setGameState("won")
       setTimeout(
         () => onComplete({ score: puzzle.size, finishTimeMs: ms }),
@@ -192,7 +189,7 @@ export function GameKings({ onComplete }: GameKingsProps) {
     }
   }, [won, puzzle.size, onComplete])
 
-  const kingCount = placement.flat().filter(Boolean).length
+  const queenCount = placement.flat().filter(Boolean).length
   const numRegions = new Set(puzzle.regions.flat()).size
 
   return (
@@ -220,7 +217,7 @@ export function GameKings({ onComplete }: GameKingsProps) {
       <div className="flex w-full max-w-xs items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {gameState === "playing"
-            ? `已放 ${kingCount} / ${numRegions} 個國王`
+            ? `已放 ${queenCount} / ${numRegions} 個皇后`
             : "選擇難度開始"}
         </p>
         {gameState !== "idle" && (
@@ -232,9 +229,9 @@ export function GameKings({ onComplete }: GameKingsProps) {
 
       {gameState === "idle" ? (
         <div className="max-w-xs space-y-1 py-6 text-center text-sm text-muted-foreground">
-          <p>每個顏色區域恰好放一個 👑</p>
-          <p>每行每列只能有一個 👑</p>
-          <p>👑 之間不得相鄰（含對角線）</p>
+          <p>每個顏色區域恰好放一個 ♛</p>
+          <p>每行每列只能有一個 ♛</p>
+          <p>♛ 之間不得相鄰（含對角線）</p>
         </div>
       ) : (
         <div
@@ -246,11 +243,10 @@ export function GameKings({ onComplete }: GameKingsProps) {
         >
           {puzzle.regions.map((row, r) =>
             row.map((regionId, c) => {
-              const hasKing = placement[r]?.[c] ?? false
+              const hasQueen = placement[r]?.[c] ?? false
               const isViolation = violations.has(`${r},${c}`)
               const colorClass = REGION_COLORS[regionId] ?? "bg-muted"
 
-              // Draw thick border between regions
               const borderTop =
                 r > 0 && puzzle.regions[r - 1]?.[c] !== regionId
                   ? "border-t-2 border-t-foreground/60"
@@ -272,11 +268,11 @@ export function GameKings({ onComplete }: GameKingsProps) {
                     height: puzzle.size === 6 ? 52 : 62,
                   }}
                 >
-                  {hasKing && (
+                  {hasQueen && (
                     <span
-                      className={`text-2xl leading-none ${isViolation ? "opacity-60" : ""}`}
+                      className={`text-2xl leading-none select-none ${isViolation ? "opacity-50" : ""}`}
                     >
-                      👑
+                      ♛
                     </span>
                   )}
                 </button>

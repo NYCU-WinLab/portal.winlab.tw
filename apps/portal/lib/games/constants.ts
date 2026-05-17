@@ -9,11 +9,11 @@ export const GAME_META: Record<GameType, GameMeta> = {
     scoreLabel: (score) => `${score} 端點`,
     timeLabel: "完成時間",
   },
-  kings: {
-    slug: "kings",
-    title: "國王放置",
-    description: "每個色區放一個國王，且不得相鄰！",
-    icon: "👑",
+  queens: {
+    slug: "queens",
+    title: "皇后謎題",
+    description: "每個色區放一個皇后，且不得相鄰！",
+    icon: "♛",
     scoreLabel: () => "完成",
     timeLabel: "完成時間",
   },
@@ -53,7 +53,7 @@ export const GAME_META: Record<GameType, GameMeta> = {
 
 export const GAME_ORDER: GameType[] = [
   "pipes",
-  "kings",
+  "queens",
   "2048",
   "memory",
   "typing",
