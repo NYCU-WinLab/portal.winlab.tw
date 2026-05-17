@@ -71,12 +71,12 @@ function moveGrid(grid: Grid, dir: Dir): { grid: Grid; changed: boolean } {
     }
   } else {
     for (let c = 0; c < 4; c++) {
-      const col = next.map((row) => row[c] ?? 0).reverse()
-      const { row: result, merged } = slideRow(col)
+      const origCol = next.map((row) => row[c] ?? 0)
+      const { row: result, merged } = slideRow([...origCol].reverse())
       const final = result.reverse()
-      if (merged || final.some((v, i) => v !== col[3 - i])) changed = true
+      if (merged || final.some((v, i) => v !== origCol[i])) changed = true
       final.forEach((v, i) => {
-        next[3 - i]![c] = v
+        next[i]![c] = v
       })
     }
   }
