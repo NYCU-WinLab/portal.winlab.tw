@@ -42,20 +42,29 @@ export function GameTyping({ onComplete }: GameTypingProps) {
       if (state !== "playing") return
       const val = e.target.value
 
+      // Reject sudden large inserts (paste, IME drop) — > 4 chars added at once
+      if (val.length - input.length > 4) return
+
       if (!startRef.current) startRef.current = Date.now()
 
       setInput(val)
 
       if (val === target && !completedRef.current) {
         completedRef.current = true
-        const ms = Date.now() - startRef.current
+        const ms = Math.max(Date.now() - startRef.current, 1)
         const words = target.trim().split(/\s+/).length
         const wpm = Math.round((words / ms) * 60000)
         setState("done")
-        setTimeout(() => onComplete({ score: wpm * 10, finishTimeMs: ms }), 100)
+        // Floor at 1s to defeat instant-fill exploits; cap WPM at 300 sanity check
+        if (ms >= 1000 && wpm <= 300) {
+          setTimeout(
+            () => onComplete({ score: wpm * 10, finishTimeMs: ms }),
+            100
+          )
+        }
       }
     },
-    [state, target, onComplete]
+    [state, target, input, onComplete]
   )
 
   const correctCount = input
@@ -109,6 +118,8 @@ export function GameTyping({ onComplete }: GameTypingProps) {
             ref={inputRef}
             value={input}
             onChange={handleChange}
+            onPaste={(e) => e.preventDefault()}
+            onDrop={(e) => e.preventDefault()}
             disabled={state === "done"}
             className="w-full rounded-lg border bg-background px-3 py-2 font-mono text-sm ring-1 ring-muted outline-none focus:ring-primary"
             placeholder="在此輸入..."
@@ -116,6 +127,7 @@ export function GameTyping({ onComplete }: GameTypingProps) {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            inputMode="text"
           />
         </>
       )}

@@ -277,7 +277,7 @@ export function GamePipes({ onComplete }: GamePipesProps) {
             : "點擊管道旋轉，讓所有端點（圓點）連通"}
         </p>
         <Button size="sm" variant="outline" onClick={start}>
-          {gameState === "idle" ? "開始" : "重新"}
+          {gameState === "idle" ? "開始遊戲" : "重新開始"}
         </Button>
       </div>
 
@@ -302,12 +302,17 @@ export function GamePipes({ onComplete }: GamePipesProps) {
                 <button
                   key={`${r},${c}`}
                   onClick={() => handleClick(r, c)}
-                  disabled={isSrc}
+                  disabled={isSrc || gameState !== "playing"}
+                  aria-label={
+                    isSrc
+                      ? "水源"
+                      : `第 ${r + 1} 行第 ${c + 1} 列管道，點擊旋轉`
+                  }
                   className={`rounded transition-colors ${
                     isConn
                       ? "bg-blue-50 dark:bg-blue-950/40"
                       : "bg-muted/40 hover:bg-muted"
-                  }`}
+                  } disabled:cursor-default`}
                   style={{ width: 50, height: 50 }}
                 >
                   <PipeSVG mask={mask} isSource={isSrc} connected={isConn} />
