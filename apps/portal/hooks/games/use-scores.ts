@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { createClient } from "@/lib/supabase/client"
@@ -7,7 +8,7 @@ import type { GameScore, GameType } from "@/lib/games/types"
 import { queryKeys } from "./query-keys"
 
 export function useLeaderboard(gameType: GameType) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   return useQuery({
     queryKey: queryKeys.leaderboard.byGame(gameType),
@@ -22,7 +23,7 @@ export function useLeaderboard(gameType: GameType) {
 }
 
 export function useSubmitScore(gameType: GameType) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
 
   return useMutation({

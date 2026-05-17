@@ -41,7 +41,7 @@ export function Scoreboard({ gameType }: ScoreboardProps) {
       <div className="space-y-1">
         {scores.map((entry, i) => (
           <div
-            key={entry.user_id}
+            key={`${entry.user_id}-${i}`}
             className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-x-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/50"
           >
             <span

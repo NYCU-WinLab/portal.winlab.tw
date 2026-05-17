@@ -34,10 +34,18 @@ export function GameMemory({ onComplete }: GameMemoryProps) {
   const startRef = useRef<number | null>(null)
   const lockRef = useRef(false)
   const completedRef = useRef(false)
+  // Mirror of cards state for effect reads without stale closure
+  const cardsRef = useRef<Card[]>([])
+
+  useEffect(() => {
+    cardsRef.current = cards
+  }, [cards])
 
   const start = useCallback(() => {
     completedRef.current = false
-    setCards(buildDeck())
+    const deck = buildDeck()
+    cardsRef.current = deck
+    setCards(deck)
     setFlippedIds([])
     setMoves(0)
     setStarted(true)
@@ -59,39 +67,40 @@ export function GameMemory({ onComplete }: GameMemoryProps) {
         if (prev.length === 0) return [id]
         return prev
       })
-      setMoves((m) => m + 1)
     },
     [started]
   )
 
   useEffect(() => {
     if (flippedIds.length !== 2) return
+    // Count one move per pair attempt
+    setMoves((m) => m + 1)
     lockRef.current = true
     const a = flippedIds[0]!
     const b = flippedIds[1]!
-    setCards((prev) => {
-      const ca = prev[a]
-      const cb = prev[b]
-      if (ca?.emoji === cb?.emoji) {
+    // Use cardsRef so we read up-to-date emoji values without stale closure
+    const ca = cardsRef.current[a]
+    const cb = cardsRef.current[b]
+
+    if (ca?.emoji === cb?.emoji) {
+      setCards((prev) => {
         const next = prev.map((c) =>
           c.id === a || c.id === b ? { ...c, matched: true } : c
         )
-        const allMatched = next.every((c) => c.matched)
-        if (allMatched && !completedRef.current) {
+        if (next.every((c) => c.matched) && !completedRef.current) {
           completedRef.current = true
-          const ms = Date.now() - (startRef.current ?? Date.now())
+          const ms = Date.now() - startRef.current!
           setCompleted(true)
           setTimeout(
             () => onComplete({ score: EMOJIS.length, finishTimeMs: ms }),
             200
           )
         }
-        lockRef.current = false
         return next
-      }
-      return prev
-    })
-    if (cards[a]?.emoji !== cards[b]?.emoji) {
+      })
+      setFlippedIds([])
+      lockRef.current = false
+    } else {
       const timer = setTimeout(() => {
         setCards((prev) =>
           prev.map((c) =>
@@ -103,8 +112,7 @@ export function GameMemory({ onComplete }: GameMemoryProps) {
       }, 900)
       return () => clearTimeout(timer)
     }
-    setFlippedIds([])
-  }, [flippedIds, cards, onComplete])
+  }, [flippedIds, onComplete])
 
   return (
     <div className="flex flex-col items-center gap-4">
