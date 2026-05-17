@@ -28,6 +28,7 @@ const baseApps = [
   { href: "/bento", label: "Bento", note: "便當訂購" },
   { href: "/debt", label: "Debt", note: "分帳記帳" },
   { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
+  { href: "/games", label: "Games", note: "小遊戲" },
   { href: "/leave", label: "Leave", note: "請假登記" },
   { href: "/meetings", label: "Meetings", note: "組會排班" },
   { href: "/profile", label: "Profile", note: "個人帳號" },

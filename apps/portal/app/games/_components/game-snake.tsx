@@ -1,0 +1,206 @@
+"use client"
+
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Button } from "@workspace/ui/components/button"
+import type { GameResult } from "@/lib/games/types"
+
+const COLS = 20
+const ROWS = 20
+const TICK_MS = 130
+
+type Pos = { r: number; c: number }
+type Dir = "up" | "down" | "left" | "right"
+type State = "idle" | "playing" | "dead"
+
+const DIR_DELTA: Record<Dir, Pos> = {
+  up: { r: -1, c: 0 },
+  down: { r: 1, c: 0 },
+  left: { r: 0, c: -1 },
+  right: { r: 0, c: 1 },
+}
+
+function randomFood(snake: Pos[]): Pos {
+  const occupied = new Set(snake.map((p) => `${p.r},${p.c}`))
+  let pos: Pos
+  do {
+    pos = {
+      r: Math.floor(Math.random() * ROWS),
+      c: Math.floor(Math.random() * COLS),
+    }
+  } while (occupied.has(`${pos.r},${pos.c}`))
+  return pos
+}
+
+interface GameSnakeProps {
+  onComplete: (result: GameResult) => void
+}
+
+export function GameSnake({ onComplete }: GameSnakeProps) {
+  const [snake, setSnake] = useState<Pos[]>([])
+  const [food, setFood] = useState<Pos>({ r: 5, c: 15 })
+  const [dir, setDir] = useState<Dir>("right")
+  const [state, setState] = useState<State>("idle")
+  const [score, setScore] = useState(0)
+
+  const dirRef = useRef<Dir>("right")
+  const snakeRef = useRef<Pos[]>([])
+  const foodRef = useRef<Pos>({ r: 5, c: 15 })
+  const startRef = useRef<number | null>(null)
+  const completedRef = useRef(false)
+
+  const start = useCallback(() => {
+    const initSnake = [
+      { r: 10, c: 12 },
+      { r: 10, c: 11 },
+      { r: 10, c: 10 },
+    ]
+    const initFood = randomFood(initSnake)
+    completedRef.current = false
+    snakeRef.current = initSnake
+    foodRef.current = initFood
+    dirRef.current = "right"
+    setSnake(initSnake)
+    setFood(initFood)
+    setDir("right")
+    setScore(0)
+    setState("playing")
+    startRef.current = Date.now()
+  }, [])
+
+  useEffect(() => {
+    if (state !== "playing") return
+
+    const interval = setInterval(() => {
+      const d = dirRef.current
+      const delta = DIR_DELTA[d]
+      const head = snakeRef.current[0]
+      if (!head) return
+      const next = { r: head.r + delta.r, c: head.c + delta.c }
+
+      if (
+        next.r < 0 ||
+        next.r >= ROWS ||
+        next.c < 0 ||
+        next.c >= COLS ||
+        snakeRef.current.some((p) => p.r === next.r && p.c === next.c)
+      ) {
+        if (!completedRef.current) {
+          completedRef.current = true
+          const ms = Date.now() - (startRef.current ?? Date.now())
+          const finalScore = snakeRef.current.length - 3
+          setState("dead")
+          onComplete({ score: finalScore, finishTimeMs: ms })
+        }
+        return
+      }
+
+      const ate = next.r === foodRef.current.r && next.c === foodRef.current.c
+      const newSnake = ate
+        ? [next, ...snakeRef.current]
+        : [next, ...snakeRef.current.slice(0, -1)]
+
+      snakeRef.current = newSnake
+      if (ate) {
+        const newFood = randomFood(newSnake)
+        foodRef.current = newFood
+        setFood(newFood)
+        setScore(newSnake.length - 3)
+      }
+      setSnake([...newSnake])
+    }, TICK_MS)
+
+    return () => clearInterval(interval)
+  }, [state, onComplete])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const map: Record<string, Dir> = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+      }
+      const next = map[e.key]
+      if (!next) return
+      e.preventDefault()
+      const opposite: Record<Dir, Dir> = {
+        up: "down",
+        down: "up",
+        left: "right",
+        right: "left",
+      }
+      if (next !== opposite[dirRef.current]) {
+        dirRef.current = next
+        setDir(next)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
+
+  const snakeSet = new Set(snake.map((p) => `${p.r},${p.c}`))
+  const isHead = (r: number, c: number) =>
+    snake[0]?.r === r && snake[0]?.c === c
+  const isFood = (r: number, c: number) => food.r === r && food.c === c
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex w-full max-w-sm items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          分數 <span className="font-bold text-foreground">{score}</span>
+        </div>
+        <Button size="sm" variant="outline" onClick={start}>
+          {state === "idle" ? "開始遊戲" : "重新開始"}
+        </Button>
+      </div>
+
+      <div
+        className="overflow-hidden rounded-xl border"
+        style={{ width: COLS * 18, height: ROWS * 18 }}
+      >
+        <div
+          className="relative"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${COLS}, 18px)`,
+            gridTemplateRows: `repeat(${ROWS}, 18px)`,
+          }}
+        >
+          {Array.from({ length: ROWS * COLS }).map((_, idx) => {
+            const r = Math.floor(idx / COLS)
+            const c = idx % COLS
+            const key = `${r},${c}`
+            const inSnake = snakeSet.has(key)
+            const head = isHead(r, c)
+            const foodCell = isFood(r, c)
+            return (
+              <div
+                key={key}
+                className={
+                  head
+                    ? "rounded-sm bg-green-600"
+                    : inSnake
+                      ? "rounded-sm bg-green-400"
+                      : foodCell
+                        ? "rounded-full bg-red-400"
+                        : (r + c) % 2 === 0
+                          ? "bg-muted/30"
+                          : "bg-muted/10"
+                }
+              />
+            )
+          })}
+        </div>
+      </div>
+
+      {state === "idle" && (
+        <p className="text-sm text-muted-foreground">使用方向鍵控制蛇的移動</p>
+      )}
+      {state === "dead" && (
+        <p className="font-semibold text-destructive">
+          遊戲結束！得 {score} 分
+        </p>
+      )}
+    </div>
+  )
+}
