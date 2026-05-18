@@ -76,8 +76,16 @@ const REGION_COLORS = [
   "bg-yellow-200 dark:bg-yellow-900/60",
 ]
 
+// 0 = empty, 1 = mark (✕ "not a queen" hint), 2 = queen
+type CellState = 0 | 1 | 2
+type Placement = CellState[][]
+
+function isQueen(p: Placement, r: number, c: number): boolean {
+  return p[r]?.[c] === 2
+}
+
 function checkAdjacent(
-  placement: boolean[][],
+  placement: Placement,
   r: number,
   c: number,
   size: number
@@ -87,7 +95,13 @@ function checkAdjacent(
       if (!dr && !dc) continue
       const nr = r + dr,
         nc = c + dc
-      if (nr >= 0 && nr < size && nc >= 0 && nc < size && placement[nr]?.[nc])
+      if (
+        nr >= 0 &&
+        nr < size &&
+        nc >= 0 &&
+        nc < size &&
+        isQueen(placement, nr, nc)
+      )
         return true
     }
   }
@@ -95,7 +109,7 @@ function checkAdjacent(
 }
 
 function computeViolations(
-  placement: boolean[][],
+  placement: Placement,
   regions: number[][],
   size: number
 ): Set<string> {
@@ -108,7 +122,7 @@ function computeViolations(
 
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
-      if (!placement[r]?.[c]) continue
+      if (!isQueen(placement, r, c)) continue
       const key = `${r},${c}`
       const region = regions[r]![c]!
       if (!byRow.has(r)) byRow.set(r, [])
@@ -131,7 +145,7 @@ function computeViolations(
 }
 
 function isComplete(
-  placement: boolean[][],
+  placement: Placement,
   regions: number[][],
   size: number
 ): boolean {
@@ -141,7 +155,7 @@ function isComplete(
   let total = 0
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
-      if (placement[r]?.[c]) total++
+      if (isQueen(placement, r, c)) total++
     }
   }
   return total === numRegions
@@ -153,7 +167,7 @@ interface GameQueensProps {
 
 export function GameQueens({ onComplete }: GameQueensProps) {
   const [puzzleIdx, setPuzzleIdx] = useState(0)
-  const [placement, setPlacement] = useState<boolean[][]>([])
+  const [placement, setPlacement] = useState<Placement>([])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
   const startRef = useRef<number | null>(null)
   const completedRef = useRef(false)
@@ -164,7 +178,10 @@ export function GameQueens({ onComplete }: GameQueensProps) {
     const p = PUZZLES[idx]!
     completedRef.current = false
     setPlacement(
-      Array.from({ length: p.size }, () => Array(p.size).fill(false))
+      Array.from(
+        { length: p.size },
+        () => Array<CellState>(p.size).fill(0) as CellState[]
+      )
     )
     setGameState("playing")
     startRef.current = Date.now()
@@ -174,8 +191,9 @@ export function GameQueens({ onComplete }: GameQueensProps) {
     (r: number, c: number) => {
       if (gameState !== "playing") return
       setPlacement((prev) => {
-        const next = prev.map((row) => [...row])
-        next[r]![c] = !next[r]![c]
+        const next = prev.map((row) => [...row]) as Placement
+        const cur = next[r]![c] ?? 0
+        next[r]![c] = ((cur + 1) % 3) as CellState
         return next
       })
     },
@@ -207,7 +225,7 @@ export function GameQueens({ onComplete }: GameQueensProps) {
     }
   }, [won, puzzle.size, onComplete])
 
-  const queenCount = placement.flat().filter(Boolean).length
+  const queenCount = placement.flat().filter((v) => v === 2).length
   const numRegions = new Set(puzzle.regions.flat()).size
 
   return (
@@ -252,6 +270,9 @@ export function GameQueens({ onComplete }: GameQueensProps) {
           <p>每個顏色區域恰好放一個 ♛</p>
           <p>每行每列只能有一個 ♛</p>
           <p>♛ 之間不得相鄰（含對角線）</p>
+          <p className="pt-2 text-xs">
+            點 1 下標 ✕（標非 ♛）／ 2 下放 ♛ ／ 3 下清空
+          </p>
         </div>
       ) : (
         <div
@@ -263,7 +284,9 @@ export function GameQueens({ onComplete }: GameQueensProps) {
         >
           {puzzle.regions.map((row, r) =>
             row.map((regionId, c) => {
-              const hasQueen = placement[r]?.[c] ?? false
+              const cell = placement[r]?.[c] ?? 0
+              const hasMark = cell === 1
+              const hasQueen = cell === 2
               const isViolation = violations.has(`${r},${c}`)
               const colorClass = REGION_COLORS[regionId] ?? "bg-muted"
 
@@ -276,11 +299,17 @@ export function GameQueens({ onComplete }: GameQueensProps) {
                   ? "border-l-2 border-l-foreground/60"
                   : "border-l border-l-foreground/10"
 
+              const stateLabel = hasQueen
+                ? "，已放皇后"
+                : hasMark
+                  ? "，已標記非皇后"
+                  : ""
+
               return (
                 <button
                   key={`${r},${c}`}
                   onClick={() => handleCellClick(r, c)}
-                  aria-label={`第 ${r + 1} 行第 ${c + 1} 列，區域 ${regionId + 1}${hasQueen ? "，已放皇后" : ""}${isViolation ? "（違規）" : ""}`}
+                  aria-label={`第 ${r + 1} 行第 ${c + 1} 列，區域 ${regionId + 1}${stateLabel}${isViolation ? "（違規）" : ""}`}
                   aria-pressed={hasQueen}
                   disabled={gameState !== "playing"}
                   className={`relative flex cursor-pointer items-center justify-center transition-colors select-none ${colorClass} ${borderTop} ${borderLeft} ${
@@ -302,6 +331,14 @@ export function GameQueens({ onComplete }: GameQueensProps) {
                       className={`text-2xl leading-none select-none ${isViolation ? "opacity-50" : ""}`}
                     >
                       ♛
+                    </span>
+                  )}
+                  {hasMark && (
+                    <span
+                      aria-hidden
+                      className="text-lg leading-none text-foreground/40 select-none"
+                    >
+                      ✕
                     </span>
                   )}
                 </button>
