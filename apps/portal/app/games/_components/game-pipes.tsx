@@ -111,9 +111,10 @@ function PipeSVG({
 
 interface GamePipesProps {
   onComplete: (result: GameResult) => void
+  onLevelChange?: (level: number | null) => void
 }
 
-export function GamePipes({ onComplete }: GamePipesProps) {
+export function GamePipes({ onComplete, onLevelChange }: GamePipesProps) {
   const [level, setLevel] = useState(1)
   const [current, setCurrent] = useState<number[][]>([])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
@@ -123,14 +124,18 @@ export function GamePipes({ onComplete }: GamePipesProps) {
   // Solved/source/scrambled all come from the deterministic level number.
   const puzzle = useMemo(() => getPuzzle(level), [level])
 
-  const start = useCallback((lvl: number) => {
-    const p = getPuzzle(lvl)
-    completedRef.current = false
-    setLevel(p.level)
-    setCurrent(p.scrambled.map((row) => [...row]))
-    setGameState("playing")
-    startRef.current = Date.now()
-  }, [])
+  const start = useCallback(
+    (lvl: number) => {
+      const p = getPuzzle(lvl)
+      completedRef.current = false
+      setLevel(p.level)
+      onLevelChange?.(p.level)
+      setCurrent(p.scrambled.map((row) => [...row]))
+      setGameState("playing")
+      startRef.current = Date.now()
+    },
+    [onLevelChange]
+  )
 
   const connected = useMemo(() => {
     if (!current.length) return new Set<string>()

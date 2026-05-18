@@ -12,6 +12,7 @@ export interface GameScore {
   score: number
   finish_time_ms: number
   achieved_at: string
+  level?: number | null
 }
 
 export interface GameResult {

@@ -7,7 +7,9 @@ export default function PageQueens() {
   return (
     <GamePage
       gameType="queens"
-      game={(onComplete) => <GameQueens onComplete={onComplete} />}
+      game={(onComplete, onLevelChange) => (
+        <GameQueens onComplete={onComplete} onLevelChange={onLevelChange} />
+      )}
     />
   )
 }

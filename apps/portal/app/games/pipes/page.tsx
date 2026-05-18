@@ -7,7 +7,9 @@ export default function PagePipes() {
   return (
     <GamePage
       gameType="pipes"
-      game={(onComplete) => <GamePipes onComplete={onComplete} />}
+      game={(onComplete, onLevelChange) => (
+        <GamePipes onComplete={onComplete} onLevelChange={onLevelChange} />
+      )}
     />
   )
 }

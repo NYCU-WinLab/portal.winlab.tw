@@ -102,9 +102,10 @@ function isComplete(
 
 interface GameQueensProps {
   onComplete: (result: GameResult) => void
+  onLevelChange?: (level: number | null) => void
 }
 
-export function GameQueens({ onComplete }: GameQueensProps) {
+export function GameQueens({ onComplete, onLevelChange }: GameQueensProps) {
   const [level, setLevel] = useState(1)
   const [placement, setPlacement] = useState<Placement>([])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
@@ -113,19 +114,23 @@ export function GameQueens({ onComplete }: GameQueensProps) {
 
   const puzzle = useMemo(() => getQueensPuzzle(level), [level])
 
-  const start = useCallback((lvl: number) => {
-    const p = getQueensPuzzle(lvl)
-    completedRef.current = false
-    setLevel(p.level)
-    setPlacement(
-      Array.from(
-        { length: p.size },
-        () => Array<CellState>(p.size).fill(0) as CellState[]
+  const start = useCallback(
+    (lvl: number) => {
+      const p = getQueensPuzzle(lvl)
+      completedRef.current = false
+      setLevel(p.level)
+      onLevelChange?.(p.level)
+      setPlacement(
+        Array.from(
+          { length: p.size },
+          () => Array<CellState>(p.size).fill(0) as CellState[]
+        )
       )
-    )
-    setGameState("playing")
-    startRef.current = Date.now()
-  }, [])
+      setGameState("playing")
+      startRef.current = Date.now()
+    },
+    [onLevelChange]
+  )
 
   const handleCellClick = useCallback(
     (r: number, c: number) => {

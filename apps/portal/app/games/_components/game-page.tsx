@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, type ReactNode } from "react"
+import { useCallback, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -11,12 +11,16 @@ import { Scoreboard } from "./scoreboard"
 
 interface GamePageProps {
   gameType: GameType
-  game: (onComplete: (result: GameResult) => void) => ReactNode
+  game: (
+    onComplete: (result: GameResult) => void,
+    onLevelChange: (level: number | null) => void
+  ) => ReactNode
 }
 
 export function GamePage({ gameType, game }: GamePageProps) {
   const meta = GAME_META[gameType]
-  const { mutate: submit } = useSubmitScore(gameType)
+  const [level, setLevel] = useState<number | null>(null)
+  const { mutate: submit } = useSubmitScore(gameType, level)
 
   const handleComplete = useCallback(
     (result: GameResult) => {
@@ -37,6 +41,10 @@ export function GamePage({ gameType, game }: GamePageProps) {
     [submit, meta]
   )
 
+  const handleLevelChange = useCallback((next: number | null) => {
+    setLevel(next)
+  }, [])
+
   return (
     <div className="space-y-10">
       <div className="flex items-center gap-3">
@@ -56,14 +64,14 @@ export function GamePage({ gameType, game }: GamePageProps) {
         <div className="flex flex-col gap-4">
           <h1 className="text-xl font-bold">{meta.title}</h1>
           <p className="text-sm text-muted-foreground">{meta.description}</p>
-          {game(handleComplete)}
+          {game(handleComplete, handleLevelChange)}
         </div>
 
         <div className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-            排行榜
+            {level !== null ? `排行榜 · 關卡 ${level}` : "排行榜"}
           </h2>
-          <Scoreboard gameType={gameType} />
+          <Scoreboard gameType={gameType} level={level} />
         </div>
       </div>
     </div>
