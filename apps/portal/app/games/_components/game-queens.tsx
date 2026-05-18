@@ -3,69 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import type { GameResult } from "@/lib/games/types"
-
-// --- Puzzle definitions ---
-// regions[r][c] = region id; solution[r][c] = true if queen placed here
-// All puzzles verified: 1 queen/row, 1/col, 1/region, no adjacency
-
-const PUZZLES = [
-  {
-    size: 5,
-    label: "5×5 入門",
-    regions: [
-      [0, 0, 0, 1, 1],
-      [2, 2, 0, 1, 1],
-      [4, 2, 2, 3, 3],
-      [4, 4, 3, 3, 3],
-      [4, 4, 4, 3, 3],
-    ],
-    solution: [
-      [false, false, true, false, false],
-      [false, false, false, false, true],
-      [false, true, false, false, false],
-      [false, false, false, true, false],
-      [true, false, false, false, false],
-    ],
-  },
-  {
-    size: 5,
-    label: "5×5 進階",
-    regions: [
-      [1, 1, 0, 0, 0],
-      [1, 1, 1, 0, 0],
-      [3, 3, 4, 2, 2],
-      [3, 4, 4, 2, 2],
-      [3, 3, 4, 4, 2],
-    ],
-    solution: [
-      [false, false, false, false, true],
-      [false, true, false, false, false],
-      [false, false, false, true, false],
-      [true, false, false, false, false],
-      [false, false, true, false, false],
-    ],
-  },
-  {
-    size: 6,
-    label: "6×6 挑戰",
-    regions: [
-      [0, 0, 1, 1, 1, 4],
-      [0, 2, 2, 2, 1, 4],
-      [2, 2, 5, 3, 4, 4],
-      [5, 5, 5, 3, 3, 4],
-      [5, 5, 5, 3, 3, 4],
-      [5, 5, 5, 3, 4, 4],
-    ],
-    solution: [
-      [false, true, false, false, false, false],
-      [false, false, false, false, true, false],
-      [true, false, false, false, false, false],
-      [false, false, false, true, false, false],
-      [false, false, false, false, false, true],
-      [false, false, true, false, false, false],
-    ],
-  },
-]
+import { QUEENS_LEVEL_COUNT, getQueensPuzzle } from "@/lib/games/queens-puzzles"
 
 const REGION_COLORS = [
   "bg-blue-200 dark:bg-blue-900/60",
@@ -74,6 +12,7 @@ const REGION_COLORS = [
   "bg-emerald-200 dark:bg-emerald-900/60",
   "bg-rose-200 dark:bg-rose-900/60",
   "bg-yellow-200 dark:bg-yellow-900/60",
+  "bg-teal-200 dark:bg-teal-900/60",
 ]
 
 // 0 = empty, 1 = mark (✕ "not a queen" hint), 2 = queen
@@ -166,17 +105,18 @@ interface GameQueensProps {
 }
 
 export function GameQueens({ onComplete }: GameQueensProps) {
-  const [puzzleIdx, setPuzzleIdx] = useState(0)
+  const [level, setLevel] = useState(1)
   const [placement, setPlacement] = useState<Placement>([])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
   const startRef = useRef<number | null>(null)
   const completedRef = useRef(false)
 
-  const puzzle = PUZZLES[puzzleIdx]!
+  const puzzle = useMemo(() => getQueensPuzzle(level), [level])
 
-  const start = useCallback((idx: number) => {
-    const p = PUZZLES[idx]!
+  const start = useCallback((lvl: number) => {
+    const p = getQueensPuzzle(lvl)
     completedRef.current = false
+    setLevel(p.level)
     setPlacement(
       Array.from(
         { length: p.size },
@@ -228,41 +168,26 @@ export function GameQueens({ onComplete }: GameQueensProps) {
   const queenCount = placement.flat().filter((v) => v === 2).length
   const numRegions = new Set(puzzle.regions.flat()).size
 
+  const goToLevel = (lvl: number) => {
+    const clamped = Math.max(1, Math.min(QUEENS_LEVEL_COUNT, lvl))
+    start(clamped)
+  }
+
+  const cellSize = puzzle.size === 7 ? 46 : puzzle.size === 6 ? 52 : 62
+
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Puzzle selector */}
-      <div className="flex flex-wrap justify-center gap-2">
-        {PUZZLES.map((p, i) => (
-          <button
-            key={i}
-            onClick={() => {
-              setPuzzleIdx(i)
-              start(i)
-            }}
-            className={`rounded-lg border px-3 py-1 text-xs font-medium transition-colors ${
-              puzzleIdx === i && gameState !== "idle"
-                ? "border-foreground bg-foreground text-background"
-                : "border-muted hover:border-foreground"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex w-full max-w-xs items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {gameState === "won"
-            ? `已完成 ${queenCount} / ${numRegions} 個皇后`
+            ? `關卡 ${level} · 已完成 ${queenCount} / ${numRegions}`
             : gameState === "playing"
-              ? `已放 ${queenCount} / ${numRegions} 個皇后`
-              : "選擇難度開始"}
+              ? `關卡 ${level} · 已放 ${queenCount} / ${numRegions}`
+              : "按下開始，從第一關出發"}
         </p>
-        {gameState !== "idle" && (
-          <Button size="sm" variant="outline" onClick={() => start(puzzleIdx)}>
-            重新開始
-          </Button>
-        )}
+        <Button size="sm" variant="outline" onClick={() => start(level)}>
+          {gameState === "idle" ? "開始遊戲" : "重新開始"}
+        </Button>
       </div>
 
       {gameState === "idle" ? (
@@ -273,79 +198,103 @@ export function GameQueens({ onComplete }: GameQueensProps) {
           <p className="pt-2 text-xs">
             點 1 下標 ✕（標非 ♛）／ 2 下放 ♛ ／ 3 下清空
           </p>
+          <p className="pt-1 text-xs">共 {QUEENS_LEVEL_COUNT} 關</p>
         </div>
       ) : (
-        <div
-          className="overflow-hidden rounded-xl border"
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${puzzle.size}, 1fr)`,
-          }}
-        >
-          {puzzle.regions.map((row, r) =>
-            row.map((regionId, c) => {
-              const cell = placement[r]?.[c] ?? 0
-              const hasMark = cell === 1
-              const hasQueen = cell === 2
-              const isViolation = violations.has(`${r},${c}`)
-              const colorClass = REGION_COLORS[regionId] ?? "bg-muted"
+        <>
+          <div
+            className="overflow-hidden rounded-xl border"
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${puzzle.size}, 1fr)`,
+            }}
+          >
+            {puzzle.regions.map((row, r) =>
+              row.map((regionId, c) => {
+                const cell = placement[r]?.[c] ?? 0
+                const hasMark = cell === 1
+                const hasQueen = cell === 2
+                const isViolation = violations.has(`${r},${c}`)
+                const colorClass = REGION_COLORS[regionId] ?? "bg-muted"
 
-              const borderTop =
-                r > 0 && puzzle.regions[r - 1]?.[c] !== regionId
-                  ? "border-t-2 border-t-foreground/60"
-                  : "border-t border-t-foreground/10"
-              const borderLeft =
-                c > 0 && puzzle.regions[r]?.[c - 1] !== regionId
-                  ? "border-l-2 border-l-foreground/60"
-                  : "border-l border-l-foreground/10"
+                const borderTop =
+                  r > 0 && puzzle.regions[r - 1]?.[c] !== regionId
+                    ? "border-t-2 border-t-foreground/60"
+                    : "border-t border-t-foreground/10"
+                const borderLeft =
+                  c > 0 && puzzle.regions[r]?.[c - 1] !== regionId
+                    ? "border-l-2 border-l-foreground/60"
+                    : "border-l border-l-foreground/10"
 
-              const stateLabel = hasQueen
-                ? "，已放皇后"
-                : hasMark
-                  ? "，已標記非皇后"
-                  : ""
+                const stateLabel = hasQueen
+                  ? "，已放皇后"
+                  : hasMark
+                    ? "，已標記非皇后"
+                    : ""
 
-              return (
-                <button
-                  key={`${r},${c}`}
-                  onClick={() => handleCellClick(r, c)}
-                  aria-label={`第 ${r + 1} 行第 ${c + 1} 列，區域 ${regionId + 1}${stateLabel}${isViolation ? "（違規）" : ""}`}
-                  aria-pressed={hasQueen}
-                  disabled={gameState !== "playing"}
-                  className={`relative flex cursor-pointer items-center justify-center transition-colors select-none ${colorClass} ${borderTop} ${borderLeft} ${
-                    isViolation ? "ring-2 ring-destructive ring-inset" : ""
-                  } disabled:cursor-default`}
-                  style={{
-                    width: puzzle.size === 6 ? 52 : 62,
-                    height: puzzle.size === 6 ? 52 : 62,
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    className="absolute top-0.5 left-1 text-[10px] font-semibold text-foreground/40 tabular-nums"
+                return (
+                  <button
+                    key={`${r},${c}`}
+                    onClick={() => handleCellClick(r, c)}
+                    aria-label={`第 ${r + 1} 行第 ${c + 1} 列，區域 ${regionId + 1}${stateLabel}${isViolation ? "（違規）" : ""}`}
+                    aria-pressed={hasQueen}
+                    disabled={gameState !== "playing"}
+                    className={`relative flex cursor-pointer items-center justify-center transition-colors select-none ${colorClass} ${borderTop} ${borderLeft} ${
+                      isViolation ? "ring-2 ring-destructive ring-inset" : ""
+                    } disabled:cursor-default`}
+                    style={{ width: cellSize, height: cellSize }}
                   >
-                    {regionId + 1}
-                  </span>
-                  {hasQueen && (
-                    <span
-                      className={`text-2xl leading-none select-none ${isViolation ? "opacity-50" : ""}`}
-                    >
-                      ♛
-                    </span>
-                  )}
-                  {hasMark && (
                     <span
                       aria-hidden
-                      className="text-lg leading-none text-foreground/40 select-none"
+                      className="absolute top-0.5 left-1 text-[10px] font-semibold text-foreground/40 tabular-nums"
                     >
-                      ✕
+                      {regionId + 1}
                     </span>
-                  )}
-                </button>
-              )
-            })
-          )}
-        </div>
+                    {hasQueen && (
+                      <span
+                        className={`text-2xl leading-none select-none ${isViolation ? "opacity-50" : ""}`}
+                      >
+                        ♛
+                      </span>
+                    )}
+                    {hasMark && (
+                      <span
+                        aria-hidden
+                        className="text-lg leading-none text-foreground/40 select-none"
+                      >
+                        ✕
+                      </span>
+                    )}
+                  </button>
+                )
+              })
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => goToLevel(level - 1)}
+              disabled={level <= 1}
+              aria-label="上一關"
+            >
+              ←
+            </Button>
+            <span className="min-w-[5rem] text-center text-muted-foreground tabular-nums">
+              {level} / {QUEENS_LEVEL_COUNT}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => goToLevel(level + 1)}
+              disabled={level >= QUEENS_LEVEL_COUNT}
+              aria-label="下一關"
+            >
+              →
+            </Button>
+          </div>
+        </>
       )}
 
       {gameState === "won" && (
