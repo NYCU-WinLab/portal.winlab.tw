@@ -6,10 +6,11 @@ import type { GameType } from "@/lib/games/types"
 
 interface ScoreboardProps {
   gameType: GameType
+  level?: number | null
 }
 
-export function Scoreboard({ gameType }: ScoreboardProps) {
-  const { data: scores, isLoading } = useLeaderboard(gameType)
+export function Scoreboard({ gameType, level = null }: ScoreboardProps) {
+  const { data: scores, isLoading } = useLeaderboard(gameType, level)
   const meta = GAME_META[gameType]
 
   if (isLoading) {

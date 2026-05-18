@@ -7,14 +7,18 @@ import { createClient } from "@/lib/supabase/client"
 import type { GameScore, GameType } from "@/lib/games/types"
 import { queryKeys } from "./query-keys"
 
-export function useLeaderboard(gameType: GameType) {
+export function useLeaderboard(
+  gameType: GameType,
+  level: number | null = null
+) {
   const supabase = useMemo(() => createClient(), [])
 
   return useQuery({
-    queryKey: queryKeys.leaderboard.byGame(gameType),
+    queryKey: queryKeys.leaderboard.byGame(gameType, level),
     queryFn: async (): Promise<GameScore[]> => {
       const { data, error } = await supabase.rpc("get_game_leaderboard", {
         p_game_type: gameType,
+        p_level: level,
       })
       if (error) throw error
       return (data ?? []) as GameScore[]
@@ -22,7 +26,10 @@ export function useLeaderboard(gameType: GameType) {
   })
 }
 
-export function useSubmitScore(gameType: GameType) {
+export function useSubmitScore(
+  gameType: GameType,
+  level: number | null = null
+) {
   const supabase = useMemo(() => createClient(), [])
   const queryClient = useQueryClient()
 
@@ -55,12 +62,13 @@ export function useSubmitScore(gameType: GameType) {
         game_type: gameType,
         score: Math.floor(score),
         finish_time_ms: Math.floor(finishTimeMs),
+        level: level,
       })
       if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.leaderboard.byGame(gameType),
+        queryKey: queryKeys.leaderboard.byGame(gameType, level),
       })
     },
   })
