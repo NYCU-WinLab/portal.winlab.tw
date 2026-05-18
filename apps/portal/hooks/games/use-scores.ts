@@ -52,13 +52,18 @@ export function useSubmitScore(
         throw new Error("Invalid score")
       }
 
+      // Use getSession() instead of getUser(): the former reads/verifies the
+      // JWT from localStorage (no network), the latter hits the auth server
+      // (~200-500ms). RLS still gates the insert via auth.uid() server-side,
+      // so token validity is enforced there.
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
+        data: { session },
+      } = await supabase.auth.getSession()
+      const userId = session?.user.id
+      if (!userId) throw new Error("Not authenticated")
 
       const { error } = await supabase.from("game_scores").insert({
-        user_id: user.id,
+        user_id: userId,
         game_type: gameType,
         score: Math.floor(score),
         finish_time_ms: Math.floor(finishTimeMs),
