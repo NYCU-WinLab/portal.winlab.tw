@@ -3,99 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import type { GameResult } from "@/lib/games/types"
-
-// Bitmask: bit0=top, bit1=right, bit2=bottom, bit3=left
-const TOP = 1,
-  RIGHT = 2,
-  BOTTOM = 4,
-  LEFT = 8
-const GRID = 6
-
-function rotateCW(mask: number, times = 1): number {
-  let m = mask
-  for (let i = 0; i < times; i++) m = ((m << 1) | (m >> 3)) & 0xf
-  return m
-}
-
-function generateSolved(
-  rows: number,
-  cols: number,
-  sr: number,
-  sc: number
-): number[][] {
-  const grid = Array.from({ length: rows }, () => Array<number>(cols).fill(0))
-  const visited = new Set<string>()
-
-  function dfs(r: number, c: number) {
-    visited.add(`${r},${c}`)
-    const dirs = [
-      { dr: -1, dc: 0, from: TOP, to: BOTTOM },
-      { dr: 0, dc: 1, from: RIGHT, to: LEFT },
-      { dr: 1, dc: 0, from: BOTTOM, to: TOP },
-      { dr: 0, dc: -1, from: LEFT, to: RIGHT },
-    ].sort(() => Math.random() - 0.5)
-
-    for (const { dr, dc, from, to } of dirs) {
-      const nr = r + dr,
-        nc = c + dc
-      if (
-        nr >= 0 &&
-        nr < rows &&
-        nc >= 0 &&
-        nc < cols &&
-        !visited.has(`${nr},${nc}`)
-      ) {
-        grid[r]![c]! |= from
-        grid[nr]![nc]! |= to
-        dfs(nr, nc)
-      }
-    }
-  }
-
-  dfs(sr, sc)
-  return grid
-}
-
-function getConnected(
-  masks: number[][],
-  source: [number, number],
-  rows: number,
-  cols: number
-): Set<string> {
-  const [sr, sc] = source
-  const visited = new Set<string>([`${sr},${sc}`])
-  const q: [number, number][] = [[sr, sc]]
-
-  while (q.length) {
-    const [r, c] = q.shift()!
-    const m = masks[r]?.[c] ?? 0
-    const neighbors: [number, number, number, number][] = [
-      [-1, 0, TOP, BOTTOM],
-      [0, 1, RIGHT, LEFT],
-      [1, 0, BOTTOM, TOP],
-      [0, -1, LEFT, RIGHT],
-    ]
-    for (const [dr, dc, cm, nm] of neighbors) {
-      const nr = r + dr,
-        nc = c + dc
-      if (
-        nr >= 0 &&
-        nr < rows &&
-        nc >= 0 &&
-        nc < cols &&
-        m & cm &&
-        (masks[nr]?.[nc] ?? 0) & nm
-      ) {
-        const key = `${nr},${nc}`
-        if (!visited.has(key)) {
-          visited.add(key)
-          q.push([nr, nc])
-        }
-      }
-    }
-  }
-  return visited
-}
+import {
+  BOTTOM,
+  LEFT,
+  PIPES_GRID,
+  PIPES_LEVEL_COUNT,
+  RIGHT,
+  TOP,
+  getConnected,
+  getEndpoints,
+  getPuzzle,
+  rotateCW,
+} from "@/lib/games/pipes-puzzle"
 
 function PipeSVG({
   mask,
@@ -111,8 +30,7 @@ function PipeSVG({
   const numConn = [TOP, RIGHT, BOTTOM, LEFT].filter((b) => mask & b).length
   const isEndpoint = numConn === 1
 
-  // Endpoint dot sits on the closed end of the pipe (opposite the open side),
-  // so the cell reads as "pipe terminates here" instead of overlapping the line.
+  // Endpoint dot sits on the closed end of the pipe (opposite the open side).
   let ex = 20,
     ey = 20
   if (isEndpoint) {
@@ -196,46 +114,33 @@ interface GamePipesProps {
 }
 
 export function GamePipes({ onComplete }: GamePipesProps) {
-  const [solved, setSolved] = useState<number[][]>([])
+  const [level, setLevel] = useState(1)
   const [current, setCurrent] = useState<number[][]>([])
-  const [source, setSource] = useState<[number, number]>([2, 2])
   const [gameState, setGameState] = useState<"idle" | "playing" | "won">("idle")
   const startRef = useRef<number | null>(null)
   const completedRef = useRef(false)
 
-  const start = useCallback(() => {
+  // Solved/source/scrambled all come from the deterministic level number.
+  const puzzle = useMemo(() => getPuzzle(level), [level])
+
+  const start = useCallback((lvl: number) => {
+    const p = getPuzzle(lvl)
     completedRef.current = false
-    const sr = Math.floor(GRID / 2),
-      sc = Math.floor(GRID / 2)
-    const solvedGrid = generateSolved(GRID, GRID, sr, sc)
-    const scrambled = solvedGrid.map((row) =>
-      row.map((mask) =>
-        mask ? rotateCW(mask, Math.floor(Math.random() * 4)) : 0
-      )
-    )
-    setSolved(solvedGrid)
-    setCurrent(scrambled)
-    setSource([sr, sc])
+    setLevel(p.level)
+    setCurrent(p.scrambled.map((row) => [...row]))
     setGameState("playing")
     startRef.current = Date.now()
   }, [])
 
   const connected = useMemo(() => {
     if (!current.length) return new Set<string>()
-    return getConnected(current, source, GRID, GRID)
-  }, [current, source])
+    return getConnected(current, puzzle.source, PIPES_GRID, PIPES_GRID)
+  }, [current, puzzle.source])
 
-  const endpoints = useMemo(() => {
-    const eps: [number, number][] = []
-    solved.forEach((row, r) =>
-      row.forEach((mask, c) => {
-        if (r === source[0] && c === source[1]) return
-        const count = [TOP, RIGHT, BOTTOM, LEFT].filter((b) => mask & b).length
-        if (count === 1) eps.push([r, c])
-      })
-    )
-    return eps
-  }, [solved, source])
+  const endpoints = useMemo(
+    () => getEndpoints(puzzle.solved, puzzle.source),
+    [puzzle]
+  )
 
   const isWon = useMemo(
     () =>
@@ -259,7 +164,10 @@ export function GamePipes({ onComplete }: GamePipesProps) {
 
   const handleClick = useCallback(
     (r: number, c: number) => {
-      if (gameState !== "playing" || (r === source[0] && c === source[1]))
+      if (
+        gameState !== "playing" ||
+        (r === puzzle.source[0] && c === puzzle.source[1])
+      )
         return
       setCurrent((prev) => {
         const next = prev.map((row) => [...row])
@@ -267,62 +175,94 @@ export function GamePipes({ onComplete }: GamePipesProps) {
         return next
       })
     },
-    [gameState, source]
+    [gameState, puzzle.source]
   )
+
+  const goToLevel = (lvl: number) => {
+    const clamped = Math.max(1, Math.min(PIPES_LEVEL_COUNT, lvl))
+    start(clamped)
+  }
 
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex w-full max-w-xs items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {gameState === "playing"
-            ? `連接 ${endpoints.filter(([r, c]) => connected.has(`${r},${c}`)).length} / ${endpoints.length} 個端點`
+          {gameState === "playing" || gameState === "won"
+            ? `關卡 ${level} · 連接 ${endpoints.filter(([r, c]) => connected.has(`${r},${c}`)).length} / ${endpoints.length}`
             : "點擊管道旋轉，讓所有端點（圓點）連通"}
         </p>
-        <Button size="sm" variant="outline" onClick={start}>
+        <Button size="sm" variant="outline" onClick={() => start(level)}>
           {gameState === "idle" ? "開始遊戲" : "重新開始"}
         </Button>
       </div>
 
       {gameState === "idle" ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          按下開始，旋轉管道讓水從藍色源頭流到所有端點
+          按下開始，旋轉管道讓水從藍色源頭流到所有端點。共 {PIPES_LEVEL_COUNT}{" "}
+          關。
         </p>
       ) : (
-        <div
-          className="rounded-xl border bg-muted/20 p-2"
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${GRID}, 50px)`,
-            gap: "2px",
-          }}
-        >
-          {current.map((row, r) =>
-            row.map((mask, c) => {
-              const isSrc = r === source[0] && c === source[1]
-              const isConn = connected.has(`${r},${c}`)
-              return (
-                <button
-                  key={`${r},${c}`}
-                  onClick={() => handleClick(r, c)}
-                  disabled={isSrc || gameState !== "playing"}
-                  aria-label={
-                    isSrc
-                      ? "水源"
-                      : `第 ${r + 1} 行第 ${c + 1} 列管道，點擊旋轉`
-                  }
-                  className={`rounded transition-colors ${
-                    isConn
-                      ? "bg-blue-50 dark:bg-blue-950/40"
-                      : "bg-muted/40 hover:bg-muted"
-                  } disabled:cursor-default`}
-                  style={{ width: 50, height: 50 }}
-                >
-                  <PipeSVG mask={mask} isSource={isSrc} connected={isConn} />
-                </button>
-              )
-            })
-          )}
-        </div>
+        <>
+          <div
+            className="rounded-xl border bg-muted/20 p-2"
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${PIPES_GRID}, 50px)`,
+              gap: "2px",
+            }}
+          >
+            {current.map((row, r) =>
+              row.map((mask, c) => {
+                const isSrc = r === puzzle.source[0] && c === puzzle.source[1]
+                const isConn = connected.has(`${r},${c}`)
+                return (
+                  <button
+                    key={`${r},${c}`}
+                    onClick={() => handleClick(r, c)}
+                    disabled={isSrc || gameState !== "playing"}
+                    aria-label={
+                      isSrc
+                        ? "水源"
+                        : `第 ${r + 1} 行第 ${c + 1} 列管道，點擊旋轉`
+                    }
+                    className={`rounded transition-colors ${
+                      isConn
+                        ? "bg-blue-50 dark:bg-blue-950/40"
+                        : "bg-muted/40 hover:bg-muted"
+                    } disabled:cursor-default`}
+                    style={{ width: 50, height: 50 }}
+                  >
+                    <PipeSVG mask={mask} isSource={isSrc} connected={isConn} />
+                  </button>
+                )
+              })
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => goToLevel(level - 1)}
+              disabled={level <= 1}
+              aria-label="上一關"
+            >
+              ←
+            </Button>
+            <span className="min-w-[5rem] text-center text-muted-foreground tabular-nums">
+              {level} / {PIPES_LEVEL_COUNT}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => goToLevel(level + 1)}
+              disabled={level >= PIPES_LEVEL_COUNT}
+              aria-label="下一關"
+            >
+              →
+            </Button>
+          </div>
+        </>
       )}
 
       {gameState === "won" && (
