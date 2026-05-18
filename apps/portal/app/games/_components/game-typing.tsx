@@ -81,10 +81,7 @@ export function GameTyping({ onComplete, onLevelChange }: GameTypingProps) {
         const wpm = Math.round((units / ms) * 60000)
         setState("done")
         if (ms >= 1000 && wpm <= 300) {
-          setTimeout(
-            () => onComplete({ score: wpm * 10, finishTimeMs: ms }),
-            100
-          )
+          onComplete({ score: wpm * 10, finishTimeMs: ms })
         }
       }
     },
