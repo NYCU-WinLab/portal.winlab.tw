@@ -87,8 +87,14 @@ export function getPuzzle(level: number): PipesPuzzle {
   const center = Math.floor(PIPES_GRID / 2)
   const source: [number, number] = [center, center]
   const solved = generateSolved(PIPES_GRID, PIPES_GRID, center, center, rng)
-  const scrambled = solved.map((row) =>
-    row.map((mask) => (mask ? rotateCW(mask, Math.floor(rng() * 4)) : 0))
+  // The source cell is rendered with a disabled button (the player can't
+  // rotate it), so its scrambled mask MUST match the solved orientation —
+  // otherwise the puzzle is unsolvable.
+  const scrambled = solved.map((row, r) =>
+    row.map((mask, c) => {
+      if (r === source[0] && c === source[1]) return mask
+      return mask ? rotateCW(mask, Math.floor(rng() * 4)) : 0
+    })
   )
   return { level: clamped, size: PIPES_GRID, source, solved, scrambled }
 }
