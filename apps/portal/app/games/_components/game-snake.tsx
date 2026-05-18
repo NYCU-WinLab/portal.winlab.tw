@@ -43,6 +43,10 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
   const [score, setScore] = useState(0)
 
   const dirRef = useRef<Dir>("right")
+  // Direction the snake actually moved on the last tick. Guards against
+  // queuing two keystrokes inside one tick window (e.g. right → down → left)
+  // which would otherwise let the snake U-turn 180° and crash into itself.
+  const movedDirRef = useRef<Dir>("right")
   const snakeRef = useRef<Pos[]>([])
   const foodRef = useRef<Pos>({ r: 5, c: 15 })
   const startRef = useRef<number | null>(null)
@@ -60,6 +64,7 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
     snakeRef.current = initSnake
     foodRef.current = initFood
     dirRef.current = "right"
+    movedDirRef.current = "right"
     setSnake(initSnake)
     setFood(initFood)
     setDir("right")
@@ -73,17 +78,25 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
 
     const interval = setInterval(() => {
       const d = dirRef.current
+      movedDirRef.current = d
       const delta = DIR_DELTA[d]
       const head = snakeRef.current[0]
       if (!head) return
       const next = { r: head.r + delta.r, c: head.c + delta.c }
+
+      // When the snake doesn't eat this tick, the tail vacates its cell on the
+      // same tick the head moves in. Self-collision must check against the
+      // body *after* removing the tail, otherwise a tight U-turn into the
+      // tail's old cell is wrongly counted as a crash.
+      const ate = next.r === foodRef.current.r && next.c === foodRef.current.c
+      const body = ate ? snakeRef.current : snakeRef.current.slice(0, -1)
 
       if (
         next.r < 0 ||
         next.r >= ROWS ||
         next.c < 0 ||
         next.c >= COLS ||
-        snakeRef.current.some((p) => p.r === next.r && p.c === next.c)
+        body.some((p) => p.r === next.r && p.c === next.c)
       ) {
         if (!completedRef.current) {
           completedRef.current = true
@@ -98,7 +111,6 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
         return
       }
 
-      const ate = next.r === foodRef.current.r && next.c === foodRef.current.c
       const newSnake = ate
         ? [next, ...snakeRef.current]
         : [next, ...snakeRef.current.slice(0, -1)]
@@ -123,7 +135,9 @@ export function GameSnake({ onComplete }: GameSnakeProps) {
       left: "right",
       right: "left",
     }
-    if (next !== opposite[dirRef.current]) {
+    // Guard against the last committed direction, not the last queued one —
+    // otherwise two fast keypresses can chain a 180° reversal inside one tick.
+    if (next !== opposite[movedDirRef.current]) {
       dirRef.current = next
       setDir(next)
     }
