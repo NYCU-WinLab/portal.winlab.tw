@@ -41,33 +41,18 @@ export function useSubmitScore(
       score: number
       finishTimeMs: number
     }) => {
-      if (
-        !Number.isFinite(score) ||
-        !Number.isFinite(finishTimeMs) ||
-        score < 0 ||
-        score > 1_000_000 ||
-        finishTimeMs < 1 ||
-        finishTimeMs > 24 * 60 * 60 * 1000
-      ) {
+      if (!Number.isFinite(score) || !Number.isFinite(finishTimeMs)) {
         throw new Error("Invalid score")
       }
 
-      // Use getSession() instead of getUser(): the former reads/verifies the
-      // JWT from localStorage (no network), the latter hits the auth server
-      // (~200-500ms). RLS still gates the insert via auth.uid() server-side,
-      // so token validity is enforced there.
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const userId = session?.user.id
-      if (!userId) throw new Error("Not authenticated")
-
-      const { error } = await supabase.from("game_scores").insert({
-        user_id: userId,
-        game_type: gameType,
-        score: Math.floor(score),
-        finish_time_ms: Math.floor(finishTimeMs),
-        level: level,
+      // Direct INSERT into game_scores is gated by RLS now; the only write
+      // path is the submit_game_score RPC, which derives user_id from
+      // auth.uid() server-side and validates per-game-type score bounds.
+      const { error } = await supabase.rpc("submit_game_score", {
+        p_game_type: gameType,
+        p_score: Math.floor(score),
+        p_finish_ms: Math.floor(finishTimeMs),
+        p_level: level,
       })
       if (error) throw error
     },
