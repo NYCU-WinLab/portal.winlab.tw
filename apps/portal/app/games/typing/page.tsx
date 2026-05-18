@@ -7,7 +7,9 @@ export default function PageTyping() {
   return (
     <GamePage
       gameType="typing"
-      game={(onComplete) => <GameTyping onComplete={onComplete} />}
+      game={(onComplete, onLevelChange) => (
+        <GameTyping onComplete={onComplete} onLevelChange={onLevelChange} />
+      )}
     />
   )
 }

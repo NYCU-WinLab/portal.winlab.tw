@@ -1,26 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import type { GameResult } from "@/lib/games/types"
-
-const PASSAGES = [
-  "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump.",
-  "Programming is the art of telling another human what one wants the computer to do. Clean code always looks like it was written by someone who cares.",
-  "Science is not only a disciple of reason but also one of romance and passion. The universe is under no obligation to make sense to you.",
-]
-
-function pickPassage(): string {
-  return PASSAGES[Math.floor(Math.random() * PASSAGES.length)] ?? PASSAGES[0]!
-}
+import {
+  TYPING_LANGUAGES,
+  countUnits,
+  getTypingLanguage,
+} from "@/lib/games/typing-passages"
 
 type State = "idle" | "playing" | "done"
 
 interface GameTypingProps {
   onComplete: (result: GameResult) => void
+  onLevelChange?: (level: number | null, displayLabel?: string | null) => void
 }
 
-export function GameTyping({ onComplete }: GameTypingProps) {
+export function GameTyping({ onComplete, onLevelChange }: GameTypingProps) {
+  const [languageId, setLanguageId] = useState(0)
   const [target, setTarget] = useState("")
   const [input, setInput] = useState("")
   const [state, setState] = useState<State>("idle")
@@ -28,14 +25,42 @@ export function GameTyping({ onComplete }: GameTypingProps) {
   const completedRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const start = useCallback(() => {
-    completedRef.current = false
-    setTarget(pickPassage())
-    setInput("")
-    setState("playing")
-    startRef.current = null
-    setTimeout(() => inputRef.current?.focus(), 50)
+  const language = getTypingLanguage(languageId)
+
+  const pickPassage = useCallback((langId: number): string => {
+    const lang = getTypingLanguage(langId)
+    const pool = lang.passages
+    return pool[Math.floor(Math.random() * pool.length)] ?? pool[0]!
   }, [])
+
+  const start = useCallback(
+    (langId: number = languageId) => {
+      const lang = getTypingLanguage(langId)
+      completedRef.current = false
+      setLanguageId(langId)
+      onLevelChange?.(langId, lang.label)
+      setTarget(pickPassage(langId))
+      setInput("")
+      setState("playing")
+      startRef.current = null
+      setTimeout(() => inputRef.current?.focus(), 50)
+    },
+    [languageId, onLevelChange, pickPassage]
+  )
+
+  const selectLanguage = useCallback(
+    (langId: number) => {
+      // Switching language from idle just updates the preview; from playing
+      // restarts cleanly into the new language.
+      if (state === "idle") {
+        setLanguageId(langId)
+        onLevelChange?.(langId, getTypingLanguage(langId).label)
+      } else {
+        start(langId)
+      }
+    },
+    [state, onLevelChange, start]
+  )
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,10 +77,9 @@ export function GameTyping({ onComplete }: GameTypingProps) {
       if (val === target && !completedRef.current) {
         completedRef.current = true
         const ms = Math.max(Date.now() - startRef.current, 1)
-        const words = target.trim().split(/\s+/).length
-        const wpm = Math.round((words / ms) * 60000)
+        const units = countUnits(target, language.code)
+        const wpm = Math.round((units / ms) * 60000)
         setState("done")
-        // Floor at 1s to defeat instant-fill exploits; cap WPM at 300 sanity check
         if (ms >= 1000 && wpm <= 300) {
           setTimeout(
             () => onComplete({ score: wpm * 10, finishTimeMs: ms }),
@@ -64,7 +88,7 @@ export function GameTyping({ onComplete }: GameTypingProps) {
         }
       }
     },
-    [state, target, input, onComplete]
+    [state, target, input, language.code, onComplete]
   )
 
   const correctCount = input
@@ -75,27 +99,49 @@ export function GameTyping({ onComplete }: GameTypingProps) {
 
   return (
     <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-wrap justify-center gap-2">
+        {TYPING_LANGUAGES.map((lang) => (
+          <button
+            key={lang.id}
+            type="button"
+            onClick={() => selectLanguage(lang.id)}
+            disabled={state === "done"}
+            aria-pressed={languageId === lang.id}
+            className={`rounded-lg border px-3 py-1 text-xs font-medium transition-colors ${
+              languageId === lang.id
+                ? "border-foreground bg-foreground text-background"
+                : "border-muted hover:border-foreground"
+            } disabled:opacity-60`}
+          >
+            {lang.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          準確率{" "}
+          <span className="mr-3">{language.label}</span>準確率{" "}
           <span
             className={`font-bold ${accuracy < 80 ? "text-destructive" : "text-foreground"}`}
           >
             {accuracy}%
           </span>
         </div>
-        <Button size="sm" variant="outline" onClick={start}>
+        <Button size="sm" variant="outline" onClick={() => start(languageId)}>
           {state === "idle" ? "開始遊戲" : "重新開始"}
         </Button>
       </div>
 
       {state === "idle" ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          點擊「開始遊戲」，盡快完整輸入以下段落
+          選擇語言後點擊「開始遊戲」，完整輸入下方段落
         </p>
       ) : (
         <>
-          <div className="rounded-xl border bg-muted/30 p-4 font-mono text-sm leading-relaxed select-none">
+          <div
+            lang={language.code}
+            className="rounded-xl border bg-muted/30 p-4 font-mono text-sm leading-relaxed select-none"
+          >
             {target.split("").map((ch, i) => {
               let cls = "text-muted-foreground"
               if (i < input.length) {
@@ -121,6 +167,7 @@ export function GameTyping({ onComplete }: GameTypingProps) {
             onPaste={(e) => e.preventDefault()}
             onDrop={(e) => e.preventDefault()}
             disabled={state === "done"}
+            lang={language.code}
             className="w-full rounded-lg border bg-background px-3 py-2 font-mono text-sm ring-1 ring-muted outline-none focus:ring-primary"
             placeholder="在此輸入..."
             autoComplete="off"

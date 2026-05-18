@@ -13,13 +13,14 @@ interface GamePageProps {
   gameType: GameType
   game: (
     onComplete: (result: GameResult) => void,
-    onLevelChange: (level: number | null) => void
+    onLevelChange: (level: number | null, displayLabel?: string | null) => void
   ) => ReactNode
 }
 
 export function GamePage({ gameType, game }: GamePageProps) {
   const meta = GAME_META[gameType]
   const [level, setLevel] = useState<number | null>(null)
+  const [levelLabel, setLevelLabel] = useState<string | null>(null)
   const { mutate: submit } = useSubmitScore(gameType, level)
 
   const handleComplete = useCallback(
@@ -41,9 +42,16 @@ export function GamePage({ gameType, game }: GamePageProps) {
     [submit, meta]
   )
 
-  const handleLevelChange = useCallback((next: number | null) => {
-    setLevel(next)
-  }, [])
+  const handleLevelChange = useCallback(
+    (next: number | null, label?: string | null) => {
+      setLevel(next)
+      setLevelLabel(label ?? null)
+    },
+    []
+  )
+
+  const scoreboardTitle =
+    level === null ? "排行榜" : `排行榜 · ${levelLabel ?? `關卡 ${level}`}`
 
   return (
     <div className="space-y-10">
@@ -69,7 +77,7 @@ export function GamePage({ gameType, game }: GamePageProps) {
 
         <div className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-            {level !== null ? `排行榜 · 關卡 ${level}` : "排行榜"}
+            {scoreboardTitle}
           </h2>
           <Scoreboard gameType={gameType} level={level} />
         </div>
