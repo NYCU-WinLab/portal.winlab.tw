@@ -1,16 +1,37 @@
-export const GALLERY_REACTIONS = ["like", "love", "point"] as const
+/** Facebook-style reactions + WinLab point (👉👈). One per user per work. */
+
+export const GALLERY_REACTIONS = [
+  "like",
+  "love",
+  "care",
+  "haha",
+  "wow",
+  "sad",
+  "angry",
+  "point",
+] as const
 
 export type GalleryReaction = (typeof GALLERY_REACTIONS)[number]
 
 export const REACTION_EMOJI: Record<GalleryReaction, string> = {
   like: "👍",
   love: "❤️",
+  care: "🤗",
+  haha: "😂",
+  wow: "😮",
+  sad: "😢",
+  angry: "😡",
   point: "👉👈",
 }
 
 export const REACTION_LABEL: Record<GalleryReaction, string> = {
   like: "Like",
   love: "Love",
+  care: "Care",
+  haha: "Haha",
+  wow: "Wow",
+  sad: "Sad",
+  angry: "Angry",
   point: "Poke",
 }
 
@@ -18,24 +39,27 @@ export type ReactionCounts = Record<GalleryReaction, number>
 
 export type ReactionNames = Record<GalleryReaction, string[]>
 
-export const EMPTY_REACTION_COUNTS: ReactionCounts = {
-  like: 0,
-  love: 0,
-  point: 0,
+function buildEmptyCounts(): ReactionCounts {
+  return Object.fromEntries(
+    GALLERY_REACTIONS.map((r) => [r, 0])
+  ) as ReactionCounts
 }
 
-export const EMPTY_REACTION_NAMES: ReactionNames = {
-  like: [],
-  love: [],
-  point: [],
+function buildEmptyNames(): ReactionNames {
+  return Object.fromEntries(
+    GALLERY_REACTIONS.map((r) => [r, [] as string[]])
+  ) as ReactionNames
 }
+
+export const EMPTY_REACTION_COUNTS = buildEmptyCounts()
+export const EMPTY_REACTION_NAMES = buildEmptyNames()
 
 export function isGalleryReaction(value: string): value is GalleryReaction {
   return (GALLERY_REACTIONS as readonly string[]).includes(value)
 }
 
 export function totalReactions(counts: ReactionCounts): number {
-  return counts.like + counts.love + counts.point
+  return GALLERY_REACTIONS.reduce((sum, r) => sum + counts[r], 0)
 }
 
 export function formatReactionSummary(counts: ReactionCounts): string {
@@ -59,19 +83,13 @@ export function aggregateReactions(
   for (const row of voteRows) {
     if (!isGalleryReaction(row.reaction)) continue
 
-    const counts = countsByImage.get(row.image_id) ?? {
-      ...EMPTY_REACTION_COUNTS,
-    }
+    const counts = countsByImage.get(row.image_id) ?? buildEmptyCounts()
     counts[row.reaction] += 1
     countsByImage.set(row.image_id, counts)
 
-    const names = namesByImage.get(row.image_id) ?? {
-      like: [],
-      love: [],
-      point: [],
-    }
-    const name = voterNameById.get(row.user_id) ?? "Unknown"
-    names[row.reaction].push(name)
+    const names = namesByImage.get(row.image_id) ?? buildEmptyNames()
+    const displayName = voterNameById.get(row.user_id) ?? "Unknown"
+    names[row.reaction].push(displayName)
     namesByImage.set(row.image_id, names)
   }
 

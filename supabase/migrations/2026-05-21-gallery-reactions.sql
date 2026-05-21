@@ -8,7 +8,18 @@ alter table public.gallery_image_votes
 
 alter table public.gallery_image_votes
   add constraint gallery_image_votes_reaction_check
-  check (reaction in ('like', 'love', 'point'));
+  check (
+    reaction in (
+      'like',
+      'love',
+      'care',
+      'haha',
+      'wow',
+      'sad',
+      'angry',
+      'point'
+    )
+  );
 
 -- Users may switch reaction type without delete+insert.
 drop policy if exists "gallery_image_votes_update" on public.gallery_image_votes;

@@ -249,35 +249,80 @@ function ReactionBar({
   canReact: boolean
   onReact: (reaction: GalleryReaction) => void
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const total = totalReactions(counts)
+  const triggerEmoji = myReaction ? REACTION_EMOJI[myReaction] : "👍"
+
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2 not-italic">
-      {GALLERY_REACTIONS.map((reaction) => {
-        const active = myReaction === reaction
-        return (
-          <button
-            key={reaction}
-            type="button"
-            onClick={() => onReact(reaction)}
-            disabled={!canReact}
-            aria-label={
-              active
-                ? `Remove ${REACTION_LABEL[reaction]}`
-                : `React with ${REACTION_LABEL[reaction]}`
-            }
-            aria-pressed={active}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-base transition-colors md:text-lg",
-              active
-                ? "border-foreground/20 bg-foreground/10 text-foreground"
-                : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-              !canReact && "cursor-not-allowed opacity-70"
-            )}
-          >
-            <span aria-hidden>{REACTION_EMOJI[reaction]}</span>
-            <span>{counts[reaction]}</span>
-          </button>
-        )
-      })}
+    <div
+      className="group/reactions relative shrink-0 not-italic"
+      onMouseEnter={() => canReact && setPickerOpen(true)}
+      onMouseLeave={() => setPickerOpen(false)}
+    >
+      <button
+        type="button"
+        disabled={!canReact}
+        onClick={() => canReact && setPickerOpen((open) => !open)}
+        aria-label={
+          myReaction
+            ? `Your reaction: ${REACTION_LABEL[myReaction]}. Open reaction picker`
+            : "Open reaction picker"
+        }
+        aria-expanded={pickerOpen}
+        aria-haspopup="true"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-base transition-colors md:text-lg",
+          myReaction
+            ? "border-foreground/20 bg-foreground/10 text-foreground"
+            : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
+          !canReact && "cursor-not-allowed opacity-70"
+        )}
+      >
+        <span className="text-xl leading-none" aria-hidden>
+          {triggerEmoji}
+        </span>
+        {total > 0 ? <span className="tabular-nums">{total}</span> : null}
+      </button>
+
+      <div
+        role="menu"
+        aria-label="Choose a reaction"
+        className={cn(
+          "absolute right-0 bottom-full z-20 mb-2 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg",
+          "transition-all duration-150",
+          pickerOpen
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-1 opacity-0 group-hover/reactions:pointer-events-auto group-hover/reactions:translate-y-0 group-hover/reactions:opacity-100"
+        )}
+      >
+        {GALLERY_REACTIONS.map((reaction) => {
+          const active = myReaction === reaction
+          return (
+            <button
+              key={reaction}
+              type="button"
+              role="menuitem"
+              disabled={!canReact}
+              onClick={() => {
+                onReact(reaction)
+                setPickerOpen(false)
+              }}
+              aria-label={
+                active
+                  ? `Remove ${REACTION_LABEL[reaction]}`
+                  : REACTION_LABEL[reaction]
+              }
+              aria-pressed={active}
+              className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-full text-2xl transition-transform hover:scale-125",
+                active && "bg-foreground/10 ring-2 ring-foreground/20"
+              )}
+            >
+              <span aria-hidden>{REACTION_EMOJI[reaction]}</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -8,22 +8,23 @@ import {
 } from "@/lib/gallery/reactions"
 
 describe("isGalleryReaction", () => {
-  test("accepts known reactions", () => {
+  test("accepts Facebook-style and point reactions", () => {
     expect(isGalleryReaction("like")).toBe(true)
-    expect(isGalleryReaction("love")).toBe(true)
+    expect(isGalleryReaction("haha")).toBe(true)
+    expect(isGalleryReaction("angry")).toBe(true)
     expect(isGalleryReaction("point")).toBe(true)
   })
 
   test("rejects unknown values", () => {
-    expect(isGalleryReaction("wow")).toBe(false)
+    expect(isGalleryReaction("fire")).toBe(false)
   })
 })
 
 describe("formatReactionSummary", () => {
   test("omits zero counts", () => {
     expect(
-      formatReactionSummary({ like: 2, love: 0, point: 1 })
-    ).toBe("👍 2 · 👉👈 1")
+      formatReactionSummary({ ...EMPTY_REACTION_COUNTS, like: 2, haha: 1 })
+    ).toBe("👍 2 · 😂 1")
   })
 
   test("returns empty string when no reactions", () => {
@@ -33,6 +34,8 @@ describe("formatReactionSummary", () => {
 
 describe("totalReactions", () => {
   test("sums all kinds", () => {
-    expect(totalReactions({ like: 1, love: 2, point: 3 })).toBe(6)
+    expect(
+      totalReactions({ ...EMPTY_REACTION_COUNTS, like: 1, angry: 2, point: 1 })
+    ).toBe(4)
   })
 })
