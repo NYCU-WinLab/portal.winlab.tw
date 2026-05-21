@@ -6,19 +6,73 @@ import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
 
-export function useMenus() {
+interface UseMenusOptions {
+  includeInactive?: boolean
+}
+
+export function useMenus(opts: UseMenusOptions = {}) {
+  const { includeInactive = false } = opts
   const supabase = createClient()
 
   return useQuery({
-    queryKey: queryKeys.menus.all,
+    queryKey: [...queryKeys.menus.all, { includeInactive }] as const,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("bento_menus")
         .select("*, menu_items:bento_menu_items(*)")
+        .order("is_active", { ascending: false })
         .order("name")
+
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       return data
+    },
+  })
+}
+
+export function useDisabledMenuCount() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: [...queryKeys.menus.all, "disabled-count"] as const,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("bento_menus")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", false)
+
+      if (error) throw error
+      return count ?? 0
+    },
+  })
+}
+
+export function useToggleMenuActive() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { id: string; nextActive: boolean }) => {
+      const { data, error } = await supabase
+        .from("bento_menus")
+        .update({
+          is_active: params.nextActive,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.menus.all })
     },
   })
 }
