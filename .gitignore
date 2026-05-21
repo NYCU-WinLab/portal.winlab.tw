@@ -21,6 +21,9 @@ coverage
 # Vercel
 .vercel
 
+# Copied from @ffmpeg/core on install (apps/gallery/scripts/sync-ffmpeg-core.mjs)
+apps/gallery/public/ffmpeg/
+
 # Build Outputs
 .next/
 out/
