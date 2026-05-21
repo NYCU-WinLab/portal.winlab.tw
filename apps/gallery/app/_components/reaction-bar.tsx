@@ -7,7 +7,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import {
   GALLERY_REACTIONS,
-  REACTION_LABEL,
+  REACTION_EMOJI,
   totalReactions,
   type GalleryReaction,
   type ReactionCounts,
@@ -166,8 +166,8 @@ export function ReactionBar({
               }}
               aria-label={
                 active
-                  ? `Remove ${REACTION_LABEL[reaction]}`
-                  : REACTION_LABEL[reaction]
+                  ? `Remove ${REACTION_EMOJI[reaction]} reaction`
+                  : `${REACTION_EMOJI[reaction]} reaction`
               }
               aria-pressed={active}
               className={cn(
@@ -197,8 +197,8 @@ export function ReactionBar({
         onContextMenu={(e) => e.preventDefault()}
         aria-label={
           myReaction
-            ? `Your reaction: ${REACTION_LABEL[myReaction]}. Hold or hover for more`
-            : "Like. Hold or hover for more reactions"
+            ? `Your reaction ${REACTION_EMOJI[myReaction]}. Hold or hover for more`
+            : "React. Hold or hover for more"
         }
         className={cn(
           "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors",

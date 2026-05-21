@@ -14,8 +14,6 @@ import {
 import {
   Popover,
   PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
@@ -27,7 +25,6 @@ import { setGalleryReaction } from "@/app/actions"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
-  REACTION_LABEL,
   type GalleryReaction,
   type ReactionCounts,
   type ReactionNames,
@@ -254,66 +251,50 @@ function ReactionSummary({
     )
   }
 
-  const activeReactions = GALLERY_REACTIONS.filter((r) => counts[r] > 0)
-  const allNames = GALLERY_REACTIONS.flatMap((r) =>
-    namesByReaction[r].map((name) => ({ reaction: r, name }))
+  const entries = GALLERY_REACTIONS.flatMap((reaction) =>
+    namesByReaction[reaction].map((name) => ({ reaction, name }))
   )
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic md:text-sm">
-      {activeReactions.map((reaction) => (
-        <span
-          key={reaction}
-          className="inline-flex items-center gap-0.5 whitespace-nowrap"
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic transition-colors hover:text-foreground md:text-sm"
+          aria-label="Show who reacted"
         >
-          <ReactionGlyph reaction={reaction} className="text-sm" />
-          <span className="tabular-nums">{counts[reaction]}</span>
-        </span>
-      ))}
-      {allNames.length > 0 ? (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 underline decoration-dotted underline-offset-4 hover:text-foreground"
-              aria-label="Show who reacted"
+          {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (
+            <span
+              key={reaction}
+              className="inline-flex items-center gap-0.5 whitespace-nowrap"
             >
-              · names
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            sideOffset={8}
-            className="w-64 rounded-xl p-3"
-          >
-            <PopoverHeader>
-              <PopoverTitle className="text-sm">Reactions</PopoverTitle>
-            </PopoverHeader>
-            <div className="max-h-52 space-y-3 overflow-y-auto text-sm">
-              {GALLERY_REACTIONS.map((reaction) => {
-                const names = namesByReaction[reaction]
-                if (names.length === 0) return null
-                return (
-                  <div key={reaction}>
-                    <p className="mb-1 flex items-center gap-1 font-medium">
-                      <ReactionGlyph reaction={reaction} className="text-base" />
-                      {REACTION_LABEL[reaction]}
-                    </p>
-                    <ul className="space-y-0.5">
-                      {names.map((name, idx) => (
-                        <li key={`${reaction}-${name}-${idx}`} className="truncate">
-                          {name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
-      ) : null}
-    </div>
+              <ReactionGlyph reaction={reaction} className="text-sm" />
+              <span className="tabular-nums">{counts[reaction]}</span>
+            </span>
+          ))}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-56 rounded-xl p-3"
+      >
+        <ul className="max-h-52 space-y-1.5 overflow-y-auto text-sm">
+          {entries.map(({ reaction, name }, idx) => (
+            <li
+              key={`${reaction}-${name}-${idx}`}
+              className="flex min-w-0 items-center gap-2"
+            >
+              <ReactionGlyph
+                reaction={reaction}
+                className="shrink-0 text-base"
+              />
+              <span className="truncate">{name}</span>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   )
 }
 

@@ -61,7 +61,7 @@ export default async function GalleryHomePage() {
 
   let countsByImage = new Map<string, typeof EMPTY_REACTION_COUNTS>()
   let namesByImage = new Map<string, typeof EMPTY_REACTION_NAMES>()
-  let myReactionByImage = new Map<string, GalleryImage["my_reaction"]>()
+  const myReactionByImage = new Map<string, GalleryImage["my_reaction"]>()
 
   if (imageIds.length > 0) {
     const { data: voteRows, error: voteError } = await supabase
