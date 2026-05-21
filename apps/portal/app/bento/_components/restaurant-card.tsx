@@ -1,12 +1,18 @@
 "use client"
 
-import { ExternalLink, Trash2 } from "lucide-react"
+import { Ban, CheckCircle2, ExternalLink, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { cn } from "@workspace/ui/lib/utils"
 
-import { useDeleteMenu, useMenuItemCounts } from "@/hooks/bento/use-menus"
+import {
+  useDeleteMenu,
+  useMenuItemCounts,
+  useToggleMenuActive,
+} from "@/hooks/bento/use-menus"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { EditRestaurantDialog } from "./edit-restaurant-dialog"
@@ -18,6 +24,7 @@ interface Restaurant {
   google_map_link?: string | null
   created_at: string
   additional?: string[] | null
+  is_active?: boolean
 }
 
 type MenuItemRow = {
@@ -45,8 +52,10 @@ export function RestaurantCard({
     restaurant.id
   )
   const deleteMenu = useDeleteMenu(restaurant.id)
+  const toggleActive = useToggleMenuActive()
 
   const loading = statsLoading
+  const isActive = restaurant.is_active !== false
 
   const handleDelete = async () => {
     try {
@@ -58,11 +67,37 @@ export function RestaurantCard({
     }
   }
 
+  const handleToggleActive = async () => {
+    const nextActive = !isActive
+    try {
+      await toggleActive.mutateAsync({ id: restaurant.id, nextActive })
+      toast.success(nextActive ? "店家已啟用" : "店家已停用")
+    } catch (error) {
+      const err =
+        error instanceof Error
+          ? error
+          : new Error(nextActive ? "啟用失敗" : "停用失敗")
+      toast.error(err.message)
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+    <div
+      className={cn(
+        "flex flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-opacity",
+        !isActive && "opacity-60"
+      )}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{restaurant.name}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{restaurant.name}</span>
+            {!isActive && (
+              <Badge variant="secondary" className="text-[10px]">
+                已停用
+              </Badge>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {restaurant.google_map_link && (
               <a
@@ -91,6 +126,38 @@ export function RestaurantCard({
             <EditRestaurantDialog
               restaurant={restaurant}
               menuItems={menuItems}
+            />
+            <ConfirmDialog
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={toggleActive.isPending}
+                >
+                  {isActive ? (
+                    <Ban className="mr-1 h-3.5 w-3.5" />
+                  ) : (
+                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {toggleActive.isPending
+                    ? "處理中..."
+                    : isActive
+                      ? "停用"
+                      : "啟用"}
+                </Button>
+              }
+              title={
+                isActive
+                  ? `停用「${restaurant.name}」？`
+                  : `啟用「${restaurant.name}」？`
+              }
+              description={
+                isActive
+                  ? "停用後，這間店家將不會出現在新增訂單與店家列表中。已存在的訂單不受影響。"
+                  : "啟用後，這間店家會重新出現在訂單與店家列表中。"
+              }
+              confirmText={isActive ? "停用" : "啟用"}
+              onConfirm={handleToggleActive}
             />
             <ConfirmDialog
               trigger={
