@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "sync-ffmpeg": "node ./scripts/sync-ffmpeg-core.mjs",
+    "predev": "bun run sync-ffmpeg",
+    "prebuild": "bun run sync-ffmpeg",
     "dev": "next dev --turbopack --port 3005",
     "dev:webpack": "next dev --webpack --port 3005",
     "build": "next build",
@@ -14,6 +17,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@supabase/ssr": "^0.10.2",
