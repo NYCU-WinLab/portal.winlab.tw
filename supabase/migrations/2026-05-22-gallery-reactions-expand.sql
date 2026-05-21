@@ -9,7 +9,6 @@ alter table public.gallery_image_votes
     reaction in (
       'like',
       'love',
-      'care',
       'haha',
       'wow',
       'sad',

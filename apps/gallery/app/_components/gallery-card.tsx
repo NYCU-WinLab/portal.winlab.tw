@@ -21,16 +21,15 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
+import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import { setGalleryReaction } from "@/app/actions"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
-  REACTION_EMOJI,
   REACTION_LABEL,
   type GalleryReaction,
   type ReactionCounts,
   type ReactionNames,
-  formatReactionSummary,
   totalReactions,
 } from "@/lib/gallery/reactions"
 import type { GalleryImage } from "@/lib/gallery/types"
@@ -61,7 +60,6 @@ export function GalleryCard({
 
   const canReact = isSignedIn && !isPending
   const reactionTotal = totalReactions(counts)
-  const summary = formatReactionSummary(counts)
 
   const onReact = (reaction: GalleryReaction) => {
     if (!isSignedIn) {
@@ -223,7 +221,7 @@ export function GalleryCard({
           </p>
           <ReactionSummary
             total={reactionTotal}
-            summary={summary}
+            counts={counts}
             namesByReaction={namesByReaction}
           />
         </div>
@@ -251,89 +249,95 @@ function ReactionBar({
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const total = totalReactions(counts)
-  const triggerEmoji = myReaction ? REACTION_EMOJI[myReaction] : "👍"
 
   return (
-    <div
-      className="group/reactions relative shrink-0 not-italic"
-      onMouseEnter={() => canReact && setPickerOpen(true)}
-      onMouseLeave={() => setPickerOpen(false)}
-    >
-      <button
-        type="button"
-        disabled={!canReact}
-        onClick={() => canReact && setPickerOpen((open) => !open)}
-        aria-label={
-          myReaction
-            ? `Your reaction: ${REACTION_LABEL[myReaction]}. Open reaction picker`
-            : "Open reaction picker"
-        }
-        aria-expanded={pickerOpen}
-        aria-haspopup="true"
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-base transition-colors md:text-lg",
-          myReaction
-            ? "border-foreground/20 bg-foreground/10 text-foreground"
-            : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-          !canReact && "cursor-not-allowed opacity-70"
-        )}
+    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={!canReact}
+          aria-label={
+            myReaction
+              ? `Your reaction: ${REACTION_LABEL[myReaction]}. Change reaction`
+              : "Add a reaction"
+          }
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-base not-italic transition-colors md:text-lg",
+            myReaction
+              ? "border-foreground/20 bg-foreground/10 text-foreground"
+              : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
+            !canReact && "cursor-not-allowed opacity-70"
+          )}
+        >
+          {myReaction ? (
+            <ReactionGlyph reaction={myReaction} className="text-xl" />
+          ) : (
+            <ReactionGlyph reaction="like" className="text-xl opacity-60" />
+          )}
+          {total > 0 ? (
+            <span className="tabular-nums">{total}</span>
+          ) : (
+            <span className="text-sm text-muted-foreground">React</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        side="top"
+        sideOffset={8}
+        className="w-auto rounded-2xl p-2"
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <span className="text-xl leading-none" aria-hidden>
-          {triggerEmoji}
-        </span>
-        {total > 0 ? <span className="tabular-nums">{total}</span> : null}
-      </button>
-
-      <div
-        role="menu"
-        aria-label="Choose a reaction"
-        className={cn(
-          "absolute right-0 bottom-full z-20 mb-2 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg",
-          "transition-all duration-150",
-          pickerOpen
-            ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-1 opacity-0 group-hover/reactions:pointer-events-auto group-hover/reactions:translate-y-0 group-hover/reactions:opacity-100"
-        )}
-      >
-        {GALLERY_REACTIONS.map((reaction) => {
-          const active = myReaction === reaction
-          return (
-            <button
-              key={reaction}
-              type="button"
-              role="menuitem"
-              disabled={!canReact}
-              onClick={() => {
-                onReact(reaction)
-                setPickerOpen(false)
-              }}
-              aria-label={
-                active
-                  ? `Remove ${REACTION_LABEL[reaction]}`
-                  : REACTION_LABEL[reaction]
-              }
-              aria-pressed={active}
-              className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-full text-2xl transition-transform hover:scale-125",
-                active && "bg-foreground/10 ring-2 ring-foreground/20"
-              )}
-            >
-              <span aria-hidden>{REACTION_EMOJI[reaction]}</span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
+        <p className="mb-2 px-1 text-xs text-muted-foreground">Pick one</p>
+        <div
+          role="menu"
+          aria-label="Choose a reaction"
+          className="grid grid-cols-4 gap-1"
+        >
+          {GALLERY_REACTIONS.map((reaction) => {
+            const active = myReaction === reaction
+            return (
+              <button
+                key={reaction}
+                type="button"
+                role="menuitem"
+                disabled={!canReact}
+                onClick={() => {
+                  onReact(reaction)
+                  setPickerOpen(false)
+                }}
+                aria-label={
+                  active
+                    ? `Remove ${REACTION_LABEL[reaction]}`
+                    : REACTION_LABEL[reaction]
+                }
+                aria-pressed={active}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-muted",
+                  active && "bg-foreground/10 ring-2 ring-foreground/20",
+                  reaction === "point" && "col-span-2 w-[5.5rem]"
+                )}
+              >
+                <ReactionGlyph
+                  reaction={reaction}
+                  className={reaction === "point" ? "text-xl" : "text-2xl"}
+                />
+              </button>
+            )
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
 function ReactionSummary({
   total,
-  summary,
+  counts,
   namesByReaction,
 }: {
   total: number
-  summary: string
+  counts: ReactionCounts
   namesByReaction: ReactionNames
 }) {
   if (total === 0) {
@@ -344,13 +348,22 @@ function ReactionSummary({
     )
   }
 
+  const activeReactions = GALLERY_REACTIONS.filter((r) => counts[r] > 0)
   const allNames = GALLERY_REACTIONS.flatMap((r) =>
     namesByReaction[r].map((name) => ({ reaction: r, name }))
   )
 
   return (
-    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground not-italic md:text-sm">
-      <p className="min-w-0 truncate">{summary}</p>
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic md:text-sm">
+      {activeReactions.map((reaction) => (
+        <span
+          key={reaction}
+          className="inline-flex items-center gap-0.5 whitespace-nowrap"
+        >
+          <ReactionGlyph reaction={reaction} className="text-sm" />
+          <span className="tabular-nums">{counts[reaction]}</span>
+        </span>
+      ))}
       {allNames.length > 0 ? (
         <Popover>
           <PopoverTrigger asChild>
@@ -376,8 +389,9 @@ function ReactionSummary({
                 if (names.length === 0) return null
                 return (
                   <div key={reaction}>
-                    <p className="mb-1 font-medium">
-                      {REACTION_EMOJI[reaction]} {REACTION_LABEL[reaction]}
+                    <p className="mb-1 flex items-center gap-1 font-medium">
+                      <ReactionGlyph reaction={reaction} className="text-base" />
+                      {REACTION_LABEL[reaction]}
                     </p>
                     <ul className="space-y-0.5">
                       {names.map((name, idx) => (

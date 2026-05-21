@@ -3,7 +3,6 @@
 export const GALLERY_REACTIONS = [
   "like",
   "love",
-  "care",
   "haha",
   "wow",
   "sad",
@@ -16,7 +15,6 @@ export type GalleryReaction = (typeof GALLERY_REACTIONS)[number]
 export const REACTION_EMOJI: Record<GalleryReaction, string> = {
   like: "👍",
   love: "❤️",
-  care: "🤗",
   haha: "😂",
   wow: "😮",
   sad: "😢",
@@ -27,7 +25,6 @@ export const REACTION_EMOJI: Record<GalleryReaction, string> = {
 export const REACTION_LABEL: Record<GalleryReaction, string> = {
   like: "Like",
   love: "Love",
-  care: "Care",
   haha: "Haha",
   wow: "Wow",
   sad: "Sad",
@@ -62,9 +59,14 @@ export function totalReactions(counts: ReactionCounts): number {
   return GALLERY_REACTIONS.reduce((sum, r) => sum + counts[r], 0)
 }
 
+/** Text fallback for summaries; point uses thin space to stay on one line. */
 export function formatReactionSummary(counts: ReactionCounts): string {
   return GALLERY_REACTIONS.filter((r) => counts[r] > 0)
-    .map((r) => `${REACTION_EMOJI[r]} ${counts[r]}`)
+    .map((r) => {
+      const glyph =
+        r === "point" ? "👉\u2009👈" : REACTION_EMOJI[r]
+      return `${glyph} ${counts[r]}`
+    })
     .join(" · ")
 }
 
