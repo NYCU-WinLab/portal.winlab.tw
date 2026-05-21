@@ -21,6 +21,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
+import { ReactionBar } from "@/app/_components/reaction-bar"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import { setGalleryReaction } from "@/app/actions"
 import { getRotation } from "@/lib/gallery/rotation"
@@ -233,101 +234,6 @@ export function GalleryCard({
         />
       </figcaption>
     </figure>
-  )
-}
-
-function ReactionBar({
-  counts,
-  myReaction,
-  canReact,
-  onReact,
-}: {
-  counts: ReactionCounts
-  myReaction: GalleryReaction | null
-  canReact: boolean
-  onReact: (reaction: GalleryReaction) => void
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const total = totalReactions(counts)
-
-  return (
-    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={!canReact}
-          aria-label={
-            myReaction
-              ? `Your reaction: ${REACTION_LABEL[myReaction]}. Change reaction`
-              : "Add a reaction"
-          }
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-base not-italic transition-colors md:text-lg",
-            myReaction
-              ? "border-foreground/20 bg-foreground/10 text-foreground"
-              : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-            !canReact && "cursor-not-allowed opacity-70"
-          )}
-        >
-          {myReaction ? (
-            <ReactionGlyph reaction={myReaction} className="text-xl" />
-          ) : (
-            <ReactionGlyph reaction="like" className="text-xl opacity-60" />
-          )}
-          {total > 0 ? (
-            <span className="tabular-nums">{total}</span>
-          ) : (
-            <span className="text-sm text-muted-foreground">React</span>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        side="top"
-        sideOffset={8}
-        className="w-auto rounded-2xl p-2"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <p className="mb-2 px-1 text-xs text-muted-foreground">Pick one</p>
-        <div
-          role="menu"
-          aria-label="Choose a reaction"
-          className="grid grid-cols-4 gap-1"
-        >
-          {GALLERY_REACTIONS.map((reaction) => {
-            const active = myReaction === reaction
-            return (
-              <button
-                key={reaction}
-                type="button"
-                role="menuitem"
-                disabled={!canReact}
-                onClick={() => {
-                  onReact(reaction)
-                  setPickerOpen(false)
-                }}
-                aria-label={
-                  active
-                    ? `Remove ${REACTION_LABEL[reaction]}`
-                    : REACTION_LABEL[reaction]
-                }
-                aria-pressed={active}
-                className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-muted",
-                  active && "bg-foreground/10 ring-2 ring-foreground/20",
-                  reaction === "point" && "col-span-2 w-[5.5rem]"
-                )}
-              >
-                <ReactionGlyph
-                  reaction={reaction}
-                  className={reaction === "point" ? "text-xl" : "text-2xl"}
-                />
-              </button>
-            )
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
   )
 }
 
