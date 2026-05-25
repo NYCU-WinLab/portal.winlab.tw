@@ -1,4 +1,13 @@
 import type { MediaKind } from "@/lib/gallery/mime"
+import type {
+  GalleryReaction,
+  ReactionCounts,
+  ReactionNames,
+} from "@/lib/gallery/reactions"
+import {
+  EMPTY_REACTION_COUNTS,
+  EMPTY_REACTION_NAMES,
+} from "@/lib/gallery/reactions"
 
 export type GalleryImage = {
   id: string
@@ -10,7 +19,9 @@ export type GalleryImage = {
   duration_seconds: number | null
   created_by: string | null
   created_at: string
-  vote_count: number
-  voted_by_me: boolean
-  voter_names: string[]
+  reaction_counts: ReactionCounts
+  my_reaction: GalleryReaction | null
+  reaction_names: ReactionNames
 }
+
+export { EMPTY_REACTION_COUNTS, EMPTY_REACTION_NAMES }

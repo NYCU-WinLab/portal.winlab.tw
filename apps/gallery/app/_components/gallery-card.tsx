@@ -14,15 +14,22 @@ import {
 import {
   Popover,
   PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
-import { unvoteGalleryImage, voteGalleryImage } from "@/app/actions"
+import { ReactionBar } from "@/app/_components/reaction-bar"
+import { ReactionGlyph } from "@/app/_components/reaction-glyph"
+import { setGalleryReaction } from "@/app/actions"
 import { getRotation } from "@/lib/gallery/rotation"
+import {
+  GALLERY_REACTIONS,
+  type GalleryReaction,
+  type ReactionCounts,
+  type ReactionNames,
+  totalReactions,
+} from "@/lib/gallery/reactions"
 import type { GalleryImage } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 
@@ -38,7 +45,6 @@ export function GalleryCard({
   const rotation = getRotation(image.id)
   const isVideo = image.media_type === "video"
   const mediaUrl = getGalleryImageUrl(image.image_path)
-  // Videos always have a poster (DB constraint). Images render directly.
   const thumbUrl =
     isVideo && image.poster_path
       ? getGalleryImageUrl(image.poster_path)
@@ -46,45 +52,66 @@ export function GalleryCard({
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [votedByMe, setVotedByMe] = useState(image.voted_by_me)
-  const [voteCount, setVoteCount] = useState(image.vote_count)
-  const [voterNames, setVoterNames] = useState(image.voter_names)
+  const [counts, setCounts] = useState(image.reaction_counts)
+  const [myReaction, setMyReaction] = useState(image.my_reaction)
+  const [namesByReaction, setNamesByReaction] = useState(image.reaction_names)
 
-  const canToggleVote = isSignedIn && !isPending
+  const canReact = isSignedIn && !isPending
+  const reactionTotal = totalReactions(counts)
 
-  const onVote = () => {
+  const onReact = (reaction: GalleryReaction) => {
     if (!isSignedIn) {
-      toast.error("Please sign in before voting.")
+      toast.error("Please sign in before reacting.")
       return
     }
 
     startTransition(async () => {
-      const result = votedByMe
-        ? await unvoteGalleryImage(image.id)
-        : await voteGalleryImage(image.id)
+      const result = await setGalleryReaction(image.id, reaction)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
-      if (votedByMe) {
-        setVotedByMe(false)
-        setVoteCount((n) => Math.max(0, n - 1))
-        setVoterNames((names) => names.filter((name) => name !== viewerName))
-        toast.success("Vote removed.")
+
+      const prev = myReaction
+      if (prev === reaction) {
+        setCounts((c) => ({
+          ...c,
+          [reaction]: Math.max(0, c[reaction] - 1),
+        }))
+        setNamesByReaction((n) => ({
+          ...n,
+          [reaction]: n[reaction].filter((name) => name !== viewerName),
+        }))
+        setMyReaction(null)
+        toast.success("Reaction removed.")
+      } else if (prev) {
+        setCounts((c) => ({
+          ...c,
+          [prev]: Math.max(0, c[prev] - 1),
+          [reaction]: c[reaction] + 1,
+        }))
+        setNamesByReaction((n) => ({
+          ...n,
+          [prev]: n[prev].filter((name) => name !== viewerName),
+          [reaction]: n[reaction].includes(viewerName)
+            ? n[reaction]
+            : [...n[reaction], viewerName],
+        }))
+        setMyReaction(reaction)
+        toast.success("Reaction updated.")
       } else {
-        setVotedByMe(true)
-        setVoteCount((n) => n + 1)
-        setVoterNames((names) =>
-          names.includes(viewerName) ? names : [...names, viewerName]
-        )
-        toast.success("Vote counted.")
+        setCounts((c) => ({ ...c, [reaction]: c[reaction] + 1 }))
+        setNamesByReaction((n) => ({
+          ...n,
+          [reaction]: n[reaction].includes(viewerName)
+            ? n[reaction]
+            : [...n[reaction], viewerName],
+        }))
+        setMyReaction(reaction)
+        toast.success("Reaction added.")
       }
     })
   }
-
-  const previewNames = voterNames.slice(0, 2)
-  const votersPreview = previewNames.join(", ")
-  const votersExtraCount = Math.max(0, voterNames.length - previewNames.length)
 
   return (
     <figure
@@ -181,72 +208,93 @@ export function GalleryCard({
       </Dialog>
       <figcaption
         className={cn(
-          "mt-4 flex items-center justify-between gap-4 text-2xl leading-snug tracking-wide text-foreground/70",
+          "mt-4 flex flex-col gap-3 text-2xl leading-snug tracking-wide text-foreground/70 sm:flex-row sm:items-end sm:justify-between",
           "italic md:text-3xl"
         )}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate">{image.name}</p>
           <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">
             by {image.uploader_name}
           </p>
-          {voterNames.length > 0 ? (
-            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground not-italic md:text-sm">
-              <p className="min-w-0 truncate">Liked by {votersPreview}</p>
-              {votersExtraCount > 0 ? (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="shrink-0 underline decoration-dotted underline-offset-4 hover:text-foreground"
-                      aria-label="Show full like list"
-                    >
-                      +{votersExtraCount}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    sideOffset={8}
-                    className="w-64 rounded-xl p-3"
-                  >
-                    <PopoverHeader>
-                      <PopoverTitle className="text-sm">Liked by</PopoverTitle>
-                    </PopoverHeader>
-                    <ul className="max-h-52 space-y-1 overflow-y-auto text-sm">
-                      {voterNames.map((name, idx) => (
-                        <li key={`${name}-${idx}`} className="truncate">
-                          {name}
-                        </li>
-                      ))}
-                    </ul>
-                  </PopoverContent>
-                </Popover>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
-              No likes yet
-            </p>
-          )}
+          <ReactionSummary
+            total={reactionTotal}
+            counts={counts}
+            namesByReaction={namesByReaction}
+          />
         </div>
-        <button
-          type="button"
-          onClick={onVote}
-          disabled={!canToggleVote}
-          aria-label={votedByMe ? "Remove vote" : "Vote for this work"}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-base not-italic transition-colors md:text-lg",
-            votedByMe
-              ? "border-foreground/20 bg-foreground/10 text-foreground"
-              : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-            !canToggleVote && "cursor-not-allowed opacity-70"
-          )}
-        >
-          <span aria-hidden>{votedByMe ? "✓" : "👍"}</span>
-          <span>{voteCount}</span>
-        </button>
+        <ReactionBar
+          counts={counts}
+          myReaction={myReaction}
+          canReact={canReact}
+          onReact={onReact}
+        />
       </figcaption>
     </figure>
+  )
+}
+
+function ReactionSummary({
+  total,
+  counts,
+  namesByReaction,
+}: {
+  total: number
+  counts: ReactionCounts
+  namesByReaction: ReactionNames
+}) {
+  if (total === 0) {
+    return (
+      <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
+        No reactions yet
+      </p>
+    )
+  }
+
+  const entries = GALLERY_REACTIONS.flatMap((reaction) =>
+    namesByReaction[reaction].map((name) => ({ reaction, name }))
+  )
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic transition-colors hover:text-foreground md:text-sm"
+          aria-label="Show who reacted"
+        >
+          {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (
+            <span
+              key={reaction}
+              className="inline-flex items-center gap-0.5 whitespace-nowrap"
+            >
+              <ReactionGlyph reaction={reaction} className="text-sm" />
+              <span className="tabular-nums">{counts[reaction]}</span>
+            </span>
+          ))}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-56 rounded-xl p-3"
+      >
+        <ul className="max-h-52 space-y-1.5 overflow-y-auto text-sm">
+          {entries.map(({ reaction, name }, idx) => (
+            <li
+              key={`${reaction}-${name}-${idx}`}
+              className="flex min-w-0 items-center gap-2"
+            >
+              <ReactionGlyph
+                reaction={reaction}
+                className="shrink-0 text-base"
+              />
+              <span className="truncate">{name}</span>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   )
 }
 

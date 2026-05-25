@@ -4,8 +4,14 @@ import { PortalShell } from "@workspace/ui/components/portal-shell"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { SignOutButton } from "@/components/sign-out-button"
-import { createClient } from "@/lib/supabase/server"
+import {
+  EMPTY_REACTION_COUNTS,
+  EMPTY_REACTION_NAMES,
+  aggregateReactions,
+  isGalleryReaction,
+} from "@/lib/gallery/reactions"
 import type { GalleryImage } from "@/lib/gallery/types"
+import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
 export const dynamic = "force-dynamic"
@@ -53,16 +59,18 @@ export default async function GalleryHomePage() {
     }
   }
 
-  let voteCountsByImage = new Map<string, number>()
-  let voterNamesByImage = new Map<string, string[]>()
+  let countsByImage = new Map<string, typeof EMPTY_REACTION_COUNTS>()
+  let namesByImage = new Map<string, typeof EMPTY_REACTION_NAMES>()
+  const myReactionByImage = new Map<string, GalleryImage["my_reaction"]>()
+
   if (imageIds.length > 0) {
     const { data: voteRows, error: voteError } = await supabase
       .from("gallery_image_votes")
-      .select("image_id, user_id")
+      .select("image_id, user_id, reaction")
       .in("image_id", imageIds)
 
     if (voteError) {
-      console.error("[gallery] failed to load vote counts", voteError)
+      console.error("[gallery] failed to load reactions", voteError)
     } else {
       const voterIds = Array.from(
         new Set((voteRows ?? []).map((row) => row.user_id).filter(Boolean))
@@ -78,7 +86,7 @@ export default async function GalleryHomePage() {
 
         if (voterProfilesError) {
           console.error(
-            "[gallery] failed to load voter profiles",
+            "[gallery] failed to load reactor profiles",
             voterProfilesError
           )
         } else {
@@ -95,34 +103,20 @@ export default async function GalleryHomePage() {
         }
       }
 
-      voteCountsByImage = (voteRows ?? []).reduce((map, row) => {
-        const current = map.get(row.image_id) ?? 0
-        map.set(row.image_id, current + 1)
-        return map
-      }, new Map<string, number>())
+      const aggregated = aggregateReactions(voteRows ?? [], voterNameById)
+      countsByImage = aggregated.countsByImage
+      namesByImage = aggregated.namesByImage
 
-      voterNamesByImage = (voteRows ?? []).reduce((map, row) => {
-        const list = map.get(row.image_id) ?? []
-        const name = voterNameById.get(row.user_id) ?? "Unknown"
-        list.push(name)
-        map.set(row.image_id, list)
-        return map
-      }, new Map<string, string[]>())
-    }
-  }
-
-  let votedImageSet = new Set<string>()
-  if (user && imageIds.length > 0) {
-    const { data: myVotes, error: myVotesError } = await supabase
-      .from("gallery_image_votes")
-      .select("image_id")
-      .eq("user_id", user.id)
-      .in("image_id", imageIds)
-
-    if (myVotesError) {
-      console.error("[gallery] failed to load user votes", myVotesError)
-    } else {
-      votedImageSet = new Set((myVotes ?? []).map((row) => row.image_id))
+      if (user) {
+        for (const row of voteRows ?? []) {
+          if (
+            row.user_id === user.id &&
+            isGalleryReaction(row.reaction)
+          ) {
+            myReactionByImage.set(row.image_id, row.reaction)
+          }
+        }
+      }
     }
   }
 
@@ -138,9 +132,9 @@ export default async function GalleryHomePage() {
     uploader_name: image.created_by
       ? (uploaderNameById.get(image.created_by) ?? "Unknown")
       : "Unknown",
-    vote_count: voteCountsByImage.get(image.id) ?? 0,
-    voted_by_me: votedImageSet.has(image.id),
-    voter_names: voterNamesByImage.get(image.id) ?? [],
+    reaction_counts: countsByImage.get(image.id) ?? EMPTY_REACTION_COUNTS,
+    my_reaction: myReactionByImage.get(image.id) ?? null,
+    reaction_names: namesByImage.get(image.id) ?? EMPTY_REACTION_NAMES,
   }))
 
   return (
