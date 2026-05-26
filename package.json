@@ -36,6 +36,9 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "tslib": "^2.8.1"
+  },
   "dependencies": {
     "@tanstack/react-query": "^5.99.2",
     "date-fns": "^4.1.0",

@@ -17,6 +17,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import {
   VIDEO_MAX_DURATION_SECONDS,
+  VIDEO_MAX_INPUT_BYTES,
   compressVideo,
   type CompressPhase,
 } from "@/lib/gallery/video-compress"
@@ -178,8 +179,9 @@ export function UploadForm() {
           </p>
         ) : null}
         <p className="text-sm text-muted-foreground italic">
-          Videos: max {VIDEO_MAX_DURATION_SECONDS}s, auto-compressed to 720p mp4
-          in your browser.
+          Videos: max {VIDEO_MAX_DURATION_SECONDS}s and{" "}
+          {VIDEO_MAX_INPUT_BYTES / 1024 / 1024} MB, auto-compressed to 720p mp4
+          in your browser (4K or very long clips may fail).
         </p>
       </div>
       {status.kind === "working" ? (
