@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, type Dispatch, type SetStateAction } from "react"
 
 import { IconX } from "@tabler/icons-react"
 
@@ -32,6 +32,53 @@ import {
 } from "@/lib/gallery/reactions"
 import type { GalleryImage } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
+
+function applyReactionOptimistic(
+  prev: GalleryReaction | null,
+  reaction: GalleryReaction,
+  viewerName: string,
+  setCounts: Dispatch<SetStateAction<ReactionCounts>>,
+  setNamesByReaction: Dispatch<SetStateAction<ReactionNames>>,
+  setMyReaction: Dispatch<SetStateAction<GalleryReaction | null>>
+) {
+  if (prev === reaction) {
+    setCounts((c) => ({
+      ...c,
+      [reaction]: Math.max(0, c[reaction] - 1),
+    }))
+    setNamesByReaction((n) => ({
+      ...n,
+      [reaction]: n[reaction].filter((name) => name !== viewerName),
+    }))
+    setMyReaction(null)
+    return "removed" as const
+  }
+  if (prev) {
+    setCounts((c) => ({
+      ...c,
+      [prev]: Math.max(0, c[prev] - 1),
+      [reaction]: c[reaction] + 1,
+    }))
+    setNamesByReaction((n) => ({
+      ...n,
+      [prev]: n[prev].filter((name) => name !== viewerName),
+      [reaction]: n[reaction].includes(viewerName)
+        ? n[reaction]
+        : [...n[reaction], viewerName],
+    }))
+    setMyReaction(reaction)
+    return "updated" as const
+  }
+  setCounts((c) => ({ ...c, [reaction]: c[reaction] + 1 }))
+  setNamesByReaction((n) => ({
+    ...n,
+    [reaction]: n[reaction].includes(viewerName)
+      ? n[reaction]
+      : [...n[reaction], viewerName],
+  }))
+  setMyReaction(reaction)
+  return "added" as const
+}
 
 export function GalleryCard({
   image,
@@ -72,44 +119,17 @@ export function GalleryCard({
         return
       }
 
-      const prev = myReaction
-      if (prev === reaction) {
-        setCounts((c) => ({
-          ...c,
-          [reaction]: Math.max(0, c[reaction] - 1),
-        }))
-        setNamesByReaction((n) => ({
-          ...n,
-          [reaction]: n[reaction].filter((name) => name !== viewerName),
-        }))
-        setMyReaction(null)
-        toast.success("Reaction removed.")
-      } else if (prev) {
-        setCounts((c) => ({
-          ...c,
-          [prev]: Math.max(0, c[prev] - 1),
-          [reaction]: c[reaction] + 1,
-        }))
-        setNamesByReaction((n) => ({
-          ...n,
-          [prev]: n[prev].filter((name) => name !== viewerName),
-          [reaction]: n[reaction].includes(viewerName)
-            ? n[reaction]
-            : [...n[reaction], viewerName],
-        }))
-        setMyReaction(reaction)
-        toast.success("Reaction updated.")
-      } else {
-        setCounts((c) => ({ ...c, [reaction]: c[reaction] + 1 }))
-        setNamesByReaction((n) => ({
-          ...n,
-          [reaction]: n[reaction].includes(viewerName)
-            ? n[reaction]
-            : [...n[reaction], viewerName],
-        }))
-        setMyReaction(reaction)
-        toast.success("Reaction added.")
-      }
+      const outcome = applyReactionOptimistic(
+        myReaction,
+        reaction,
+        viewerName,
+        setCounts,
+        setNamesByReaction,
+        setMyReaction
+      )
+      if (outcome === "removed") toast.success("Reaction removed.")
+      else if (outcome === "updated") toast.success("Reaction updated.")
+      else toast.success("Reaction added.")
     })
   }
 
@@ -260,7 +280,7 @@ function ReactionSummary({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic transition-colors hover:text-foreground md:text-sm"
+          className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic transition-colors select-none hover:text-foreground md:text-sm"
           aria-label="Show who reacted"
         >
           {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (
@@ -283,7 +303,7 @@ function ReactionSummary({
           {entries.map(({ reaction, name }, idx) => (
             <li
               key={`${reaction}-${name}-${idx}`}
-              className="flex min-w-0 items-center gap-2"
+              className="flex min-w-0 select-none items-center gap-2"
             >
               <ReactionGlyph
                 reaction={reaction}
