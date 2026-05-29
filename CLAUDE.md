@@ -48,7 +48,7 @@ bun run test                     # all workspaces (turbo test)
 cd apps/portal && bun test       # one workspace
 ```
 
-Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP), not by `bun test`. Strategy + roadmap: `docs/ci-testing-strategy.md`.
+Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP via `supabase test db`, see `.github/workflows/db-tests.yml`), not by `bun test`.
 
 ### Git hooks (husky)
 

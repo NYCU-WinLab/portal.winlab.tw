@@ -12,7 +12,6 @@ effect, captured authoritatively from production.
 
 The repo's migration history before 2026-04-23 lived only in the Supabase
 dashboard (never committed); the baseline captures the full production schema as
-of 2026-05-29, so `git` is now the source of truth. See
-`docs/ci-testing-strategy.md` and issue #157.
+of 2026-05-29, so `git` is now the source of truth. See issue #157.
 
 New migrations go in `../migrations/` as usual and build on top of the baseline.
