@@ -9,6 +9,8 @@ import type { FieldCategory } from "@/lib/approve/types"
 import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import { drainOutboxBatch } from "@/lib/approve/email-drain"
+import { validateUploadPayload } from "@/lib/approve/upload"
+import { computeOrphanedSigners } from "@/lib/approve/signers"
 
 // Fire the outbox drain after the response is sent to the browser. Using
 // `after()` keeps the submit flow fast (user doesn't wait on Resend) while
@@ -32,12 +34,9 @@ async function requireUser() {
 
 export async function uploadPdf(formData: FormData): Promise<void> {
   const user = await requireUser()
-  const documentId = formData.get("documentId")
-  const file = formData.get("file")
-  if (typeof documentId !== "string" || !(file instanceof File)) {
-    throw new Error("bad payload")
-  }
-  if (file.size > 50 * 1024 * 1024) throw new Error("PDF too large (>50MB)")
+  const parsed = validateUploadPayload(formData)
+  if ("error" in parsed) throw new Error(parsed.error)
+  const { documentId, file } = parsed
 
   const supabase = await createClient()
   const { data: doc, error: docErr } = await supabase
@@ -165,9 +164,10 @@ export async function syncSigners(documentId: string): Promise<void> {
     .eq("document_id", documentId)
   if (signersErr) throw new Error(signersErr.message)
 
-  const toRemove = (signers ?? [])
-    .map((s) => s.signer_id)
-    .filter((id) => !stillUsed.has(id))
+  const toRemove = computeOrphanedSigners(
+    [...stillUsed],
+    (signers ?? []).map((s) => s.signer_id)
+  )
 
   if (toRemove.length) {
     const { error } = await supabase
