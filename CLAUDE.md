@@ -39,7 +39,16 @@ bun run dev --filter=portal         # portal only
 turbo run typecheck --filter=portal # bypass the bun wrapper, call turbo directly
 ```
 
-No test runner. Don't add one without asking.
+### Testing
+
+Bun's built-in test runner (`bun test`) — no vitest/jest. Tests are colocated `*.test.ts` next to the code they cover, importing from `bun:test` and the workspace `@/` alias. `bun run test` → `turbo test` fans out to every workspace that defines a `test` script.
+
+```bash
+bun run test                     # all workspaces (turbo test)
+cd apps/portal && bun test       # one workspace
+```
+
+Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP), not by `bun test`. Strategy + roadmap: `docs/ci-testing-strategy.md`.
 
 ### Git hooks (husky)
 
