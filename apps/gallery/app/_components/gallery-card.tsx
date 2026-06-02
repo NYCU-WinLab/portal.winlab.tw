@@ -1,8 +1,14 @@
 "use client"
 
-import { useState, useTransition, type Dispatch, type SetStateAction } from "react"
+import {
+  useEffect,
+  useState,
+  useTransition,
+  type Dispatch,
+  type SetStateAction,
+} from "react"
 
-import { IconX } from "@tabler/icons-react"
+import { IconChevronLeft, IconChevronRight, IconX } from "@tabler/icons-react"
 
 import {
   Dialog,
@@ -20,6 +26,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
 import { ReactionBar } from "@/app/_components/reaction-bar"
+import { GalleryComments } from "@/app/_components/gallery-comments"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import { setGalleryReaction } from "@/app/actions"
 import { getRotation } from "@/lib/gallery/rotation"
@@ -30,7 +37,7 @@ import {
   type ReactionNames,
   totalReactions,
 } from "@/lib/gallery/reactions"
-import type { GalleryImage } from "@/lib/gallery/types"
+import type { GalleryImage, GallerySequenceItem } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 
 function applyReactionOptimistic(
@@ -80,22 +87,49 @@ function applyReactionOptimistic(
   return "added" as const
 }
 
+function mediaUrlFromItem(item: GallerySequenceItem): string {
+  return getGalleryImageUrl(item.image_path)
+}
+
+function posterUrlFromItem(item: GallerySequenceItem): string | null {
+  return item.poster_path ? getGalleryImageUrl(item.poster_path) : null
+}
+
 export function GalleryCard({
   image,
   isSignedIn,
+  viewerId,
   viewerName,
 }: {
   image: GalleryImage
   isSignedIn: boolean
+  viewerId: string | null
   viewerName: string
 }) {
   const rotation = getRotation(image.id)
-  const isVideo = image.media_type === "video"
-  const mediaUrl = getGalleryImageUrl(image.image_path)
-  const thumbUrl =
-    isVideo && image.poster_path
-      ? getGalleryImageUrl(image.poster_path)
-      : mediaUrl
+  const sequenceMedia: GallerySequenceItem[] =
+    image.sequence_items.length > 0
+      ? image.sequence_items
+      : [
+          {
+            id: image.id,
+            name: image.name,
+            image_path: image.image_path,
+            media_type: image.media_type,
+            poster_path: image.poster_path,
+          },
+        ]
+  const isSequence = sequenceMedia.length > 1
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const activeItem = sequenceMedia[activeIndex] ?? sequenceMedia[0]
+  const activeIsVideo = activeItem?.media_type === "video"
+  const mediaUrl = activeItem ? mediaUrlFromItem(activeItem) : ""
+  const thumbUrl = activeItem
+    ? activeIsVideo && activeItem.poster_path
+      ? posterUrlFromItem(activeItem) ?? mediaUrlFromItem(activeItem)
+      : mediaUrlFromItem(activeItem)
+    : ""
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -105,6 +139,16 @@ export function GalleryCard({
 
   const canReact = isSignedIn && !isPending
   const reactionTotal = totalReactions(counts)
+
+  useEffect(() => {
+    if (isDialogOpen) return
+    setActiveIndex(0)
+    setLightboxFailed(false)
+  }, [isDialogOpen])
+
+  useEffect(() => {
+    setLightboxFailed(false)
+  }, [activeIndex])
 
   const onReact = (reaction: GalleryReaction) => {
     if (!isSignedIn) {
@@ -147,7 +191,7 @@ export function GalleryCard({
         } as React.CSSProperties
       }
     >
-      <Dialog>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
           <div
             className={cn(
@@ -163,7 +207,7 @@ export function GalleryCard({
               <>
                 <img
                   src={thumbUrl}
-                  alt={image.name}
+                  alt={activeItem?.name ?? image.name}
                   width={1200}
                   height={1500}
                   loading="lazy"
@@ -171,7 +215,12 @@ export function GalleryCard({
                   className="h-auto w-full object-cover"
                   onError={() => setThumbFailed(true)}
                 />
-                {isVideo ? <PlayBadge /> : null}
+                {activeIsVideo ? <PlayBadge /> : null}
+                {isSequence ? (
+                  <div className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-xs text-white">
+                    {image.sequence_count} shots
+                  </div>
+                ) : null}
               </>
             )}
           </div>
@@ -179,11 +228,10 @@ export function GalleryCard({
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "flex h-[100dvh] w-screen max-w-none items-center justify-center !rounded-none border-0 bg-transparent p-4 shadow-none ring-0",
-            "sm:h-auto sm:max-h-[95vh] sm:w-auto sm:max-w-[95vw]"
+            "!h-[100dvh] !w-screen !max-w-none !rounded-none border-0 bg-transparent p-2 shadow-none ring-0"
           )}
         >
-          <DialogTitle className="sr-only">{image.name}</DialogTitle>
+          <DialogTitle className="sr-only">{activeItem?.name ?? image.name}</DialogTitle>
           <DialogClose
             aria-label="Close"
             className={cn(
@@ -196,34 +244,93 @@ export function GalleryCard({
           >
             <IconX className="h-5 w-5" />
           </DialogClose>
-          {lightboxFailed ? (
-            <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-              This {isVideo ? "video" : "image"} cannot be previewed in your
-              browser.
+          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-white/10 bg-background/95 shadow-2xl md:flex-row">
+            <div className="relative flex min-h-[42vh] min-w-0 flex-1 items-center justify-center bg-black/70 p-4 md:min-h-0 md:min-w-[22rem]">
+              {lightboxFailed ? (
+                <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
+                  This {activeIsVideo ? "video" : "image"} cannot be previewed in
+                  your browser.
+                </div>
+              ) : activeIsVideo ? (
+                <video
+                  src={mediaUrl}
+                  poster={
+                    activeItem ? (posterUrlFromItem(activeItem) ?? undefined) : undefined
+                  }
+                  controls
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  className="block h-auto max-h-[calc(100dvh-5.5rem)] w-auto max-w-full bg-black object-contain shadow-2xl"
+                  onError={() => setLightboxFailed(true)}
+                />
+              ) : (
+                <img
+                  src={mediaUrl}
+                  alt={activeItem?.name ?? image.name}
+                  className="block h-auto max-h-[calc(100dvh-5.5rem)] w-auto max-w-full bg-white object-contain shadow-2xl"
+                  onError={() => setLightboxFailed(true)}
+                />
+              )}
+              {isSequence ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveIndex((idx) =>
+                        idx === 0 ? sequenceMedia.length - 1 : idx - 1
+                      )
+                    }
+                    className="absolute left-3 top-1/2 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    aria-label="Previous photo"
+                  >
+                    <IconChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
+                    }
+                    className="absolute right-3 top-1/2 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    aria-label="Next photo"
+                  >
+                    <IconChevronRight className="h-5 w-5" />
+                  </button>
+                  <div className="absolute right-0 bottom-3 left-0 z-[60] mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
+                    {sequenceMedia.map((item, idx) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setActiveIndex(idx)}
+                        className={cn(
+                          "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
+                          idx === activeIndex && "bg-white"
+                        )}
+                        aria-label={`View shot ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
-          ) : isVideo ? (
-            <video
-              src={mediaUrl}
-              poster={
-                image.poster_path
-                  ? getGalleryImageUrl(image.poster_path)
-                  : undefined
-              }
-              controls
-              autoPlay
-              playsInline
-              preload="metadata"
-              className="block h-auto max-h-full w-auto max-w-full bg-black object-contain shadow-2xl"
-              onError={() => setLightboxFailed(true)}
-            />
-          ) : (
-            <img
-              src={mediaUrl}
-              alt={image.name}
-              className="block h-auto max-h-full w-auto max-w-full bg-white object-contain shadow-2xl"
-              onError={() => setLightboxFailed(true)}
-            />
-          )}
+            <aside className="flex w-full min-h-0 flex-col border-t border-border/60 bg-background md:w-[24rem] md:shrink-0 md:border-t-0 md:border-l">
+              <div className="border-b border-border/60 px-4 py-3">
+                <p className="truncate text-base text-foreground">{image.name}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  by {image.uploader_name}
+                </p>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                <GalleryComments
+                  imageId={image.id}
+                  initialComments={image.comments}
+                  isSignedIn={isSignedIn}
+                  viewerId={viewerId}
+                  viewerName={viewerName}
+                />
+              </div>
+            </aside>
+          </div>
         </DialogContent>
       </Dialog>
       <figcaption
@@ -237,18 +344,32 @@ export function GalleryCard({
           <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">
             by {image.uploader_name}
           </p>
+          {isSequence ? (
+            <p className="mt-1 truncate text-xs text-muted-foreground/80 not-italic md:text-sm">
+              Sequence · {image.sequence_count} shots (tap to expand)
+            </p>
+          ) : null}
           <ReactionSummary
             total={reactionTotal}
             counts={counts}
             namesByReaction={namesByReaction}
           />
         </div>
-        <ReactionBar
-          counts={counts}
-          myReaction={myReaction}
-          canReact={canReact}
-          onReact={onReact}
-        />
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsDialogOpen(true)}
+            className="text-xs text-muted-foreground not-italic transition-colors hover:text-foreground md:text-sm"
+          >
+            Comments ({image.comments.length})
+          </button>
+          <ReactionBar
+            counts={counts}
+            myReaction={myReaction}
+            canReact={canReact}
+            onReact={onReact}
+          />
+        </div>
       </figcaption>
     </figure>
   )

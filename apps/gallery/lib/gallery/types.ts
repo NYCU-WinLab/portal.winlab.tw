@@ -19,9 +19,32 @@ export type GalleryImage = {
   duration_seconds: number | null
   created_by: string | null
   created_at: string
+  sequence_id: string | null
+  sequence_index: number | null
+  sequence_count: number
+  sequence_items: GallerySequenceItem[]
+  comments: GalleryComment[]
   reaction_counts: ReactionCounts
   my_reaction: GalleryReaction | null
   reaction_names: ReactionNames
+}
+
+export type GallerySequenceItem = {
+  id: string
+  name: string
+  image_path: string
+  media_type: MediaKind
+  poster_path: string | null
+}
+
+export type GalleryComment = {
+  id: string
+  image_id: string
+  parent_id: string | null
+  body: string
+  created_by: string
+  created_at: string
+  commenter_name: string
 }
 
 export { EMPTY_REACTION_COUNTS, EMPTY_REACTION_NAMES }

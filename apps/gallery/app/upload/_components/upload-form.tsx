@@ -76,6 +76,7 @@ export function UploadForm() {
 
       let successCount = 0
       const failed: string[] = []
+      const sequenceId = files.length > 1 ? crypto.randomUUID() : null
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i]!
@@ -103,6 +104,8 @@ export function UploadForm() {
               artworkName,
               setStatus,
               labelPrefix,
+              sequenceId,
+              sequenceIndex: sequenceId ? i : null,
             })
           } else {
             await uploadVideo({
@@ -112,6 +115,8 @@ export function UploadForm() {
               artworkName,
               setStatus,
               labelPrefix,
+              sequenceId,
+              sequenceIndex: sequenceId ? i : null,
             })
           }
           successCount += 1
@@ -181,6 +186,9 @@ export function UploadForm() {
           Videos: max {VIDEO_MAX_DURATION_SECONDS}s, auto-compressed to 720p mp4
           in your browser.
         </p>
+        <p className="text-sm text-muted-foreground italic">
+          Multi-select uploads are grouped as one sequence card on the wall.
+        </p>
       </div>
       {status.kind === "working" ? (
         <div className="flex flex-col gap-2">
@@ -212,6 +220,8 @@ type UploadCtx = {
   artworkName: string
   setStatus: (s: Status) => void
   labelPrefix: string
+  sequenceId: string | null
+  sequenceIndex: number | null
 }
 
 async function uploadImage(
@@ -225,6 +235,8 @@ async function uploadImage(
     artworkName,
     setStatus,
     labelPrefix,
+    sequenceId,
+    sequenceIndex,
   } = ctx
   const ext = guessExtension(resolved.mime, file.name)
   if (ext === "bin") throw new Error("Unsupported extension")
@@ -254,6 +266,8 @@ async function uploadImage(
     name: artworkName,
     imagePath: objectPath,
     mediaType: "image",
+    sequenceId,
+    sequenceIndex,
   })
   if (!result.ok) {
     await supabase.storage.from("gallery").remove([objectPath])
@@ -262,7 +276,16 @@ async function uploadImage(
 }
 
 async function uploadVideo(ctx: UploadCtx): Promise<void> {
-  const { supabase, userId, file, artworkName, setStatus, labelPrefix } = ctx
+  const {
+    supabase,
+    userId,
+    file,
+    artworkName,
+    setStatus,
+    labelPrefix,
+    sequenceId,
+    sequenceIndex,
+  } = ctx
 
   const compressed = await compressVideo(file, {
     onProgress: (ratio, phase) => {
@@ -319,6 +342,8 @@ async function uploadVideo(ctx: UploadCtx): Promise<void> {
     mediaType: "video",
     posterPath,
     durationSeconds: compressed.durationSeconds,
+    sequenceId,
+    sequenceIndex,
   })
   if (!result.ok) {
     await supabase.storage.from("gallery").remove([videoPath, posterPath])
