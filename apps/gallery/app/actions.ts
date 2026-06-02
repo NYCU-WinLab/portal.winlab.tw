@@ -9,6 +9,9 @@ import {
 import { createClient } from "@/lib/supabase/server"
 
 export type ReactionActionResult = { ok: true } | { ok: false; error: string }
+export type CommentActionResult<T = undefined> =
+  | ({ ok: true } & (T extends undefined ? {} : { data: T }))
+  | { ok: false; error: string }
 
 export async function setGalleryReaction(
   imageId: string,
@@ -63,6 +66,89 @@ export async function setGalleryReaction(
     if (insertError) {
       return { ok: false, error: `Reaction failed: ${insertError.message}` }
     }
+  }
+
+  revalidatePath("/")
+  return { ok: true }
+}
+
+export type CreatedGalleryComment = {
+  id: string
+  image_id: string
+  parent_id: string | null
+  body: string
+  created_by: string
+  created_at: string
+}
+
+export async function addGalleryComment(
+  imageId: string,
+  body: string,
+  parentId?: string | null
+): Promise<CommentActionResult<CreatedGalleryComment>> {
+  const trimmed = body.trim()
+  if (!imageId) return { ok: false, error: "Missing image id." }
+  if (!trimmed) return { ok: false, error: "Comment cannot be empty." }
+  if (trimmed.length > 1000) {
+    return { ok: false, error: "Comment is too long (max 1000 chars)." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  if (parentId) {
+    const { data: parent, error: parentError } = await supabase
+      .from("gallery_comments")
+      .select("id, image_id")
+      .eq("id", parentId)
+      .maybeSingle()
+    if (parentError) {
+      return { ok: false, error: `Comment failed: ${parentError.message}` }
+    }
+    if (!parent || parent.image_id !== imageId) {
+      return { ok: false, error: "Invalid parent comment." }
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("gallery_comments")
+    .insert({
+      image_id: imageId,
+      parent_id: parentId ?? null,
+      body: trimmed,
+      created_by: userId,
+    })
+    .select("id, image_id, parent_id, body, created_by, created_at")
+    .single()
+
+  if (error || !data) {
+    return { ok: false, error: `Comment failed: ${error?.message ?? "Unknown error."}` }
+  }
+
+  revalidatePath("/")
+  return { ok: true, data }
+}
+
+export async function deleteGalleryComment(
+  commentId: string
+): Promise<CommentActionResult> {
+  if (!commentId) return { ok: false, error: "Missing comment id." }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { error } = await supabase
+    .from("gallery_comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("created_by", userId)
+
+  if (error) {
+    return { ok: false, error: `Delete failed: ${error.message}` }
   }
 
   revalidatePath("/")

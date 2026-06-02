@@ -13,6 +13,8 @@ export type RegisterMediaInput = {
   mediaType: "image" | "video"
   posterPath?: string | null
   durationSeconds?: number | null
+  sequenceId?: string | null
+  sequenceIndex?: number | null
 }
 
 /**
@@ -33,6 +35,12 @@ export async function registerGalleryImage(
   }
   if (input.mediaType === "image" && input.posterPath) {
     return { ok: false, error: "Images must not have a poster path." }
+  }
+  if ((input.sequenceId && input.sequenceIndex == null) || (!input.sequenceId && input.sequenceIndex != null)) {
+    return { ok: false, error: "Sequence metadata is incomplete." }
+  }
+  if (input.sequenceIndex != null && input.sequenceIndex < 0) {
+    return { ok: false, error: "Invalid sequence index." }
   }
 
   const supabase = await createClient()
@@ -92,6 +100,8 @@ export async function registerGalleryImage(
         ? Math.max(1, Math.round(input.durationSeconds))
         : null,
     created_by: userId,
+    sequence_id: input.sequenceId ?? null,
+    sequence_index: input.sequenceIndex ?? null,
   }
 
   const { error: insertError } = await supabase

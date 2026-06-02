@@ -19,10 +19,12 @@ function pickCols(width: number): number {
 export function GalleryGrid({
   images,
   isSignedIn,
+  viewerId,
   viewerName,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
+  viewerId: string | null
   viewerName: string
 }) {
   // SSR seeds with 3-col layout (desktop default). useEffect rebuckets on
@@ -63,6 +65,7 @@ export function GalleryGrid({
               key={image.id}
               image={image}
               isSignedIn={isSignedIn}
+              viewerId={viewerId}
               viewerName={viewerName}
             />
           ))}
