@@ -7,15 +7,6 @@ import {
   type CategoryDef,
 } from "@/lib/approve/field-categories"
 
-// 前端暫時隱藏這些欄位類型，僅保留「簽名」。恢復時移除此集合與下方的 filter 即可。
-const HIDDEN_CATEGORIES = new Set<CategoryDef["id"]>([
-  "contact_address",
-  "household_address",
-  "id_number",
-  "phone",
-  "other",
-])
-
 export function FieldPalette({
   onPlace,
 }: {
@@ -23,7 +14,7 @@ export function FieldPalette({
 }) {
   return (
     <div className="flex flex-wrap gap-1">
-      {FIELD_CATEGORIES.filter((c) => !HIDDEN_CATEGORIES.has(c.id)).map((c) => {
+      {FIELD_CATEGORIES.map((c) => {
         const Icon = c.icon
         return (
           <Button
