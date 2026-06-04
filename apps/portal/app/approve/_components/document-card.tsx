@@ -23,7 +23,7 @@ export function DocumentCard({
 }: {
   href: string
   title: string
-  subtitle: string
+  subtitle?: string
   status?: ApproveDocument["status"]
   actions?: ReactNode
 }) {
@@ -38,7 +38,9 @@ export function DocumentCard({
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        )}
       </Link>
       {actions}
     </div>

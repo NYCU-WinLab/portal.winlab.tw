@@ -95,7 +95,7 @@ export function DocumentDashboard() {
                 key={row.id}
                 href={`/approve/sign/${row.document_id}`}
                 title={row.document.title}
-                subtitle={`送簽：${row.document.creator?.name ?? "?"} · ${row.created_at.slice(0, 10)}`}
+                subtitle={`送簽：${row.document.creator?.name ?? "?"}`}
               />
             ))
           )}
@@ -112,7 +112,6 @@ export function DocumentDashboard() {
                 key={row.id}
                 href={`/approve/view/${row.document_id}`}
                 title={row.document.title}
-                subtitle={`簽於 ${row.signed_at?.slice(0, 10) ?? ""}`}
               />
             ))
           )}
@@ -142,7 +141,6 @@ export function DocumentDashboard() {
                       : `/approve/view/${doc.id}`
                   }
                   title={doc.title}
-                  subtitle={`更新於 ${doc.updated_at.slice(0, 10)}`}
                   status={doc.status}
                   actions={
                     canRemove ? (
