@@ -34,7 +34,7 @@ export function SignerProgress({
                 : "text-xs"
             }
           >
-            {r.status === "signed" ? r.signed_at?.slice(0, 10) : "pending"}
+            {r.status === "signed" ? "signed" : "pending"}
           </span>
         </div>
       ))}
