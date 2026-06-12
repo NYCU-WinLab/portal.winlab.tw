@@ -1,4 +1,4 @@
-/** Facebook-style reactions + WinLab point (👉👈). One per user per work. */
+/** Facebook-style reactions + WinLab point (👉👈) + cheers (🍻). One per user per work. */
 
 export const GALLERY_REACTIONS = [
   "like",
@@ -8,6 +8,7 @@ export const GALLERY_REACTIONS = [
   "sad",
   "angry",
   "point",
+  "cheers",
 ] as const
 
 export type GalleryReaction = (typeof GALLERY_REACTIONS)[number]
@@ -20,6 +21,7 @@ export const REACTION_EMOJI: Record<GalleryReaction, string> = {
   sad: "😢",
   angry: "😡",
   point: "👉👈",
+  cheers: "🍻",
 }
 
 export const REACTION_LABEL: Record<GalleryReaction, string> = {
@@ -30,6 +32,7 @@ export const REACTION_LABEL: Record<GalleryReaction, string> = {
   sad: "Sad",
   angry: "Angry",
   point: "Poke",
+  cheers: "Cheers",
 }
 
 export type ReactionCounts = Record<GalleryReaction, number>
@@ -63,8 +66,7 @@ export function totalReactions(counts: ReactionCounts): number {
 export function formatReactionSummary(counts: ReactionCounts): string {
   return GALLERY_REACTIONS.filter((r) => counts[r] > 0)
     .map((r) => {
-      const glyph =
-        r === "point" ? "👉\u2009👈" : REACTION_EMOJI[r]
+      const glyph = r === "point" ? "👉\u2009👈" : REACTION_EMOJI[r]
       return `${glyph} ${counts[r]}`
     })
     .join(" · ")
