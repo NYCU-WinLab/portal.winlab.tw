@@ -13,6 +13,7 @@ describe("isGalleryReaction", () => {
     expect(isGalleryReaction("haha")).toBe(true)
     expect(isGalleryReaction("angry")).toBe(true)
     expect(isGalleryReaction("point")).toBe(true)
+    expect(isGalleryReaction("cheers")).toBe(true)
   })
 
   test("rejects unknown values", () => {
