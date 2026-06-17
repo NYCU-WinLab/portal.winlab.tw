@@ -37,7 +37,11 @@ import {
   type ReactionNames,
   totalReactions,
 } from "@/lib/gallery/reactions"
-import type { GalleryImage, GalleryMember, GallerySequenceItem } from "@/lib/gallery/types"
+import type {
+  GalleryImage,
+  GalleryMember,
+  GallerySequenceItem,
+} from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 
 function applyReactionOptimistic(
@@ -129,7 +133,7 @@ export function GalleryCard({
   const mediaUrl = activeItem ? mediaUrlFromItem(activeItem) : ""
   const thumbUrl = activeItem
     ? activeIsVideo && activeItem.poster_path
-      ? posterUrlFromItem(activeItem) ?? mediaUrlFromItem(activeItem)
+      ? (posterUrlFromItem(activeItem) ?? mediaUrlFromItem(activeItem))
       : mediaUrlFromItem(activeItem)
     : ""
   const [thumbFailed, setThumbFailed] = useState(false)
@@ -233,7 +237,9 @@ export function GalleryCard({
             "!h-[100dvh] !w-screen !max-w-none !rounded-none border-0 bg-transparent p-2 shadow-none ring-0"
           )}
         >
-          <DialogTitle className="sr-only">{activeItem?.name ?? image.name}</DialogTitle>
+          <DialogTitle className="sr-only">
+            {activeItem?.name ?? image.name}
+          </DialogTitle>
           <DialogClose
             aria-label="Close"
             className={cn(
@@ -250,14 +256,16 @@ export function GalleryCard({
             <div className="relative flex min-h-[42vh] min-w-0 flex-1 items-center justify-center bg-black/70 p-4 md:min-h-0 md:min-w-[22rem]">
               {lightboxFailed ? (
                 <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-                  This {activeIsVideo ? "video" : "image"} cannot be previewed in
-                  your browser.
+                  This {activeIsVideo ? "video" : "image"} cannot be previewed
+                  in your browser.
                 </div>
               ) : activeIsVideo ? (
                 <video
                   src={mediaUrl}
                   poster={
-                    activeItem ? (posterUrlFromItem(activeItem) ?? undefined) : undefined
+                    activeItem
+                      ? (posterUrlFromItem(activeItem) ?? undefined)
+                      : undefined
                   }
                   controls
                   autoPlay
@@ -283,7 +291,7 @@ export function GalleryCard({
                         idx === 0 ? sequenceMedia.length - 1 : idx - 1
                       )
                     }
-                    className="absolute left-3 top-1/2 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    className="absolute top-1/2 left-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                     aria-label="Previous photo"
                   >
                     <IconChevronLeft className="h-5 w-5" />
@@ -293,7 +301,7 @@ export function GalleryCard({
                     onClick={() =>
                       setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
                     }
-                    className="absolute right-3 top-1/2 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    className="absolute top-1/2 right-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                     aria-label="Next photo"
                   >
                     <IconChevronRight className="h-5 w-5" />
@@ -315,14 +323,16 @@ export function GalleryCard({
                 </>
               ) : null}
             </div>
-            <aside className="flex w-full min-h-0 flex-col border-t border-border/60 bg-background md:w-[24rem] md:shrink-0 md:border-t-0 md:border-l">
+            <aside className="flex min-h-0 w-full flex-col border-t border-border/60 bg-background md:w-[24rem] md:shrink-0 md:border-t-0 md:border-l">
               <div className="border-b border-border/60 px-4 py-3">
-                <p className="truncate text-base text-foreground">{image.name}</p>
+                <p className="truncate text-base text-foreground">
+                  {image.name}
+                </p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
                   by {image.uploader_name}
                 </p>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
                 <GalleryComments
                   imageId={image.id}
                   initialComments={image.comments}
@@ -427,7 +437,7 @@ function ReactionSummary({
           {entries.map(({ reaction, name }, idx) => (
             <li
               key={`${reaction}-${name}-${idx}`}
-              className="flex min-w-0 select-none items-center gap-2"
+              className="flex min-w-0 items-center gap-2 select-none"
             >
               <ReactionGlyph
                 reaction={reaction}
