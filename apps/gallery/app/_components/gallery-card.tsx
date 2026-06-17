@@ -8,6 +8,8 @@ import {
   type SetStateAction,
 } from "react"
 
+import Image from "next/image"
+
 import { IconChevronLeft, IconChevronRight, IconX } from "@tabler/icons-react"
 
 import {
@@ -28,7 +30,15 @@ import { toast } from "sonner"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
+import {
+  galleryPillClass,
+  galleryPolaroidClass,
+  gallerySans,
+  gallerySerif,
+} from "@/components/gallery-chrome"
 import { setGalleryReaction } from "@/app/actions"
+import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
+import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
@@ -38,11 +48,12 @@ import {
   totalReactions,
 } from "@/lib/gallery/reactions"
 import type {
+  GalleryComment,
   GalleryImage,
   GalleryMember,
   GallerySequenceItem,
 } from "@/lib/gallery/types"
-import { getGalleryImageUrl } from "@/lib/gallery/url"
+import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function applyReactionOptimistic(
   prev: GalleryReaction | null,
@@ -95,6 +106,13 @@ function mediaUrlFromItem(item: GallerySequenceItem): string {
   return getGalleryImageUrl(item.image_path)
 }
 
+function thumbUrlFromItem(item: GallerySequenceItem): string {
+  if (item.media_type === "video" && item.poster_path) {
+    return getGalleryThumbUrl(item.poster_path)
+  }
+  return getGalleryThumbUrl(item.image_path)
+}
+
 function posterUrlFromItem(item: GallerySequenceItem): string | null {
   return item.poster_path ? getGalleryImageUrl(item.poster_path) : null
 }
@@ -113,6 +131,7 @@ export function GalleryCard({
   members: GalleryMember[]
 }) {
   const rotation = getRotation(image.id)
+  const frame = getPolaroidFrame(image.id)
   const sequenceMedia: GallerySequenceItem[] =
     image.sequence_items.length > 0
       ? image.sequence_items
@@ -123,28 +142,31 @@ export function GalleryCard({
             image_path: image.image_path,
             media_type: image.media_type,
             poster_path: image.poster_path,
+            created_at: image.created_at,
           },
         ]
   const isSequence = sequenceMedia.length > 1
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const activeItem = sequenceMedia[activeIndex] ?? sequenceMedia[0]
+  const uploadedAt = activeItem?.created_at ?? image.created_at
   const activeIsVideo = activeItem?.media_type === "video"
   const mediaUrl = activeItem ? mediaUrlFromItem(activeItem) : ""
-  const thumbUrl = activeItem
-    ? activeIsVideo && activeItem.poster_path
-      ? (posterUrlFromItem(activeItem) ?? mediaUrlFromItem(activeItem))
-      : mediaUrlFromItem(activeItem)
-    : ""
+  const thumbUrl = activeItem ? thumbUrlFromItem(activeItem) : ""
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [counts, setCounts] = useState(image.reaction_counts)
   const [myReaction, setMyReaction] = useState(image.my_reaction)
   const [namesByReaction, setNamesByReaction] = useState(image.reaction_names)
+  const [comments, setComments] = useState<GalleryComment[]>(image.comments)
 
   const canReact = isSignedIn && !isPending
   const reactionTotal = totalReactions(counts)
+
+  useEffect(() => {
+    setComments(image.comments)
+  }, [image.comments])
 
   useEffect(() => {
     if (isDialogOpen) return
@@ -184,8 +206,8 @@ export function GalleryCard({
   }
 
   return (
-    <figure className="w-full">
-      <div className="flex justify-center px-4 py-5 sm:px-5 sm:py-6">
+    <figure className={cn("mx-auto w-full sm:max-w-none", frame.maxWidthClass)}>
+      <div className="flex justify-center px-3 py-4 sm:px-4 sm:py-5">
         <div
           className={cn(
             "group/polaroid w-full max-w-full origin-center",
@@ -201,189 +223,256 @@ export function GalleryCard({
         >
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <div
+              <button
+                type="button"
+                className="block w-full rounded-[2px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <div className={galleryPolaroidClass()}>
+                  {thumbFailed ? (
+                    <div
+                      className={cn(
+                        "flex w-full items-center justify-center bg-muted/80 px-4 text-center text-xs text-muted-foreground",
+                        frame.aspectClass
+                      )}
+                    >
+                      Preview unavailable
+                    </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "relative overflow-hidden bg-neutral-100",
+                        frame.aspectClass
+                      )}
+                    >
+                      <Image
+                        src={thumbUrl}
+                        alt={activeItem?.name ?? image.name}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover"
+                        onError={() => setThumbFailed(true)}
+                      />
+                      {activeIsVideo ? <PlayBadge /> : null}
+                      {isSequence ? (
+                        <div
+                          className={cn(
+                            gallerySans(),
+                            "absolute top-2.5 right-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                          )}
+                        >
+                          {image.sequence_count} shots
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  <div className="px-3 pt-3 pb-4">
+                    <p
+                      className={cn(
+                        gallerySerif(),
+                        "truncate text-center text-sm leading-snug text-foreground/85"
+                      )}
+                    >
+                      {image.name}
+                    </p>
+                    <p
+                      className={cn(
+                        gallerySans(),
+                        "mt-1 truncate text-center text-[10px] text-muted-foreground"
+                      )}
+                    >
+                      {image.uploader_name}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </DialogTrigger>
+            <DialogContent
+              showCloseButton={false}
+              className={cn(
+                "!z-[100] !h-[100dvh] !w-screen !max-w-none !rounded-none border-0 bg-transparent p-0 shadow-none ring-0"
+              )}
+            >
+              <DialogTitle className="sr-only">
+                {activeItem?.name ?? image.name}
+              </DialogTitle>
+              <DialogClose
+                aria-label="Close"
                 className={cn(
-                  "relative w-full cursor-pointer overflow-hidden rounded-sm bg-white",
-                  "border border-black/[0.06]",
-                  "shadow-[0_2px_8px_rgba(0,0,0,0.04),0_12px_32px_-16px_rgba(0,0,0,0.2)]",
-                  "transition-shadow duration-500 group-hover/polaroid:shadow-[0_4px_12px_rgba(0,0,0,0.06),0_20px_40px_-12px_rgba(0,0,0,0.22)]"
+                  "fixed top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-[60]",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                  "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                  "transition-colors hover:bg-white",
+                  "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                 )}
               >
-            {thumbFailed ? (
-              <div className="flex aspect-[4/5] w-full items-center justify-center bg-muted px-4 text-center text-sm text-muted-foreground italic">
-                Preview unavailable (try Safari for HEIC, or export as JPEG)
-              </div>
-            ) : (
-              <>
-                <img
-                  src={thumbUrl}
-                  alt={activeItem?.name ?? image.name}
-                  width={1200}
-                  height={1500}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-auto w-full object-cover"
-                  onError={() => setThumbFailed(true)}
-                />
-                {activeIsVideo ? <PlayBadge /> : null}
-                {isSequence ? (
-                  <div className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-xs text-white">
-                    {image.sequence_count} shots
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-        </DialogTrigger>
-        <DialogContent
-          showCloseButton={false}
-          className={cn(
-            "!h-[100dvh] !w-screen !max-w-none !rounded-none border-0 bg-transparent p-2 shadow-none ring-0"
-          )}
-        >
-          <DialogTitle className="sr-only">
-            {activeItem?.name ?? image.name}
-          </DialogTitle>
-          <DialogClose
-            aria-label="Close"
-            className={cn(
-              "fixed top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-[60]",
-              "inline-flex h-11 w-11 items-center justify-center rounded-full",
-              "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-              "transition-colors hover:bg-white",
-              "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-            )}
-          >
-            <IconX className="h-5 w-5" />
-          </DialogClose>
-          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-white/10 bg-background/95 shadow-2xl md:flex-row">
-            <div className="relative flex min-h-[42vh] min-w-0 flex-1 items-center justify-center bg-black/70 p-4 md:min-h-0 md:min-w-[22rem]">
-              {lightboxFailed ? (
-                <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-                  This {activeIsVideo ? "video" : "image"} cannot be previewed
-                  in your browser.
-                </div>
-              ) : activeIsVideo ? (
-                <video
-                  src={mediaUrl}
-                  poster={
-                    activeItem
-                      ? (posterUrlFromItem(activeItem) ?? undefined)
-                      : undefined
-                  }
-                  controls
-                  autoPlay
-                  playsInline
-                  preload="metadata"
-                  className="block h-auto max-h-[calc(100dvh-5.5rem)] w-auto max-w-full bg-black object-contain shadow-2xl"
-                  onError={() => setLightboxFailed(true)}
-                />
-              ) : (
-                <img
-                  src={mediaUrl}
-                  alt={activeItem?.name ?? image.name}
-                  className="block h-auto max-h-[calc(100dvh-5.5rem)] w-auto max-w-full bg-white object-contain shadow-2xl"
-                  onError={() => setLightboxFailed(true)}
-                />
-              )}
-              {isSequence ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveIndex((idx) =>
-                        idx === 0 ? sequenceMedia.length - 1 : idx - 1
-                      )
-                    }
-                    className="absolute top-1/2 left-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                    aria-label="Previous photo"
-                  >
-                    <IconChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
-                    }
-                    className="absolute top-1/2 right-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                    aria-label="Next photo"
-                  >
-                    <IconChevronRight className="h-5 w-5" />
-                  </button>
-                  <div className="absolute right-0 bottom-3 left-0 z-[60] mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
-                    {sequenceMedia.map((item, idx) => (
+                <IconX className="h-5 w-5" />
+              </DialogClose>
+              <div className="relative h-[100dvh] w-full overflow-hidden bg-neutral-950 md:flex md:flex-row md:bg-background md:shadow-2xl">
+                <div className="absolute inset-0 flex min-w-0 items-center justify-center p-3 sm:p-5 md:relative md:min-h-0 md:flex-1">
+                  {lightboxFailed ? (
+                    <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
+                      This {activeIsVideo ? "video" : "image"} cannot be
+                      previewed in your browser.
+                    </div>
+                  ) : activeIsVideo ? (
+                    <video
+                      src={mediaUrl}
+                      poster={
+                        activeItem
+                          ? (posterUrlFromItem(activeItem) ?? undefined)
+                          : undefined
+                      }
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      className="block h-auto max-h-full w-auto max-w-full object-contain shadow-2xl"
+                      onError={() => setLightboxFailed(true)}
+                    />
+                  ) : (
+                    <img
+                      src={mediaUrl}
+                      alt={activeItem?.name ?? image.name}
+                      className="block h-auto max-h-full w-auto max-w-full object-contain shadow-2xl"
+                      onError={() => setLightboxFailed(true)}
+                    />
+                  )}
+                  {isSequence ? (
+                    <>
                       <button
-                        key={item.id}
                         type="button"
-                        onClick={() => setActiveIndex(idx)}
+                        onClick={() =>
+                          setActiveIndex((idx) =>
+                            idx === 0 ? sequenceMedia.length - 1 : idx - 1
+                          )
+                        }
+                        className="absolute top-1/2 left-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                        aria-label="Previous photo"
+                      >
+                        <IconChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveIndex(
+                            (idx) => (idx + 1) % sequenceMedia.length
+                          )
+                        }
+                        className="absolute top-1/2 right-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                        aria-label="Next photo"
+                      >
+                        <IconChevronRight className="h-5 w-5" />
+                      </button>
+                      <div className="absolute right-0 bottom-[calc(min(42dvh,20rem)+0.75rem)] left-0 z-[60] mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4 md:bottom-3">
+                        {sequenceMedia.map((item, idx) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setActiveIndex(idx)}
+                            className={cn(
+                              "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
+                              idx === activeIndex && "bg-white"
+                            )}
+                            aria-label={`View shot ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+                <aside
+                  className={cn(
+                    "absolute inset-x-0 bottom-0 z-10 flex max-h-[min(42dvh,20rem)] min-h-0 w-full flex-col",
+                    "rounded-t-2xl border-t border-border/40 bg-background/95 shadow-[0_-10px_40px_rgba(0,0,0,0.18)] backdrop-blur-md",
+                    "md:relative md:max-h-[100dvh] md:w-[26rem] md:shrink-0 md:rounded-none md:border-t-0 md:border-l md:border-border/50 md:bg-background md:shadow-none md:backdrop-blur-none"
+                  )}
+                >
+                  <div
+                    aria-hidden
+                    className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border/80 md:hidden"
+                  />
+                  <div className="space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
+                    <div className="min-w-0 space-y-0.5">
+                      <h2
                         className={cn(
-                          "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
-                          idx === activeIndex && "bg-white"
+                          gallerySerif(),
+                          "text-lg leading-snug text-foreground sm:text-xl"
                         )}
-                        aria-label={`View shot ${idx + 1}`}
-                      />
-                    ))}
+                      >
+                        {activeItem?.name ?? image.name}
+                      </h2>
+                      <p
+                        className={cn(
+                          gallerySans(),
+                          "text-xs text-muted-foreground"
+                        )}
+                      >
+                        by {image.uploader_name}
+                        {uploadedAt ? (
+                          <>
+                            <span aria-hidden> · </span>
+                            <time dateTime={uploadedAt}>
+                              {formatUploadedAt(uploadedAt)}
+                            </time>
+                          </>
+                        ) : null}
+                      </p>
+                      {isSequence ? (
+                        <p
+                          className={cn(
+                            gallerySans(),
+                            "text-[11px] text-muted-foreground/70"
+                          )}
+                        >
+                          Shot {activeIndex + 1} of {sequenceMedia.length}
+                        </p>
+                      ) : null}
+                    </div>
+                    <ReactionBar
+                      counts={counts}
+                      myReaction={myReaction}
+                      canReact={canReact}
+                      onReact={onReact}
+                    />
                   </div>
-                </>
-              ) : null}
-            </div>
-            <aside className="flex min-h-0 w-full flex-col border-t border-border/60 bg-background md:w-[24rem] md:shrink-0 md:border-t-0 md:border-l">
-              <div className="border-b border-border/60 px-4 py-3">
-                <p className="truncate text-base text-foreground">
-                  {image.name}
-                </p>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  by {image.uploader_name}
-                </p>
+                  <div className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
+                    <GalleryComments
+                      imageId={image.id}
+                      comments={comments}
+                      onCommentsChange={setComments}
+                      isSignedIn={isSignedIn}
+                      viewerId={viewerId}
+                      viewerName={viewerName}
+                      members={members}
+                    />
+                  </div>
+                </aside>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
-                <GalleryComments
-                  imageId={image.id}
-                  initialComments={image.comments}
-                  isSignedIn={isSignedIn}
-                  viewerId={viewerId}
-                  viewerName={viewerName}
-                  members={members}
-                />
-              </div>
-            </aside>
-          </div>
-        </DialogContent>
+            </DialogContent>
           </Dialog>
         </div>
       </div>
-      <figcaption
-        className={cn(
-          "mt-1 space-y-2.5 font-[family-name:var(--font-caption)] not-italic",
-          "text-foreground/90"
-        )}
-      >
-        <div className="min-w-0">
-          <p className="truncate text-base leading-snug font-medium text-foreground md:text-lg">
-            {image.name}
-          </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground md:text-sm">
-            by {image.uploader_name}
-          </p>
-          {isSequence ? (
-            <p className="mt-1 truncate text-[11px] tracking-wide text-muted-foreground/80 uppercase md:text-xs">
-              Sequence · {image.sequence_count} shots
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+      <figcaption className={cn(gallerySans(), "mt-3 space-y-2")}>
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            reactionTotal > 0 ? "justify-between" : "justify-end"
+          )}
+        >
           <ReactionSummary
             total={reactionTotal}
             counts={counts}
             namesByReaction={namesByReaction}
           />
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setIsDialogOpen(true)}
-              className="rounded-full border border-border/80 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/60 hover:text-foreground md:text-xs"
+              className={galleryPillClass()}
             >
-              Comments ({image.comments.length})
+              {comments.length > 0
+                ? `${comments.length} comment${comments.length === 1 ? "" : "s"}`
+                : "Comment"}
             </button>
             <ReactionBar
               counts={counts}
@@ -407,13 +496,7 @@ function ReactionSummary({
   counts: ReactionCounts
   namesByReaction: ReactionNames
 }) {
-  if (total === 0) {
-    return (
-      <p className="text-[11px] text-muted-foreground/70 md:text-xs">
-        No reactions yet
-      </p>
-    )
-  }
+  if (total === 0) return null
 
   const entries = GALLERY_REACTIONS.flatMap((reaction) =>
     namesByReaction[reaction].map((name) => ({ reaction, name }))
@@ -424,7 +507,10 @@ function ReactionSummary({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground transition-colors select-none hover:text-foreground md:text-xs"
+          className={cn(
+            galleryPillClass(),
+            "max-w-full flex-wrap gap-x-1.5 gap-y-1"
+          )}
           aria-label="Show who reacted"
         >
           {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (

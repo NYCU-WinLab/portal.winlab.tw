@@ -1,5 +1,3 @@
-import type { AuthUser } from "@supabase/supabase-js"
-
 import { createClient } from "@/lib/supabase/server"
 
 export type NormalizedUser = {
@@ -44,23 +42,4 @@ export async function getCurrentUser(): Promise<NormalizedUser | null> {
   const { data, error } = await supabase.auth.getClaims()
   if (error || !data?.claims) return null
   return normalizeClaims(data.claims)
-}
-
-// Reads JWT claims (no Auth API call) and shapes into a lightweight AuthUser
-// seed for the client AuthProvider. Full AuthUser will be filled in via
-// onAuthStateChange once the browser hydrates.
-export async function getInitialAuthUser(): Promise<AuthUser | null> {
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.getClaims()
-  if (error || !data?.claims) return null
-  const claims = data.claims
-  return {
-    id: claims.sub,
-    email: typeof claims.email === "string" ? claims.email : undefined,
-    user_metadata:
-      (claims.user_metadata as Record<string, unknown> | undefined) ?? {},
-    app_metadata: {},
-    aud: "authenticated",
-    created_at: "",
-  } as unknown as AuthUser
 }

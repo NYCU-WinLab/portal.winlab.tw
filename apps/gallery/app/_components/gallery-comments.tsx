@@ -9,6 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
 import { addGalleryComment, deleteGalleryComment } from "@/app/actions"
+import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { parseMentions } from "@/lib/gallery/mentions"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
@@ -16,20 +17,21 @@ type CommentNode = GalleryComment & { depth: number }
 
 export function GalleryComments({
   imageId,
-  initialComments,
+  comments,
+  onCommentsChange,
   isSignedIn,
   viewerId,
   viewerName,
   members,
 }: {
   imageId: string
-  initialComments: GalleryComment[]
+  comments: GalleryComment[]
+  onCommentsChange: (comments: GalleryComment[]) => void
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
 }) {
-  const [comments, setComments] = useState(initialComments)
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -41,10 +43,10 @@ export function GalleryComments({
   const filteredMembers = useMemo(() => {
     if (mentionQuery === null) return []
     const q = mentionQuery.toLowerCase()
-    return members
-      .filter((m) => (m.name ?? "").toLowerCase().includes(q))
-      .slice(0, 6)
+    return members.filter((m) => (m.name ?? "").toLowerCase().includes(q))
   }, [mentionQuery, members])
+
+  const mentionBrowseAll = mentionQuery === ""
 
   const handleDraftChange = (value: string) => {
     setDraft(value)
@@ -58,8 +60,7 @@ export function GalleryComments({
   }
 
   const showMentionPicker = mentionQuery !== null
-  const mentionPickerEmpty =
-    showMentionPicker && filteredMembers.length === 0
+  const mentionPickerEmpty = showMentionPicker && filteredMembers.length === 0
 
   const applyMention = (member: GalleryMember) => {
     const name = member.name
@@ -91,8 +92,8 @@ export function GalleryComments({
         toast.error(result.error)
         return
       }
-      setComments((prev) => [
-        ...prev,
+      onCommentsChange([
+        ...comments,
         {
           ...result.data,
           commenter_name: viewerName,
@@ -112,47 +113,54 @@ export function GalleryComments({
         toast.error(result.error)
         return
       }
-      setComments((prev) => removeCommentWithDescendants(prev, commentId))
+      onCommentsChange(removeCommentWithDescendants(comments, commentId))
       toast.success("Comment deleted.")
     })
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col not-italic">
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+    <div className={cn("flex min-h-0 flex-1 flex-col", gallerySans())}>
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
         {flattened.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No comments yet.</p>
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            No comments yet — say something?
+          </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {flattened.map((comment) => {
               const mine = viewerId === comment.created_by
               return (
                 <li
                   key={comment.id}
                   className={cn(
-                    "space-y-1 rounded-md border border-border/60 px-3 py-2",
-                    comment.depth > 0 && "ml-5"
+                    "rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5",
+                    comment.depth > 0 && "ml-4 border-l-2 border-l-border"
                   )}
                 >
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="font-medium text-foreground">
                       {comment.commenter_name}
                     </span>
-                    <span>·</span>
-                    <span>{new Date(comment.created_at).toLocaleString()}</span>
+                    <span aria-hidden>·</span>
+                    <time dateTime={comment.created_at}>
+                      {new Date(comment.created_at).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </time>
                   </div>
-                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
+                  <p className="mt-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
                     <FormattedComment
                       content={comment.body}
                       members={members}
                     />
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="mt-2 flex items-center gap-2">
                     {isSignedIn ? (
                       <button
                         type="button"
                         onClick={() => setReplyTarget(comment.id)}
-                        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        className={galleryPillClass()}
                       >
                         Reply
                       </button>
@@ -161,7 +169,10 @@ export function GalleryComments({
                       <button
                         type="button"
                         onClick={() => removeComment(comment.id)}
-                        className="text-xs text-destructive/90 transition-colors hover:text-destructive"
+                        className={cn(
+                          galleryPillClass(),
+                          "text-destructive/90 hover:text-destructive"
+                        )}
                       >
                         Delete
                       </button>
@@ -174,75 +185,88 @@ export function GalleryComments({
         )}
       </div>
 
-      <div className="relative shrink-0 space-y-2 border-t border-border/60 pt-3">
+      <div className="relative mt-3 shrink-0 border-t border-border/50 pt-3">
+        {replyTarget ? (
+          <button
+            type="button"
+            onClick={() => setReplyTarget(null)}
+            className={cn(
+              gallerySans(),
+              "mb-2 text-[11px] text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Cancel reply
+          </button>
+        ) : null}
         {showMentionPicker ? (
-          <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+          <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-56 flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-md">
             {mentionPickerEmpty ? (
               <p className="px-3 py-2.5 text-xs text-muted-foreground">
                 {members.length === 0
-                  ? "No lab members loaded — check sign-in."
+                  ? "No lab members loaded — sign in and refresh."
                   : "No matching names."}
               </p>
             ) : (
-              filteredMembers.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => applyMention(m)}
-                  className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              <>
+                <p
+                  className={cn(
+                    gallerySans(),
+                    "shrink-0 border-b border-border/50 px-3 py-2 text-[10px] tracking-wide text-muted-foreground uppercase"
+                  )}
                 >
-                  <Avatar className="size-5">
-                    <AvatarFallback className="text-[10px]">
-                      {(m.name ?? "?").slice(0, 1).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="truncate">{m.name ?? m.email}</span>
-                </button>
-              ))
+                  {mentionBrowseAll
+                    ? `Lab members (${filteredMembers.length})`
+                    : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"}`}
+                </p>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {filteredMembers.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => applyMention(m)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      <Avatar className="size-5">
+                        <AvatarFallback className="text-[10px]">
+                          {(m.name ?? "?").slice(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{m.name ?? m.email}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         ) : null}
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => handleDraftChange(e.target.value)}
-          onSelect={(e) =>
-            syncMentionQuery(
-              e.currentTarget.value,
-              e.currentTarget.selectionStart ?? e.currentTarget.value.length
-            )
-          }
-          onClick={(e) =>
-            syncMentionQuery(
-              e.currentTarget.value,
-              e.currentTarget.selectionStart ?? e.currentTarget.value.length
-            )
-          }
-          placeholder={
-            isSignedIn
-              ? "Write a comment… type @ to mention someone"
-              : "Sign in to leave a comment"
-          }
-          disabled={!isSignedIn || isPending}
-          className="min-h-20 resize-none text-sm"
-        />
-        <div className="flex items-center justify-between gap-2">
-          {replyTarget ? (
-            <button
-              type="button"
-              onClick={() => setReplyTarget(null)}
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Replying to a comment · cancel
-            </button>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              {comments.length} comment{comments.length === 1 ? "" : "s"}
-            </span>
-          )}
+        <div className="relative">
+          <Textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => handleDraftChange(e.target.value)}
+            onSelect={(e) =>
+              syncMentionQuery(
+                e.currentTarget.value,
+                e.currentTarget.selectionStart ?? e.currentTarget.value.length
+              )
+            }
+            onClick={(e) =>
+              syncMentionQuery(
+                e.currentTarget.value,
+                e.currentTarget.selectionStart ?? e.currentTarget.value.length
+              )
+            }
+            placeholder={isSignedIn ? "Add a comment… @" : "Sign in to comment"}
+            disabled={!isSignedIn || isPending}
+            className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-20 text-sm"
+          />
           <Button
             type="button"
             size="sm"
+            className={cn(
+              gallerySans(),
+              "absolute right-2 bottom-2 h-8 rounded-full px-3 text-xs"
+            )}
             disabled={!isSignedIn || isPending || !draft.trim()}
             onClick={submit}
           >

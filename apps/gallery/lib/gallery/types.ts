@@ -35,6 +35,7 @@ export type GallerySequenceItem = {
   image_path: string
   media_type: MediaKind
   poster_path: string | null
+  created_at: string
 }
 
 export type GalleryComment = {

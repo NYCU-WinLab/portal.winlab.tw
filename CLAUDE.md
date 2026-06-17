@@ -100,9 +100,9 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 ### Monorepo topology
 
 - `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/bento`, `/approve`, `/leave`, `/meetings`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/profile`, `/admin`) live here.
-- `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3001). Different design system (Instrument Serif, polaroid layout) but still uses `<PortalShell>` from `@workspace/ui`.
+- `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `apps/mcp` — `mcp.winlab.tw`, an MCP server exposing portal data over OAuth 2.1.
-- `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; both portal and gallery import it.
+- `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
 - `packages/typescript-config` — `base.json` / `nextjs.json` / `react-library.json`.
 

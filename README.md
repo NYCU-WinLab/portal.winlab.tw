@@ -36,7 +36,19 @@ Two apps live on their own subdomains because their design system diverges from 
 ```bash
 bun install
 cp apps/portal/.env.example apps/portal/.env.local   # fill the two Supabase keys
+cp apps/gallery/.env.example apps/gallery/.env.local # gallery keys (see below)
 bun run dev                                          # http://localhost:3000
+```
+
+For gallery-only dev: `bun run dev --filter=gallery` → http://localhost:3005
+
+### Gallery env (`apps/gallery/.env.local`)
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=          # server-only — mention resolution + admin writes
+GALLERY_API_SECRET=           # mention notification API (Apps Script)
 ```
 
 `.env.local` values live with [@zyx1121](https://github.com/zyx1121). Keycloak setup happens entirely in the Supabase + Keycloak dashboards — never in code.
@@ -44,8 +56,9 @@ bun run dev                                          # http://localhost:3000
 ## Common commands
 
 ```bash
-bun run dev                       # everything (portal :3000)
+bun run dev                       # everything (portal :3000, gallery :3005)
 bun run dev --filter=portal       # just portal
+bun run dev --filter=gallery      # just gallery (:3005)
 bun run build                     # turbo build
 bun run typecheck                 # tsc --noEmit
 bun run lint                      # eslint

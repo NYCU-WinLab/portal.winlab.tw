@@ -1,0 +1,4 @@
+[data-slot="dialog-overlay"],
+[data-slot="dialog-content"] {
+  z-index: 100;
+}
