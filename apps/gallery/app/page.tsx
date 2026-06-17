@@ -11,7 +11,7 @@ import {
   aggregateReactions,
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
-import type { GalleryComment, GalleryImage } from "@/lib/gallery/types"
+import type { GalleryComment, GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -34,6 +34,16 @@ export default async function GalleryHomePage({
 
   const supabase = await createClient()
   const user = await getCurrentUser()
+
+  const { data: memberRows } = await supabase
+    .from("user_profiles")
+    .select("id, name, email")
+    .order("name", { ascending: true })
+
+  const members: GalleryMember[] = (memberRows ?? []).filter(
+    (row) => typeof row.name === "string" && row.name.trim().length > 0
+  )
+
   const { data, count, error } = await supabase
     .from("gallery_images")
     .select(
@@ -305,6 +315,7 @@ export default async function GalleryHomePage({
         isSignedIn={Boolean(user)}
         viewerId={user?.id ?? null}
         viewerName={user?.name ?? "You"}
+        members={members}
       />
       <GalleryPagination page={currentPage} totalPages={totalPages} />
     </PortalShell>

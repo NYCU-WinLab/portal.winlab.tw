@@ -6,6 +6,8 @@ import {
   type GalleryReaction,
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
+import { parseMentions } from "@/lib/gallery/mentions"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 export type ReactionActionResult = { ok: true } | { ok: false; error: string }
@@ -125,6 +127,30 @@ export async function addGalleryComment(
 
   if (error || !data) {
     return { ok: false, error: `Comment failed: ${error?.message ?? "Unknown error."}` }
+  }
+
+  const mentionNames = parseMentions(trimmed)
+  if (mentionNames.length > 0) {
+    const admin = createAdminClient()
+    const { data: profiles } = await admin
+      .from("user_profiles")
+      .select("id, name")
+      .in("name", mentionNames)
+
+    const others = (profiles ?? []).filter((p) => p.id !== userId)
+    if (others.length > 0) {
+      const { error: mentionError } = await admin
+        .from("gallery_comment_mentions")
+        .insert(
+          others.map((u) => ({
+            comment_id: data.id,
+            mentioned_user_id: u.id,
+          }))
+        )
+      if (mentionError) {
+        console.error("[gallery] failed to save comment mentions", mentionError)
+      }
+    }
   }
 
   revalidatePath("/")

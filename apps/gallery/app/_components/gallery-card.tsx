@@ -37,7 +37,7 @@ import {
   type ReactionNames,
   totalReactions,
 } from "@/lib/gallery/reactions"
-import type { GalleryImage, GallerySequenceItem } from "@/lib/gallery/types"
+import type { GalleryImage, GalleryMember, GallerySequenceItem } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 
 function applyReactionOptimistic(
@@ -100,11 +100,13 @@ export function GalleryCard({
   isSignedIn,
   viewerId,
   viewerName,
+  members,
 }: {
   image: GalleryImage
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
+  members: GalleryMember[]
 }) {
   const rotation = getRotation(image.id)
   const sequenceMedia: GallerySequenceItem[] =
@@ -327,6 +329,7 @@ export function GalleryCard({
                   isSignedIn={isSignedIn}
                   viewerId={viewerId}
                   viewerName={viewerName}
+                  members={members}
                 />
               </div>
             </aside>

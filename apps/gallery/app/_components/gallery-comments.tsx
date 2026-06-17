@@ -1,14 +1,16 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
 
+import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import { Button } from "@workspace/ui/components/button"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
 import { addGalleryComment, deleteGalleryComment } from "@/app/actions"
-import type { GalleryComment } from "@/lib/gallery/types"
+import { parseMentions } from "@/lib/gallery/mentions"
+import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
 type CommentNode = GalleryComment & { depth: number }
 
@@ -18,19 +20,55 @@ export function GalleryComments({
   isSignedIn,
   viewerId,
   viewerName,
+  members,
 }: {
   imageId: string
   initialComments: GalleryComment[]
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
+  members: GalleryMember[]
 }) {
   const [comments, setComments] = useState(initialComments)
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const flattened = useMemo(() => flattenComments(comments), [comments])
+
+  const filteredMembers = useMemo(() => {
+    if (mentionQuery === null) return []
+    const q = mentionQuery.toLowerCase()
+    return members
+      .filter((m) => (m.name ?? "").toLowerCase().includes(q))
+      .slice(0, 6)
+  }, [mentionQuery, members])
+
+  const handleDraftChange = (value: string) => {
+    setDraft(value)
+    const cursor = textareaRef.current?.selectionStart ?? value.length
+    const before = value.slice(0, cursor)
+    const match = before.match(/@([\p{L}\p{N}._-]*)$/u)
+    setMentionQuery(match?.[1] ?? null)
+  }
+
+  const applyMention = (member: GalleryMember) => {
+    const name = member.name
+    if (!name) return
+    const cursor = textareaRef.current?.selectionStart ?? draft.length
+    const before = draft.slice(0, cursor).replace(/@[\p{L}\p{N}._-]*$/u, "")
+    const after = draft.slice(cursor)
+    const next = `${before}@${name} ${after}`
+    setDraft(next)
+    setMentionQuery(null)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      const pos = before.length + name.length + 2
+      textareaRef.current?.setSelectionRange(pos, pos)
+    })
+  }
 
   const submit = () => {
     if (!isSignedIn) {
@@ -55,6 +93,7 @@ export function GalleryComments({
       ])
       setDraft("")
       setReplyTarget(null)
+      setMentionQuery(null)
       toast.success("Comment posted.")
     })
   }
@@ -73,16 +112,38 @@ export function GalleryComments({
 
   return (
     <div className="mt-3 space-y-3 not-italic">
-      <div className="space-y-2">
+      <div className="relative space-y-2">
         <Textarea
+          ref={textareaRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => handleDraftChange(e.target.value)}
           placeholder={
-            isSignedIn ? "Write a comment..." : "Sign in to leave a comment"
+            isSignedIn
+              ? "Write a comment… type @ to mention someone"
+              : "Sign in to leave a comment"
           }
           disabled={!isSignedIn || isPending}
           className="min-h-20 resize-none text-sm"
         />
+        {filteredMembers.length > 0 ? (
+          <div className="absolute right-0 bottom-full left-0 z-10 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+            {filteredMembers.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => applyMention(m)}
+                className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              >
+                <Avatar className="size-5">
+                  <AvatarFallback className="text-[10px]">
+                    {(m.name ?? "?").slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">{m.name ?? m.email}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-2">
           {replyTarget ? (
             <button
@@ -130,7 +191,7 @@ export function GalleryComments({
                   <span>{new Date(comment.created_at).toLocaleString()}</span>
                 </div>
                 <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-                  {comment.body}
+                  <FormattedComment content={comment.body} members={members} />
                 </p>
                 <div className="flex items-center gap-3">
                   {isSignedIn ? (
@@ -158,6 +219,43 @@ export function GalleryComments({
         </ul>
       )}
     </div>
+  )
+}
+
+function FormattedComment({
+  content,
+  members,
+}: {
+  content: string
+  members: GalleryMember[]
+}) {
+  const mentionNames = new Set(parseMentions(content))
+  const knownNames = new Set(
+    members.map((m) => m.name).filter((n): n is string => Boolean(n))
+  )
+
+  if (mentionNames.size === 0) return <>{content}</>
+
+  const parts = content.split(/(@[\p{L}\p{N}._-]+)/gu)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("@")) {
+          const name = part.slice(1)
+          if (mentionNames.has(name) && knownNames.has(name)) {
+            return (
+              <span
+                key={i}
+                className="rounded bg-blue-500/15 px-1 py-0.5 text-blue-700 dark:text-blue-300"
+              >
+                {part}
+              </span>
+            )
+          }
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </>
   )
 }
 
