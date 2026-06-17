@@ -110,23 +110,68 @@ export function GalleryComments({
     })
   }
 
+  const showMentionPicker = mentionQuery !== null && filteredMembers.length > 0
+
   return (
-    <div className="mt-3 space-y-3 not-italic">
-      <div className="relative space-y-2">
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => handleDraftChange(e.target.value)}
-          placeholder={
-            isSignedIn
-              ? "Write a comment… type @ to mention someone"
-              : "Sign in to leave a comment"
-          }
-          disabled={!isSignedIn || isPending}
-          className="min-h-20 resize-none text-sm"
-        />
-        {filteredMembers.length > 0 ? (
-          <div className="absolute right-0 bottom-full left-0 z-10 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+    <div className="flex min-h-0 flex-1 flex-col not-italic">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {flattened.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No comments yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {flattened.map((comment) => {
+              const mine = viewerId === comment.created_by
+              return (
+                <li
+                  key={comment.id}
+                  className={cn(
+                    "space-y-1 rounded-md border border-border/60 px-3 py-2",
+                    comment.depth > 0 && "ml-5"
+                  )}
+                >
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {comment.commenter_name}
+                    </span>
+                    <span>·</span>
+                    <span>{new Date(comment.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
+                    <FormattedComment
+                      content={comment.body}
+                      members={members}
+                    />
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {isSignedIn ? (
+                      <button
+                        type="button"
+                        onClick={() => setReplyTarget(comment.id)}
+                        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        Reply
+                      </button>
+                    ) : null}
+                    {mine ? (
+                      <button
+                        type="button"
+                        onClick={() => removeComment(comment.id)}
+                        className="text-xs text-destructive/90 transition-colors hover:text-destructive"
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="relative shrink-0 space-y-2 border-t border-border/60 pt-3">
+        {showMentionPicker ? (
+          <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
             {filteredMembers.map((m) => (
               <button
                 key={m.id}
@@ -144,6 +189,18 @@ export function GalleryComments({
             ))}
           </div>
         ) : null}
+        <Textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => handleDraftChange(e.target.value)}
+          placeholder={
+            isSignedIn
+              ? "Write a comment… type @ to mention someone"
+              : "Sign in to leave a comment"
+          }
+          disabled={!isSignedIn || isPending}
+          className="min-h-20 resize-none text-sm"
+        />
         <div className="flex items-center justify-between gap-2">
           {replyTarget ? (
             <button
@@ -168,56 +225,6 @@ export function GalleryComments({
           </Button>
         </div>
       </div>
-
-      {flattened.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No comments yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {flattened.map((comment) => {
-            const mine = viewerId === comment.created_by
-            return (
-              <li
-                key={comment.id}
-                className={cn(
-                  "space-y-1 rounded-md border border-border/60 px-3 py-2",
-                  comment.depth > 0 && "ml-5"
-                )}
-              >
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    {comment.commenter_name}
-                  </span>
-                  <span>·</span>
-                  <span>{new Date(comment.created_at).toLocaleString()}</span>
-                </div>
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-                  <FormattedComment content={comment.body} members={members} />
-                </p>
-                <div className="flex items-center gap-3">
-                  {isSignedIn ? (
-                    <button
-                      type="button"
-                      onClick={() => setReplyTarget(comment.id)}
-                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Reply
-                    </button>
-                  ) : null}
-                  {mine ? (
-                    <button
-                      type="button"
-                      onClick={() => removeComment(comment.id)}
-                      className="text-xs text-destructive/90 transition-colors hover:text-destructive"
-                    >
-                      Delete
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
     </div>
   )
 }
