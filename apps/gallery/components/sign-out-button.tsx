@@ -3,11 +3,11 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 
-import { Button } from "@workspace/ui/components/button"
+import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
 
-export function SignOutButton() {
+export function SignOutButton({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -21,15 +21,16 @@ export function SignOutButton() {
   }
 
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="sm"
       onClick={onClick}
       disabled={pending}
-      className="h-auto p-0 text-lg font-normal hover:bg-transparent"
+      className={cn(
+        className,
+        "disabled:pointer-events-none disabled:opacity-50"
+      )}
     >
       {pending ? "Signing out…" : "Sign out"}
-    </Button>
+    </button>
   )
 }

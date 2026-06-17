@@ -43,7 +43,7 @@ export default async function RootLayout({
       <body
         className={cn(
           instrumentSerif.className,
-          "bg-background text-foreground"
+          "overflow-x-hidden bg-background text-foreground"
         )}
       >
         <ThemeProvider>

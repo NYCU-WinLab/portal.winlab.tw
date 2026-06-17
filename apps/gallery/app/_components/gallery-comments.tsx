@@ -48,11 +48,18 @@ export function GalleryComments({
 
   const handleDraftChange = (value: string) => {
     setDraft(value)
-    const cursor = textareaRef.current?.selectionStart ?? value.length
+    syncMentionQuery(value, textareaRef.current?.selectionStart ?? value.length)
+  }
+
+  const syncMentionQuery = (value: string, cursor: number) => {
     const before = value.slice(0, cursor)
     const match = before.match(/@([\p{L}\p{N}._-]*)$/u)
-    setMentionQuery(match?.[1] ?? null)
+    setMentionQuery(match ? (match[1] ?? "") : null)
   }
+
+  const showMentionPicker = mentionQuery !== null
+  const mentionPickerEmpty =
+    showMentionPicker && filteredMembers.length === 0
 
   const applyMention = (member: GalleryMember) => {
     const name = member.name
@@ -109,8 +116,6 @@ export function GalleryComments({
       toast.success("Comment deleted.")
     })
   }
-
-  const showMentionPicker = mentionQuery !== null && filteredMembers.length > 0
 
   return (
     <div className="flex min-h-0 flex-1 flex-col not-italic">
@@ -172,27 +177,47 @@ export function GalleryComments({
       <div className="relative shrink-0 space-y-2 border-t border-border/60 pt-3">
         {showMentionPicker ? (
           <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
-            {filteredMembers.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => applyMention(m)}
-                className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-              >
-                <Avatar className="size-5">
-                  <AvatarFallback className="text-[10px]">
-                    {(m.name ?? "?").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate">{m.name ?? m.email}</span>
-              </button>
-            ))}
+            {mentionPickerEmpty ? (
+              <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                {members.length === 0
+                  ? "No lab members loaded — check sign-in."
+                  : "No matching names."}
+              </p>
+            ) : (
+              filteredMembers.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => applyMention(m)}
+                  className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  <Avatar className="size-5">
+                    <AvatarFallback className="text-[10px]">
+                      {(m.name ?? "?").slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{m.name ?? m.email}</span>
+                </button>
+              ))
+            )}
           </div>
         ) : null}
         <Textarea
           ref={textareaRef}
           value={draft}
           onChange={(e) => handleDraftChange(e.target.value)}
+          onSelect={(e) =>
+            syncMentionQuery(
+              e.currentTarget.value,
+              e.currentTarget.selectionStart ?? e.currentTarget.value.length
+            )
+          }
+          onClick={(e) =>
+            syncMentionQuery(
+              e.currentTarget.value,
+              e.currentTarget.selectionStart ?? e.currentTarget.value.length
+            )
+          }
           placeholder={
             isSignedIn
               ? "Write a comment… type @ to mention someone"

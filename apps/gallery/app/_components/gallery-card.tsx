@@ -185,7 +185,7 @@ export function GalleryCard({
 
   return (
     <figure className="w-full">
-      <div className="flex justify-center px-3 py-4 sm:px-4 sm:py-5">
+      <div className="flex justify-center px-4 py-5 sm:px-5 sm:py-6">
         <div
           className={cn(
             "group/polaroid w-full max-w-full origin-center",

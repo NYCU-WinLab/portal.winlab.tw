@@ -6,6 +6,11 @@ import { GalleryPagination } from "@/app/_components/gallery-pagination"
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { SignOutButton } from "@/components/sign-out-button"
 import {
+  GallerySiteFooter,
+  galleryCornerClass,
+  galleryNavLinkClass,
+} from "@/components/gallery-chrome"
+import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
   aggregateReactions,
@@ -279,37 +284,41 @@ export default async function GalleryHomePage({
     <PortalShell
       appName="Gallery"
       appHref="/"
-      containerClassName="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-20 sm:px-6 sm:py-24"
-      cornerClassName="text-lg"
+      containerClassName="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-16 sm:px-6 sm:py-24"
+      cornerClassName={galleryCornerClass()}
       bottomLeft={
-        <Link
-          href="https://portal.winlab.tw"
-          className="transition-colors hover:text-foreground"
-        >
+        <Link href="https://portal.winlab.tw" className={galleryNavLinkClass()}>
           ← Portal
         </Link>
       }
       topRight={
         user ? (
-          <div className="flex items-center gap-4">
-            <Link
-              href="/upload"
-              className="transition-colors hover:text-foreground"
-            >
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link href="/upload" className={galleryNavLinkClass()}>
               Manage
             </Link>
-            <SignOutButton />
+            <SignOutButton className={galleryNavLinkClass()} />
           </div>
         ) : (
           <Link
             href="/auth/login?next=/upload"
-            className="transition-colors hover:text-foreground"
+            className={galleryNavLinkClass()}
           >
             Sign in
           </Link>
         )
       }
     >
+      <div className="mb-10 text-center sm:mb-12">
+        <h1 className="sr-only">Gallery</h1>
+        <p className="font-[family-name:var(--font-serif)] text-2xl text-foreground/90 italic sm:text-3xl">
+          On the wall
+        </p>
+        <p className="mx-auto mt-2 max-w-lg font-[family-name:var(--font-caption)] text-[11px] leading-relaxed text-muted-foreground not-italic sm:text-xs">
+          Lab photos, slightly crooked on purpose. Open one to react or leave a
+          comment.
+        </p>
+      </div>
       <div className="overflow-x-clip">
         <GalleryGrid
           images={images}
@@ -319,6 +328,7 @@ export default async function GalleryHomePage({
           members={members}
         />
         <GalleryPagination page={currentPage} totalPages={totalPages} />
+        <GallerySiteFooter />
       </div>
     </PortalShell>
   )
