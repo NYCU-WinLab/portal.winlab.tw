@@ -9,6 +9,7 @@ type PortalShellProps = {
   children: React.ReactNode
   topRight?: React.ReactNode
   bottomLeft?: React.ReactNode
+  bottomRight?: React.ReactNode
   containerClassName?: string
   cornerClassName?: string
 }
@@ -19,6 +20,7 @@ export function PortalShell({
   children,
   topRight,
   bottomLeft,
+  bottomRight,
   containerClassName,
   cornerClassName,
 }: PortalShellProps) {
@@ -43,7 +45,7 @@ export function PortalShell({
         </PortalCorner>
       ) : null}
       <PortalCorner position="bottom-right" className={cornerClassName}>
-        © {new Date().getFullYear()}
+        {bottomRight ?? <>© {new Date().getFullYear()}</>}
       </PortalCorner>
       <main
         className={cn(

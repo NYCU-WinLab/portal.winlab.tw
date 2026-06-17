@@ -8,6 +8,11 @@ const nextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/gallery/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/render/image/public/gallery/**",
+      },
     ],
   },
   // Gallery uploads go to Supabase Storage from the browser (bypasses Vercel

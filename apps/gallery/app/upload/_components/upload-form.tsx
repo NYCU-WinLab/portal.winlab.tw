@@ -7,8 +7,10 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { cn } from "@workspace/ui/lib/utils"
 
 import { registerGalleryImage } from "@/app/upload/actions"
+import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import {
   guessExtension,
   resolveMediaMimeType,
@@ -145,9 +147,12 @@ export function UploadForm() {
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <Label htmlFor="gallery-name" className="text-xl italic">
+    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Label
+          htmlFor="gallery-name"
+          className={cn(gallerySerif(), "text-base")}
+        >
           Name (single upload only)
         </Label>
         <Input
@@ -157,11 +162,17 @@ export function UploadForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={pending}
-          className="h-12 rounded-none border-0 border-b border-border bg-transparent px-0 !text-lg focus-visible:border-foreground focus-visible:ring-0"
+          className={cn(
+            gallerySans(),
+            "h-11 rounded-xl border-border/60 bg-background"
+          )}
         />
       </div>
-      <div className="flex flex-col gap-3">
-        <Label htmlFor="gallery-file" className="text-xl italic">
+      <div className="flex flex-col gap-2">
+        <Label
+          htmlFor="gallery-file"
+          className={cn(gallerySerif(), "text-base")}
+        >
           Images & videos
         </Label>
         <Input
@@ -175,29 +186,39 @@ export function UploadForm() {
             setFileNames(Array.from(e.target.files ?? []).map((f) => f.name))
           }
           disabled={pending}
-          className="h-12 rounded-none border-0 border-b border-border bg-transparent px-0 !text-lg file:mr-4 file:!text-base focus-visible:border-foreground focus-visible:ring-0"
+          className={cn(
+            gallerySans(),
+            "h-11 rounded-xl border-border/60 bg-background file:mr-3 file:text-sm"
+          )}
         />
         {fileNames.length > 0 ? (
-          <p className="text-base text-muted-foreground italic">
+          <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
             {fileNames.length} selected: {fileNames.slice(0, 3).join(", ")}
             {fileNames.length > 3 ? ` (+${fileNames.length - 3} more)` : ""}
           </p>
         ) : null}
-        <p className="text-sm text-muted-foreground italic">
+        <p
+          className={cn(
+            gallerySans(),
+            "text-xs leading-relaxed text-muted-foreground"
+          )}
+        >
           Videos: max {VIDEO_MAX_DURATION_SECONDS}s and{" "}
           {VIDEO_MAX_INPUT_BYTES / 1024 / 1024} MB, auto-compressed to 720p mp4
-          in your browser (4K or very long clips may fail).
+          in your browser.
         </p>
-        <p className="text-sm text-muted-foreground italic">
-          Multi-select uploads are grouped as one sequence card on the wall.
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          Multi-select uploads are grouped as one sequence on the wall.
         </p>
       </div>
       {status.kind === "working" ? (
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground italic">{status.label}</p>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+          <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+            {status.label}
+          </p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full bg-foreground transition-[width] duration-200"
+              className="h-full rounded-full bg-foreground transition-[width] duration-200"
               style={{ width: `${Math.round(status.ratio * 100)}%` }}
             />
           </div>
@@ -207,7 +228,7 @@ export function UploadForm() {
         type="submit"
         size="lg"
         disabled={pending}
-        className="mt-4 h-14 !text-lg italic"
+        className={cn(gallerySans(), "h-12 rounded-full")}
       >
         {pending ? "Uploading…" : "Upload selected"}
       </Button>

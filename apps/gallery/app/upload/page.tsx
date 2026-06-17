@@ -1,17 +1,24 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-
-import { PortalShell } from "@workspace/ui/components/portal-shell"
 
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { RenameButton } from "@/app/upload/_components/rename-button"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { UploadForm } from "@/app/upload/_components/upload-form"
+import {
+  GalleryNavLink,
+  galleryShellNavLinkClass,
+  galleryPanelClass,
+  gallerySans,
+  gallerySectionLeadClass,
+  gallerySectionTitleClass,
+} from "@/components/gallery-chrome"
+import { GalleryShell } from "@/components/gallery-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 import { getCurrentUser } from "@/lib/user"
+import { cn } from "@workspace/ui/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -42,40 +49,45 @@ export default async function UploadPage() {
   >
 
   return (
-    <PortalShell
-      appName="Gallery"
-      appHref="/"
-      containerClassName="mx-auto w-full max-w-3xl px-6 py-24"
-      cornerClassName="text-lg"
-      topRight={<SignOutButton />}
-      bottomLeft={
-        <Link href="/" className="transition-colors hover:text-foreground">
-          Back
-        </Link>
+    <GalleryShell
+      active="manage"
+      nav={
+        <>
+          <GalleryNavLink href="/" tone="shell">
+            Wall
+          </GalleryNavLink>
+          <GalleryNavLink href="/upload" active tone="shell">
+            Manage
+          </GalleryNavLink>
+          <SignOutButton className={galleryShellNavLinkClass()} />
+        </>
       }
+      containerClassName="max-w-3xl"
     >
-      <div className="flex flex-col gap-16">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-6xl tracking-tight italic md:text-7xl">
-            Manage works
-          </h1>
-          <p className="text-lg text-muted-foreground md:text-xl">
-            Upload your own. Edit names, delete, and keep your wall tidy.
+      <div className="flex flex-col gap-10 sm:gap-12">
+        <header className="space-y-2">
+          <h1 className={gallerySectionTitleClass()}>Manage</h1>
+          <p className={gallerySectionLeadClass()}>
+            Upload photos or videos, rename works, and keep your wall tidy.
           </p>
-        </div>
+        </header>
 
-        <UploadForm />
+        <section className={galleryPanelClass()}>
+          <UploadForm />
+        </section>
 
-        <section className="flex flex-col gap-6">
-          <h2 className="text-3xl italic">
-            Uploaded by you ({myImages.length})
+        <section className="space-y-4">
+          <h2
+            className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
+          >
+            Your uploads ({myImages.length})
           </h2>
           {myImages.length === 0 ? (
-            <p className="text-base text-muted-foreground italic">
-              You haven&rsquo;t uploaded anything yet.
+            <p className={gallerySectionLeadClass()}>
+              You haven&apos;t uploaded anything yet.
             </p>
           ) : (
-            <ul className="flex flex-col">
+            <ul className="flex flex-col gap-3">
               {myImages.map((image) => {
                 const isVideo = image.media_type === "video"
                 const thumbPath =
@@ -85,17 +97,37 @@ export default async function UploadPage() {
                 return (
                   <li
                     key={image.id}
-                    className="flex items-center gap-6 border-b border-border/60 py-5 last:border-b-0"
+                    className={cn(
+                      galleryPanelClass(),
+                      "flex items-center gap-4 !p-4 sm:gap-5"
+                    )}
                   >
                     <UploadListThumb
                       src={getGalleryImageUrl(thumbPath)}
                       alt={image.name}
                       isVideo={isVideo}
                     />
-                    <div className="flex flex-1 flex-col gap-1">
-                      <p className="text-2xl italic">{image.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(image.created_at).toLocaleDateString()}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p
+                        className={cn(
+                          gallerySectionTitleClass(),
+                          "truncate text-lg sm:text-xl"
+                        )}
+                      >
+                        {image.name}
+                      </p>
+                      <p
+                        className={cn(
+                          gallerySans(),
+                          "text-xs text-muted-foreground"
+                        )}
+                      >
+                        {new Date(image.created_at).toLocaleDateString(
+                          undefined,
+                          {
+                            dateStyle: "medium",
+                          }
+                        )}
                         {isVideo && image.duration_seconds
                           ? ` · ${image.duration_seconds}s video`
                           : ""}
@@ -117,6 +149,6 @@ export default async function UploadPage() {
           )}
         </section>
       </div>
-    </PortalShell>
+    </GalleryShell>
   )
 }
