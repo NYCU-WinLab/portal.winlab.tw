@@ -279,7 +279,7 @@ export default async function GalleryHomePage({
     <PortalShell
       appName="Gallery"
       appHref="/"
-      containerClassName="mx-auto w-full max-w-7xl px-6 py-24"
+      containerClassName="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-20 sm:px-6 sm:py-24"
       cornerClassName="text-lg"
       bottomLeft={
         <Link
@@ -310,14 +310,16 @@ export default async function GalleryHomePage({
         )
       }
     >
-      <GalleryGrid
-        images={images}
-        isSignedIn={Boolean(user)}
-        viewerId={user?.id ?? null}
-        viewerName={user?.name ?? "You"}
-        members={members}
-      />
-      <GalleryPagination page={currentPage} totalPages={totalPages} />
+      <div className="overflow-x-clip">
+        <GalleryGrid
+          images={images}
+          isSignedIn={Boolean(user)}
+          viewerId={user?.id ?? null}
+          viewerName={user?.name ?? "You"}
+          members={members}
+        />
+        <GalleryPagination page={currentPage} totalPages={totalPages} />
+      </div>
     </PortalShell>
   )
 }

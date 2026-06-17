@@ -3,7 +3,7 @@
 //
 // We hash the id into a number, then map to [-MAX_DEG, +MAX_DEG]. UUID first
 // 8 hex chars is plenty of entropy for a tilt.
-const MAX_DEG = 5
+const MAX_DEG = 4
 
 export function getRotation(id: string): number {
   // Pull a stable 32-bit-ish int out of the id. UUID prefix works; for any

@@ -184,27 +184,31 @@ export function GalleryCard({
   }
 
   return (
-    <figure
-      className={cn(
-        "group relative block w-full",
-        "transition-transform duration-500 ease-out will-change-transform",
-        "[transform:rotate(var(--gallery-rot))]",
-        "hover:[transform:rotate(0deg)_scale(1.02)]"
-      )}
-      style={
-        {
-          "--gallery-rot": `${rotation}deg`,
-        } as React.CSSProperties
-      }
-    >
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <div
-            className={cn(
-              "relative w-full cursor-pointer overflow-hidden bg-white",
-              "border border-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.18)]"
-            )}
-          >
+    <figure className="w-full">
+      <div className="flex justify-center px-3 py-4 sm:px-4 sm:py-5">
+        <div
+          className={cn(
+            "group/polaroid w-full max-w-full origin-center",
+            "transition-transform duration-500 ease-out will-change-transform",
+            "[transform:rotate(var(--gallery-rot))]",
+            "hover:[transform:rotate(0deg)]"
+          )}
+          style={
+            {
+              "--gallery-rot": `${rotation}deg`,
+            } as React.CSSProperties
+          }
+        >
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <div
+                className={cn(
+                  "relative w-full cursor-pointer overflow-hidden rounded-sm bg-white",
+                  "border border-black/[0.06]",
+                  "shadow-[0_2px_8px_rgba(0,0,0,0.04),0_12px_32px_-16px_rgba(0,0,0,0.2)]",
+                  "transition-shadow duration-500 group-hover/polaroid:shadow-[0_4px_12px_rgba(0,0,0,0.06),0_20px_40px_-12px_rgba(0,0,0,0.22)]"
+                )}
+              >
             {thumbFailed ? (
               <div className="flex aspect-[4/5] w-full items-center justify-center bg-muted px-4 text-center text-sm text-muted-foreground italic">
                 Preview unavailable (try Safari for HEIC, or export as JPEG)
@@ -345,43 +349,49 @@ export function GalleryCard({
             </aside>
           </div>
         </DialogContent>
-      </Dialog>
+          </Dialog>
+        </div>
+      </div>
       <figcaption
         className={cn(
-          "mt-4 flex flex-col gap-3 text-2xl leading-snug tracking-wide text-foreground/70 sm:flex-row sm:items-end sm:justify-between",
-          "italic md:text-3xl"
+          "mt-1 space-y-2.5 font-[family-name:var(--font-caption)] not-italic",
+          "text-foreground/90"
         )}
       >
-        <div className="min-w-0 flex-1">
-          <p className="truncate">{image.name}</p>
-          <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">
+        <div className="min-w-0">
+          <p className="truncate text-base leading-snug font-medium text-foreground md:text-lg">
+            {image.name}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground md:text-sm">
             by {image.uploader_name}
           </p>
           {isSequence ? (
-            <p className="mt-1 truncate text-xs text-muted-foreground/80 not-italic md:text-sm">
-              Sequence · {image.sequence_count} shots (tap to expand)
+            <p className="mt-1 truncate text-[11px] tracking-wide text-muted-foreground/80 uppercase md:text-xs">
+              Sequence · {image.sequence_count} shots
             </p>
           ) : null}
+        </div>
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
           <ReactionSummary
             total={reactionTotal}
             counts={counts}
             namesByReaction={namesByReaction}
           />
-        </div>
-        <div className="flex items-center gap-3 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setIsDialogOpen(true)}
-            className="text-xs text-muted-foreground not-italic transition-colors hover:text-foreground md:text-sm"
-          >
-            Comments ({image.comments.length})
-          </button>
-          <ReactionBar
-            counts={counts}
-            myReaction={myReaction}
-            canReact={canReact}
-            onReact={onReact}
-          />
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setIsDialogOpen(true)}
+              className="rounded-full border border-border/80 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/60 hover:text-foreground md:text-xs"
+            >
+              Comments ({image.comments.length})
+            </button>
+            <ReactionBar
+              counts={counts}
+              myReaction={myReaction}
+              canReact={canReact}
+              onReact={onReact}
+            />
+          </div>
         </div>
       </figcaption>
     </figure>
@@ -399,7 +409,7 @@ function ReactionSummary({
 }) {
   if (total === 0) {
     return (
-      <p className="mt-1 truncate text-xs text-muted-foreground/70 not-italic md:text-sm">
+      <p className="text-[11px] text-muted-foreground/70 md:text-xs">
         No reactions yet
       </p>
     )
@@ -414,7 +424,7 @@ function ReactionSummary({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground not-italic transition-colors select-none hover:text-foreground md:text-sm"
+          className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground transition-colors select-none hover:text-foreground md:text-xs"
           aria-label="Show who reacted"
         >
           {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (

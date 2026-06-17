@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Instrument_Serif } from "next/font/google"
+import { Geist, Instrument_Serif } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 
@@ -19,6 +19,11 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
 })
 
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-caption",
+})
+
 export const metadata: Metadata = {
   title: "Gallery — WinLab",
   description: "Art from NYCU WinLab.",
@@ -33,7 +38,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", instrumentSerif.variable)}
+      className={cn("antialiased", instrumentSerif.variable, geistSans.variable)}
     >
       <body
         className={cn(

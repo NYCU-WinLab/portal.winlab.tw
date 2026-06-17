@@ -59,9 +59,9 @@ export function GalleryGrid({
   })
 
   return (
-    <div className="flex gap-12">
+    <div className="flex gap-5 sm:gap-8 lg:gap-10">
       {buckets.map((bucket, i) => (
-        <div key={i} className="flex min-w-0 flex-1 flex-col gap-12">
+        <div key={i} className="flex min-w-0 flex-1 flex-col gap-8 sm:gap-10 lg:gap-12">
           {bucket.map((image) => (
             <GalleryCard
               key={image.id}

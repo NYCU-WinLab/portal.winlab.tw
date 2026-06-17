@@ -23,7 +23,7 @@ export function GalleryPagination({
   return (
     <nav
       aria-label="Gallery pages"
-      className="mt-12 flex items-center justify-center gap-2 not-italic"
+      className="mt-10 flex items-center justify-center gap-2 font-[family-name:var(--font-caption)] not-italic sm:mt-12"
     >
       <Link
         href={buildPageHref(page - 1)}
