@@ -47,4 +47,10 @@ export type GalleryComment = {
   commenter_name: string
 }
 
+export type GalleryMember = {
+  id: string
+  name: string | null
+  email: string | null
+}
+
 export { EMPTY_REACTION_COUNTS, EMPTY_REACTION_NAMES }

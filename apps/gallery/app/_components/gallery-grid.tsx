@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
-import type { GalleryImage } from "@/lib/gallery/types"
+import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 const BREAKPOINTS = [
   { minWidth: 1024, cols: 3 },
@@ -21,11 +21,13 @@ export function GalleryGrid({
   isSignedIn,
   viewerId,
   viewerName,
+  members,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
+  members: GalleryMember[]
 }) {
   // SSR seeds with 3-col layout (desktop default). useEffect rebuckets on
   // mount and on resize. The seed shape stays stable so React doesn't blow
@@ -67,6 +69,7 @@ export function GalleryGrid({
               isSignedIn={isSignedIn}
               viewerId={viewerId}
               viewerName={viewerName}
+              members={members}
             />
           ))}
         </div>
