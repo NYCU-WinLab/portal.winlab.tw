@@ -112,38 +112,40 @@ export function GalleryComments({
 
   return (
     <div className="mt-3 space-y-3 not-italic">
-      <div className="relative space-y-2">
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => handleDraftChange(e.target.value)}
-          placeholder={
-            isSignedIn
-              ? "Write a comment… type @ to mention someone"
-              : "Sign in to leave a comment"
-          }
-          disabled={!isSignedIn || isPending}
-          className="min-h-20 resize-none text-sm"
-        />
-        {filteredMembers.length > 0 ? (
-          <div className="absolute right-0 bottom-full left-0 z-10 mb-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
-            {filteredMembers.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => applyMention(m)}
-                className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-              >
-                <Avatar className="size-5">
-                  <AvatarFallback className="text-[10px]">
-                    {(m.name ?? "?").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate">{m.name ?? m.email}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
+      <div className="space-y-2">
+        <div className="relative">
+          <Textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => handleDraftChange(e.target.value)}
+            placeholder={
+              isSignedIn
+                ? "Write a comment… type @ to mention someone"
+                : "Sign in to leave a comment"
+            }
+            disabled={!isSignedIn || isPending}
+            className="min-h-20 resize-none text-sm"
+          />
+          {filteredMembers.length > 0 ? (
+            <div className="absolute top-full right-0 left-0 z-50 mt-1 flex max-h-48 flex-col overflow-y-auto rounded-xl border border-border bg-popover shadow-md">
+              {filteredMembers.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => applyMention(m)}
+                  className="flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  <Avatar className="size-5">
+                    <AvatarFallback className="text-[10px]">
+                      {(m.name ?? "?").slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{m.name ?? m.email}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="flex items-center justify-between gap-2">
           {replyTarget ? (
             <button
