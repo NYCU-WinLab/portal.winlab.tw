@@ -24,17 +24,17 @@ export const POPPABLE_ZONGZI_SPOTS: Omit<PoppableZongziSpec, "id" | "delay">[] =
     { left: "86%", top: "36%", size: 52, rotate: -10 },
   ]
 
-/** Phone — four corners only, smaller, so polaroids stay tappable. */
+/** Phone — edge spots with room for center-anchored sticker size. */
 export const MOBILE_POPPABLE_ZONGZI_SPOTS: Omit<
   PoppableZongziSpec,
   "id" | "delay"
 >[] = [
-  { left: "3%", top: "17%", size: 40, rotate: -10 },
-  { left: "4%", top: "83%", size: 36, rotate: 8 },
-  { left: "91%", top: "18%", size: 38, rotate: 12 },
-  { left: "90%", top: "82%", size: 36, rotate: -8 },
-  { left: "6%", top: "48%", size: 34, rotate: 6 },
-  { left: "88%", top: "50%", size: 34, rotate: -6 },
+  { left: "11%", top: "18%", size: 34, rotate: -10 },
+  { left: "11%", top: "84%", size: 32, rotate: 8 },
+  { left: "89%", top: "18%", size: 34, rotate: 12 },
+  { left: "89%", top: "84%", size: 32, rotate: -8 },
+  { left: "13%", top: "50%", size: 30, rotate: 6 },
+  { left: "87%", top: "50%", size: 30, rotate: -6 },
 ]
 
 export function getPoppableZongziSpotPool(isMobile: boolean) {

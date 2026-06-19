@@ -2,12 +2,19 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { IconLogout } from "@tabler/icons-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
 
-export function SignOutButton({ className }: { className?: string }) {
+export function SignOutButton({
+  className,
+  iconOnly = false,
+}: {
+  className?: string
+  iconOnly?: boolean
+}) {
   const [pending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -25,12 +32,19 @@ export function SignOutButton({ className }: { className?: string }) {
       type="button"
       onClick={onClick}
       disabled={pending}
+      aria-label={iconOnly ? "Sign out" : undefined}
       className={cn(
         className,
         "disabled:pointer-events-none disabled:opacity-50"
       )}
     >
-      {pending ? "Signing out…" : "Sign out"}
+      {iconOnly ? (
+        <IconLogout className="size-4" aria-hidden />
+      ) : pending ? (
+        "Signing out…"
+      ) : (
+        "Sign out"
+      )}
     </button>
   )
 }
