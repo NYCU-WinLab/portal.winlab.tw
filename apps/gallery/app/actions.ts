@@ -7,6 +7,11 @@ import {
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
 import { parseMentions } from "@/lib/gallery/mentions"
+import {
+  type GallerySeasonalThemeId,
+  isGallerySeasonalThemeId,
+} from "@/lib/gallery/seasonal-themes"
+import { setGallerySeasonalThemeId } from "@/lib/gallery/settings"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -126,7 +131,10 @@ export async function addGalleryComment(
     .single()
 
   if (error || !data) {
-    return { ok: false, error: `Comment failed: ${error?.message ?? "Unknown error."}` }
+    return {
+      ok: false,
+      error: `Comment failed: ${error?.message ?? "Unknown error."}`,
+    }
   }
 
   const mentionNames = parseMentions(trimmed)
@@ -178,5 +186,38 @@ export async function deleteGalleryComment(
   }
 
   revalidatePath("/")
+  return { ok: true }
+}
+
+export async function setGallerySeasonalTheme(
+  themeId: GallerySeasonalThemeId | null
+): Promise<ReactionActionResult> {
+  if (themeId !== null && !isGallerySeasonalThemeId(themeId)) {
+    return { ok: false, error: "Unknown theme." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (profileError) {
+    return { ok: false, error: profileError.message }
+  }
+  if (!profile?.is_admin) {
+    return { ok: false, error: "Only super admins can change the site theme." }
+  }
+
+  const result = await setGallerySeasonalThemeId(supabase, themeId, userId)
+  if (!result.ok) return result
+
+  revalidatePath("/", "layout")
+  revalidatePath("/upload")
   return { ok: true }
 }

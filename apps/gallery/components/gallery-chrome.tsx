@@ -13,7 +13,7 @@ export function gallerySerif() {
 
 export function galleryPageBackdropClass() {
   return cn(
-    "pointer-events-none fixed inset-0 -z-10",
+    "gallery-page-backdrop pointer-events-none fixed inset-0 -z-10",
     "bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,rgba(120,113,108,0.07),transparent_55%)]",
     "dark:bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,rgba(255,255,255,0.04),transparent_55%)]"
   )
@@ -57,7 +57,7 @@ export function galleryPillClass() {
 
 export function galleryPolaroidClass() {
   return cn(
-    "w-full overflow-hidden bg-white",
+    "gallery-polaroid w-full overflow-hidden bg-white",
     "rounded-[2px] border border-black/[0.07]",
     "shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_28px_-14px_rgba(0,0,0,0.22)]",
     "transition-shadow duration-500",
@@ -78,7 +78,7 @@ export function gallerySectionLeadClass() {
 
 export function galleryPanelClass() {
   return cn(
-    "rounded-2xl border border-border/60 bg-card/60 p-5 shadow-sm backdrop-blur-sm sm:p-6"
+    "gallery-panel rounded-2xl border border-border/60 bg-card/60 p-5 shadow-sm backdrop-blur-sm sm:p-6"
   )
 }
 
@@ -89,7 +89,7 @@ export function GalleryFooter() {
     <p
       className={cn(
         gallerySans(),
-        "w-full text-center text-[11px] text-muted-foreground"
+        "gallery-footer w-full text-center text-[11px] text-muted-foreground"
       )}
     >
       <span className={cn(gallerySerif(), "text-foreground/80")}>Gallery</span>

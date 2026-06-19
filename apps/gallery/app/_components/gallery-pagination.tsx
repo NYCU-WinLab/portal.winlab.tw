@@ -27,7 +27,7 @@ export function GalleryPagination({
       aria-label="Gallery pages"
       className={cn(
         gallerySans(),
-        "mt-12 flex items-center justify-center gap-2 sm:mt-14"
+        "gallery-pagination mt-12 flex items-center justify-center gap-2 sm:mt-14"
       )}
     >
       <Link

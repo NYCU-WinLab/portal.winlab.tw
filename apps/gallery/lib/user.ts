@@ -5,6 +5,7 @@ export type NormalizedUser = {
   email: string | null
   name: string
   avatarUrl: string | null
+  isAdmin: boolean
 }
 
 function pickString(meta: Record<string, unknown>, key: string) {
@@ -34,6 +35,7 @@ export function normalizeClaims(claims: ClaimsShape): NormalizedUser {
     email: claims.email ?? null,
     name,
     avatarUrl,
+    isAdmin: false,
   }
 }
 
@@ -41,5 +43,22 @@ export async function getCurrentUser(): Promise<NormalizedUser | null> {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
   if (error || !data?.claims) return null
-  return normalizeClaims(data.claims)
+
+  const base = normalizeClaims(data.claims)
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("name, is_admin")
+    .eq("id", base.id)
+    .maybeSingle()
+
+  const profileName =
+    typeof profile?.name === "string" && profile.name.trim()
+      ? profile.name.trim()
+      : null
+
+  return {
+    ...base,
+    name: profileName ?? base.name,
+    isAdmin: profile?.is_admin === true,
+  }
 }
