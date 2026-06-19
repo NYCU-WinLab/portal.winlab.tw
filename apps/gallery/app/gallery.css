@@ -233,7 +233,7 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop {
   border: 0;
   background: transparent;
   cursor: pointer;
-  transform: rotate(var(--seed-rotate, 0deg));
+  transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg));
   opacity: 0;
   filter: drop-shadow(0 6px 14px rgba(30, 120, 75, 0.22));
   animation: gallery-zongzi-pop-in 0.55s ease-out forwards;
@@ -244,7 +244,7 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop {
 }
 
 html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop:hover {
-  transform: rotate(var(--seed-rotate, 0deg)) scale(1.08);
+  transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg)) scale(1.08);
   filter: drop-shadow(0 8px 18px rgba(30, 120, 75, 0.32));
 }
 
@@ -282,18 +282,21 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-burst-particle {
 @keyframes gallery-zongzi-pop-in {
   from {
     opacity: 0;
-    transform: rotate(var(--seed-rotate, 0deg)) translateY(0.5rem) scale(0.75);
+    transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
+      translateY(0.5rem) scale(0.75);
   }
   to {
     opacity: 1;
-    transform: rotate(var(--seed-rotate, 0deg)) translateY(0) scale(1);
+    transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
+      translateY(0) scale(1);
   }
 }
 
 @keyframes gallery-zongzi-pop-out {
   to {
     opacity: 0;
-    transform: rotate(var(--seed-rotate, 0deg)) scale(1.35);
+    transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
+      scale(1.35);
   }
 }
 
@@ -321,12 +324,13 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-burst-particle {
 
 @media (max-width: 767px) {
   html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop {
-    transform: rotate(var(--seed-rotate, 0deg)) scale(0.92);
+    transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
+      scale(0.92);
   }
 
   html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop-image {
-    max-width: 2.5rem;
-    max-height: 2.5rem;
+    max-width: 2rem;
+    max-height: 2rem;
     width: auto !important;
     height: auto !important;
   }

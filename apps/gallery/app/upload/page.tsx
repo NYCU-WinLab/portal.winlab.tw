@@ -6,14 +6,12 @@ import { RenameButton } from "@/app/upload/_components/rename-button"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import {
-  galleryShellNavLinkClass,
   galleryPanelClass,
   gallerySans,
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
 import { GalleryShell } from "@/components/gallery-shell"
-import { SignOutButton } from "@/components/sign-out-button"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
 import {
@@ -59,15 +57,7 @@ export default async function UploadPage() {
   >
 
   return (
-    <GalleryShell
-      active="manage"
-      nav={
-        <>
-          <SignOutButton className={galleryShellNavLinkClass()} />
-        </>
-      }
-      containerClassName="max-w-3xl"
-    >
+    <GalleryShell active="manage" signedIn containerClassName="max-w-3xl">
       <div className="flex flex-col gap-10 sm:gap-12">
         <header>
           <h1 className={gallerySectionTitleClass()}>Manage</h1>

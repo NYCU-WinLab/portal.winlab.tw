@@ -48,6 +48,15 @@ export function galleryShellNavLinkClass(active = false) {
   )
 }
 
+export function galleryShellIconButtonClass() {
+  return cn(
+    gallerySans(),
+    "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/85 transition-colors",
+    "hover:bg-muted/60 hover:text-foreground",
+    "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+  )
+}
+
 export function galleryPillClass() {
   return cn(
     gallerySans(),

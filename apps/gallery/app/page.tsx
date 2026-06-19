@@ -1,10 +1,5 @@
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { GalleryPagination } from "@/app/_components/gallery-pagination"
-import { SignOutButton } from "@/components/sign-out-button"
-import {
-  GalleryNavLink,
-  galleryShellNavLinkClass,
-} from "@/components/gallery-chrome"
 import { GalleryShell } from "@/components/gallery-shell"
 import { loadGalleryHomePage } from "@/lib/gallery/load-home-page"
 import { createClient } from "@/lib/supabase/server"
@@ -31,21 +26,8 @@ export default async function GalleryHomePage({
       userId: user?.id ?? null,
     })
 
-  const nav = user ? (
-    <>
-      <GalleryNavLink href="/upload" tone="shell">
-        Manage
-      </GalleryNavLink>
-      <SignOutButton className={galleryShellNavLinkClass()} />
-    </>
-  ) : (
-    <GalleryNavLink href="/auth/login?next=/upload" tone="shell">
-      Sign in
-    </GalleryNavLink>
-  )
-
   return (
-    <GalleryShell active="home" nav={nav}>
+    <GalleryShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
         <GalleryGrid
           images={images}
