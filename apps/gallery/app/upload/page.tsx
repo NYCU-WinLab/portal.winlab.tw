@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation"
 
+import { SeasonalThemePanel } from "@/app/upload/_components/seasonal-theme-panel"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { RenameButton } from "@/app/upload/_components/rename-button"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import {
-  GalleryNavLink,
   galleryShellNavLinkClass,
   galleryPanelClass,
   gallerySans,
@@ -16,6 +16,10 @@ import { GalleryShell } from "@/components/gallery-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
+import {
+  getGallerySeasonalThemeId,
+  isGallerySettingsReady,
+} from "@/lib/gallery/settings"
 import { getGalleryImageUrl } from "@/lib/gallery/url"
 import { getCurrentUser } from "@/lib/user"
 import { cn } from "@workspace/ui/lib/utils"
@@ -27,13 +31,19 @@ export default async function UploadPage() {
   if (!user) redirect("/auth/login?next=/upload")
 
   const supabase = await createClient()
-  const { data } = await supabase
-    .from("gallery_images")
-    .select(
-      "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at"
-    )
-    .eq("created_by", user.id)
-    .order("created_at", { ascending: false })
+  const [imagesResult, seasonalThemeId, settingsReady] = await Promise.all([
+    supabase
+      .from("gallery_images")
+      .select(
+        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at"
+      )
+      .eq("created_by", user.id)
+      .order("created_at", { ascending: false }),
+    getGallerySeasonalThemeId(supabase),
+    isGallerySettingsReady(supabase),
+  ])
+
+  const { data } = imagesResult
 
   const myImages = (data ?? []) as Array<
     Pick<
@@ -53,24 +63,22 @@ export default async function UploadPage() {
       active="manage"
       nav={
         <>
-          <GalleryNavLink href="/" tone="shell">
-            Wall
-          </GalleryNavLink>
-          <GalleryNavLink href="/upload" active tone="shell">
-            Manage
-          </GalleryNavLink>
           <SignOutButton className={galleryShellNavLinkClass()} />
         </>
       }
       containerClassName="max-w-3xl"
     >
       <div className="flex flex-col gap-10 sm:gap-12">
-        <header className="space-y-2">
+        <header>
           <h1 className={gallerySectionTitleClass()}>Manage</h1>
-          <p className={gallerySectionLeadClass()}>
-            Upload photos or videos, rename works, and keep your wall tidy.
-          </p>
         </header>
+
+        {user.isAdmin ? (
+          <SeasonalThemePanel
+            activeThemeId={seasonalThemeId}
+            settingsReady={settingsReady}
+          />
+        ) : null}
 
         <section className={galleryPanelClass()}>
           <UploadForm />

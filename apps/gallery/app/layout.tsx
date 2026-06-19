@@ -9,6 +9,8 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { KonamiWinlabLogo } from "@/app/_components/konami-winlab-logo"
 import { ThemeProvider } from "@/components/theme-provider"
+import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
+import { createClient } from "@/lib/supabase/server"
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -28,13 +30,17 @@ export const metadata: Metadata = {
   description: "Art from NYCU WinLab.",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const supabase = await createClient()
+  const seasonalThemeId = await getGallerySeasonalThemeId(supabase)
+
   return (
     <html
       lang="en"
       suppressHydrationWarning
+      data-gallery-theme={seasonalThemeId ?? undefined}
       className={cn(
         "antialiased",
         instrumentSerif.variable,
@@ -42,6 +48,7 @@ export default function RootLayout({
       )}
     >
       <body
+        data-gallery-theme={seasonalThemeId ?? undefined}
         className={cn(
           instrumentSerif.className,
           "overflow-x-hidden bg-background text-foreground"

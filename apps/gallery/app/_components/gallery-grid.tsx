@@ -28,7 +28,7 @@ export function GalleryGrid({
 
   return (
     <div className="columns-1 gap-x-5 sm:columns-2 sm:gap-x-7 lg:columns-3 lg:gap-x-8">
-      {images.map((image) => (
+      {images.map((image, index) => (
         <div
           key={image.id}
           className="mb-9 w-full max-w-full break-inside-avoid sm:mb-11 lg:mb-12"
@@ -39,6 +39,7 @@ export function GalleryGrid({
             viewerId={viewerId}
             viewerName={viewerName}
             members={members}
+            priorityLcp={index === 0}
           />
         </div>
       ))}

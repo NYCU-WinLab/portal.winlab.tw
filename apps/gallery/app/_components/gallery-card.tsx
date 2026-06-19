@@ -10,7 +10,12 @@ import {
 
 import Image from "next/image"
 
-import { IconChevronLeft, IconChevronRight, IconX } from "@tabler/icons-react"
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronUp,
+  IconX,
+} from "@tabler/icons-react"
 
 import {
   Dialog,
@@ -123,12 +128,14 @@ export function GalleryCard({
   viewerId,
   viewerName,
   members,
+  priorityLcp = false,
 }: {
   image: GalleryImage
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
+  priorityLcp?: boolean
 }) {
   const rotation = getRotation(image.id)
   const frame = getPolaroidFrame(image.id)
@@ -147,6 +154,7 @@ export function GalleryCard({
         ]
   const isSequence = sequenceMedia.length > 1
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const activeItem = sequenceMedia[activeIndex] ?? sequenceMedia[0]
   const uploadedAt = activeItem?.created_at ?? image.created_at
@@ -172,6 +180,7 @@ export function GalleryCard({
     if (isDialogOpen) return
     setActiveIndex(0)
     setLightboxFailed(false)
+    setMobileDetailsOpen(false)
   }, [isDialogOpen])
 
   useEffect(() => {
@@ -207,7 +216,7 @@ export function GalleryCard({
 
   return (
     <figure className={cn("mx-auto w-full sm:max-w-none", frame.maxWidthClass)}>
-      <div className="flex justify-center px-3 py-4 sm:px-4 sm:py-5">
+      <div className="flex justify-center px-3 py-3 sm:px-4 sm:py-4">
         <div
           className={cn(
             "group/polaroid w-full max-w-full origin-center",
@@ -248,6 +257,7 @@ export function GalleryCard({
                         src={thumbUrl}
                         alt={activeItem?.name ?? image.name}
                         fill
+                        priority={priorityLcp}
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         className="object-cover"
                         onError={() => setThumbFailed(true)}
@@ -265,7 +275,7 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="px-3 pt-3 pb-4">
+                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
                     <p
                       className={cn(
                         gallerySerif(),
@@ -289,7 +299,13 @@ export function GalleryCard({
             <DialogContent
               showCloseButton={false}
               className={cn(
-                "!z-[100] !h-[100dvh] !w-screen !max-w-none !rounded-none border-0 bg-transparent p-0 shadow-none ring-0"
+                "gallery-lightbox",
+                "!fixed !inset-0 !top-0 !left-0 !z-[100]",
+                "!h-dvh !max-h-none !w-screen !max-w-none",
+                "!translate-x-0 !translate-y-0 !translate-none",
+                "!gap-0 !overflow-hidden !rounded-none !border-0 !bg-transparent !p-0 !shadow-none !ring-0",
+                "sm:!max-w-none",
+                "data-open:animate-none data-closed:animate-none"
               )}
             >
               <DialogTitle className="sr-only">
@@ -298,7 +314,7 @@ export function GalleryCard({
               <DialogClose
                 aria-label="Close"
                 className={cn(
-                  "fixed top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-[60]",
+                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
                   "inline-flex h-11 w-11 items-center justify-center rounded-full",
                   "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
                   "transition-colors hover:bg-white",
@@ -307,8 +323,8 @@ export function GalleryCard({
               >
                 <IconX className="h-5 w-5" />
               </DialogClose>
-              <div className="relative h-[100dvh] w-full overflow-hidden bg-neutral-950 md:flex md:flex-row md:bg-background md:shadow-2xl">
-                <div className="absolute inset-0 flex min-w-0 items-center justify-center p-3 sm:p-5 md:relative md:min-h-0 md:flex-1">
+              <div className="gallery-lightbox-layout">
+                <div className="gallery-lightbox-media">
                   {lightboxFailed ? (
                     <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
                       This {activeIsVideo ? "video" : "image"} cannot be
@@ -326,14 +342,14 @@ export function GalleryCard({
                       autoPlay
                       playsInline
                       preload="metadata"
-                      className="block h-auto max-h-full w-auto max-w-full object-contain shadow-2xl"
+                      className="gallery-lightbox-image"
                       onError={() => setLightboxFailed(true)}
                     />
                   ) : (
                     <img
                       src={mediaUrl}
                       alt={activeItem?.name ?? image.name}
-                      className="block h-auto max-h-full w-auto max-w-full object-contain shadow-2xl"
+                      className="gallery-lightbox-image"
                       onError={() => setLightboxFailed(true)}
                     />
                   )}
@@ -346,7 +362,7 @@ export function GalleryCard({
                             idx === 0 ? sequenceMedia.length - 1 : idx - 1
                           )
                         }
-                        className="absolute top-1/2 left-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                        className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                         aria-label="Previous photo"
                       >
                         <IconChevronLeft className="h-5 w-5" />
@@ -358,12 +374,12 @@ export function GalleryCard({
                             (idx) => (idx + 1) % sequenceMedia.length
                           )
                         }
-                        className="absolute top-1/2 right-3 z-[60] inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                        className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                         aria-label="Next photo"
                       >
                         <IconChevronRight className="h-5 w-5" />
                       </button>
-                      <div className="absolute right-0 bottom-[calc(min(42dvh,20rem)+0.75rem)] left-0 z-[60] mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4 md:bottom-3">
+                      <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
                         {sequenceMedia.map((item, idx) => (
                           <button
                             key={item.id}
@@ -382,16 +398,50 @@ export function GalleryCard({
                 </div>
                 <aside
                   className={cn(
-                    "absolute inset-x-0 bottom-0 z-10 flex max-h-[min(42dvh,20rem)] min-h-0 w-full flex-col",
-                    "rounded-t-2xl border-t border-border/40 bg-background/95 shadow-[0_-10px_40px_rgba(0,0,0,0.18)] backdrop-blur-md",
-                    "md:relative md:max-h-[100dvh] md:w-[26rem] md:shrink-0 md:rounded-none md:border-t-0 md:border-l md:border-border/50 md:bg-background md:shadow-none md:backdrop-blur-none"
+                    "gallery-lightbox-aside",
+                    mobileDetailsOpen && "gallery-lightbox-aside--expanded"
                   )}
                 >
-                  <div
-                    aria-hidden
-                    className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border/80 md:hidden"
-                  />
-                  <div className="space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
+                  <button
+                    type="button"
+                    className="gallery-lightbox-aside-toggle md:hidden"
+                    aria-expanded={mobileDetailsOpen}
+                    onClick={() => setMobileDetailsOpen((open) => !open)}
+                  >
+                    <span
+                      aria-hidden
+                      className="mx-auto h-1 w-10 shrink-0 rounded-full bg-border/80"
+                    />
+                    <span className="flex w-full items-center justify-between gap-3 pt-2">
+                      <span className="min-w-0 text-left">
+                        <span
+                          className={cn(
+                            gallerySerif(),
+                            "block truncate text-base leading-snug text-foreground"
+                          )}
+                        >
+                          {activeItem?.name ?? image.name}
+                        </span>
+                        <span
+                          className={cn(
+                            gallerySans(),
+                            "mt-0.5 block text-[11px] text-muted-foreground"
+                          )}
+                        >
+                          {comments.length > 0
+                            ? `${comments.length} comment${comments.length === 1 ? "" : "s"}`
+                            : "Comments & reactions"}
+                        </span>
+                      </span>
+                      <IconChevronUp
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          mobileDetailsOpen && "rotate-180"
+                        )}
+                      />
+                    </span>
+                  </button>
+                  <div className="gallery-lightbox-aside-header space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
                     <div className="min-w-0 space-y-0.5">
                       <h2
                         className={cn(
@@ -435,7 +485,7 @@ export function GalleryCard({
                       onReact={onReact}
                     />
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
+                  <div className="gallery-lightbox-aside-comments flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
                     <GalleryComments
                       imageId={image.id}
                       comments={comments}
@@ -467,7 +517,10 @@ export function GalleryCard({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsDialogOpen(true)}
+              onClick={() => {
+                setMobileDetailsOpen(true)
+                setIsDialogOpen(true)
+              }}
               className={galleryPillClass()}
             >
               {comments.length > 0
