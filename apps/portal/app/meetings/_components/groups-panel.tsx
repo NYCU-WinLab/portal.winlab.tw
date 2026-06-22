@@ -181,8 +181,9 @@ export function GroupsPanel({ isAdmin }: { isAdmin: boolean }) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
   }
 
-  const nextNumber =
-    groups.length > 0 ? Math.max(...groups.map((g) => g.groupNumber)) + 1 : 1
+  const usedNumbers = new Set(groups.map((g) => g.groupNumber))
+  let nextNumber = 1
+  while (usedNumbers.has(nextNumber)) nextNumber++
 
   return (
     <div className="flex flex-col gap-2">
