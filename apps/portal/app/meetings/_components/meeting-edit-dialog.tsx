@@ -33,6 +33,7 @@ import {
   useUpdateOwnMeeting,
 } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
+import { useMeetingGroups } from "@/hooks/meetings/use-meeting-groups"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { PresenterSelect } from "./presenter-select"
@@ -122,6 +123,7 @@ export function MeetingEditDialog({
   onOpenChange,
 }: Props) {
   const { data: users = [] } = useLabUsers()
+  const { data: groups = [] } = useMeetingGroups()
   const updateOwn = useUpdateOwnMeeting()
   const updateAdmin = useAdminUpdateMeeting()
 
@@ -307,9 +309,12 @@ export function MeetingEditDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">未指定</SelectItem>
-                    {[1, 2, 3, 4].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        小組 {n}
+                    {groups.map((g) => (
+                      <SelectItem
+                        key={g.groupNumber}
+                        value={String(g.groupNumber)}
+                      >
+                        小組 {g.groupNumber}
                       </SelectItem>
                     ))}
                   </SelectContent>
