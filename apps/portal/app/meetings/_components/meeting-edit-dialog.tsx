@@ -226,6 +226,12 @@ export function MeetingEditDialog({
     }
 
     if (isAdmin) {
+      const validGroupNumber =
+        questionGroupNumber !== null &&
+        groups.some((g) => g.groupNumber === questionGroupNumber)
+          ? questionGroupNumber
+          : null
+
       updateAdmin.mutate(
         {
           ...common,
@@ -234,7 +240,7 @@ export function MeetingEditDialog({
           isHoliday,
           location: location || "EC 411",
           startTime: startTime || "15:30",
-          questionGroupNumber,
+          questionGroupNumber: validGroupNumber,
         },
         { onSuccess: () => onOpenChange(false) }
       )
