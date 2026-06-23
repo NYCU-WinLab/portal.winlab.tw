@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { triggerReceiptEmailDrain } from "@/app/receipts/actions"
+import { fetchReceipts } from "@/lib/receipts/fetch"
 import { createClient } from "@/lib/supabase/client"
 import {
   RECEIPT_FILE_EXT,
@@ -11,10 +12,8 @@ import {
 } from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
-  STATUS_ORDER,
   toReceipt,
   type DatabaseReceiptWithTags,
-  type Receipt,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
 
@@ -23,36 +22,11 @@ import { queryKeys } from "./query-keys"
 const TABLE = "receipts"
 const SIGNED_URL_TTL = 60 * 60 // one hour — covers the time a tab stays open
 
-// Embed tags via the assignments join table; PostgREST returns
-// { receipt_tag_assignments: [{ receipt_tags: {...} }, ...] }
-const RECEIPT_WITH_TAGS_SELECT = `
-  *,
-  receipt_tag_assignments (
-    receipt_tags ( id, name, variant, created_by, created_at )
-  )
-`
-
 export function useReceipts() {
   const supabase = createClient()
   return useQuery({
     queryKey: queryKeys.receipts.all,
-    queryFn: async (): Promise<Receipt[]> => {
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select(RECEIPT_WITH_TAGS_SELECT)
-        .order("created_at", { ascending: false })
-      if (error) {
-        console.error("[receipts] list query failed", error)
-        throw new Error(error.message || "讀取收據失敗")
-      }
-      return (data as unknown as DatabaseReceiptWithTags[])
-        .map(toReceipt)
-        .sort((a, b) => {
-          const byStatus = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-          if (byStatus !== 0) return byStatus
-          return b.createdAt.localeCompare(a.createdAt)
-        })
-    },
+    queryFn: () => fetchReceipts(supabase),
     retry: 2,
   })
 }

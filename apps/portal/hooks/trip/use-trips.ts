@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { fetchTrips } from "@/lib/trip/fetch"
 import { createClient } from "@/lib/supabase/client"
 import type { Trip, TripStatus } from "@/lib/trip/types"
 
@@ -12,16 +13,7 @@ export function useTrips() {
 
   return useQuery({
     queryKey: queryKeys.trips.list(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("trips")
-        .select("*")
-        .order("status", { ascending: true }) // open first
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      return (data ?? []) as Trip[]
-    },
+    queryFn: () => fetchTrips(supabase),
   })
 }
 
