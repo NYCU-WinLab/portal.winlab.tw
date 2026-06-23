@@ -17,6 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 import { IconDots } from "@tabler/icons-react"
 import Link from "next/link"
 
@@ -33,6 +34,16 @@ import { deleteDocument } from "../actions"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { DocumentCard } from "./document-card"
+
+function DocListSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="h-[68px] w-full rounded-xl" />
+      ))}
+    </div>
+  )
+}
 
 export function DocumentDashboard() {
   const { user } = useAuth()
@@ -85,7 +96,9 @@ export function DocumentDashboard() {
         </TabsList>
 
         <TabsContent value="inbox" className="flex flex-col gap-3">
-          {(inbox.data ?? []).length === 0 ? (
+          {inbox.isLoading ? (
+            <DocListSkeleton />
+          ) : (inbox.data ?? []).length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
               沒有待簽文件
             </p>
@@ -102,7 +115,9 @@ export function DocumentDashboard() {
         </TabsContent>
 
         <TabsContent value="signed" className="flex flex-col gap-3">
-          {(signed.data ?? []).length === 0 ? (
+          {signed.isLoading ? (
+            <DocListSkeleton />
+          ) : (signed.data ?? []).length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
               還沒簽過任何文件
             </p>
@@ -118,7 +133,9 @@ export function DocumentDashboard() {
         </TabsContent>
 
         <TabsContent value="sent" className="flex flex-col gap-3">
-          {(sent.data ?? []).length === 0 ? (
+          {sent.isLoading ? (
+            <DocListSkeleton />
+          ) : (sent.data ?? []).length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
               還沒送過任何文件
             </p>
