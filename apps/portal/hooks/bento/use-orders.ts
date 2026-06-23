@@ -2,68 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import type { Order, OrderWithStats } from "@/lib/bento/types"
+import { fetchOrders } from "@/lib/bento/fetch"
+import type { Order } from "@/lib/bento/types"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
-
-interface OrderItemRaw {
-  user_id: string | null
-  menu_items?: { name: string; price: number } | null
-}
-
-function computeOrderStats(orderItems: OrderItemRaw[]) {
-  const uniqueUsers = new Set(
-    orderItems.map((item) => item.user_id).filter(Boolean)
-  )
-
-  const menuItemCounts = new Map<string, { name: string; count: number }>()
-  let totalPrice = 0
-
-  for (const item of orderItems) {
-    const name = item.menu_items?.name
-    const price = parseFloat(String(item.menu_items?.price || 0))
-    totalPrice += price
-
-    if (name) {
-      const existing = menuItemCounts.get(name)
-      if (existing) {
-        existing.count += 1
-      } else {
-        menuItemCounts.set(name, { name, count: 1 })
-      }
-    }
-  }
-
-  return {
-    user_count: uniqueUsers.size,
-    menu_item_names: Array.from(menuItemCounts.keys()),
-    menu_items: Array.from(menuItemCounts.values()),
-    total_items: orderItems.length,
-    total_price: totalPrice,
-  }
-}
 
 export function useOrders() {
   const supabase = createClient()
 
   return useQuery({
     queryKey: queryKeys.orders.list(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("bento_orders")
-        .select(
-          "*, restaurants:bento_menus(name, additional), order_items:bento_order_items(*, menu_items:bento_menu_items(name, price))"
-        )
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map((order) => ({
-        ...order,
-        stats: computeOrderStats((order.order_items || []) as OrderItemRaw[]),
-      })) as unknown as OrderWithStats[]
-    },
+    queryFn: () => fetchOrders(supabase),
   })
 }
 
