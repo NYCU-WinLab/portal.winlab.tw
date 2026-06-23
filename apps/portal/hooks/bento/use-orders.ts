@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import type { Order, OrderWithStats } from "@/lib/bento/types"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -9,17 +10,6 @@ import { queryKeys } from "./query-keys"
 interface OrderItemRaw {
   user_id: string | null
   menu_items?: { name: string; price: number } | null
-}
-
-interface OrderItemWithUser extends OrderItemRaw {
-  id: string
-  order_id: string
-  menu_item_id: string
-  anonymous_name?: string | null
-  anonymous_contact?: string | null
-  no_sauce?: boolean
-  additional?: number | null
-  user?: { name: string | null } | null
 }
 
 function computeOrderStats(orderItems: OrderItemRaw[]) {
@@ -72,7 +62,7 @@ export function useOrders() {
       return (data || []).map((order) => ({
         ...order,
         stats: computeOrderStats((order.order_items || []) as OrderItemRaw[]),
-      }))
+      })) as unknown as OrderWithStats[]
     },
   })
 }
@@ -83,7 +73,7 @@ export function useOrder(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orders.detail(id!),
     queryFn: async () => {
-      const { data: order, error } = await supabase
+      const { data, error } = await supabase
         .from("bento_orders")
         .select(
           "*, restaurants:bento_menus(*), order_items:bento_order_items(*, menu_items:bento_menu_items(*))"
@@ -93,8 +83,10 @@ export function useOrder(id: string | undefined) {
 
       if (error) throw error
 
+      const order = data as unknown as Order
+
       if (order?.order_items) {
-        const items = order.order_items as OrderItemWithUser[]
+        const items = order.order_items
         const userIds = [
           ...new Set(
             items
@@ -156,7 +148,7 @@ export function useCreateOrder() {
       const { data, error } = await supabase.rpc("create_bento_order", {
         p_restaurant_id: params.p_restaurant_id,
         p_order_date: params.p_order_date,
-        p_auto_close_at: params.p_auto_close_at ?? null,
+        p_auto_close_at: params.p_auto_close_at ?? undefined,
       })
       if (error) throw error
       return data

@@ -1,5 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr"
 
+import type { Database } from "./database.types"
+
 // Mirrors the exact UTF-8 validation that @supabase/supabase-js runs when it
 // decodes a stored JWT. If a stored session contains bytes that fail this
 // check the SDK throws "Invalid UTF-8 sequence" and the auth client is left
@@ -65,7 +67,7 @@ function purgeCorruptedAuthStorageOnce() {
 
 export function createClient() {
   purgeCorruptedAuthStorageOnce()
-  return createBrowserClient(
+  return createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     { cookieOptions: { name: "portal" } }
