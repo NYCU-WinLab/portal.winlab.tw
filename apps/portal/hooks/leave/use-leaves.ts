@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import type { Leave, LeaveWithUser } from "@/lib/leave/types"
+import { fetchLeaves } from "@/lib/leave/fetch"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -12,38 +12,7 @@ export function useLeaves() {
 
   return useQuery({
     queryKey: queryKeys.leaves.list(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leaves")
-        .select("*")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      const leaves = (data ?? []) as Leave[]
-      if (leaves.length === 0) return [] as LeaveWithUser[]
-
-      const userIds = [...new Set(leaves.map((l) => l.user_id))]
-      const { data: profiles } = await supabase
-        .from("user_profiles")
-        .select("id, name")
-        .in("id", userIds)
-
-      const profileMap = new Map(
-        (profiles ?? []).map((p: { id: string; name: string | null }) => [
-          p.id,
-          p,
-        ])
-      )
-
-      return leaves.map((leave) => ({
-        ...leave,
-        user: profileMap.has(leave.user_id)
-          ? { name: profileMap.get(leave.user_id)!.name ?? null }
-          : null,
-      })) as LeaveWithUser[]
-    },
+    queryFn: () => fetchLeaves(supabase),
   })
 }
 
