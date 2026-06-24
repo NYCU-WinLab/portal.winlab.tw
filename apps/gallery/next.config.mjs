@@ -1,6 +1,17 @@
+import path from "path"
+import { fileURLToPath } from "url"
+
+const monorepoRoot = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../.."
+)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
+  turbopack: {
+    root: monorepoRoot,
+  },
   images: {
     remotePatterns: [
       {

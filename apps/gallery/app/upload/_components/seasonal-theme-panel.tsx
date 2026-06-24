@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react"
 
-import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
@@ -14,9 +13,20 @@ import {
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
 import {
+  GALLERY_SEASONAL_THEME_IDS,
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
+
+type ThemeChoice = GallerySeasonalThemeId | "off"
+
+const THEME_OPTIONS: Array<{ value: ThemeChoice; label: string }> = [
+  { value: "off", label: "Off" },
+  ...GALLERY_SEASONAL_THEME_IDS.map((id) => ({
+    value: id,
+    label: GALLERY_SEASONAL_THEMES[id].label,
+  })),
+]
 
 export function SeasonalThemePanel({
   activeThemeId,
@@ -25,68 +35,85 @@ export function SeasonalThemePanel({
   activeThemeId: GallerySeasonalThemeId | null
   settingsReady?: boolean
 }) {
-  const theme = GALLERY_SEASONAL_THEMES["dragon-boat"]
-  const [enabled, setEnabled] = useState(activeThemeId === theme.id)
+  const [selected, setSelected] = useState<ThemeChoice>(activeThemeId ?? "off")
   const [isPending, startTransition] = useTransition()
 
-  const onToggle = (next: boolean) => {
-    setEnabled(next)
+  const onSelect = (next: ThemeChoice) => {
+    const previous = selected
+    setSelected(next)
     startTransition(async () => {
-      const result = await setGallerySeasonalTheme(next ? theme.id : null)
+      const themeId = next === "off" ? null : next
+      const result = await setGallerySeasonalTheme(themeId)
       if (!result.ok) {
-        setEnabled(!next)
+        setSelected(previous)
         toast.error(result.error)
         return
       }
-      toast.success(
-        next ? `${theme.label} theme is on.` : "Seasonal theme off."
-      )
+      if (themeId) {
+        toast.success(`${GALLERY_SEASONAL_THEMES[themeId].label} theme is on.`)
+      } else {
+        toast.success("Seasonal theme off.")
+      }
     })
   }
 
   return (
     <section className={galleryPanelClass()}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h2
-            className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
-          >
-            Site theme
-          </h2>
-          <p className={gallerySectionLeadClass()}>
-            Toggle a limited-time look for everyone visiting the gallery wall.
-          </p>
-        </div>
-        <Switch
-          checked={enabled}
-          disabled={isPending}
-          onCheckedChange={onToggle}
-          aria-label={`${theme.label} theme`}
-        />
+      <div className="space-y-1">
+        <h2 className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}>
+          Site theme
+        </h2>
+        <p className={gallerySectionLeadClass()}>
+          Pick a limited-time look for everyone visiting the gallery wall.
+        </p>
       </div>
+
       <div
         className={cn(
           gallerySans(),
-          "mt-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3"
+          "mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
         )}
+        role="radiogroup"
+        aria-label="Seasonal site theme"
       >
-        <p className="text-sm font-medium text-foreground">{theme.label}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {theme.description}
-        </p>
-        {!settingsReady ? (
-          <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
-            Database settings not ready — apply{" "}
-            <code className="text-[10px]">2026-06-12-gallery-settings.sql</code>
-            , or set{" "}
-            <code className="text-[10px]">
-              GALLERY_SEASONAL_THEME=dragon-boat
-            </code>{" "}
-            in <code className="text-[10px]">.env.local</code> for local
-            preview.
-          </p>
-        ) : null}
+        {THEME_OPTIONS.map((option) => {
+          const checked = selected === option.value
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              disabled={isPending}
+              onClick={() => onSelect(option.value)}
+              className={cn(
+                "min-w-[8.5rem] flex-1 rounded-xl border px-4 py-3 text-left transition-colors",
+                checked
+                  ? "border-foreground/25 bg-foreground/[0.07] text-foreground"
+                  : "border-border/60 bg-muted/20 text-muted-foreground hover:border-foreground/15 hover:bg-muted/40 hover:text-foreground"
+              )}
+            >
+              <span className="text-sm font-medium">{option.label}</span>
+            </button>
+          )
+        })}
       </div>
+
+      {!settingsReady ? (
+        <p
+          className={cn(
+            gallerySans(),
+            "mt-3 text-xs text-amber-800 dark:text-amber-200"
+          )}
+        >
+          Database settings not ready — apply{" "}
+          <code className="text-[10px]">2026-06-12-gallery-settings.sql</code>,
+          or set{" "}
+          <code className="text-[10px]">GALLERY_SEASONAL_THEME=world-cup</code>{" "}
+          in <code className="text-[10px]">.env.local</code> for local preview.
+        </p>
+      ) : null}
     </section>
   )
 }

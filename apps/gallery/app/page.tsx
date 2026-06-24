@@ -1,6 +1,6 @@
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { GalleryPagination } from "@/app/_components/gallery-pagination"
-import { GalleryShell } from "@/components/gallery-shell"
+import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryHomePage } from "@/lib/gallery/load-home-page"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
@@ -27,7 +27,7 @@ export default async function GalleryHomePage({
     })
 
   return (
-    <GalleryShell active="home" signedIn={Boolean(user)}>
+    <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
         <GalleryGrid
           images={images}
@@ -38,6 +38,6 @@ export default async function GalleryHomePage({
         />
         <GalleryPagination page={currentPage} totalPages={totalPages} />
       </div>
-    </GalleryShell>
+    </GalleryThemedShell>
   )
 }
