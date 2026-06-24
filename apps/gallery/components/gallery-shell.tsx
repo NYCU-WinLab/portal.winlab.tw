@@ -3,6 +3,8 @@ import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { GalleryFootballSeeds } from "@/components/gallery-football-seeds"
+import { GalleryHeaderPitchline } from "@/components/gallery-header-pitchline"
 import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
@@ -16,6 +18,12 @@ import {
   GalleryShellNav,
   type GalleryShellActive,
 } from "@/components/gallery-shell-nav"
+import {
+  GALLERY_SEASONAL_THEMES,
+  type GallerySeasonalThemeId,
+} from "@/lib/gallery/seasonal-themes"
+import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
+import { createClient } from "@/lib/supabase/server"
 
 export type { GalleryShellActive } from "@/components/gallery-shell-nav"
 
@@ -23,13 +31,19 @@ export function GalleryShell({
   children,
   active = "home",
   signedIn = false,
+  seasonalThemeId = null,
   containerClassName,
 }: {
   children: ReactNode
   active?: GalleryShellActive
   signedIn?: boolean
+  seasonalThemeId?: GallerySeasonalThemeId | null
   containerClassName?: string
 }) {
+  const theme = seasonalThemeId
+    ? GALLERY_SEASONAL_THEMES[seasonalThemeId]
+    : null
+
   return (
     <div className="relative min-h-dvh bg-background text-foreground">
       <div className={galleryPageBackdropClass()} aria-hidden />
@@ -48,23 +62,30 @@ export function GalleryShell({
               )}
             >
               Gallery
-              <span
-                className={cn(
-                  gallerySans(),
-                  "gallery-seasonal-badge shrink-0 rounded-full border border-emerald-700/25 bg-emerald-600/10 px-1.5 py-0.5 text-[9px] tracking-wide text-emerald-800 uppercase not-italic sm:px-2 sm:text-[10px]"
-                )}
-                aria-hidden
-              >
-                端午
-              </span>
+              {theme ? (
+                <span
+                  className={cn(
+                    gallerySans(),
+                    "gallery-seasonal-badge shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tracking-wide uppercase not-italic sm:px-2 sm:text-[10px]",
+                    seasonalThemeId === "dragon-boat" &&
+                      "border-emerald-700/25 bg-emerald-600/10 text-emerald-800",
+                    seasonalThemeId === "world-cup" &&
+                      "border-lime-800/25 bg-lime-600/12 text-lime-950"
+                  )}
+                  aria-hidden
+                >
+                  {theme.badge}
+                </span>
+              ) : null}
             </Link>
             <div className="gallery-header-seasonal-row min-w-0 flex-1 overflow-hidden">
-              <GalleryHeaderSeasonal />
+              <GalleryHeaderSeasonal themeId={seasonalThemeId} />
             </div>
             <GalleryShellNav active={active} signedIn={signedIn} />
           </div>
         </div>
-        <GalleryHeaderWaterline />
+        {seasonalThemeId === "dragon-boat" ? <GalleryHeaderWaterline /> : null}
+        {seasonalThemeId === "world-cup" ? <GalleryHeaderPitchline /> : null}
       </header>
       <main
         className={cn(
@@ -77,7 +98,34 @@ export function GalleryShell({
           <GalleryFooter />
         </div>
       </main>
-      <GalleryZongziSeeds />
+      {seasonalThemeId === "dragon-boat" ? <GalleryZongziSeeds /> : null}
+      {seasonalThemeId === "world-cup" ? <GalleryFootballSeeds /> : null}
     </div>
+  )
+}
+
+export async function GalleryThemedShell({
+  children,
+  active = "home",
+  signedIn = false,
+  containerClassName,
+}: {
+  children: ReactNode
+  active?: GalleryShellActive
+  signedIn?: boolean
+  containerClassName?: string
+}) {
+  const supabase = await createClient()
+  const seasonalThemeId = await getGallerySeasonalThemeId(supabase)
+
+  return (
+    <GalleryShell
+      active={active}
+      signedIn={signedIn}
+      seasonalThemeId={seasonalThemeId}
+      containerClassName={containerClassName}
+    >
+      {children}
+    </GalleryShell>
   )
 }

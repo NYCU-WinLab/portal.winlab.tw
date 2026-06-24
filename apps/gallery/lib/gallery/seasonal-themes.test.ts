@@ -11,6 +11,10 @@ describe("isGallerySeasonalThemeId", () => {
     expect(isGallerySeasonalThemeId("dragon-boat")).toBe(true)
   })
 
+  test("accepts world-cup", () => {
+    expect(isGallerySeasonalThemeId("world-cup")).toBe(true)
+  })
+
   test("rejects unknown ids", () => {
     expect(isGallerySeasonalThemeId("christmas")).toBe(false)
     expect(isGallerySeasonalThemeId(null)).toBe(false)
@@ -26,6 +30,7 @@ describe("parseSeasonalThemeSetting", () => {
 
   test("returns theme id when valid", () => {
     expect(parseSeasonalThemeSetting({ id: "dragon-boat" })).toBe("dragon-boat")
+    expect(parseSeasonalThemeSetting({ id: "world-cup" })).toBe("world-cup")
   })
 
   test("returns null for invalid id", () => {
@@ -37,6 +42,12 @@ describe("getSeasonalThemeEnvOverride", () => {
   test("reads dragon-boat from env", () => {
     process.env.GALLERY_SEASONAL_THEME = "dragon-boat"
     expect(getSeasonalThemeEnvOverride()).toBe("dragon-boat")
+    delete process.env.GALLERY_SEASONAL_THEME
+  })
+
+  test("reads world-cup from env", () => {
+    process.env.GALLERY_SEASONAL_THEME = "world-cup"
+    expect(getSeasonalThemeEnvOverride()).toBe("world-cup")
     delete process.env.GALLERY_SEASONAL_THEME
   })
 
