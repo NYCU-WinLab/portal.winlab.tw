@@ -42,7 +42,12 @@ export function GalleryShellNav({
   mentionNotifications?: GalleryMentionNotification[]
 }) {
   return (
-    <>
+    <div
+      className={cn(
+        gallerySans(),
+        "relative z-10 flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
+      )}
+    >
       {signedIn && viewerId ? (
         <GalleryMentionBell
           viewerId={viewerId}
@@ -50,12 +55,7 @@ export function GalleryShellNav({
         />
       ) : null}
 
-      <nav
-        className={cn(
-          gallerySans(),
-          "relative z-10 hidden shrink-0 items-center justify-end gap-4 md:flex"
-        )}
-      >
+      <nav className="hidden shrink-0 items-center gap-4 md:flex">
         <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
           Portal
         </GalleryNavLink>
@@ -75,12 +75,7 @@ export function GalleryShellNav({
         )}
       </nav>
 
-      <div
-        className={cn(
-          gallerySans(),
-          "relative z-10 flex shrink-0 items-center gap-0.5 md:hidden"
-        )}
-      >
+      <div className="flex shrink-0 items-center gap-0.5 md:hidden">
         {signedIn ? (
           <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
         ) : (
@@ -143,6 +138,6 @@ export function GalleryShellNav({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </>
+    </div>
   )
 }
