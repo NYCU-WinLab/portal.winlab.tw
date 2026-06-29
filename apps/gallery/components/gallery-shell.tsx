@@ -60,12 +60,12 @@ export function GalleryShell({
       />
       <header className="gallery-shell-header pointer-events-none">
         <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-1.5 pb-1 sm:px-6 sm:pb-1.5">
-          <div className="gallery-shell-nav-row relative flex min-h-[1.75rem] flex-nowrap items-center gap-2 sm:gap-3">
+          <div className="gallery-shell-nav-row relative grid w-full min-h-[1.75rem] grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
             <Link
               href="/"
               className={cn(
                 galleryShellBrandClass(active === "home"),
-                "relative z-10 inline-flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2"
+                "relative z-10 inline-flex min-w-0 items-center gap-1.5 sm:gap-2"
               )}
             >
               Gallery
@@ -85,15 +85,17 @@ export function GalleryShell({
                 </span>
               ) : null}
             </Link>
-            <div className="gallery-header-seasonal-row min-w-0 flex-1 overflow-hidden">
+            <div className="gallery-header-seasonal-row relative z-0 flex min-w-0 items-end justify-center justify-self-stretch overflow-hidden">
               <GalleryHeaderSeasonal themeId={seasonalThemeId} />
             </div>
-            <GalleryShellNav
-              active={active}
-              signedIn={signedIn}
-              viewerId={viewerId}
-              mentionNotifications={mentionNotifications}
-            />
+            <div className="relative z-10 justify-self-end">
+              <GalleryShellNav
+                active={active}
+                signedIn={signedIn}
+                viewerId={viewerId}
+                mentionNotifications={mentionNotifications}
+              />
+            </div>
           </div>
         </div>
         {seasonalThemeId === "dragon-boat" ? <GalleryHeaderWaterline /> : null}
