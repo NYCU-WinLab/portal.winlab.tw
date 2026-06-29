@@ -18,12 +18,15 @@ import {
   GalleryShellNav,
   type GalleryShellActive,
 } from "@/components/gallery-shell-nav"
+import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
 import {
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
+import { loadUnreadGalleryMentions } from "@/lib/gallery/mention-notifications"
 import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/user"
 
 export type { GalleryShellActive } from "@/components/gallery-shell-nav"
 
@@ -31,13 +34,17 @@ export function GalleryShell({
   children,
   active = "home",
   signedIn = false,
+  viewerId = null,
   seasonalThemeId = null,
+  mentionNotifications = [],
   containerClassName,
 }: {
   children: ReactNode
   active?: GalleryShellActive
   signedIn?: boolean
+  viewerId?: string | null
   seasonalThemeId?: GallerySeasonalThemeId | null
+  mentionNotifications?: GalleryMentionNotification[]
   containerClassName?: string
 }) {
   const theme = seasonalThemeId
@@ -81,7 +88,12 @@ export function GalleryShell({
             <div className="gallery-header-seasonal-row min-w-0 flex-1 overflow-hidden">
               <GalleryHeaderSeasonal themeId={seasonalThemeId} />
             </div>
-            <GalleryShellNav active={active} signedIn={signedIn} />
+            <GalleryShellNav
+              active={active}
+              signedIn={signedIn}
+              viewerId={viewerId}
+              mentionNotifications={mentionNotifications}
+            />
           </div>
         </div>
         {seasonalThemeId === "dragon-boat" ? <GalleryHeaderWaterline /> : null}
@@ -116,13 +128,19 @@ export async function GalleryThemedShell({
   containerClassName?: string
 }) {
   const supabase = await createClient()
-  const seasonalThemeId = await getGallerySeasonalThemeId(supabase)
+  const user = await getCurrentUser()
+  const [seasonalThemeId, mentionNotifications] = await Promise.all([
+    getGallerySeasonalThemeId(supabase),
+    user ? loadUnreadGalleryMentions(supabase, user.id) : Promise.resolve([]),
+  ])
 
   return (
     <GalleryShell
       active={active}
-      signedIn={signedIn}
+      signedIn={Boolean(user)}
+      viewerId={user?.id ?? null}
       seasonalThemeId={seasonalThemeId}
+      mentionNotifications={mentionNotifications}
       containerClassName={containerClassName}
     >
       {children}

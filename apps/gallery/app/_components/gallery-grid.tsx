@@ -10,12 +10,16 @@ export function GalleryGrid({
   viewerId,
   viewerName,
   members,
+  openPhotoId = null,
+  openCommentId = null,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
+  openPhotoId?: string | null
+  openCommentId?: string | null
 }) {
   if (images.length === 0) {
     return (
@@ -37,6 +41,8 @@ export function GalleryGrid({
             viewerName={viewerName}
             members={members}
             priorityLcp={index === 0}
+            initialOpen={openPhotoId === image.id}
+            highlightCommentId={openPhotoId === image.id ? openCommentId : null}
           />
         </div>
       ))}

@@ -24,19 +24,32 @@ import {
   galleryShellIconButtonClass,
   galleryShellNavLinkClass,
 } from "@/components/gallery-chrome"
+import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
+import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
 
 export type GalleryShellActive = "home" | "manage"
 
 export function GalleryShellNav({
   active,
   signedIn,
+  viewerId = null,
+  mentionNotifications = [],
 }: {
   active: GalleryShellActive
   signedIn: boolean
+  viewerId?: string | null
+  mentionNotifications?: GalleryMentionNotification[]
 }) {
   return (
     <>
+      {signedIn && viewerId ? (
+        <GalleryMentionBell
+          viewerId={viewerId}
+          initialNotifications={mentionNotifications}
+        />
+      ) : null}
+
       <nav
         className={cn(
           gallerySans(),
