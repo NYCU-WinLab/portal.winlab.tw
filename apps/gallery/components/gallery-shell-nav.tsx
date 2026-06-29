@@ -24,16 +24,22 @@ import {
   galleryShellIconButtonClass,
   galleryShellNavLinkClass,
 } from "@/components/gallery-chrome"
+import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
+import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
 
 export type GalleryShellActive = "home" | "manage"
 
 export function GalleryShellNav({
   active,
   signedIn,
+  viewerId = null,
+  mentionNotifications = [],
 }: {
   active: GalleryShellActive
   signedIn: boolean
+  viewerId?: string | null
+  mentionNotifications?: GalleryMentionNotification[]
 }) {
   return (
     <>
@@ -43,11 +49,19 @@ export function GalleryShellNav({
           "relative z-10 hidden shrink-0 items-center justify-end gap-4 md:flex"
         )}
       >
-        <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
-          Portal
-        </GalleryNavLink>
-        {signedIn ? (
+        {signedIn && viewerId ? (
           <>
+            <GalleryMentionBell
+              viewerId={viewerId}
+              initialNotifications={mentionNotifications}
+            />
+            <GalleryNavLink
+              href="https://portal.winlab.tw"
+              external
+              tone="shell"
+            >
+              Portal
+            </GalleryNavLink>
             {active !== "manage" ? (
               <GalleryNavLink href="/upload" tone="shell">
                 Manage
@@ -56,10 +70,15 @@ export function GalleryShellNav({
             <SignOutButton className={galleryShellNavLinkClass()} />
           </>
         ) : (
+          <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
+            Portal
+          </GalleryNavLink>
+        )}
+        {!signedIn ? (
           <GalleryNavLink href="/auth/login?next=/upload" tone="shell">
             Sign in
           </GalleryNavLink>
-        )}
+        ) : null}
       </nav>
 
       <div
@@ -68,8 +87,14 @@ export function GalleryShellNav({
           "relative z-10 flex shrink-0 items-center gap-0.5 md:hidden"
         )}
       >
-        {signedIn ? (
-          <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
+        {signedIn && viewerId ? (
+          <>
+            <GalleryMentionBell
+              viewerId={viewerId}
+              initialNotifications={mentionNotifications}
+            />
+            <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
+          </>
         ) : (
           <Link
             href="/auth/login?next=/upload"
