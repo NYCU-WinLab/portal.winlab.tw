@@ -59,8 +59,10 @@ export function GalleryMentionBell({
 
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
-      .channel(`gallery-mentions:${viewerId}`)
+    const channelName = `gallery-mentions:${viewerId}:${crypto.randomUUID()}`
+    const channel = supabase.channel(channelName)
+
+    channel
       .on(
         "postgres_changes",
         {
@@ -110,7 +112,7 @@ export function GalleryMentionBell({
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      void supabase.removeChannel(channel)
     }
   }, [viewerId])
 

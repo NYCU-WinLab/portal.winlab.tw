@@ -43,25 +43,24 @@ export function GalleryShellNav({
 }) {
   return (
     <>
+      {signedIn && viewerId ? (
+        <GalleryMentionBell
+          viewerId={viewerId}
+          initialNotifications={mentionNotifications}
+        />
+      ) : null}
+
       <nav
         className={cn(
           gallerySans(),
           "relative z-10 hidden shrink-0 items-center justify-end gap-4 md:flex"
         )}
       >
-        {signedIn && viewerId ? (
+        <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
+          Portal
+        </GalleryNavLink>
+        {signedIn ? (
           <>
-            <GalleryMentionBell
-              viewerId={viewerId}
-              initialNotifications={mentionNotifications}
-            />
-            <GalleryNavLink
-              href="https://portal.winlab.tw"
-              external
-              tone="shell"
-            >
-              Portal
-            </GalleryNavLink>
             {active !== "manage" ? (
               <GalleryNavLink href="/upload" tone="shell">
                 Manage
@@ -70,15 +69,10 @@ export function GalleryShellNav({
             <SignOutButton className={galleryShellNavLinkClass()} />
           </>
         ) : (
-          <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
-            Portal
-          </GalleryNavLink>
-        )}
-        {!signedIn ? (
           <GalleryNavLink href="/auth/login?next=/upload" tone="shell">
             Sign in
           </GalleryNavLink>
-        ) : null}
+        )}
       </nav>
 
       <div
@@ -87,14 +81,8 @@ export function GalleryShellNav({
           "relative z-10 flex shrink-0 items-center gap-0.5 md:hidden"
         )}
       >
-        {signedIn && viewerId ? (
-          <>
-            <GalleryMentionBell
-              viewerId={viewerId}
-              initialNotifications={mentionNotifications}
-            />
-            <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
-          </>
+        {signedIn ? (
+          <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
         ) : (
           <Link
             href="/auth/login?next=/upload"
