@@ -27,12 +27,9 @@ export function GalleryGrid({
   }
 
   return (
-    <div className="columns-1 gap-x-5 sm:columns-2 sm:gap-x-7 lg:columns-3 lg:gap-x-8">
+    <div className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12">
       {images.map((image, index) => (
-        <div
-          key={image.id}
-          className="mb-9 w-full max-w-full break-inside-avoid sm:mb-11 lg:mb-12"
-        >
+        <div key={image.id} className="w-full max-w-full">
           <GalleryCard
             image={image}
             isSignedIn={isSignedIn}
