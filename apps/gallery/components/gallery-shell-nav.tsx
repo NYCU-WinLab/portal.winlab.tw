@@ -45,7 +45,7 @@ export function GalleryShellNav({
     <div
       className={cn(
         gallerySans(),
-        "relative z-10 flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
+        "relative z-10 ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
       )}
     >
       {signedIn && viewerId ? (
