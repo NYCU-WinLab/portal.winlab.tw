@@ -7,6 +7,7 @@ import {
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
 import { parseMentions, resolveMentionedProfiles } from "@/lib/gallery/mentions"
+import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
 import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
@@ -111,6 +112,73 @@ export type CreatedGalleryComment = {
   body: string
   created_by: string
   created_at: string
+  updated_at: string | null
+}
+
+async function syncGalleryCommentMentions(
+  admin: ReturnType<typeof createAdminClient>,
+  commentId: string,
+  body: string,
+  authorId: string
+) {
+  const mentionNames = parseMentions(body)
+  const { data: existingRows } = await admin
+    .from("gallery_comment_mentions")
+    .select("mentioned_user_id")
+    .eq("comment_id", commentId)
+
+  const existingIds = new Set(
+    (existingRows ?? []).map((row) => row.mentioned_user_id)
+  )
+
+  if (mentionNames.length === 0) {
+    if (existingIds.size > 0) {
+      const { error } = await admin
+        .from("gallery_comment_mentions")
+        .delete()
+        .eq("comment_id", commentId)
+      if (error) {
+        console.error("[gallery] failed to clear comment mentions", error)
+      }
+    }
+    return
+  }
+
+  const { data: profiles } = await admin
+    .from("user_profiles")
+    .select("id, name")
+    .not("name", "is", null)
+
+  const matched = resolveMentionedProfiles(mentionNames, profiles ?? [])
+  const others = matched.filter((profile) => profile.id !== authorId)
+  const targetIds = new Set(others.map((profile) => profile.id))
+
+  const toRemove = [...existingIds].filter((id) => !targetIds.has(id))
+  if (toRemove.length > 0) {
+    const { error } = await admin
+      .from("gallery_comment_mentions")
+      .delete()
+      .eq("comment_id", commentId)
+      .in("mentioned_user_id", toRemove)
+    if (error) {
+      console.error("[gallery] failed to remove stale mentions", error)
+    }
+  }
+
+  const toAdd = others.filter((profile) => !existingIds.has(profile.id))
+  if (toAdd.length === 0) return
+
+  const { error: mentionError } = await admin
+    .from("gallery_comment_mentions")
+    .insert(
+      toAdd.map((profile) => ({
+        comment_id: commentId,
+        mentioned_user_id: profile.id,
+      }))
+    )
+  if (mentionError) {
+    console.error("[gallery] failed to save comment mentions", mentionError)
+  }
 }
 
 export async function addGalleryComment(
@@ -187,27 +255,73 @@ export async function addGalleryComment(
 
   const mentionNames = parseMentions(trimmed)
   if (mentionNames.length > 0) {
-    const { data: profiles } = await admin
-      .from("user_profiles")
-      .select("id, name")
-      .not("name", "is", null)
+    await syncGalleryCommentMentions(admin, data.id, trimmed, userId)
+  }
 
-    const matched = resolveMentionedProfiles(mentionNames, profiles ?? [])
-    const others = matched.filter((p) => p.id !== userId)
-    if (others.length > 0) {
-      const { error: mentionError } = await admin
-        .from("gallery_comment_mentions")
-        .insert(
-          others.map((u) => ({
-            comment_id: data.id,
-            mentioned_user_id: u.id,
-          }))
-        )
-      if (mentionError) {
-        console.error("[gallery] failed to save comment mentions", mentionError)
+  revalidatePath("/", "layout")
+  return { ok: true, data: { ...data, updated_at: null } }
+}
+
+export async function updateGalleryComment(
+  commentId: string,
+  body: string
+): Promise<CommentActionResult<CreatedGalleryComment>> {
+  const trimmed = body.trim()
+  if (!commentId) return { ok: false, error: "Missing comment id." }
+  if (!trimmed) return { ok: false, error: "Comment cannot be empty." }
+  if (trimmed.length > 1000) {
+    return { ok: false, error: "Comment is too long (max 1000 chars)." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const updatedAt = new Date().toISOString()
+  let data: CreatedGalleryComment | null = null
+  let error: { code?: string; message?: string } | null = null
+
+  const withUpdatedAt = await supabase
+    .from("gallery_comments")
+    .update({ body: trimmed, updated_at: updatedAt })
+    .eq("id", commentId)
+    .eq("created_by", userId)
+    .select("id, image_id, parent_id, body, created_by, created_at, updated_at")
+    .maybeSingle()
+
+  data = withUpdatedAt.data as CreatedGalleryComment | null
+  error = withUpdatedAt.error
+
+  if (error && isGalleryCommentEditUnavailable(error)) {
+    const fallback = await supabase
+      .from("gallery_comments")
+      .update({ body: trimmed })
+      .eq("id", commentId)
+      .eq("created_by", userId)
+      .select("id, image_id, parent_id, body, created_by, created_at")
+      .maybeSingle()
+
+    if (fallback.error || !fallback.data) {
+      return {
+        ok: false,
+        error: `Update failed: ${fallback.error?.message ?? "Comment edit is not available yet — apply the gallery comments update migration."}`,
       }
     }
+
+    data = { ...fallback.data, updated_at: null }
+    error = null
   }
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: `Update failed: ${error?.message ?? "Comment not found."}`,
+    }
+  }
+
+  const admin = createAdminClient()
+  await syncGalleryCommentMentions(admin, commentId, trimmed, userId)
 
   revalidatePath("/", "layout")
   return { ok: true, data }
