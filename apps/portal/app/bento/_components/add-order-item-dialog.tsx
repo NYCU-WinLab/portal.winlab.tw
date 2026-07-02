@@ -224,8 +224,8 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
               </Select>
             </div>
           )}
-          <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col gap-3 pb-4">
+            <div>
               <Select value={selectedItem} onValueChange={setSelectedItem}>
                 <SelectTrigger id="menuItem" className="w-full">
                   <SelectValue placeholder="選擇品項" />
@@ -294,7 +294,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                     setSelectedAdditional(parseInt(value))
                   }
                 >
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="選項" />
                   </SelectTrigger>
                   <SelectContent>
