@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react"
 
 import { Badge } from "@workspace/ui/components/badge"
 
-import { parseOrderDate } from "@/lib/bento/date"
+import { formatOrderDate, orderBatchSuffix } from "@/lib/bento/date"
 
 import { OrderStats } from "./order-stats"
 
@@ -25,6 +25,7 @@ interface Order {
   status: "active" | "closed"
   created_at: string
   closed_at: string | null
+  order_date?: string | null
   restaurants: {
     id: string
     name: string
@@ -36,7 +37,8 @@ interface Order {
 }
 
 export function OrderDetailHeader({ order }: { order: Order }) {
-  const orderDate = parseOrderDate(order.id)
+  const orderDate = formatOrderDate(order.order_date, order.id)
+  const batch = orderBatchSuffix(order.id)
   const orderItems = order.order_items || []
 
   return (
@@ -47,6 +49,11 @@ export function OrderDetailHeader({ order }: { order: Order }) {
           <Badge variant="default" className="text-xs">
             {orderDate}
           </Badge>
+          {batch && (
+            <Badge variant="secondary" className="text-xs">
+              第 {batch} 批
+            </Badge>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           {order.restaurants.google_map_link && (
