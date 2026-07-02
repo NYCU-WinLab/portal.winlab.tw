@@ -12,6 +12,7 @@ import type {
   GalleryMember,
 } from "@/lib/gallery/types"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { loadGalleryCommentRows } from "@/lib/gallery/comment-edit"
 
 export const GALLERY_PAGE_SIZE = 36
 
@@ -158,11 +159,7 @@ export async function loadGalleryHomePage(
         .from("gallery_image_votes")
         .select("image_id, user_id, reaction")
         .in("image_id", imageIds),
-      supabase
-        .from("gallery_comments")
-        .select("id, image_id, parent_id, body, created_by, created_at")
-        .in("image_id", imageIds)
-        .order("created_at", { ascending: true }),
+      loadGalleryCommentRows(supabase, imageIds),
     ])
 
     if (voteResult.error) {
@@ -173,7 +170,7 @@ export async function loadGalleryHomePage(
     }
 
     const voteRows = voteResult.data ?? []
-    const commentRows = commentResult.data ?? []
+    const commentRows = commentResult.data
 
     if (!userId) {
       const profileIds = Array.from(
@@ -222,6 +219,7 @@ export async function loadGalleryHomePage(
         body: row.body,
         created_by: row.created_by,
         created_at: row.created_at,
+        updated_at: row.updated_at ?? null,
         commenter_name: nameById.get(row.created_by) ?? "Unknown",
       })
       commentsByImage.set(row.image_id, bucket)
