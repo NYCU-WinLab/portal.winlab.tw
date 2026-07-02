@@ -44,12 +44,13 @@ create or replace function public.create_bento_order(
 returns bento_orders
 language plpgsql
 security definer
+set search_path to 'public'
 as $function$
 declare
   v_base     text;
   v_order_id text;
   v_suffix   int := 1;
-  v_order    bento_orders;
+  v_order    public.bento_orders;
 begin
   -- Check admin
   if not has_role(auth.uid(), 'bento', 'admin') then
@@ -72,13 +73,13 @@ begin
     -- Pick the next candidate id that is not currently taken.
     v_order_id := v_base;
     v_suffix := 1;
-    while exists (select 1 from bento_orders where id = v_order_id) loop
+    while exists (select 1 from public.bento_orders where id = v_order_id) loop
       v_suffix := v_suffix + 1;
       v_order_id := v_base || '-' || v_suffix;
     end loop;
 
     begin
-      insert into bento_orders
+      insert into public.bento_orders
         (id, restaurant_id, status, created_by, auto_close_at, order_date)
       values
         (v_order_id, p_restaurant_id, 'active', auth.uid(), p_auto_close_at, p_order_date)
