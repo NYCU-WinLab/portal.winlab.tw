@@ -1,6 +1,12 @@
 import { createClient } from "@supabase/supabase-js"
 
-import { exchangeAuthCode } from "@/lib/auth/auth-codes"
+import {
+  exchangeAuthCode,
+  peekAuthCode,
+  type PeekedAuthData,
+  type StoredAuthData,
+} from "@/lib/auth/auth-codes"
+import type { OAuthClientStore } from "@/lib/auth/oauth-clients"
 import {
   parseTokenAuthorizationCodeRequest,
   validateOAuthClientRequest,
@@ -19,7 +25,19 @@ export async function POST(request: Request) {
   return Response.json({ error: "unsupported_grant_type" }, { status: 400 })
 }
 
-async function handleAuthorizationCode(body: FormData) {
+// Deps are injectable for testing; production callers (POST above) always
+// use the defaults, so behaviour is unchanged from before this refactor.
+export async function handleAuthorizationCode(
+  body: FormData,
+  deps: {
+    peek?: (code: string) => Promise<PeekedAuthData | null>
+    exchange?: (code: string) => Promise<StoredAuthData | null>
+    clientStore?: OAuthClientStore
+  } = {}
+) {
+  const peek = deps.peek ?? peekAuthCode
+  const exchange = deps.exchange ?? exchangeAuthCode
+
   let request: ReturnType<typeof parseTokenAuthorizationCodeRequest>
 
   try {
@@ -30,17 +48,21 @@ async function handleAuthorizationCode(body: FormData) {
     )
   }
 
-  const stored = await exchangeAuthCode(request.code)
-  if (!stored) return invalidGrant("Invalid or expired authorization code")
+  // Peek only — the code is *not* consumed yet, so a request that fails
+  // validation below (in particular PKCE) never burns it. This is the fix
+  // for the code-burning DoS: previously exchangeAuthCode (atomic
+  // delete-consume) ran before PKCE was checked.
+  const peeked = await peek(request.code)
+  if (!peeked) return invalidGrant("Invalid or expired authorization code")
 
-  if (request.redirectUri !== stored.redirectUri)
+  if (request.redirectUri !== peeked.redirectUri)
     return invalidGrant("redirect_uri mismatch")
-  if (request.clientId !== stored.clientId)
+  if (request.clientId !== peeked.clientId)
     return invalidGrant("client_id mismatch")
   if (
     request.resource &&
-    stored.resource &&
-    request.resource !== stored.resource
+    peeked.resource &&
+    request.resource !== peeked.resource
   )
     return invalidGrant("resource mismatch")
 
@@ -51,7 +73,7 @@ async function handleAuthorizationCode(body: FormData) {
         redirectUri: request.redirectUri,
         resource: request.resource,
       },
-      { expectedResource: getMcpResourceUrl() }
+      { expectedResource: getMcpResourceUrl(), store: deps.clientStore }
     )
   } catch (error) {
     return invalidGrant(
@@ -59,8 +81,12 @@ async function handleAuthorizationCode(body: FormData) {
     )
   }
 
-  if (!verifyPkce(request.codeVerifier, stored.codeChallenge))
+  if (!verifyPkce(request.codeVerifier, peeked.codeChallenge))
     return invalidGrant("PKCE verification failed")
+
+  // All validation passed — only now do we consume the code.
+  const stored = await exchange(request.code)
+  if (!stored) return invalidGrant("Invalid or expired authorization code")
 
   return Response.json({
     access_token: stored.accessToken,
