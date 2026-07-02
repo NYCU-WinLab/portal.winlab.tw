@@ -15,6 +15,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
+  IconLink,
   IconX,
 } from "@tabler/icons-react"
 
@@ -45,6 +46,7 @@ import {
 import { setGalleryReaction } from "@/app/actions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
+import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
@@ -213,6 +215,41 @@ export function GalleryCard({
     setLightboxFailed(false)
   }, [activeIndex])
 
+  useEffect(() => {
+    if (!isDialogOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" && isSequence) {
+        event.preventDefault()
+        setActiveIndex((idx) =>
+          idx === 0 ? sequenceMedia.length - 1 : idx - 1
+        )
+        return
+      }
+      if (event.key === "ArrowRight" && isSequence) {
+        event.preventDefault()
+        setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isDialogOpen, isSequence, sequenceMedia.length])
+
+  const copyShareLink = async () => {
+    const href = buildGalleryPhotoHref({
+      photoId: image.id,
+      commentId: highlightCommentId,
+    })
+    const url = `${window.location.origin}${href}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success("Link copied.")
+    } catch {
+      toast.error("Could not copy link.")
+    }
+  }
+
   const onReact = (reaction: GalleryReaction) => {
     if (!isSignedIn) {
       toast.error("Please sign in before reacting.")
@@ -349,6 +386,20 @@ export function GalleryCard({
               >
                 <IconX className="h-5 w-5" />
               </DialogClose>
+              <button
+                type="button"
+                onClick={() => void copyShareLink()}
+                aria-label="Copy share link"
+                className={cn(
+                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                  "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                  "transition-colors hover:bg-white",
+                  "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                )}
+              >
+                <IconLink className="h-5 w-5" />
+              </button>
               <div className="gallery-lightbox-layout">
                 <div className="gallery-lightbox-media">
                   {lightboxFailed ? (
