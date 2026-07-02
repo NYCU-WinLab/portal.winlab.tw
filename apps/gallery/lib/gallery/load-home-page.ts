@@ -11,6 +11,7 @@ import type {
   GalleryImage,
   GalleryMember,
 } from "@/lib/gallery/types"
+import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 
 export const GALLERY_PAGE_SIZE = 36
 
@@ -55,9 +56,11 @@ export async function loadGalleryHomePage(
   {
     page,
     userId,
+    filters = { uploaderId: null, media: "all", uploadedAfter: null },
   }: {
     page: number
     userId: string | null
+    filters?: GalleryHomeFilters
   }
 ): Promise<{
   images: GalleryImage[]
@@ -76,15 +79,27 @@ export async function loadGalleryHomePage(
           .select("id, name, email")
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
-    supabase
-      .from("gallery_images")
-      .select(
-        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index",
-        { count: "exact" }
-      )
-      .or("sequence_id.is.null,sequence_index.eq.0")
-      .order("created_at", { ascending: false })
-      .range(from, to),
+    (() => {
+      let query = supabase
+        .from("gallery_images")
+        .select(
+          "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index",
+          { count: "exact" }
+        )
+        .or("sequence_id.is.null,sequence_index.eq.0")
+
+      if (filters.uploaderId) {
+        query = query.eq("created_by", filters.uploaderId)
+      }
+      if (filters.media === "image" || filters.media === "video") {
+        query = query.eq("media_type", filters.media)
+      }
+      if (filters.uploadedAfter) {
+        query = query.gte("created_at", filters.uploadedAfter)
+      }
+
+      return query.order("created_at", { ascending: false }).range(from, to)
+    })(),
   ])
 
   if (imagesResult.error) {

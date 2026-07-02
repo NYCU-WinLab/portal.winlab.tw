@@ -10,7 +10,7 @@ import { toast } from "sonner"
 
 import { addGalleryComment, deleteGalleryComment } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
-import { parseMentions } from "@/lib/gallery/mentions"
+import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
 type CommentNode = GalleryComment & { depth: number }
@@ -182,7 +182,7 @@ export function GalleryComments({
                     </time>
                   </div>
                   <p className="mt-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
-                    <FormattedComment
+                    <FormattedCommentMentions
                       content={comment.body}
                       members={members}
                     />
@@ -307,43 +307,6 @@ export function GalleryComments({
         </div>
       </div>
     </div>
-  )
-}
-
-function FormattedComment({
-  content,
-  members,
-}: {
-  content: string
-  members: GalleryMember[]
-}) {
-  const mentionNames = new Set(parseMentions(content))
-  const knownNames = new Set(
-    members.map((m) => m.name).filter((n): n is string => Boolean(n))
-  )
-
-  if (mentionNames.size === 0) return <>{content}</>
-
-  const parts = content.split(/(@[\p{L}\p{N}._-]+)/gu)
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("@")) {
-          const name = part.slice(1)
-          if (mentionNames.has(name) && knownNames.has(name)) {
-            return (
-              <span
-                key={i}
-                className="rounded bg-blue-500/15 px-1 py-0.5 text-blue-700 dark:text-blue-300"
-              >
-                {part}
-              </span>
-            )
-          }
-        }
-        return <span key={i}>{part}</span>
-      })}
-    </>
   )
 }
 

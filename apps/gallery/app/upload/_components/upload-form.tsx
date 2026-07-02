@@ -30,6 +30,7 @@ type Status =
       kind: "working"
       label: string
       ratio: number
+      batch?: { current: number; total: number }
     }
 
 const PHASE_LABEL: Record<CompressPhase, string> = {
@@ -81,10 +82,23 @@ export function UploadForm() {
       const failed: string[] = []
       const sequenceId = files.length > 1 ? crypto.randomUUID() : null
 
+      const batch =
+        files.length > 1 ? { total: files.length, current: 0 } : undefined
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i]!
+        const batchCurrent = i + 1
         const labelPrefix =
-          files.length > 1 ? `(${i + 1}/${files.length}) ` : ""
+          files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
+
+        if (batch) {
+          setStatus({
+            kind: "working",
+            label: `Uploading ${batchCurrent} of ${files.length}`,
+            ratio: (i + 0.05) / files.length,
+            batch: { current: batchCurrent, total: files.length },
+          })
+        }
 
         const resolved = resolveMediaMimeType(file)
         if (!resolved) {
@@ -213,6 +227,16 @@ export function UploadForm() {
       </div>
       {status.kind === "working" ? (
         <div className="flex flex-col gap-2">
+          {status.batch ? (
+            <p
+              className={cn(
+                gallerySans(),
+                "text-sm font-medium text-foreground tabular-nums"
+              )}
+            >
+              {status.batch.current}/{status.batch.total}
+            </p>
+          ) : null}
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
             {status.label}
           </p>

@@ -3,18 +3,23 @@ import Link from "next/link"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { galleryNavLinkClass, gallerySans } from "@/components/gallery-chrome"
+import {
+  buildGalleryHomeHref,
+  type GalleryHomeFilters,
+} from "@/lib/gallery/home-filters"
 
-function buildPageHref(page: number) {
-  if (page <= 1) return "/"
-  return `/?page=${page}`
+function buildPageHref(page: number, filters?: GalleryHomeFilters) {
+  return buildGalleryHomeHref({ page, filters })
 }
 
 export function GalleryPagination({
   page,
   totalPages,
+  filters,
 }: {
   page: number
   totalPages: number
+  filters?: GalleryHomeFilters
 }) {
   if (totalPages <= 1) return null
 
@@ -31,7 +36,7 @@ export function GalleryPagination({
       )}
     >
       <Link
-        href={buildPageHref(page - 1)}
+        href={buildPageHref(page - 1, filters)}
         className={cn(
           galleryNavLinkClass(),
           page <= 1 && "pointer-events-none opacity-40"
@@ -43,7 +48,7 @@ export function GalleryPagination({
       {visible.map((p) => (
         <Link
           key={p}
-          href={buildPageHref(p)}
+          href={buildPageHref(p, filters)}
           className={galleryNavLinkClass(p === page)}
           aria-current={p === page ? "page" : undefined}
         >
@@ -51,7 +56,7 @@ export function GalleryPagination({
         </Link>
       ))}
       <Link
-        href={buildPageHref(page + 1)}
+        href={buildPageHref(page + 1, filters)}
         className={cn(
           galleryNavLinkClass(),
           page >= totalPages && "pointer-events-none opacity-40"

@@ -73,6 +73,31 @@ export async function setGalleryReaction(
     if (insertError) {
       return { ok: false, error: `Reaction failed: ${insertError.message}` }
     }
+
+    const admin = createAdminClient()
+    const { data: image } = await admin
+      .from("gallery_images")
+      .select("created_by")
+      .eq("id", imageId)
+      .maybeSingle()
+
+    if (image?.created_by && image.created_by !== userId) {
+      const { error: notifyError } = await admin
+        .from("gallery_activity_notifications")
+        .insert({
+          recipient_user_id: image.created_by,
+          kind: "reaction",
+          image_id: imageId,
+          actor_user_id: userId,
+          reaction,
+        })
+      if (notifyError && notifyError.code !== "23505") {
+        console.error(
+          "[gallery] failed to save reaction notification",
+          notifyError
+        )
+      }
+    }
   }
 
   revalidatePath("/")
@@ -105,10 +130,11 @@ export async function addGalleryComment(
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Please sign in first." }
 
+  let parentAuthorId: string | null = null
   if (parentId) {
     const { data: parent, error: parentError } = await supabase
       .from("gallery_comments")
-      .select("id, image_id")
+      .select("id, image_id, created_by")
       .eq("id", parentId)
       .maybeSingle()
     if (parentError) {
@@ -117,6 +143,7 @@ export async function addGalleryComment(
     if (!parent || parent.image_id !== imageId) {
       return { ok: false, error: "Invalid parent comment." }
     }
+    parentAuthorId = parent.created_by
   }
 
   const { data, error } = await supabase
@@ -137,9 +164,29 @@ export async function addGalleryComment(
     }
   }
 
+  const admin = createAdminClient()
+
+  if (parentAuthorId && parentAuthorId !== userId) {
+    const { error: replyNotifyError } = await admin
+      .from("gallery_activity_notifications")
+      .insert({
+        recipient_user_id: parentAuthorId,
+        kind: "reply",
+        image_id: imageId,
+        comment_id: data.id,
+        actor_user_id: userId,
+        body: trimmed.slice(0, 200),
+      })
+    if (replyNotifyError && replyNotifyError.code !== "23505") {
+      console.error(
+        "[gallery] failed to save reply notification",
+        replyNotifyError
+      )
+    }
+  }
+
   const mentionNames = parseMentions(trimmed)
   if (mentionNames.length > 0) {
-    const admin = createAdminClient()
     const { data: profiles } = await admin
       .from("user_profiles")
       .select("id, name")
@@ -187,6 +234,38 @@ export async function deleteGalleryComment(
   }
 
   revalidatePath("/")
+  return { ok: true }
+}
+
+export async function markGalleryActivityNotificationsRead(
+  activityIds: string[]
+): Promise<ReactionActionResult> {
+  const uniqueIds = Array.from(
+    new Set(activityIds.filter((id) => typeof id === "string" && id.length > 0))
+  )
+  if (uniqueIds.length === 0) return { ok: true }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { error } = await supabase
+    .from("gallery_activity_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("recipient_user_id", userId)
+    .in("id", uniqueIds)
+    .is("read_at", null)
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Could not mark notifications read: ${error.message}`,
+    }
+  }
+
+  revalidatePath("/", "layout")
+  revalidatePath("/upload")
   return { ok: true }
 }
 
