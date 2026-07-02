@@ -1,6 +1,17 @@
+import path from "path"
+import { fileURLToPath } from "url"
+
+const monorepoRoot = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../.."
+)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
+  turbopack: {
+    root: monorepoRoot,
+  },
   images: {
     remotePatterns: [
       {
@@ -21,6 +32,22 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: "20mb",
     },
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+          },
+        ],
+      },
+    ]
   },
 }
 

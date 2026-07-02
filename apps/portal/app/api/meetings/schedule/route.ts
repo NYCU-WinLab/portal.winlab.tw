@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 
+import { createClient } from "@/lib/supabase/server"
 import type { DbMeeting, DbMeetingGroup } from "@/lib/meetings/types"
 
 function createServiceClient() {
-  return createClient(
+  return createServiceRoleClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!
   )
 }
 
+const SITE_ORIGIN =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://portal.winlab.tw"
+
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": SITE_ORIGIN,
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Credentials": "true",
   "Content-Type": "application/json; charset=utf-8",
 }
 
@@ -23,6 +28,17 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest) {
+  const authClient = await createClient()
+  const {
+    data: { user },
+  } = await authClient.auth.getUser()
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: CORS }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const date = searchParams.get("date")
 

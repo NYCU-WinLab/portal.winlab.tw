@@ -7,11 +7,11 @@ import {
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
-import { GalleryShell } from "@/components/gallery-shell"
+import { GalleryThemedShell } from "@/components/gallery-shell"
 
 export default function AuthCodeErrorPage() {
   return (
-    <GalleryShell>
+    <GalleryThemedShell>
       <div className="flex min-h-[50vh] flex-col justify-center">
         <div className={galleryPanelClass()}>
           <div className="mx-auto flex w-full max-w-md flex-col gap-6">
@@ -27,6 +27,6 @@ export default function AuthCodeErrorPage() {
           </div>
         </div>
       </div>
-    </GalleryShell>
+    </GalleryThemedShell>
   )
 }

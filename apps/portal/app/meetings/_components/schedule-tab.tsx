@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { IconPaperclip } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 import {
   Table,
   TableBody,
@@ -64,7 +65,13 @@ export function ScheduleTab({ year }: { year: number }) {
   const currentWeekId = getCurrentWeekId(meetings)
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">載入中…</p>
+    return (
+      <div className="flex flex-col gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+    )
   }
 
   return (

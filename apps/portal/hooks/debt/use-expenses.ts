@@ -43,7 +43,7 @@ export function useCreateExpense() {
     mutationFn: async (input: ExpenseInput) => {
       const { data, error } = await supabase.rpc("debt_create_expense", {
         p_name: input.name,
-        p_description: input.description || null,
+        p_description: input.description || "",
         p_items: input.items,
       })
 
@@ -70,7 +70,7 @@ export function useUpdateExpense() {
       const { error } = await supabase.rpc("debt_update_expense", {
         p_expense_id: input.id,
         p_name: input.name,
-        p_description: input.description || null,
+        p_description: input.description || "",
         p_items: input.items,
       })
 

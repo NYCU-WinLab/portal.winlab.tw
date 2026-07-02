@@ -9,6 +9,7 @@ import {
 } from "react"
 
 import Image from "next/image"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import {
   IconChevronLeft,
@@ -129,6 +130,8 @@ export function GalleryCard({
   viewerName,
   members,
   priorityLcp = false,
+  initialOpen = false,
+  highlightCommentId = null,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -136,7 +139,11 @@ export function GalleryCard({
   viewerName: string
   members: GalleryMember[]
   priorityLcp?: boolean
+  initialOpen?: boolean
+  highlightCommentId?: string | null
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const rotation = getRotation(image.id)
   const frame = getPolaroidFrame(image.id)
   const sequenceMedia: GallerySequenceItem[] =
@@ -153,7 +160,7 @@ export function GalleryCard({
           },
         ]
   const isSequence = sequenceMedia.length > 1
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(initialOpen)
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const activeItem = sequenceMedia[activeIndex] ?? sequenceMedia[0]
@@ -175,6 +182,25 @@ export function GalleryCard({
   useEffect(() => {
     setComments(image.comments)
   }, [image.comments])
+
+  useEffect(() => {
+    if (initialOpen) {
+      setIsDialogOpen(true)
+      if (highlightCommentId) setMobileDetailsOpen(true)
+    }
+  }, [initialOpen, highlightCommentId])
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsDialogOpen(open)
+    if (open) return
+    if (!searchParams.has("photo")) return
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("photo")
+    params.delete("comment")
+    const qs = params.toString()
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+  }
 
   useEffect(() => {
     if (isDialogOpen) return
@@ -230,7 +256,7 @@ export function GalleryCard({
             } as React.CSSProperties
           }
         >
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
               <button
                 type="button"
@@ -494,6 +520,7 @@ export function GalleryCard({
                       viewerId={viewerId}
                       viewerName={viewerName}
                       members={members}
+                      highlightCommentId={highlightCommentId}
                     />
                   </div>
                 </aside>

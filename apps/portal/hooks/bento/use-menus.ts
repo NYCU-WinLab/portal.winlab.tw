@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import type { Database } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -216,9 +217,10 @@ export function useUpdateMenu(id: string) {
       additional?: string[] | null
       menu_items?: MenuItemInput[]
     }) => {
-      const updatePayload: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
-      }
+      const updatePayload: Database["public"]["Tables"]["bento_menus"]["Update"] =
+        {
+          updated_at: new Date().toISOString(),
+        }
       if (params.name !== undefined) updatePayload.name = params.name
       if (params.phone !== undefined) updatePayload.phone = params.phone
       if (params.additional !== undefined)
