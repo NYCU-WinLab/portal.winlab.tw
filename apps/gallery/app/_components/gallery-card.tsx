@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  useCallback,
   useEffect,
   useState,
   useTransition,
@@ -15,6 +16,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
+  IconDownload,
   IconLink,
   IconX,
 } from "@tabler/icons-react"
@@ -36,6 +38,7 @@ import { toast } from "sonner"
 
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
+import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import {
   galleryPillClass,
@@ -47,6 +50,7 @@ import { setGalleryReaction } from "@/app/actions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
@@ -62,6 +66,7 @@ import type {
   GallerySequenceItem,
 } from "@/lib/gallery/types"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
+import { createClient } from "@/lib/supabase/client"
 
 function applyReactionOptimistic(
   prev: GalleryReaction | null,
@@ -134,6 +139,9 @@ export function GalleryCard({
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
+  open,
+  onOpenChange,
+  gridFocused = false,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -143,6 +151,9 @@ export function GalleryCard({
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  gridFocused?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -162,7 +173,19 @@ export function GalleryCard({
           },
         ]
   const isSequence = sequenceMedia.length > 1
-  const [isDialogOpen, setIsDialogOpen] = useState(initialOpen)
+  const [internalOpen, setInternalOpen] = useState(initialOpen)
+  const isDialogOpen = open !== undefined ? open : internalOpen
+  const setIsDialogOpen = (next: boolean) => {
+    onOpenChange?.(next)
+    if (open === undefined) setInternalOpen(next)
+    if (next) return
+    if (!searchParams.has("photo")) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("photo")
+    params.delete("comment")
+    const qs = params.toString()
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+  }
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const activeItem = sequenceMedia[activeIndex] ?? sequenceMedia[0]
@@ -186,23 +209,62 @@ export function GalleryCard({
   }, [image.comments])
 
   useEffect(() => {
-    if (initialOpen) {
-      setIsDialogOpen(true)
-      if (highlightCommentId) setMobileDetailsOpen(true)
+    if (open && highlightCommentId) {
+      setMobileDetailsOpen(true)
     }
-  }, [initialOpen, highlightCommentId])
+  }, [open, highlightCommentId])
 
-  const handleDialogOpenChange = (open: boolean) => {
-    setIsDialogOpen(open)
-    if (open) return
-    if (!searchParams.has("photo")) return
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("photo")
-    params.delete("comment")
-    const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+  const handleDialogOpenChange = (next: boolean) => {
+    setIsDialogOpen(next)
   }
+
+  const refreshSocial = useCallback(async () => {
+    const supabase = createClient()
+    const social = await loadLightboxSocial(supabase, image.id, viewerId)
+    setComments(social.comments)
+    setCounts(social.reaction_counts)
+    setNamesByReaction(social.reaction_names)
+    setMyReaction(social.my_reaction)
+  }, [image.id, viewerId])
+
+  useEffect(() => {
+    if (!isDialogOpen) return
+
+    const supabase = createClient()
+    const channelName = `gallery-lightbox:${image.id}:${crypto.randomUUID()}`
+    const channel = supabase.channel(channelName)
+
+    const onChange = () => {
+      void refreshSocial()
+    }
+
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "gallery_comments",
+          filter: `image_id=eq.${image.id}`,
+        },
+        onChange
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "gallery_image_votes",
+          filter: `image_id=eq.${image.id}`,
+        },
+        onChange
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [isDialogOpen, image.id, refreshSocial])
 
   useEffect(() => {
     if (isDialogOpen) return
@@ -278,7 +340,14 @@ export function GalleryCard({
   }
 
   return (
-    <figure className={cn("mx-auto w-full sm:max-w-none", frame.maxWidthClass)}>
+    <figure
+      className={cn(
+        "mx-auto w-full sm:max-w-none",
+        frame.maxWidthClass,
+        gridFocused &&
+          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background"
+      )}
+    >
       <div className="flex justify-center px-3 py-3 sm:px-4 sm:py-4">
         <div
           className={cn(
@@ -294,12 +363,12 @@ export function GalleryCard({
           }
         >
           <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="block w-full rounded-[2px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <div className={galleryPolaroidClass()}>
+            <div className={galleryPolaroidClass()}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="block w-full rounded-[2px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
                   {thumbFailed ? (
                     <div
                       className={cn(
@@ -338,7 +407,7 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
+                  <div className="gallery-polaroid-caption px-3 pt-3 pb-2">
                     <p
                       className={cn(
                         gallerySerif(),
@@ -347,18 +416,27 @@ export function GalleryCard({
                     >
                       {image.name}
                     </p>
-                    <p
-                      className={cn(
-                        gallerySans(),
-                        "mt-1 truncate text-center text-[10px] text-muted-foreground"
-                      )}
-                    >
-                      {image.uploader_name}
-                    </p>
                   </div>
-                </div>
-              </button>
-            </DialogTrigger>
+                </button>
+              </DialogTrigger>
+              <p
+                className={cn(
+                  gallerySans(),
+                  "truncate px-3 pb-4 text-center text-[10px] text-muted-foreground"
+                )}
+              >
+                {image.created_by && isSignedIn ? (
+                  <UploaderFilterLink
+                    uploaderId={image.created_by}
+                    className="text-muted-foreground"
+                  >
+                    {image.uploader_name}
+                  </UploaderFilterLink>
+                ) : (
+                  image.uploader_name
+                )}
+              </p>
+            </div>
             <DialogContent
               showCloseButton={false}
               className={cn(
@@ -391,7 +469,10 @@ export function GalleryCard({
                 onClick={() => void copyShareLink()}
                 aria-label="Copy share link"
                 className={cn(
-                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
+                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
+                  isSignedIn
+                    ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
+                    : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
                   "inline-flex h-11 w-11 items-center justify-center rounded-full",
                   "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
                   "transition-colors hover:bg-white",
@@ -400,6 +481,22 @@ export function GalleryCard({
               >
                 <IconLink className="h-5 w-5" />
               </button>
+              {isSignedIn ? (
+                <a
+                  href={mediaUrl}
+                  download
+                  aria-label="Save original"
+                  className={cn(
+                    "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
+                    "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                    "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                    "transition-colors hover:bg-white",
+                    "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                  )}
+                >
+                  <IconDownload className="h-5 w-5" />
+                </a>
+              ) : null}
               <div className="gallery-lightbox-layout">
                 <div className="gallery-lightbox-media">
                   {lightboxFailed ? (
@@ -534,7 +631,14 @@ export function GalleryCard({
                           "text-xs text-muted-foreground"
                         )}
                       >
-                        by {image.uploader_name}
+                        by{" "}
+                        {image.created_by && isSignedIn ? (
+                          <UploaderFilterLink uploaderId={image.created_by}>
+                            {image.uploader_name}
+                          </UploaderFilterLink>
+                        ) : (
+                          image.uploader_name
+                        )}
                         {uploadedAt ? (
                           <>
                             <span aria-hidden> · </span>
