@@ -18,7 +18,7 @@ export function useLeaderboard(
     queryFn: async (): Promise<GameScore[]> => {
       const { data, error } = await supabase.rpc("get_game_leaderboard", {
         p_game_type: gameType,
-        p_level: level,
+        p_level: level ?? undefined,
       })
       if (error) throw error
       return (data ?? []) as GameScore[]
@@ -52,7 +52,7 @@ export function useSubmitScore(
         p_game_type: gameType,
         p_score: Math.floor(score),
         p_finish_ms: Math.floor(finishTimeMs),
-        p_level: level,
+        p_level: level ?? undefined,
       })
       if (error) throw error
     },

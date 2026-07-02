@@ -6,7 +6,7 @@ import {
   type GalleryReaction,
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
-import { parseMentions } from "@/lib/gallery/mentions"
+import { parseMentions, resolveMentionedProfiles } from "@/lib/gallery/mentions"
 import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
@@ -143,9 +143,10 @@ export async function addGalleryComment(
     const { data: profiles } = await admin
       .from("user_profiles")
       .select("id, name")
-      .in("name", mentionNames)
+      .not("name", "is", null)
 
-    const others = (profiles ?? []).filter((p) => p.id !== userId)
+    const matched = resolveMentionedProfiles(mentionNames, profiles ?? [])
+    const others = matched.filter((p) => p.id !== userId)
     if (others.length > 0) {
       const { error: mentionError } = await admin
         .from("gallery_comment_mentions")
@@ -161,7 +162,7 @@ export async function addGalleryComment(
     }
   }
 
-  revalidatePath("/")
+  revalidatePath("/", "layout")
   return { ok: true, data }
 }
 
@@ -186,6 +187,38 @@ export async function deleteGalleryComment(
   }
 
   revalidatePath("/")
+  return { ok: true }
+}
+
+export async function markGalleryMentionsRead(
+  commentIds: string[]
+): Promise<ReactionActionResult> {
+  const uniqueIds = Array.from(
+    new Set(commentIds.filter((id) => typeof id === "string" && id.length > 0))
+  )
+  if (uniqueIds.length === 0) return { ok: true }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { error } = await supabase
+    .from("gallery_comment_mentions")
+    .update({ read_at: new Date().toISOString() })
+    .eq("mentioned_user_id", userId)
+    .in("comment_id", uniqueIds)
+    .is("read_at", null)
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Could not mark mentions read: ${error.message}`,
+    }
+  }
+
+  revalidatePath("/", "layout")
+  revalidatePath("/upload")
   return { ok: true }
 }
 

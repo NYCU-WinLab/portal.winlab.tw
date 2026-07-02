@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import { Button } from "@workspace/ui/components/button"
@@ -23,6 +23,7 @@ export function GalleryComments({
   viewerId,
   viewerName,
   members,
+  highlightCommentId = null,
 }: {
   imageId: string
   comments: GalleryComment[]
@@ -31,14 +32,39 @@ export function GalleryComments({
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
+  highlightCommentId?: string | null
 }) {
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const flattened = useMemo(() => flattenComments(comments), [comments])
+
+  useEffect(() => {
+    if (!highlightCommentId) return
+    const exists = flattened.some(
+      (comment) => comment.id === highlightCommentId
+    )
+    if (!exists) return
+
+    const frame = requestAnimationFrame(() => {
+      const node = listRef.current?.querySelector<HTMLElement>(
+        `[data-comment-id="${highlightCommentId}"]`
+      )
+      node?.scrollIntoView({ behavior: "smooth", block: "center" })
+      setHighlightedId(highlightCommentId)
+    })
+
+    const timer = window.setTimeout(() => setHighlightedId(null), 2400)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [flattened, highlightCommentId])
 
   const filteredMembers = useMemo(() => {
     if (mentionQuery === null) return []
@@ -120,7 +146,10 @@ export function GalleryComments({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", gallerySans())}>
-      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5"
+      >
         {flattened.length === 0 ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
             No comments yet — say something?
@@ -132,9 +161,12 @@ export function GalleryComments({
               return (
                 <li
                   key={comment.id}
+                  data-comment-id={comment.id}
                   className={cn(
-                    "rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5",
-                    comment.depth > 0 && "ml-4 border-l-2 border-l-border"
+                    "rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5 transition-colors duration-700",
+                    comment.depth > 0 && "ml-4 border-l-2 border-l-border",
+                    highlightedId === comment.id &&
+                      "gallery-comment-highlight border-amber-500/40 bg-amber-500/10"
                   )}
                 >
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">

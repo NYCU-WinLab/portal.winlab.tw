@@ -11,7 +11,7 @@ import {
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
-import { GalleryShell } from "@/components/gallery-shell"
+import { GalleryThemedShell } from "@/components/gallery-shell"
 import { createClient } from "@/lib/supabase/server"
 import type { GalleryImage } from "@/lib/gallery/types"
 import {
@@ -57,7 +57,7 @@ export default async function UploadPage() {
   >
 
   return (
-    <GalleryShell active="manage" signedIn containerClassName="max-w-3xl">
+    <GalleryThemedShell active="manage" signedIn containerClassName="max-w-3xl">
       <div className="flex flex-col gap-10 sm:gap-12">
         <header>
           <h1 className={gallerySectionTitleClass()}>Manage</h1>
@@ -147,6 +147,6 @@ export default async function UploadPage() {
           )}
         </section>
       </div>
-    </GalleryShell>
+    </GalleryThemedShell>
   )
 }

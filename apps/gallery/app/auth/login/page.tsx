@@ -7,7 +7,7 @@ import {
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
-import { GalleryShell } from "@/components/gallery-shell"
+import { GalleryThemedShell } from "@/components/gallery-shell"
 import { getCurrentUser } from "@/lib/user"
 
 type LoginPageProps = {
@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (user) redirect(safeNext)
 
   return (
-    <GalleryShell>
+    <GalleryThemedShell>
       <AuthStateReset />
       <div className="flex min-h-[50vh] flex-col justify-center">
         <div className={galleryPanelClass()}>
@@ -41,6 +41,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         </div>
       </div>
-    </GalleryShell>
+    </GalleryThemedShell>
   )
 }

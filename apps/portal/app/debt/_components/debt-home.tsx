@@ -4,6 +4,7 @@ import { IconPlus } from "@tabler/icons-react"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import { useBalances } from "@/hooks/debt/use-balances"
 import { useMembers } from "@/hooks/debt/use-members"
@@ -15,8 +16,8 @@ import { ExpenseCard } from "./expense-card"
 import { ExpenseForm } from "./expense-form"
 
 export function DebtHome() {
-  const { data: balances } = useBalances()
-  const { data: expenses } = useMyExpenses()
+  const { data: balances, isLoading: balancesLoading } = useBalances()
+  const { data: expenses, isLoading: expensesLoading } = useMyExpenses()
   const { data: members = [] } = useMembers()
 
   const [showForm, setShowForm] = useState(false)
@@ -35,6 +36,26 @@ export function DebtHome() {
   const handleClose = () => {
     setShowForm(false)
     setEditingExpense(null)
+  }
+
+  if ((balancesLoading || expensesLoading) && !balances && !expenses) {
+    return (
+      <div className="flex flex-col gap-10">
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-6 w-16 rounded-md" />
+          <Skeleton className="h-4 w-72 rounded-md" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (

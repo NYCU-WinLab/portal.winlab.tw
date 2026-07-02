@@ -24,25 +24,38 @@ import {
   galleryShellIconButtonClass,
   galleryShellNavLinkClass,
 } from "@/components/gallery-chrome"
+import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
+import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
 
 export type GalleryShellActive = "home" | "manage"
 
 export function GalleryShellNav({
   active,
   signedIn,
+  viewerId = null,
+  mentionNotifications = [],
 }: {
   active: GalleryShellActive
   signedIn: boolean
+  viewerId?: string | null
+  mentionNotifications?: GalleryMentionNotification[]
 }) {
   return (
-    <>
-      <nav
-        className={cn(
-          gallerySans(),
-          "relative z-10 hidden shrink-0 items-center justify-end gap-4 md:flex"
-        )}
-      >
+    <div
+      className={cn(
+        gallerySans(),
+        "relative z-10 flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
+      )}
+    >
+      {signedIn && viewerId ? (
+        <GalleryMentionBell
+          viewerId={viewerId}
+          initialNotifications={mentionNotifications}
+        />
+      ) : null}
+
+      <nav className="hidden shrink-0 items-center gap-4 md:flex">
         <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
           Portal
         </GalleryNavLink>
@@ -62,12 +75,7 @@ export function GalleryShellNav({
         )}
       </nav>
 
-      <div
-        className={cn(
-          gallerySans(),
-          "relative z-10 flex shrink-0 items-center gap-0.5 md:hidden"
-        )}
-      >
+      <div className="flex shrink-0 items-center gap-0.5 md:hidden">
         {signedIn ? (
           <SignOutButton iconOnly className={galleryShellIconButtonClass()} />
         ) : (
@@ -130,6 +138,6 @@ export function GalleryShellNav({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </>
+    </div>
   )
 }
