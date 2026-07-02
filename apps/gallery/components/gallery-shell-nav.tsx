@@ -26,7 +26,7 @@ import {
 } from "@/components/gallery-chrome"
 import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
-import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
+import type { GalleryNotification } from "@/lib/gallery/notifications"
 
 export type GalleryShellActive = "home" | "manage"
 
@@ -39,7 +39,7 @@ export function GalleryShellNav({
   active: GalleryShellActive
   signedIn: boolean
   viewerId?: string | null
-  mentionNotifications?: GalleryMentionNotification[]
+  mentionNotifications?: GalleryNotification[]
 }) {
   return (
     <div

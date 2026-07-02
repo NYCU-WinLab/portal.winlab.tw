@@ -3,14 +3,28 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog"
 import { Button } from "@workspace/ui/components/button"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
-import { addGalleryComment, deleteGalleryComment } from "@/app/actions"
+import {
+  addGalleryComment,
+  deleteGalleryComment,
+  updateGalleryComment,
+} from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
-import { parseMentions } from "@/lib/gallery/mentions"
+import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
 type CommentNode = GalleryComment & { depth: number }
@@ -36,6 +50,9 @@ export function GalleryComments({
 }) {
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState("")
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -123,6 +140,7 @@ export function GalleryComments({
         {
           ...result.data,
           commenter_name: viewerName,
+          updated_at: result.data.updated_at ?? null,
         },
       ])
       setDraft("")
@@ -140,7 +158,50 @@ export function GalleryComments({
         return
       }
       onCommentsChange(removeCommentWithDescendants(comments, commentId))
+      if (editingId === commentId) {
+        setEditingId(null)
+        setEditDraft("")
+      }
       toast.success("Comment deleted.")
+    })
+  }
+
+  const startEdit = (comment: GalleryComment) => {
+    setReplyTarget(null)
+    setEditingId(comment.id)
+    setEditDraft(comment.body)
+    setMentionQuery(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft("")
+  }
+
+  const saveEdit = (commentId: string) => {
+    const body = editDraft.trim()
+    if (!body) return
+
+    startTransition(async () => {
+      const result = await updateGalleryComment(commentId, body)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      onCommentsChange(
+        comments.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                body: result.data.body,
+                updated_at: result.data.updated_at,
+              }
+            : comment
+        )
+      )
+      setEditingId(null)
+      setEditDraft("")
+      toast.success("Comment updated.")
     })
   }
 
@@ -158,6 +219,8 @@ export function GalleryComments({
           <ul className="space-y-2.5">
             {flattened.map((comment) => {
               const mine = viewerId === comment.created_by
+              const isEditing = editingId === comment.id
+              const edited = isCommentEdited(comment)
               return (
                 <li
                   key={comment.id}
@@ -180,36 +243,86 @@ export function GalleryComments({
                         timeStyle: "short",
                       })}
                     </time>
-                  </div>
-                  <p className="mt-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
-                    <FormattedComment
-                      content={comment.body}
-                      members={members}
-                    />
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    {isSignedIn ? (
-                      <button
-                        type="button"
-                        onClick={() => setReplyTarget(comment.id)}
-                        className={galleryPillClass()}
-                      >
-                        Reply
-                      </button>
-                    ) : null}
-                    {mine ? (
-                      <button
-                        type="button"
-                        onClick={() => removeComment(comment.id)}
-                        className={cn(
-                          galleryPillClass(),
-                          "text-destructive/90 hover:text-destructive"
-                        )}
-                      >
-                        Delete
-                      </button>
+                    {edited ? (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>edited</span>
+                      </>
                     ) : null}
                   </div>
+                  {isEditing ? (
+                    <div className="mt-1.5 space-y-2">
+                      <Textarea
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        disabled={isPending}
+                        className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-background text-sm"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className={cn(
+                            gallerySans(),
+                            "h-8 rounded-full px-3 text-xs"
+                          )}
+                          disabled={isPending || !editDraft.trim()}
+                          onClick={() => saveEdit(comment.id)}
+                        >
+                          Save
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={isPending}
+                          className={galleryPillClass()}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
+                      <FormattedCommentMentions
+                        content={comment.body}
+                        members={members}
+                      />
+                    </p>
+                  )}
+                  {!isEditing ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      {isSignedIn ? (
+                        <button
+                          type="button"
+                          onClick={() => setReplyTarget(comment.id)}
+                          className={galleryPillClass()}
+                        >
+                          Reply
+                        </button>
+                      ) : null}
+                      {mine ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(comment)}
+                            className={galleryPillClass()}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTargetId(comment.id)}
+                            className={cn(
+                              galleryPillClass(),
+                              "text-destructive/90 hover:text-destructive"
+                            )}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </li>
               )
             })}
@@ -306,44 +419,43 @@ export function GalleryComments({
           </Button>
         </div>
       </div>
+
+      <AlertDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this comment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the comment and any replies. Cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteTargetId) return
+                removeComment(deleteTargetId)
+                setDeleteTargetId(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
 
-function FormattedComment({
-  content,
-  members,
-}: {
-  content: string
-  members: GalleryMember[]
-}) {
-  const mentionNames = new Set(parseMentions(content))
-  const knownNames = new Set(
-    members.map((m) => m.name).filter((n): n is string => Boolean(n))
-  )
-
-  if (mentionNames.size === 0) return <>{content}</>
-
-  const parts = content.split(/(@[\p{L}\p{N}._-]+)/gu)
+function isCommentEdited(comment: GalleryComment): boolean {
+  if (!comment.updated_at) return false
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("@")) {
-          const name = part.slice(1)
-          if (mentionNames.has(name) && knownNames.has(name)) {
-            return (
-              <span
-                key={i}
-                className="rounded bg-blue-500/15 px-1 py-0.5 text-blue-700 dark:text-blue-300"
-              >
-                {part}
-              </span>
-            )
-          }
-        }
-        return <span key={i}>{part}</span>
-      })}
-    </>
+    new Date(comment.updated_at).getTime() >
+    new Date(comment.created_at).getTime()
   )
 }
 

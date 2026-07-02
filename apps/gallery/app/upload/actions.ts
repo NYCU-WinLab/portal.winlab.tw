@@ -6,6 +6,9 @@ import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
+export type RegisterResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string }
 
 export type RegisterMediaInput = {
   name: string
@@ -23,7 +26,7 @@ export type RegisterMediaInput = {
  */
 export async function registerGalleryImage(
   input: RegisterMediaInput
-): Promise<ActionResult> {
+): Promise<RegisterResult> {
   const trimmed = input.name.trim()
   if (!trimmed) return { ok: false, error: "Name is required." }
   if (!input.imagePath) return { ok: false, error: "Missing media path." }
@@ -36,7 +39,10 @@ export async function registerGalleryImage(
   if (input.mediaType === "image" && input.posterPath) {
     return { ok: false, error: "Images must not have a poster path." }
   }
-  if ((input.sequenceId && input.sequenceIndex == null) || (!input.sequenceId && input.sequenceIndex != null)) {
+  if (
+    (input.sequenceId && input.sequenceIndex == null) ||
+    (!input.sequenceId && input.sequenceIndex != null)
+  ) {
     return { ok: false, error: "Sequence metadata is incomplete." }
   }
   if (input.sequenceIndex != null && input.sequenceIndex < 0) {
@@ -104,21 +110,23 @@ export async function registerGalleryImage(
     sequence_index: input.sequenceIndex ?? null,
   }
 
-  const { error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from("gallery_images")
     .insert(insertPayload)
+    .select("id")
+    .single()
 
-  if (insertError) {
+  if (insertError || !inserted) {
     await supabase.storage.from("gallery").remove(expectedPaths)
     return {
       ok: false,
-      error: `Database insert failed: ${insertError.message}`,
+      error: `Database insert failed: ${insertError?.message ?? "Unknown error."}`,
     }
   }
 
   revalidatePath("/")
   revalidatePath("/upload")
-  return { ok: true }
+  return { ok: true, id: inserted.id }
 }
 
 export async function deleteGalleryImage(
@@ -144,6 +152,67 @@ export async function deleteGalleryImage(
     .remove(targets)
   if (storageError) {
     console.error("[gallery] storage delete failed", storageError)
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return { ok: true }
+}
+
+export async function updateGallerySequenceOrder(
+  sequenceId: string,
+  orderedImageIds: string[]
+): Promise<ActionResult> {
+  if (!sequenceId) return { ok: false, error: "Missing sequence id." }
+  if (orderedImageIds.length === 0) {
+    return { ok: false, error: "Sequence is empty." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const uniqueIds = Array.from(new Set(orderedImageIds))
+  if (uniqueIds.length !== orderedImageIds.length) {
+    return { ok: false, error: "Duplicate shots in sequence order." }
+  }
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("gallery_images")
+    .select("id")
+    .eq("sequence_id", sequenceId)
+    .eq("created_by", userId)
+
+  if (fetchError) {
+    return { ok: false, error: `Sequence load failed: ${fetchError.message}` }
+  }
+
+  const existingIds = new Set((rows ?? []).map((row) => row.id))
+  if (existingIds.size !== orderedImageIds.length) {
+    return { ok: false, error: "Sequence shots do not match your uploads." }
+  }
+  for (const id of orderedImageIds) {
+    if (!existingIds.has(id)) {
+      return { ok: false, error: "Sequence shots do not match your uploads." }
+    }
+  }
+
+  for (let index = 0; index < orderedImageIds.length; index++) {
+    const imageId = orderedImageIds[index]!
+    const { error } = await supabase
+      .from("gallery_images")
+      .update({ sequence_index: index })
+      .eq("id", imageId)
+      .eq("created_by", userId)
+      .eq("sequence_id", sequenceId)
+
+    if (error) {
+      return {
+        ok: false,
+        error: `Could not reorder sequence: ${error.message}`,
+      }
+    }
   }
 
   revalidatePath("/")

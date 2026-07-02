@@ -5,12 +5,13 @@ import Link from "next/link"
 import { Badge } from "@workspace/ui/components/badge"
 
 import type { OrderWithStats } from "@/lib/bento/types"
-import { parseOrderDate } from "@/lib/bento/date"
+import { formatOrderDate, orderBatchSuffix } from "@/lib/bento/date"
 
 import { OrderStats } from "./order-stats"
 
 export function OrderCard({ order }: { order: OrderWithStats }) {
-  const orderDate = parseOrderDate(order.id)
+  const orderDate = formatOrderDate(order.order_date, order.id)
+  const batch = orderBatchSuffix(order.id)
   const orderItems = order.order_items || []
 
   return (
@@ -26,6 +27,11 @@ export function OrderCard({ order }: { order: OrderWithStats }) {
         >
           {orderDate}
         </Badge>
+        {batch && (
+          <Badge variant="secondary" className="text-xs">
+            第 {batch} 批
+          </Badge>
+        )}
       </div>
       <OrderStats
         orderItems={orderItems}

@@ -2,8 +2,10 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryHomeFiltersBar } from "@/app/_components/gallery-home-filters"
 import { GalleryPagination } from "@/app/_components/gallery-pagination"
 import { GalleryThemedShell } from "@/components/gallery-shell"
+import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { loadGalleryHomePage } from "@/lib/gallery/load-home-page"
 import {
   buildGalleryPhotoHref,
@@ -15,13 +17,21 @@ import { getCurrentUser } from "@/lib/user"
 export const dynamic = "force-dynamic"
 
 type GalleryHomePageProps = {
-  searchParams: Promise<{ page?: string; photo?: string; comment?: string }>
+  searchParams: Promise<{
+    page?: string
+    photo?: string
+    comment?: string
+    uploader?: string
+    media?: string
+    after?: string
+  }>
 }
 
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment } = await searchParams
+  const { page, photo, comment, uploader, media, after } = await searchParams
+  const filters = parseGalleryHomeFilters({ uploader, media, after })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -56,11 +66,17 @@ export default async function GalleryHomePage({
     await loadGalleryHomePage(supabase, {
       page: loadPage,
       userId: user?.id ?? null,
+      filters,
     })
 
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
+        {user ? (
+          <Suspense fallback={null}>
+            <GalleryHomeFiltersBar filters={filters} members={members} />
+          </Suspense>
+        ) : null}
         <Suspense
           fallback={
             <GalleryGrid
@@ -82,7 +98,11 @@ export default async function GalleryHomePage({
             openCommentId={openCommentId}
           />
         </Suspense>
-        <GalleryPagination page={currentPage} totalPages={totalPages} />
+        <GalleryPagination
+          page={currentPage}
+          totalPages={totalPages}
+          filters={filters}
+        />
       </div>
     </GalleryThemedShell>
   )
