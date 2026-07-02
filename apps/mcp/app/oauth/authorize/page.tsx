@@ -32,6 +32,7 @@ export default async function AuthorizePage({
   return (
     <AuthorizeForm
       clientId={result.clientId}
+      clientName={result.clientName}
       redirectUri={result.redirectUri}
       codeChallenge={result.codeChallenge}
       resource={result.resource}
@@ -49,10 +50,10 @@ async function loadAuthorize(searchParams: AuthorizePageProps["searchParams"]) {
     }
 
     const request = parseAuthorizeRequest(params)
-    await validateOAuthClientRequest(request, {
+    const client = await validateOAuthClientRequest(request, {
       expectedResource: getMcpResourceUrl(),
     })
-    return request
+    return { ...request, clientName: client.client_name }
   } catch (error) {
     return {
       error:

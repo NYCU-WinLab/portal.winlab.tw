@@ -2,9 +2,21 @@ import { z } from "zod"
 
 import { getOAuthClient, type OAuthClientStore } from "@/lib/auth/oauth-clients"
 
+const safeRedirectUri = z
+  .string()
+  .url()
+  .refine(
+    (u) =>
+      /^https:\/\//.test(u) || /^http:\/\/localhost(:\d+)?(\/|$)/.test(u),
+    {
+      message:
+        "redirect_uri must use https:// (http://localhost allowed for development)",
+    }
+  )
+
 const authorizeRequestSchema = z.object({
   client_id: z.string().min(1),
-  redirect_uri: z.string().url(),
+  redirect_uri: safeRedirectUri,
   response_type: z.literal("code"),
   code_challenge: z.string().min(1),
   code_challenge_method: z.literal("S256"),
