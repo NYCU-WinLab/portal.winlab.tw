@@ -391,7 +391,10 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="代替哪位用戶點餐（留空為自己）" />
                 </SelectTrigger>
-                <SelectContent>
+                {/* popper (not item-aligned) — the ~48-user list janks on open
+                    in item-aligned mode because Radix measures/positions the
+                    whole list against the selected item. */}
+                <SelectContent position="popper">
                   {(userList ?? []).map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name ?? u.id}
