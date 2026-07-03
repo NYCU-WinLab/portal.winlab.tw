@@ -9,6 +9,10 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.menus.all, id] as const,
     stats: (id: string) => [...queryKeys.menus.all, id, "stats"] as const,
   },
+  optionGroups: {
+    all: ["bento", "option-groups"] as const,
+    byRestaurant: (id: string) => [...queryKeys.optionGroups.all, id] as const,
+  },
   users: {
     all: ["bento", "users"] as const,
   },

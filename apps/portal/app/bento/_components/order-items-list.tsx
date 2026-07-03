@@ -25,6 +25,7 @@ interface OrderItem {
     name: string | null
     email?: string
   } | null
+  selected_options?: { group_name: string; label: string }[]
 }
 
 interface GroupedOrderItem {
@@ -118,6 +119,15 @@ export function OrderItemsList({
                   className="flex flex-wrap items-center gap-2"
                 >
                   <span>{item.menu_items?.name}</span>
+                  {item.selected_options?.map((opt, i) => (
+                    <Badge
+                      key={`${opt.group_name}-${i}`}
+                      variant="secondary"
+                      className="px-2 py-0.5 text-[11px]"
+                    >
+                      {opt.label}
+                    </Badge>
+                  ))}
                   {item.no_sauce && (
                     <Badge
                       variant="secondary"

@@ -397,6 +397,7 @@ export type Database = {
           google_map_link: string | null
           id: string
           is_active: boolean
+          kind: string
           name: string
           phone: string
           updated_at: string | null
@@ -407,6 +408,7 @@ export type Database = {
           google_map_link?: string | null
           id?: string
           is_active?: boolean
+          kind?: string
           name: string
           phone: string
           updated_at?: string | null
@@ -417,11 +419,112 @@ export type Database = {
           google_map_link?: string | null
           id?: string
           is_active?: boolean
+          kind?: string
           name?: string
           phone?: string
           updated_at?: string | null
         }
         Relationships: []
+      }
+      bento_option_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          required: boolean
+          restaurant_id: string
+          single_select: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          required?: boolean
+          restaurant_id: string
+          single_select?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          required?: boolean
+          restaurant_id?: string
+          single_select?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bento_option_groups_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "bento_menus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bento_option_values: {
+        Row: {
+          group_id: string
+          id: string
+          label: string
+          price_delta: number
+          sort_order: number
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          label: string
+          price_delta?: number
+          sort_order?: number
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          label?: string
+          price_delta?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bento_option_values_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "bento_option_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bento_order_item_options: {
+        Row: {
+          option_value_id: string
+          order_item_id: string
+        }
+        Insert: {
+          option_value_id: string
+          order_item_id: string
+        }
+        Update: {
+          option_value_id?: string
+          order_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bento_order_item_options_option_value_id_fkey"
+            columns: ["option_value_id"]
+            isOneToOne: false
+            referencedRelation: "bento_option_values"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bento_order_item_options_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "bento_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bento_order_items: {
         Row: {
@@ -2083,6 +2186,34 @@ export type Database = {
       }
     }
     Functions: {
+      add_bento_order_item: {
+        Args: {
+          p_anonymous_contact?: string
+          p_anonymous_name?: string
+          p_menu_item_id: string
+          p_no_sauce?: boolean
+          p_option_value_ids?: string[]
+          p_order_id: string
+          p_user_id?: string
+        }
+        Returns: {
+          additional: number | null
+          anonymous_contact: string | null
+          anonymous_name: string | null
+          created_at: string | null
+          id: string
+          menu_item_id: string
+          no_sauce: boolean | null
+          order_id: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bento_order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_doc_status: { Args: { doc_id: string }; Returns: string }
       approve_is_creator: {
         Args: { doc_id: string; uid: string }
