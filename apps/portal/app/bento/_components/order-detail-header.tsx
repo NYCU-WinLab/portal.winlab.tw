@@ -1,18 +1,12 @@
 "use client"
 
-import { ExternalLink, Image as ImageIcon } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 
 import { Badge } from "@workspace/ui/components/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@workspace/ui/components/dialog"
 
 import { formatOrderDate, orderBatchSuffix } from "@/lib/bento/date"
 
+import { MenuImageButton } from "./menu-image-dialog"
 import { OrderStats } from "./order-stats"
 
 interface OrderItem {
@@ -85,28 +79,10 @@ export function OrderDetailHeader({ order }: { order: Order }) {
             </a>
           </span>
           {order.restaurants.menu_image_url && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-foreground transition-colors hover:text-muted-foreground"
-                >
-                  <ImageIcon className="h-3.5 w-3.5" />
-                  查看菜單圖
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>{order.restaurants.name} 菜單</DialogTitle>
-                </DialogHeader>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={order.restaurants.menu_image_url}
-                  alt={`${order.restaurants.name} 菜單圖片`}
-                  className="max-h-[80vh] w-full rounded-md object-contain"
-                />
-              </DialogContent>
-            </Dialog>
+            <MenuImageButton
+              imageUrl={order.restaurants.menu_image_url}
+              shopName={order.restaurants.name}
+            />
           )}
         </div>
       </div>
