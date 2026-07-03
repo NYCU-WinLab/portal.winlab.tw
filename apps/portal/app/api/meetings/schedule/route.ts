@@ -15,6 +15,15 @@ function createServiceClient() {
 const SITE_ORIGIN =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://portal.winlab.tw"
 
+// Server-to-server callers (the Apps Script reminder mailer) can't carry a
+// Supabase login cookie, so they authenticate with a shared secret instead —
+// same pattern as the bulletin API. Browser sessions still work via cookie.
+function hasValidSecret(request: NextRequest): boolean {
+  const secret = process.env.MEETINGS_API_SECRET
+  if (!secret) return false
+  return (request.headers.get("Authorization") ?? "") === `Bearer ${secret}`
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": SITE_ORIGIN,
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -28,15 +37,19 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest) {
-  const authClient = await createClient()
-  const {
-    data: { user },
-  } = await authClient.auth.getUser()
-  if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: CORS }
-    )
+  // Accept either a valid shared secret (server-to-server) or a logged-in
+  // Supabase session (browser). The secret check avoids the cookie round-trip.
+  if (!hasValidSecret(request)) {
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: CORS }
+      )
+    }
   }
 
   const { searchParams } = new URL(request.url)
