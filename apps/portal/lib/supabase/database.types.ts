@@ -398,6 +398,7 @@ export type Database = {
           id: string
           is_active: boolean
           kind: string
+          menu_image_url: string | null
           name: string
           phone: string
           updated_at: string | null
@@ -409,6 +410,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind?: string
+          menu_image_url?: string | null
           name: string
           phone: string
           updated_at?: string | null
@@ -420,6 +422,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           kind?: string
+          menu_image_url?: string | null
           name?: string
           phone?: string
           updated_at?: string | null

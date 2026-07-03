@@ -1,7 +1,7 @@
 "use client"
 
 import { Pencil } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -17,7 +17,11 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 
-import { useUpdateMenu } from "@/hooks/bento/use-menus"
+import {
+  useRemoveMenuImage,
+  useUpdateMenu,
+  useUploadMenuImage,
+} from "@/hooks/bento/use-menus"
 
 import { MenuItemsEditor, type MenuItemDraft } from "./menu-items-editor"
 
@@ -27,6 +31,7 @@ interface Restaurant {
   phone: string
   google_map_link?: string | null
   additional?: string[] | null
+  menu_image_url?: string | null
 }
 
 interface MenuItemRow {
@@ -65,7 +70,13 @@ export function EditRestaurantDialog({
     restaurant.additional || []
   )
   const [newAdditionalOption, setNewAdditionalOption] = useState("")
+  const [menuImageUrl, setMenuImageUrl] = useState<string | null>(
+    restaurant.menu_image_url ?? null
+  )
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const updateMenu = useUpdateMenu(restaurant.id)
+  const uploadImage = useUploadMenuImage(restaurant.id)
+  const removeImage = useRemoveMenuImage(restaurant.id)
 
   useEffect(() => {
     if (open) {
@@ -74,8 +85,35 @@ export function EditRestaurantDialog({
       setGoogleMapLink(restaurant.google_map_link ?? "")
       setMenuItems(toDraft(existingMenuItems))
       setAdditionalOptions(restaurant.additional || [])
+      setMenuImageUrl(restaurant.menu_image_url ?? null)
     }
   }, [open, restaurant, existingMenuItems])
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const url = await uploadImage.mutateAsync(file)
+      setMenuImageUrl(url)
+      toast.success("菜單圖已上傳")
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error("上傳失敗")
+      toast.error(`上傳失敗：${err.message}`)
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const handleImageRemove = async () => {
+    try {
+      await removeImage.mutateAsync()
+      setMenuImageUrl(null)
+      toast.success("菜單圖已移除")
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error("移除失敗")
+      toast.error(`移除失敗：${err.message}`)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -153,6 +191,56 @@ export function EditRestaurantDialog({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>菜單圖片（選填）</Label>
+              {menuImageUrl ? (
+                <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={menuImageUrl}
+                    alt="菜單圖片"
+                    className="max-h-48 w-full rounded-md border object-contain"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadImage.isPending}
+                    >
+                      {uploadImage.isPending ? "上傳中..." : "更換"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleImageRemove}
+                      disabled={removeImage.isPending}
+                    >
+                      移除
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadImage.isPending}
+                >
+                  {uploadImage.isPending ? "上傳中..." : "上傳菜單圖"}
+                </Button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
               />
             </div>
             <div className="space-y-2">
