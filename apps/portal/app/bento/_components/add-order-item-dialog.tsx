@@ -38,6 +38,8 @@ import { useOrder } from "@/hooks/bento/use-orders"
 import { useUsers } from "@/hooks/bento/use-users"
 import { useAuth } from "@/hooks/use-auth"
 
+import { MenuImageButton } from "./menu-image-dialog"
+
 interface MenuItem {
   id: string
   name: string
@@ -119,6 +121,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
 
   const restaurantAdditionalOptions: string[] | null =
     order?.restaurants?.additional || null
+  const menuImageUrl = order?.restaurants?.menu_image_url
 
   const groups = optionGroups ?? []
   const isDrinks = groups.length > 0
@@ -355,6 +358,15 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4">
+            {menuImageUrl && (
+              <div className="flex justify-end">
+                <MenuImageButton
+                  imageUrl={menuImageUrl}
+                  shopName={order?.restaurants?.name ?? "菜單"}
+                  className="text-sm text-muted-foreground"
+                />
+              </div>
+            )}
             {isAnonymous && (
               <div className="space-y-3">
                 <Input
