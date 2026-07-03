@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
+  async redirects() {
+    return [
+      // bento.winlab.tw is retired — the app lives at /bento now
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "bento.winlab.tw" }],
+        destination: "https://portal.winlab.tw/bento",
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {
