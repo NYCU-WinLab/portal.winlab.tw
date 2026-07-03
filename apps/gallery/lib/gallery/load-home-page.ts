@@ -11,6 +11,8 @@ import type {
   GalleryImage,
   GalleryMember,
 } from "@/lib/gallery/types"
+import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { loadGalleryCommentRows } from "@/lib/gallery/comment-edit"
 
 export const GALLERY_PAGE_SIZE = 36
 
@@ -55,9 +57,11 @@ export async function loadGalleryHomePage(
   {
     page,
     userId,
+    filters = { uploaderId: null, media: "all", uploadedAfter: null },
   }: {
     page: number
     userId: string | null
+    filters?: GalleryHomeFilters
   }
 ): Promise<{
   images: GalleryImage[]
@@ -76,15 +80,27 @@ export async function loadGalleryHomePage(
           .select("id, name, email")
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
-    supabase
-      .from("gallery_images")
-      .select(
-        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index",
-        { count: "exact" }
-      )
-      .or("sequence_id.is.null,sequence_index.eq.0")
-      .order("created_at", { ascending: false })
-      .range(from, to),
+    (() => {
+      let query = supabase
+        .from("gallery_images")
+        .select(
+          "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index",
+          { count: "exact" }
+        )
+        .or("sequence_id.is.null,sequence_index.eq.0")
+
+      if (filters.uploaderId) {
+        query = query.eq("created_by", filters.uploaderId)
+      }
+      if (filters.media === "image" || filters.media === "video") {
+        query = query.eq("media_type", filters.media)
+      }
+      if (filters.uploadedAfter) {
+        query = query.gte("created_at", filters.uploadedAfter)
+      }
+
+      return query.order("created_at", { ascending: false }).range(from, to)
+    })(),
   ])
 
   if (imagesResult.error) {
@@ -143,11 +159,7 @@ export async function loadGalleryHomePage(
         .from("gallery_image_votes")
         .select("image_id, user_id, reaction")
         .in("image_id", imageIds),
-      supabase
-        .from("gallery_comments")
-        .select("id, image_id, parent_id, body, created_by, created_at")
-        .in("image_id", imageIds)
-        .order("created_at", { ascending: true }),
+      loadGalleryCommentRows(supabase, imageIds),
     ])
 
     if (voteResult.error) {
@@ -158,7 +170,7 @@ export async function loadGalleryHomePage(
     }
 
     const voteRows = voteResult.data ?? []
-    const commentRows = commentResult.data ?? []
+    const commentRows = commentResult.data
 
     if (!userId) {
       const profileIds = Array.from(
@@ -207,6 +219,7 @@ export async function loadGalleryHomePage(
         body: row.body,
         created_by: row.created_by,
         created_at: row.created_at,
+        updated_at: row.updated_at ?? null,
         commenter_name: nameById.get(row.created_by) ?? "Unknown",
       })
       commentsByImage.set(row.image_id, bucket)

@@ -15,17 +15,24 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { markGalleryMentionsRead } from "@/app/actions"
+import {
+  markGalleryActivityNotificationsRead,
+  markGalleryMentionsRead,
+} from "@/app/actions"
+import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import {
   gallerySans,
   galleryShellIconButtonClass,
 } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
-import {
-  fetchGalleryMentionNotification,
-  type GalleryMentionNotification,
-} from "@/lib/gallery/mention-notifications"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import {
+  fetchGalleryActivityNotification,
+  fetchGalleryMentionNotification,
+  isActivityNotificationsUnavailable,
+  sortGalleryNotifications,
+  type GalleryNotification,
+} from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/client"
 
 function truncateBody(body: string, max = 72): string {
@@ -34,11 +41,16 @@ function truncateBody(body: string, max = 72): string {
   return `${trimmed.slice(0, max - 1)}…`
 }
 
-function sortNotifications(items: GalleryMentionNotification[]) {
-  return [...items].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+function notificationSummary(notification: GalleryNotification): string {
+  const actor = notification.actor_name
+  const work = notification.image_name
+  if (notification.kind === "mention") {
+    return `${actor} mentioned you on ${work}`
+  }
+  if (notification.kind === "reply") {
+    return `${actor} replied to your comment on ${work}`
+  }
+  return `${actor} reacted to ${work}`
 }
 
 export function GalleryMentionBell({
@@ -46,7 +58,7 @@ export function GalleryMentionBell({
   initialNotifications,
 }: {
   viewerId: string
-  initialNotifications: GalleryMentionNotification[]
+  initialNotifications: GalleryNotification[]
 }) {
   const router = useRouter()
   const [notifications, setNotifications] = useState(initialNotifications)
@@ -59,7 +71,7 @@ export function GalleryMentionBell({
 
   useEffect(() => {
     const supabase = createClient()
-    const channelName = `gallery-mentions:${viewerId}:${crypto.randomUUID()}`
+    const channelName = `gallery-notifications:${viewerId}:${crypto.randomUUID()}`
     const channel = supabase.channel(channelName)
 
     channel
@@ -83,10 +95,21 @@ export function GalleryMentionBell({
           if (!notification) return
 
           setNotifications((current) => {
-            if (current.some((item) => item.comment_id === commentId)) {
-              return current
+            const mapped: GalleryNotification = {
+              key: `mention:${notification.comment_id}`,
+              kind: "mention",
+              image_id: notification.image_id,
+              image_name: notification.image_name,
+              comment_id: notification.comment_id,
+              actor_name: notification.author_name,
+              body: notification.body,
+              reaction: null,
+              created_at: notification.created_at,
+              mention_comment_id: notification.comment_id,
+              activity_id: null,
             }
-            return sortNotifications([notification, ...current])
+            if (current.some((item) => item.key === mapped.key)) return current
+            return sortGalleryNotifications([mapped, ...current])
           })
         }
       )
@@ -105,23 +128,95 @@ export function GalleryMentionBell({
           }
           if (!row.comment_id || !row.read_at) return
           setNotifications((current) =>
-            current.filter((item) => item.comment_id !== row.comment_id)
+            current.filter((item) => item.mention_comment_id !== row.comment_id)
           )
         }
       )
-      .subscribe()
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "gallery_activity_notifications",
+          filter: `recipient_user_id=eq.${viewerId}`,
+        },
+        async (payload) => {
+          const activityId = (payload.new as { id?: string }).id
+          if (!activityId) return
+
+          const notification = await fetchGalleryActivityNotification(
+            supabase,
+            activityId,
+            viewerId
+          )
+          if (!notification) return
+
+          setNotifications((current) => {
+            if (current.some((item) => item.key === notification.key)) {
+              return current
+            }
+            return sortGalleryNotifications([notification, ...current])
+          })
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "gallery_activity_notifications",
+          filter: `recipient_user_id=eq.${viewerId}`,
+        },
+        (payload) => {
+          const row = payload.new as { id?: string; read_at?: string | null }
+          if (!row.id || !row.read_at) return
+          setNotifications((current) =>
+            current.filter((item) => item.activity_id !== row.id)
+          )
+        }
+      )
+      .subscribe((status, err) => {
+        if (
+          err &&
+          isActivityNotificationsUnavailable({
+            message: err.message,
+          })
+        ) {
+          return
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)
     }
   }, [viewerId])
 
-  const openMention = (notification: GalleryMentionNotification) => {
+  const markRead = async (items: GalleryNotification[]) => {
+    const mentionIds = items
+      .map((item) => item.mention_comment_id)
+      .filter((id): id is string => Boolean(id))
+    const activityIds = items
+      .map((item) => item.activity_id)
+      .filter((id): id is string => Boolean(id))
+
+    const [mentionResult, activityResult] = await Promise.all([
+      mentionIds.length > 0
+        ? markGalleryMentionsRead(mentionIds)
+        : Promise.resolve({ ok: true as const }),
+      activityIds.length > 0
+        ? markGalleryActivityNotificationsRead(activityIds)
+        : Promise.resolve({ ok: true as const }),
+    ])
+
+    return mentionResult.ok && activityResult.ok
+  }
+
+  const openNotification = (notification: GalleryNotification) => {
     startTransition(async () => {
-      const result = await markGalleryMentionsRead([notification.comment_id])
-      if (!result.ok) return
+      const ok = await markRead([notification])
+      if (!ok) return
       setNotifications((current) =>
-        current.filter((item) => item.comment_id !== notification.comment_id)
+        current.filter((item) => item.key !== notification.key)
       )
       router.push(
         buildGalleryPhotoHref({
@@ -135,10 +230,8 @@ export function GalleryMentionBell({
   const markAllRead = () => {
     if (notifications.length === 0) return
     startTransition(async () => {
-      const result = await markGalleryMentionsRead(
-        notifications.map((item) => item.comment_id)
-      )
-      if (!result.ok) return
+      const ok = await markRead(notifications)
+      if (!ok) return
       setNotifications([])
     })
   }
@@ -153,8 +246,8 @@ export function GalleryMentionBell({
           className={cn(galleryShellIconButtonClass(), "relative")}
           aria-label={
             unreadCount > 0
-              ? `${unreadCount} unread mention${unreadCount === 1 ? "" : "s"}`
-              : "Mentions"
+              ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+              : "Notifications"
           }
           disabled={isPending}
         >
@@ -176,7 +269,7 @@ export function GalleryMentionBell({
         className={cn(gallerySans(), "w-80 max-w-[calc(100vw-2rem)]")}
       >
         <DropdownMenuLabel className="flex items-center justify-between gap-2">
-          <span>Mentions</span>
+          <span>Notifications</span>
           {unreadCount > 0 ? (
             <button
               type="button"
@@ -191,24 +284,30 @@ export function GalleryMentionBell({
         <DropdownMenuSeparator />
         {unreadCount === 0 ? (
           <div className="px-2 py-3 text-xs text-muted-foreground">
-            No unread @mentions.
+            You&apos;re all caught up.
           </div>
         ) : (
           notifications.map((notification) => (
             <DropdownMenuItem
-              key={notification.comment_id}
+              key={notification.key}
               className="flex cursor-pointer flex-col items-start gap-1 py-2"
-              onClick={() => openMention(notification)}
+              onClick={() => openNotification(notification)}
               disabled={isPending}
             >
-              <span className="text-xs text-foreground">
-                <span className="font-medium">{notification.author_name}</span>
-                {" mentioned you on "}
-                <span className="font-medium">{notification.image_name}</span>
+              <span className="flex items-center gap-1.5 text-xs text-foreground">
+                {notification.kind === "reaction" && notification.reaction ? (
+                  <ReactionGlyph
+                    reaction={notification.reaction}
+                    className="shrink-0 text-sm"
+                  />
+                ) : null}
+                <span>{notificationSummary(notification)}</span>
               </span>
-              <span className="line-clamp-2 text-[11px] text-muted-foreground">
-                {truncateBody(notification.body)}
-              </span>
+              {notification.body ? (
+                <span className="line-clamp-2 text-[11px] text-muted-foreground">
+                  {truncateBody(notification.body)}
+                </span>
+              ) : null}
               <span className="text-[10px] text-muted-foreground/80">
                 {formatUploadedAt(notification.created_at)}
               </span>

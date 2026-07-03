@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react"
 import { useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -11,6 +12,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { registerGalleryImage } from "@/app/upload/actions"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
   guessExtension,
   resolveMediaMimeType,
@@ -30,6 +32,7 @@ type Status =
       kind: "working"
       label: string
       ratio: number
+      batch?: { current: number; total: number }
     }
 
 const PHASE_LABEL: Record<CompressPhase, string> = {
@@ -41,6 +44,7 @@ const PHASE_LABEL: Record<CompressPhase, string> = {
 
 /** Client uploads bytes to Supabase Storage; server action only registers the row (no 413 on Vercel). */
 export function UploadForm() {
+  const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState("")
@@ -80,11 +84,25 @@ export function UploadForm() {
       let successCount = 0
       const failed: string[] = []
       const sequenceId = files.length > 1 ? crypto.randomUUID() : null
+      let wallPhotoId: string | null = null
+
+      const batch =
+        files.length > 1 ? { total: files.length, current: 0 } : undefined
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i]!
+        const batchCurrent = i + 1
         const labelPrefix =
-          files.length > 1 ? `(${i + 1}/${files.length}) ` : ""
+          files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
+
+        if (batch) {
+          setStatus({
+            kind: "working",
+            label: `Uploading ${batchCurrent} of ${files.length}`,
+            ratio: (i + 0.05) / files.length,
+            batch: { current: batchCurrent, total: files.length },
+          })
+        }
 
         const resolved = resolveMediaMimeType(file)
         if (!resolved) {
@@ -98,8 +116,9 @@ export function UploadForm() {
           files.length === 1 && trimmed ? trimmed : inferArtworkName(file.name)
 
         try {
+          let registeredId: string
           if (resolved.kind === "image") {
-            await uploadImage({
+            registeredId = await uploadImage({
               supabase,
               userId,
               file,
@@ -111,7 +130,7 @@ export function UploadForm() {
               sequenceIndex: sequenceId ? i : null,
             })
           } else {
-            await uploadVideo({
+            registeredId = await uploadVideo({
               supabase,
               userId,
               file,
@@ -121,6 +140,9 @@ export function UploadForm() {
               sequenceId,
               sequenceIndex: sequenceId ? i : null,
             })
+          }
+          if (!wallPhotoId && (sequenceId ? i === 0 : true)) {
+            wallPhotoId = registeredId
           }
           successCount += 1
         } catch (err) {
@@ -133,7 +155,17 @@ export function UploadForm() {
 
       if (successCount > 0) {
         const suffix = successCount > 1 ? "s" : ""
-        toast.success(`Uploaded ${successCount} work${suffix}.`)
+        if (wallPhotoId) {
+          const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
+          toast.success(`Uploaded ${successCount} work${suffix}.`, {
+            action: {
+              label: "View on wall",
+              onClick: () => router.push(href),
+            },
+          })
+        } else {
+          toast.success(`Uploaded ${successCount} work${suffix}.`)
+        }
         form?.reset()
         setName("")
         setFileNames([])
@@ -213,6 +245,16 @@ export function UploadForm() {
       </div>
       {status.kind === "working" ? (
         <div className="flex flex-col gap-2">
+          {status.batch ? (
+            <p
+              className={cn(
+                gallerySans(),
+                "text-sm font-medium text-foreground tabular-nums"
+              )}
+            >
+              {status.batch.current}/{status.batch.total}
+            </p>
+          ) : null}
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
             {status.label}
           </p>
@@ -249,7 +291,7 @@ type UploadCtx = {
 
 async function uploadImage(
   ctx: UploadCtx & { resolved: ResolvedMime }
-): Promise<void> {
+): Promise<string> {
   const {
     supabase,
     userId,
@@ -296,9 +338,10 @@ async function uploadImage(
     await supabase.storage.from("gallery").remove([objectPath])
     throw new Error(result.error)
   }
+  return result.id
 }
 
-async function uploadVideo(ctx: UploadCtx): Promise<void> {
+async function uploadVideo(ctx: UploadCtx): Promise<string> {
   const {
     supabase,
     userId,
@@ -372,4 +415,5 @@ async function uploadVideo(ctx: UploadCtx): Promise<void> {
     await supabase.storage.from("gallery").remove([videoPath, posterPath])
     throw new Error(result.error)
   }
+  return result.id
 }

@@ -18,13 +18,13 @@ import {
   GalleryShellNav,
   type GalleryShellActive,
 } from "@/components/gallery-shell-nav"
-import type { GalleryMentionNotification } from "@/lib/gallery/mention-notifications"
+import type { GalleryNotification } from "@/lib/gallery/notifications"
 import {
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
-import { loadUnreadGalleryMentions } from "@/lib/gallery/mention-notifications"
+import { loadUnreadGalleryNotifications } from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -44,7 +44,7 @@ export function GalleryShell({
   signedIn?: boolean
   viewerId?: string | null
   seasonalThemeId?: GallerySeasonalThemeId | null
-  mentionNotifications?: GalleryMentionNotification[]
+  mentionNotifications?: GalleryNotification[]
   containerClassName?: string
 }) {
   const theme = seasonalThemeId
@@ -60,7 +60,7 @@ export function GalleryShell({
       />
       <header className="gallery-shell-header pointer-events-none">
         <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-1.5 pb-1 sm:px-6 sm:pb-1.5">
-          <div className="gallery-shell-nav-row relative grid w-full min-h-[1.75rem] grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
+          <div className="gallery-shell-nav-row relative grid min-h-[1.75rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
             <Link
               href="/"
               className={cn(
@@ -133,7 +133,9 @@ export async function GalleryThemedShell({
   const user = await getCurrentUser()
   const [seasonalThemeId, mentionNotifications] = await Promise.all([
     getGallerySeasonalThemeId(supabase),
-    user ? loadUnreadGalleryMentions(supabase, user.id) : Promise.resolve([]),
+    user
+      ? loadUnreadGalleryNotifications(supabase, user.id)
+      : Promise.resolve([]),
   ])
 
   return (
