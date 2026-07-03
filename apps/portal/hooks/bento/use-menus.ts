@@ -337,3 +337,83 @@ export function useDeleteMenu(id: string) {
     },
   })
 }
+
+const MENU_IMAGE_BUCKET = "bento-menus"
+
+async function clearMenuImageFolder(
+  supabase: ReturnType<typeof createClient>,
+  restaurantId: string
+) {
+  const { data: existing } = await supabase.storage
+    .from(MENU_IMAGE_BUCKET)
+    .list(restaurantId)
+  if (existing && existing.length > 0) {
+    await supabase.storage
+      .from(MENU_IMAGE_BUCKET)
+      .remove(existing.map((f) => `${restaurantId}/${f.name}`))
+  }
+}
+
+// Uploads a restaurant's image menu to the public bento-menus bucket (one file
+// per restaurant, replacing any previous one) and stores its URL on the row.
+export function useUploadMenuImage(restaurantId: string) {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      await clearMenuImageFolder(supabase, restaurantId)
+
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg"
+      const path = `${restaurantId}/menu.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from(MENU_IMAGE_BUCKET)
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (uploadError) throw uploadError
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(MENU_IMAGE_BUCKET).getPublicUrl(path)
+      // Cache-bust so the <img> refreshes when the menu is replaced.
+      const url = `${publicUrl}?v=${Date.now()}`
+
+      const { error: updateError } = await supabase
+        .from("bento_menus")
+        .update({ menu_image_url: url, updated_at: new Date().toISOString() })
+        .eq("id", restaurantId)
+      if (updateError) throw updateError
+
+      return url
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.menus.all })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.menus.detail(restaurantId),
+      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useRemoveMenuImage(restaurantId: string) {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      await clearMenuImageFolder(supabase, restaurantId)
+      const { error } = await supabase
+        .from("bento_menus")
+        .update({ menu_image_url: null, updated_at: new Date().toISOString() })
+        .eq("id", restaurantId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.menus.all })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.menus.detail(restaurantId),
+      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}

@@ -14,6 +14,7 @@ export interface Restaurant {
   google_map_link?: string | null
   additional?: string[] | null
   kind?: "meal" | "drinks"
+  menu_image_url?: string | null
   created_at: string
 }
 
