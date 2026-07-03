@@ -13,7 +13,32 @@ export interface Restaurant {
   phone: string
   google_map_link?: string | null
   additional?: string[] | null
+  kind?: "meal" | "drinks"
   created_at: string
+}
+
+export interface OptionValue {
+  id: string
+  group_id: string
+  label: string
+  price_delta: number
+  sort_order: number
+}
+
+export interface OptionGroup {
+  id: string
+  restaurant_id: string
+  name: string
+  required: boolean
+  single_select: boolean
+  sort_order: number
+  values: OptionValue[]
+}
+
+// A selected option shown on an order item (group name + chosen label).
+export interface SelectedOption {
+  group_name: string
+  label: string
 }
 
 export interface OrderItem {
@@ -36,6 +61,7 @@ export interface OrderItemWithUser extends OrderItem {
     name: string | null
     email?: string
   } | null
+  selected_options?: SelectedOption[]
 }
 
 export interface Order {

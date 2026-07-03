@@ -27,9 +27,11 @@ import {
 
 import { useAdmin } from "@/hooks/bento/use-admin"
 import { useMenu } from "@/hooks/bento/use-menus"
+import { useOptionGroups } from "@/hooks/bento/use-option-groups"
 import {
   useAddAnonymousItem,
   useAddOrderItem,
+  useAddOrderItemWithOptions,
   useAdminAddItem,
 } from "@/hooks/bento/use-order-items"
 import { useOrder } from "@/hooks/bento/use-orders"
@@ -51,19 +53,34 @@ interface CartLine {
   menu_item_id: string
   no_sauce: boolean
   additional: number | null
+  optionValueIds: string[]
 }
 
+type ValueLabel = Map<string, { group: string; label: string; sort: number }>
+
 function describeLine(
-  line: Pick<CartLine, "menu_item_id" | "no_sauce" | "additional">,
+  line: Pick<
+    CartLine,
+    "menu_item_id" | "no_sauce" | "additional" | "optionValueIds"
+  >,
   menuItems: MenuItem[],
-  additionalOptions: string[] | null
+  additionalOptions: string[] | null,
+  valueLabel: ValueLabel
 ): string {
   const name = menuItems.find((m) => m.id === line.menu_item_id)?.name ?? ""
   const parts: string[] = []
+
+  line.optionValueIds
+    .map((id) => valueLabel.get(id))
+    .filter((v): v is NonNullable<typeof v> => Boolean(v))
+    .sort((a, b) => a.sort - b.sort)
+    .forEach((v) => parts.push(v.label))
+
   if (line.no_sauce) parts.push("不醬")
   const additionalLabel =
     line.additional !== null ? additionalOptions?.[line.additional] : undefined
   if (additionalLabel) parts.push(additionalLabel)
+
   return parts.length > 0 ? `${name}（${parts.join("、")}）` : name
 }
 
@@ -74,6 +91,9 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
   const [selectedAdditional, setSelectedAdditional] = useState<number | null>(
     null
   )
+  const [selectedOptions, setSelectedOptions] = useState<
+    Record<string, string>
+  >({})
   const [cart, setCart] = useState<CartLine[]>([])
   const [targetUserId, setTargetUserId] = useState<string | null>(null)
   const [anonymousName, setAnonymousName] = useState("")
@@ -87,14 +107,33 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
   const { data: order } = useOrder(open ? orderId : undefined)
   const restaurantId = order?.restaurants?.id
   const { data: menuData } = useMenu(open ? restaurantId : undefined)
+  const { data: optionGroups } = useOptionGroups(
+    open ? restaurantId : undefined
+  )
   const { data: userList } = useUsers()
 
   const addItem = useAddOrderItem()
   const adminAddItem = useAdminAddItem()
   const addAnonymousItem = useAddAnonymousItem()
+  const addWithOptions = useAddOrderItemWithOptions()
 
   const restaurantAdditionalOptions: string[] | null =
     order?.restaurants?.additional || null
+
+  const groups = optionGroups ?? []
+  const isDrinks = groups.length > 0
+  const requiredGroups = groups.filter((g) => g.required)
+
+  const valueLabel: ValueLabel = new Map()
+  groups.forEach((g) =>
+    g.values.forEach((v) =>
+      valueLabel.set(v.id, {
+        group: g.name,
+        label: v.label,
+        sort: g.sort_order,
+      })
+    )
+  )
 
   const defaultAdditional =
     restaurantAdditionalOptions && restaurantAdditionalOptions.length > 0
@@ -136,6 +175,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     setSelectedItem("")
     setNoSauce(false)
     setSelectedAdditional(defaultAdditional)
+    setSelectedOptions({})
   }
 
   const resetAll = () => {
@@ -151,22 +191,13 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     setOpen(value)
     if (value) {
       setSelectedAdditional(defaultAdditional)
+      setSelectedOptions({})
     } else {
       resetAll()
     }
   }
 
-  // Lines to submit = cart plus a still-pending selection the user hasn't
-  // explicitly added yet. This keeps the single-item flow a one-tap submit.
-  const pendingLine: CartLine | null = selectedItem
-    ? {
-        key: "pending",
-        menu_item_id: selectedItem,
-        no_sauce: noSauce,
-        additional: selectedAdditional,
-      }
-    : null
-  const effectiveLines: CartLine[] = pendingLine ? [...cart, pendingLine] : cart
+  const pendingOptionsMet = requiredGroups.every((g) => selectedOptions[g.id])
 
   // Monotonic counter so cart keys stay unique across add/remove sequences
   // even when crypto.randomUUID is unavailable (e.g. plain-http contexts).
@@ -181,13 +212,15 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
 
   const handleAddToCart = () => {
     if (!selectedItem) return
+    if (isDrinks && !pendingOptionsMet) return
     setCart((prev) => [
       ...prev,
       {
         key: makeKey(),
         menu_item_id: selectedItem,
-        no_sauce: noSauce,
-        additional: selectedAdditional,
+        no_sauce: isDrinks ? false : noSauce,
+        additional: isDrinks ? null : selectedAdditional,
+        optionValueIds: isDrinks ? Object.values(selectedOptions) : [],
       },
     ])
     resetSelection()
@@ -196,6 +229,21 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
   const handleRemoveFromCart = (key: string) => {
     setCart((prev) => prev.filter((line) => line.key !== key))
   }
+
+  // For meal shops a still-pending selection is auto-included on submit, so the
+  // single-item flow stays one tap. Drink shops require 加入清單 first (each drink
+  // has mandatory ice/sugar), so only the cart is submitted.
+  const pendingLine: CartLine | null =
+    !isDrinks && selectedItem
+      ? {
+          key: "pending",
+          menu_item_id: selectedItem,
+          no_sauce: noSauce,
+          additional: selectedAdditional,
+          optionValueIds: [],
+        }
+      : null
+  const effectiveLines: CartLine[] = pendingLine ? [...cart, pendingLine] : cart
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -217,7 +265,16 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     let added = 0
     try {
       for (const line of effectiveLines) {
-        if (isAnonymous) {
+        if (isDrinks) {
+          await addWithOptions.mutateAsync({
+            order_id: orderId,
+            menu_item_id: line.menu_item_id,
+            option_value_ids: line.optionValueIds,
+            user_id: isAdminUser && targetUserId ? targetUserId : null,
+            anonymous_name: isAnonymous ? anonymousName.trim() : null,
+            anonymous_contact: isAnonymous ? anonymousContact.trim() : null,
+          })
+        } else if (isAnonymous) {
           await addAnonymousItem.mutateAsync({
             order_id: orderId,
             menu_item_id: line.menu_item_id,
@@ -272,12 +329,15 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     submitting ||
     addItem.isPending ||
     adminAddItem.isPending ||
-    addAnonymousItem.isPending
+    addAnonymousItem.isPending ||
+    addWithOptions.isPending
 
   const submitDisabled =
     isPending ||
     effectiveLines.length === 0 ||
     (isAnonymous && (!anonymousName.trim() || !anonymousContact.trim()))
+
+  const addDisabled = !selectedItem || (isDrinks && !pendingOptionsMet)
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -288,7 +348,9 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
         <DialogHeader>
           <DialogTitle>新增訂餐</DialogTitle>
           <DialogDescription>
-            選擇品項與選項，可加入多筆後一次送出
+            {isDrinks
+              ? "選擇品項與甜度、冰量，加入清單後一次送出"
+              : "選擇品項與選項，可加入多筆後一次送出"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
@@ -372,54 +434,92 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                 </SelectContent>
               </Select>
 
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="noSauce"
-                    checked={noSauce}
-                    onCheckedChange={(checked) => setNoSauce(checked === true)}
-                  />
-                  <Label
-                    htmlFor="noSauce"
-                    className="cursor-pointer whitespace-nowrap"
-                  >
-                    不醬
-                  </Label>
-                </div>
-                {restaurantAdditionalOptions &&
-                  restaurantAdditionalOptions.length > 0 && (
+              {/* Drink shops: mandatory option groups (甜度 / 冰量). */}
+              {isDrinks &&
+                groups.map((group) => (
+                  <div key={group.id} className="flex items-center gap-3">
+                    <Label className="w-12 shrink-0 text-sm">
+                      {group.name}
+                      {group.required && (
+                        <span className="text-destructive"> *</span>
+                      )}
+                    </Label>
                     <Select
-                      value={
-                        selectedAdditional !== null
-                          ? selectedAdditional.toString()
-                          : undefined
-                      }
-                      onValueChange={(value) =>
-                        setSelectedAdditional(parseInt(value))
+                      value={selectedOptions[group.id] ?? ""}
+                      onValueChange={(v) =>
+                        setSelectedOptions((prev) => ({
+                          ...prev,
+                          [group.id]: v,
+                        }))
                       }
                     >
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="選項" />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={`選擇${group.name}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {restaurantAdditionalOptions.map(
-                          (option: string, index: number) => (
-                            <SelectItem key={index} value={index.toString()}>
-                              {option}
-                            </SelectItem>
-                          )
-                        )}
+                        {group.values.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                  )}
-              </div>
+                  </div>
+                ))}
+
+              {/* Meal shops: 不醬 + restaurant additional option. */}
+              {!isDrinks && (
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="noSauce"
+                      checked={noSauce}
+                      onCheckedChange={(checked) =>
+                        setNoSauce(checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor="noSauce"
+                      className="cursor-pointer whitespace-nowrap"
+                    >
+                      不醬
+                    </Label>
+                  </div>
+                  {restaurantAdditionalOptions &&
+                    restaurantAdditionalOptions.length > 0 && (
+                      <Select
+                        value={
+                          selectedAdditional !== null
+                            ? selectedAdditional.toString()
+                            : undefined
+                        }
+                        onValueChange={(value) =>
+                          setSelectedAdditional(parseInt(value))
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="選項" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {restaurantAdditionalOptions.map(
+                            (option: string, index: number) => (
+                              <SelectItem key={index} value={index.toString()}>
+                                {option}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                </div>
+              )}
 
               <Button
                 type="button"
                 variant="secondary"
                 className="w-full"
                 onClick={handleAddToCart}
-                disabled={!selectedItem}
+                disabled={addDisabled}
               >
                 加入清單
               </Button>
@@ -440,7 +540,8 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                       {describeLine(
                         line,
                         menuItems,
-                        restaurantAdditionalOptions
+                        restaurantAdditionalOptions,
+                        valueLabel
                       )}
                     </span>
                     <Button
@@ -482,7 +583,8 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                           {describeLine(
                             line,
                             menuItems,
-                            restaurantAdditionalOptions
+                            restaurantAdditionalOptions,
+                            valueLabel
                           )}
                         </li>
                       ))}
