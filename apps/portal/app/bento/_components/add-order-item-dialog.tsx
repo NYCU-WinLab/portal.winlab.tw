@@ -348,7 +348,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                         result.push(
                           <div
                             key={`header-${type}`}
-                            className="sticky top-0 bg-muted/50 px-3 py-2 text-xs font-medium text-foreground backdrop-blur-sm"
+                            className="sticky top-0 bg-muted px-3 py-2 text-xs font-medium text-foreground"
                           >
                             {type}
                           </div>
