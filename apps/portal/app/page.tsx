@@ -1,6 +1,8 @@
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Toaster } from "@workspace/ui/components/sonner"
 
 import { BulletinBoard } from "@/app/_components/bulletin-board"
@@ -22,6 +24,25 @@ const externalServices = [
   { href: "https://gitlab.winlab.tw", label: "GitLab", note: "Gitlab" },
   { href: "https://wiki.winlab.tw", label: "Wiki", note: "Wiki" },
 ]
+
+function BulletinBoardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  )
+}
+
+function BulletinChatSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  )
+}
 
 const baseApps = [
   { href: "/approve", label: "Approve", note: "文件簽核" },
@@ -64,8 +85,12 @@ export default async function Page() {
           email={currentUser.email}
           avatarUrl={currentUser.avatarUrl}
         />
-        <BulletinBoard />
-        <BulletinChat />
+        <Suspense fallback={<BulletinBoardSkeleton />}>
+          <BulletinBoard />
+        </Suspense>
+        <Suspense fallback={<BulletinChatSkeleton />}>
+          <BulletinChat />
+        </Suspense>
         <nav className="flex flex-col gap-3">
           {apps.map((app) => (
             <Button

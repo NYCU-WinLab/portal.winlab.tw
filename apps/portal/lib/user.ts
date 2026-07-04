@@ -1,4 +1,5 @@
 import type { AuthSession, AuthUser } from "@supabase/supabase-js"
+import { cache } from "react"
 
 import { createClient } from "@/lib/supabase/server"
 
@@ -64,9 +65,16 @@ export function normalizeClaims(claims: ClaimsShape): NormalizedUser {
   }
 }
 
-export async function getCurrentUser(): Promise<NormalizedUser | null> {
+// Memoizes the create-client + getClaims work within a single request/render
+// pass, so callers like getCurrentUser() and getInitialAuthUser() don't each
+// re-verify the same JWT with a brand-new Supabase client.
+const getCachedClaims = cache(async () => {
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.getClaims()
+  return supabase.auth.getClaims()
+})
+
+export async function getCurrentUser(): Promise<NormalizedUser | null> {
+  const { data, error } = await getCachedClaims()
   if (error || !data?.claims) return null
   return normalizeClaims(data.claims)
 }
@@ -82,8 +90,7 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
 // seed for the client AuthProvider. Full AuthUser will be filled in via
 // onAuthStateChange once the browser hydrates.
 export async function getInitialAuthUser(): Promise<AuthUser | null> {
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.getClaims()
+  const { data, error } = await getCachedClaims()
   if (error || !data?.claims) return null
   const claims = data.claims
   return {

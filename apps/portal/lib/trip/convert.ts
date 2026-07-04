@@ -1,7 +1,5 @@
 "use client"
 
-import { PDFDocument } from "pdf-lib"
-
 const MAX_DIM = 2000
 const JPEG_QUALITY = 0.85
 const ACCEPTED_IMAGE_TYPES = new Set([
@@ -57,6 +55,7 @@ async function imageToPdfBlob(file: File): Promise<Blob> {
   })
   const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
 
+  const { PDFDocument } = await import("pdf-lib")
   const pdf = await PDFDocument.create()
   const image = await pdf.embedJpg(jpegBytes)
   const page = pdf.addPage([image.width, image.height])

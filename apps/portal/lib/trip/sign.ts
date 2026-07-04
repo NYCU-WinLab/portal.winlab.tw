@@ -1,6 +1,6 @@
 "use client"
 
-import { PDFDocument, type PDFImage } from "pdf-lib"
+import type { PDFDocument, PDFImage } from "pdf-lib"
 
 export type SignaturePosition = "tl" | "tr" | "bl" | "br"
 
@@ -26,6 +26,7 @@ export async function stampSignatureOnPdf(
   position: SignaturePosition
 ): Promise<Blob> {
   const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer())
+  const { PDFDocument } = await import("pdf-lib")
   const pdf = await PDFDocument.load(pdfBytes)
   const image = await embedSignatureImage(pdf, signatureDataUrl)
   if (!image) {
