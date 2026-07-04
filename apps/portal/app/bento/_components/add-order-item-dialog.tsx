@@ -58,7 +58,10 @@ interface CartLine {
   optionValueIds: string[]
 }
 
-type ValueLabel = Map<string, { group: string; label: string; sort: number }>
+type ValueLabel = Map<
+  string,
+  { group: string; label: string; price_delta: number; sort: number }
+>
 
 function describeLine(
   line: Pick<
@@ -76,7 +79,9 @@ function describeLine(
     .map((id) => valueLabel.get(id))
     .filter((v): v is NonNullable<typeof v> => Boolean(v))
     .sort((a, b) => a.sort - b.sort)
-    .forEach((v) => parts.push(v.label))
+    .forEach((v) =>
+      parts.push(v.price_delta > 0 ? `${v.label} +$${v.price_delta}` : v.label)
+    )
 
   if (line.no_sauce) parts.push("不醬")
   const additionalLabel =
@@ -133,6 +138,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
       valueLabel.set(v.id, {
         group: g.name,
         label: v.label,
+        price_delta: v.price_delta,
         sort: g.sort_order,
       })
     )

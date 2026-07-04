@@ -20,7 +20,6 @@ begin
     values (v_rid, '加料', false, false, 3)
     returning id into v_addon;
     insert into public.bento_option_values (group_id, label, price_delta, sort_order) values
-      (v_addon, '蜜漬白玉丸', 10, 1),
-      (v_addon, '儿儿益生菌', 25, 2);
+      (v_addon, '蜜漬白玉丸', 10, 1);
   end if;
 end $$;
