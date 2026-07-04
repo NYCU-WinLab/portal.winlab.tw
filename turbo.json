@@ -17,7 +17,11 @@
         "SUPABASE_SECRET_KEY",
         "GALLERY_API_SECRET",
         "RESEND_API_KEY",
-        "CRON_SECRET"
+        "CRON_SECRET",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "OTEL_SERVICE_NAME",
+        "OTEL_RESOURCE_ATTRIBUTES"
       ]
     },
     "lint": {
@@ -47,7 +51,11 @@
         "SUPABASE_SECRET_KEY",
         "GALLERY_API_SECRET",
         "RESEND_API_KEY",
-        "CRON_SECRET"
+        "CRON_SECRET",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "OTEL_SERVICE_NAME",
+        "OTEL_RESOURCE_ATTRIBUTES"
       ]
     }
   }
