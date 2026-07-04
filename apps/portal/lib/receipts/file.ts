@@ -1,5 +1,3 @@
-import { PDFDocument } from "pdf-lib"
-
 // Receipts get archived as PDF — uniform format whether the user uploaded an
 // image (phone photo of a paper receipt) or a PDF invoice. PDFs go through
 // untouched so vector content survives; images get rasterized to JPEG inside a
@@ -28,6 +26,7 @@ export async function fileToReceiptPdf(file: File): Promise<Blob> {
     throw new Error("只支援圖片或 PDF — 收到的是 " + (file.type || "未知格式"))
   }
   const jpegBytes = await rasterizeToJpeg(file)
+  const { PDFDocument } = await import("pdf-lib")
   const pdf = await PDFDocument.create()
   const image = await pdf.embedJpg(jpegBytes)
   const page = pdf.addPage([image.width, image.height])

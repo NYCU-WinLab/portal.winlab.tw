@@ -1,6 +1,6 @@
 "use client"
 
-import { PDFDocument } from "pdf-lib"
+import type { PDFDocument } from "pdf-lib"
 
 import type { ApproveField } from "./types"
 
@@ -18,6 +18,7 @@ export async function buildSignedPdf(
     )
   }
   const pdfBytes = await res.arrayBuffer()
+  const { PDFDocument } = await import("pdf-lib")
   const pdf = await PDFDocument.load(pdfBytes)
   const pages = pdf.getPages()
 

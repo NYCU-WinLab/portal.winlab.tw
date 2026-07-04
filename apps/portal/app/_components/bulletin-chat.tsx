@@ -56,7 +56,8 @@ async function fetchInitial(): Promise<{
       supabase
         .from("user_profiles")
         .select("id, name, email")
-        .order("name", { ascending: true }),
+        .order("name", { ascending: true })
+        .limit(500),
       supabase.rpc("is_portal_admin"),
     ])
 
