@@ -94,7 +94,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     null
   )
   const [selectedOptions, setSelectedOptions] = useState<
-    Record<string, string>
+    Record<string, string[]>
   >({})
   const [cart, setCart] = useState<CartLine[]>([])
   const [targetUserId, setTargetUserId] = useState<string | null>(null)
@@ -200,7 +200,9 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
     }
   }
 
-  const pendingOptionsMet = requiredGroups.every((g) => selectedOptions[g.id])
+  const pendingOptionsMet = requiredGroups.every(
+    (g) => (selectedOptions[g.id]?.length ?? 0) > 0
+  )
 
   // Monotonic counter so cart keys stay unique across add/remove sequences
   // even when crypto.randomUUID is unavailable (e.g. plain-http contexts).
@@ -223,7 +225,7 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
         menu_item_id: selectedItem,
         no_sauce: isDrinks ? false : noSauce,
         additional: isDrinks ? null : selectedAdditional,
-        optionValueIds: isDrinks ? Object.values(selectedOptions) : [],
+        optionValueIds: isDrinks ? Object.values(selectedOptions).flat() : [],
       },
     ])
     resetSelection()
@@ -449,38 +451,78 @@ export function AddOrderItemDialog({ orderId }: { orderId: string }) {
                 </SelectContent>
               </Select>
 
-              {/* Drink shops: mandatory option groups (甜度 / 冰量). */}
+              {/* Drink shops: mandatory single-select groups (甜度 / 冰量)
+                  plus optional multi-select add-ons (加料). */}
               {isDrinks &&
-                groups.map((group) => (
-                  <div key={group.id} className="flex items-center gap-3">
-                    <Label className="w-12 shrink-0 text-sm">
-                      {group.name}
-                      {group.required && (
-                        <span className="text-destructive"> *</span>
-                      )}
-                    </Label>
-                    <Select
-                      value={selectedOptions[group.id] ?? ""}
-                      onValueChange={(v) =>
-                        setSelectedOptions((prev) => ({
-                          ...prev,
-                          [group.id]: v,
-                        }))
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={`選擇${group.name}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {group.values.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+                groups.map((group) =>
+                  group.single_select ? (
+                    <div key={group.id} className="flex items-center gap-3">
+                      <Label className="w-12 shrink-0 text-sm">
+                        {group.name}
+                        {group.required && (
+                          <span className="text-destructive"> *</span>
+                        )}
+                      </Label>
+                      <Select
+                        value={selectedOptions[group.id]?.[0] ?? ""}
+                        onValueChange={(v) =>
+                          setSelectedOptions((prev) => ({
+                            ...prev,
+                            [group.id]: v ? [v] : [],
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={`選擇${group.name}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {group.values.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div key={group.id} className="space-y-2">
+                      <Label className="text-sm">{group.name}</Label>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2">
+                        {group.values.map((v) => {
+                          const checked =
+                            selectedOptions[group.id]?.includes(v.id) ?? false
+                          return (
+                            <div key={v.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`opt-${v.id}`}
+                                checked={checked}
+                                onCheckedChange={(next) =>
+                                  setSelectedOptions((prev) => {
+                                    const current = prev[group.id] ?? []
+                                    return {
+                                      ...prev,
+                                      [group.id]:
+                                        next === true
+                                          ? [...current, v.id]
+                                          : current.filter((id) => id !== v.id),
+                                    }
+                                  })
+                                }
+                              />
+                              <Label
+                                htmlFor={`opt-${v.id}`}
+                                className="cursor-pointer font-normal whitespace-nowrap"
+                              >
+                                {v.label}
+                                {v.price_delta > 0 && ` +$${v.price_delta}`}
+                              </Label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                )}
 
               {/* Meal shops: 不醬 + restaurant additional option. */}
               {!isDrinks && (

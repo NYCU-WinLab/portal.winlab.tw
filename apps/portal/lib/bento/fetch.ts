@@ -5,6 +5,9 @@ import type { OrderWithStats } from "@/lib/bento/types"
 interface OrderItemRaw {
   user_id: string | null
   menu_items?: { name: string; price: number } | null
+  bento_order_item_options?: Array<{
+    bento_option_values: { price_delta: number } | null
+  }> | null
 }
 
 function computeOrderStats(orderItems: OrderItemRaw[]) {
@@ -18,7 +21,11 @@ function computeOrderStats(orderItems: OrderItemRaw[]) {
   for (const item of orderItems) {
     const name = item.menu_items?.name
     const price = parseFloat(String(item.menu_items?.price || 0))
-    totalPrice += price
+    const optionsPrice = (item.bento_order_item_options ?? []).reduce(
+      (sum, opt) => sum + (opt.bento_option_values?.price_delta ?? 0),
+      0
+    )
+    totalPrice += price + optionsPrice
 
     if (name) {
       const existing = menuItemCounts.get(name)
@@ -47,7 +54,7 @@ export async function fetchOrders(
   const { data, error } = await supabase
     .from("bento_orders")
     .select(
-      "*, restaurants:bento_menus(name, additional), order_items:bento_order_items(*, menu_items:bento_menu_items(name, price))"
+      "*, restaurants:bento_menus(name, additional), order_items:bento_order_items(*, menu_items:bento_menu_items(name, price), bento_order_item_options(bento_option_values(price_delta)))"
     )
     .order("created_at", { ascending: false })
 

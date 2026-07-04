@@ -93,7 +93,7 @@ export function useOrder(id: string | undefined) {
           const valueIds = [...new Set(picks.map((p) => p.option_value_id))]
           const { data: values } = await supabase
             .from("bento_option_values")
-            .select("id, label, group_id, sort_order")
+            .select("id, label, price_delta, group_id, sort_order")
             .in("id", valueIds)
           const groupIds = [...new Set((values ?? []).map((v) => v.group_id))]
           const { data: groups } = await supabase
@@ -106,7 +106,12 @@ export function useOrder(id: string | undefined) {
 
           const byItem = new Map<
             string,
-            Array<{ group_name: string; label: string; group_sort: number }>
+            Array<{
+              group_name: string
+              label: string
+              price_delta: number
+              group_sort: number
+            }>
           >()
           for (const pick of picks) {
             const value = valueMap.get(pick.option_value_id)
@@ -116,6 +121,7 @@ export function useOrder(id: string | undefined) {
             list.push({
               group_name: group?.name ?? "",
               label: value.label,
+              price_delta: value.price_delta,
               group_sort: group?.sort_order ?? 0,
             })
             byItem.set(pick.order_item_id, list)
@@ -125,7 +131,11 @@ export function useOrder(id: string | undefined) {
             ...item,
             selected_options: (byItem.get(item.id) ?? [])
               .sort((a, b) => a.group_sort - b.group_sort)
-              .map(({ group_name, label }) => ({ group_name, label })),
+              .map(({ group_name, label, price_delta }) => ({
+                group_name,
+                label,
+                price_delta,
+              })),
           }))
         }
       }
