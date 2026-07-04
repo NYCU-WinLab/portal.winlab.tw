@@ -40,6 +40,7 @@ export interface OptionGroup {
 export interface SelectedOption {
   group_name: string
   label: string
+  price_delta: number
 }
 
 export interface OrderItem {

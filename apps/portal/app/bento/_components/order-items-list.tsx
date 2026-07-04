@@ -25,7 +25,11 @@ interface OrderItem {
     name: string | null
     email?: string
   } | null
-  selected_options?: { group_name: string; label: string }[]
+  selected_options?: {
+    group_name: string
+    label: string
+    price_delta: number
+  }[]
 }
 
 interface GroupedOrderItem {
@@ -73,8 +77,12 @@ export function OrderItemsList({
           total: 0,
         }
       }
+      const optionsTotal = (item.selected_options ?? []).reduce(
+        (sum, opt) => sum + opt.price_delta,
+        0
+      )
       acc[groupKey].items.push(item)
-      acc[groupKey].total += item.menu_items?.price || 0
+      acc[groupKey].total += (item.menu_items?.price || 0) + optionsTotal
       return acc
     },
     {} as Record<string, GroupedOrderItem>
@@ -126,6 +134,7 @@ export function OrderItemsList({
                       className="px-2 py-0.5 text-[11px]"
                     >
                       {opt.label}
+                      {opt.price_delta > 0 && ` +$${opt.price_delta}`}
                     </Badge>
                   ))}
                   {item.no_sauce && (
