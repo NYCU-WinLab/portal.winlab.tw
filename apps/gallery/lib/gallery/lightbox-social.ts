@@ -1,34 +1,32 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { loadGalleryCommentRows } from "@/lib/gallery/comment-edit"
+import {
+  aggregateCommentLikes,
+  buildGalleryComments,
+  loadGalleryCommentRowsWithSocial,
+} from "@/lib/gallery/comment-social"
 import {
   aggregateReactions,
   isGalleryReaction,
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
 } from "@/lib/gallery/reactions"
-import type { GalleryComment } from "@/lib/gallery/types"
 import type { GalleryReaction } from "@/lib/gallery/reactions"
 
 export async function loadLightboxSocial(
   supabase: SupabaseClient,
   imageId: string,
   viewerId: string | null
-): Promise<{
-  comments: GalleryComment[]
-  reaction_counts: typeof EMPTY_REACTION_COUNTS
-  reaction_names: typeof EMPTY_REACTION_NAMES
-  my_reaction: GalleryReaction | null
-}> {
-  const [commentResult, voteResult] = await Promise.all([
-    loadGalleryCommentRows(supabase, [imageId]),
+) {
+  const [commentLoad, voteResult] = await Promise.all([
+    loadGalleryCommentRowsWithSocial(supabase, [imageId], viewerId),
     supabase
       .from("gallery_image_votes")
       .select("image_id, user_id, reaction")
       .eq("image_id", imageId),
   ])
 
-  const commentRows = commentResult.error ? [] : commentResult.data
+  const commentRows = commentLoad.error ? [] : commentLoad.rows
   const voteRows = voteResult.data ?? []
 
   const profileIds = Array.from(
@@ -56,16 +54,11 @@ export async function loadLightboxSocial(
     }
   }
 
-  const comments: GalleryComment[] = commentRows.map((row) => ({
-    id: row.id,
-    image_id: row.image_id,
-    parent_id: row.parent_id ?? null,
-    body: row.body,
-    created_by: row.created_by,
-    created_at: row.created_at,
-    updated_at: row.updated_at ?? null,
-    commenter_name: nameById.get(row.created_by) ?? "Unknown",
-  }))
+  const social = aggregateCommentLikes(
+    commentLoad.error ? [] : commentLoad.likes,
+    viewerId
+  )
+  const comments = buildGalleryComments(commentRows, nameById, social)
 
   const aggregated = aggregateReactions(voteRows, nameById)
   const counts = aggregated.countsByImage.get(imageId) ?? EMPTY_REACTION_COUNTS

@@ -5,7 +5,6 @@ import { UploadForm } from "@/app/upload/_components/upload-form"
 import { UploadManageList } from "@/app/upload/_components/upload-manage-list"
 import {
   galleryPanelClass,
-  gallerySans,
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
@@ -30,7 +29,7 @@ export default async function UploadPage() {
     supabase
       .from("gallery_images")
       .select(
-        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index"
+        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index, pinned_at"
       )
       .eq("created_by", user.id)
       .order("created_at", { ascending: false }),
@@ -38,7 +37,10 @@ export default async function UploadPage() {
     isGallerySettingsReady(supabase),
   ])
 
-  const myImages = (imagesResult.data ?? []) as ManageUploadRow[]
+  const myImages = (imagesResult.data ?? []).map((row) => ({
+    ...(row as ManageUploadRow),
+    pinned_at: (row as ManageUploadRow).pinned_at ?? null,
+  }))
 
   return (
     <GalleryThemedShell active="manage" signedIn containerClassName="max-w-3xl">
@@ -69,7 +71,7 @@ export default async function UploadPage() {
               You haven&apos;t uploaded anything yet.
             </p>
           ) : (
-            <UploadManageList images={myImages} />
+            <UploadManageList images={myImages} isAdmin={user.isAdmin} />
           )}
         </section>
       </div>

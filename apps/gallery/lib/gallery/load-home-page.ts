@@ -1,18 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
   aggregateReactions,
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
-import type {
-  GalleryComment,
-  GalleryImage,
-  GalleryMember,
-} from "@/lib/gallery/types"
-import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
-import { loadGalleryCommentRows } from "@/lib/gallery/comment-edit"
+import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
 
@@ -31,6 +26,7 @@ type CoverRow = {
   duration_seconds: number | null
   created_by: string
   created_at: string
+  pinned_at: string | null
   sequence_id: string | null
   sequence_index: number | null
 }
@@ -52,12 +48,27 @@ function buildMembers(rows: ProfileRow[]): GalleryMember[] {
   )
 }
 
+function buildCommentCountByImage(
+  rows: { image_id: string }[]
+): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    counts.set(row.image_id, (counts.get(row.image_id) ?? 0) + 1)
+  }
+  return counts
+}
+
 export async function loadGalleryHomePage(
   supabase: SupabaseClient,
   {
     page,
     userId,
-    filters = { uploaderId: null, media: "all", uploadedAfter: null },
+    filters = {
+      uploaderId: null,
+      media: "all",
+      uploadedAfter: null,
+      query: null,
+    },
   }: {
     page: number
     userId: string | null
@@ -84,7 +95,7 @@ export async function loadGalleryHomePage(
       let query = supabase
         .from("gallery_images")
         .select(
-          "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index",
+          "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index",
           { count: "exact" }
         )
         .or("sequence_id.is.null,sequence_index.eq.0")
@@ -98,8 +109,14 @@ export async function loadGalleryHomePage(
       if (filters.uploadedAfter) {
         query = query.gte("created_at", filters.uploadedAfter)
       }
+      if (filters.query) {
+        query = query.ilike("name", `%${filters.query}%`)
+      }
 
-      return query.order("created_at", { ascending: false }).range(from, to)
+      return query
+        .order("pinned_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .range(from, to)
     })(),
   ])
 
@@ -150,34 +167,41 @@ export async function loadGalleryHomePage(
   let countsByImage = new Map<string, typeof EMPTY_REACTION_COUNTS>()
   let namesByImage = new Map<string, typeof EMPTY_REACTION_NAMES>()
   const myReactionByImage = new Map<string, GalleryImage["my_reaction"]>()
-  const commentsByImage = new Map<string, GalleryComment[]>()
+  let commentCountByImage = new Map<string, number>()
   let nameById = buildNameById((profilesResult.data ?? []) as ProfileRow[])
 
   if (imageIds.length > 0) {
-    const [voteResult, commentResult] = await Promise.all([
+    const [voteResult, commentCountResult] = await Promise.all([
       supabase
         .from("gallery_image_votes")
         .select("image_id, user_id, reaction")
         .in("image_id", imageIds),
-      loadGalleryCommentRows(supabase, imageIds),
+      supabase
+        .from("gallery_comments")
+        .select("image_id")
+        .in("image_id", imageIds),
     ])
 
     if (voteResult.error) {
       console.error("[gallery] failed to load reactions", voteResult.error)
     }
-    if (commentResult.error) {
-      console.error("[gallery] failed to load comments", commentResult.error)
+    if (commentCountResult.error) {
+      console.error(
+        "[gallery] failed to load comment counts",
+        commentCountResult.error
+      )
     }
 
     const voteRows = voteResult.data ?? []
-    const commentRows = commentResult.data
+    commentCountByImage = buildCommentCountByImage(
+      (commentCountResult.data ?? []) as { image_id: string }[]
+    )
 
     if (!userId) {
       const profileIds = Array.from(
         new Set([
           ...coverRows.map((image) => image.created_by).filter(Boolean),
           ...voteRows.map((row) => row.user_id).filter(Boolean),
-          ...commentRows.map((row) => row.created_by).filter(Boolean),
         ])
       ) as string[]
 
@@ -209,21 +233,6 @@ export async function loadGalleryHomePage(
         }
       }
     }
-
-    for (const row of commentRows) {
-      const bucket = commentsByImage.get(row.image_id) ?? []
-      bucket.push({
-        id: row.id,
-        image_id: row.image_id,
-        parent_id: row.parent_id ?? null,
-        body: row.body,
-        created_by: row.created_by,
-        created_at: row.created_at,
-        updated_at: row.updated_at ?? null,
-        commenter_name: nameById.get(row.created_by) ?? "Unknown",
-      })
-      commentsByImage.set(row.image_id, bucket)
-    }
   }
 
   const members = userId
@@ -239,12 +248,14 @@ export async function loadGalleryHomePage(
     duration_seconds: image.duration_seconds ?? null,
     created_by: image.created_by,
     created_at: image.created_at,
+    pinned_at: image.pinned_at ?? null,
     sequence_id: image.sequence_id ?? null,
     sequence_index:
       typeof image.sequence_index === "number" ? image.sequence_index : null,
     sequence_count: 1,
     sequence_items: [],
-    comments: commentsByImage.get(image.id) ?? [],
+    comments: [],
+    comment_count: commentCountByImage.get(image.id) ?? 0,
     uploader_name: image.created_by
       ? (nameById.get(image.created_by) ?? "Unknown")
       : "Unknown",
@@ -274,4 +285,70 @@ export async function loadGalleryHomePage(
   )
 
   return { images, members, totalPages, currentPage }
+}
+
+export async function loadGalleryHomePages(
+  supabase: SupabaseClient,
+  {
+    throughPage,
+    userId,
+    filters = {
+      uploaderId: null,
+      media: "all",
+      uploadedAfter: null,
+      query: null,
+    },
+  }: {
+    throughPage: number
+    userId: string | null
+    filters?: GalleryHomeFilters
+  }
+): Promise<{
+  images: GalleryImage[]
+  members: GalleryMember[]
+  totalPages: number
+  currentPage: number
+  hasMore: boolean
+}> {
+  const targetPage = Math.max(1, throughPage)
+  const first = await loadGalleryHomePage(supabase, {
+    page: 1,
+    userId,
+    filters,
+  })
+
+  if (targetPage === 1) {
+    return {
+      ...first,
+      hasMore: first.currentPage < first.totalPages,
+    }
+  }
+
+  const extraPages = await Promise.all(
+    Array.from({ length: targetPage - 1 }, (_, index) =>
+      loadGalleryHomePage(supabase, {
+        page: index + 2,
+        userId,
+        filters,
+      })
+    )
+  )
+
+  const seen = new Set<string>()
+  const images: GalleryImage[] = []
+  for (const batch of [first, ...extraPages]) {
+    for (const image of batch.images) {
+      if (seen.has(image.id)) continue
+      seen.add(image.id)
+      images.push(image)
+    }
+  }
+
+  return {
+    images,
+    members: first.members,
+    totalPages: first.totalPages,
+    currentPage: targetPage,
+    hasMore: targetPage < first.totalPages,
+  }
 }

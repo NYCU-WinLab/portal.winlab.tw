@@ -7,6 +7,7 @@ export type ManageUploadRow = WallPhotoSource & {
   poster_path: string | null
   duration_seconds: number | null
   created_at: string
+  pinned_at: string | null
 }
 
 export type ManageUploadSequence = {

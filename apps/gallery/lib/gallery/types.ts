@@ -19,11 +19,13 @@ export type GalleryImage = {
   duration_seconds: number | null
   created_by: string | null
   created_at: string
+  pinned_at: string | null
   sequence_id: string | null
   sequence_index: number | null
   sequence_count: number
   sequence_items: GallerySequenceItem[]
   comments: GalleryComment[]
+  comment_count: number
   reaction_counts: ReactionCounts
   my_reaction: GalleryReaction | null
   reaction_names: ReactionNames
@@ -46,7 +48,10 @@ export type GalleryComment = {
   created_by: string
   created_at: string
   updated_at: string | null
+  pinned_at: string | null
   commenter_name: string
+  like_count: number
+  liked_by_me: boolean
 }
 
 export type GalleryMember = {
