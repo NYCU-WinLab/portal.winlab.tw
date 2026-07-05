@@ -13,6 +13,11 @@ interface OrderItem {
   menu_item_id: string
   no_sauce?: boolean
   additional?: number | null
+  selected_options?: {
+    group_name: string
+    label: string
+    price_delta: number
+  }[]
   menu_items: {
     name: string
     price: number
