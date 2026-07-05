@@ -1,5 +1,8 @@
 "use client"
 
+import { useState } from "react"
+import { ChevronDown } from "lucide-react"
+
 import { cn } from "@workspace/ui/lib/utils"
 
 import { computeOrderStats, type StatsOrderItem } from "@/lib/bento/order-stats"
@@ -21,6 +24,7 @@ export function OrderStats({
     orderItems,
     restaurantAdditional
   )
+  const [showDetails, setShowDetails] = useState(false)
 
   if (variant === "compact") {
     return (
@@ -36,6 +40,8 @@ export function OrderStats({
     )
   }
 
+  const hasDetails = menuItems.some((item) => item.combinations.length > 0)
+
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       <div className="grid grid-cols-3 gap-2">
@@ -49,35 +55,53 @@ export function OrderStats({
       </div>
 
       {menuItems.length > 0 && (
-        <ul className="flex flex-col gap-3">
-          {menuItems.map((item) => (
-            <li key={item.menu_item_id} className="flex flex-col gap-1.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm font-medium text-foreground">
-                  {item.name}
-                </span>
-                <span className="shrink-0 text-sm font-medium text-muted-foreground tabular-nums">
-                  ×{item.totalCount}
-                </span>
-              </div>
-              {item.combinations.length > 0 && (
-                <ul className="flex flex-col gap-1 border-l border-border pl-3">
-                  {item.combinations.map((combo) => (
-                    <li
-                      key={combo.key}
-                      className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"
-                    >
-                      <span>{combo.label}</span>
-                      <span className="shrink-0 tabular-nums">
-                        ×{combo.count}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-3">
+          {hasDetails && (
+            <button
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+              aria-expanded={showDetails}
+              className="flex items-center gap-1 self-start text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronDown
+                className={cn(
+                  "size-3.5 transition-transform",
+                  showDetails && "rotate-180"
+                )}
+              />
+              {showDetails ? "隱藏明細" : "顯示明細"}
+            </button>
+          )}
+          <ul className="flex flex-col gap-3">
+            {menuItems.map((item) => (
+              <li key={item.menu_item_id} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 text-sm font-medium text-muted-foreground tabular-nums">
+                    ×{item.totalCount}
+                  </span>
+                </div>
+                {showDetails && item.combinations.length > 0 && (
+                  <ul className="flex flex-col gap-1 border-l border-border pl-3">
+                    {item.combinations.map((combo) => (
+                      <li
+                        key={combo.key}
+                        className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"
+                      >
+                        <span>{combo.label}</span>
+                        <span className="shrink-0 tabular-nums">
+                          ×{combo.count}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
