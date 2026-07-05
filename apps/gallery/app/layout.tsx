@@ -1,5 +1,5 @@
 import { trace } from "@opentelemetry/api"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Instrument_Serif } from "next/font/google"
 import { headers } from "next/headers"
 
@@ -9,6 +9,7 @@ import "./gallery.css"
 import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { GalleryInstallPrompt } from "@/app/_components/gallery-install-prompt"
 import { KonamiWinlabLogo } from "@/app/_components/konami-winlab-logo"
 import { ThemeProvider } from "@/components/theme-provider"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
@@ -31,6 +32,22 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Gallery — WinLab",
   description: "Art from NYCU WinLab.",
+  applicationName: "Gallery",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Gallery",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 }
 
 export default async function RootLayout({
@@ -71,6 +88,7 @@ export default async function RootLayout({
       >
         <ThemeProvider>
           {children}
+          <GalleryInstallPrompt />
           <KonamiWinlabLogo />
           <Toaster />
         </ThemeProvider>
