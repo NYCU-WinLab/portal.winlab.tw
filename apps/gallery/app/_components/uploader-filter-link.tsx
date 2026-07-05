@@ -26,6 +26,7 @@ export function UploaderFilterLink({
         uploaderId,
         media: "all",
         uploadedAfter: null,
+        query: searchParams.get("q"),
       },
       photoId: searchParams.get("photo"),
       commentId: searchParams.get("comment"),
