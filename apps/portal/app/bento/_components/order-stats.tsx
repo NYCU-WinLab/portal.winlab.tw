@@ -1,7 +1,5 @@
 "use client"
 
-import type { ReactElement } from "react"
-
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -9,12 +7,21 @@ interface OrderItemForStats {
   menu_item_id: string
   no_sauce?: boolean
   additional?: number | null
+  selected_options?: {
+    group_name: string
+    label: string
+    price_delta: number
+  }[]
   menu_items: {
     name: string
     price: number
   }
   user_id: string | null
   anonymous_name?: string | null
+}
+
+function optionLabel(opt: { label: string; price_delta: number }): string {
+  return opt.price_delta > 0 ? `${opt.label} +$${opt.price_delta}` : opt.label
 }
 
 interface OrderStatsProps {
@@ -43,7 +50,7 @@ export function OrderStats({
       name: string
       price: number
       totalCount: number
-      combinations: Map<string, number>
+      combinations: Map<string, { count: number; label: string }>
     }
   >()
 
@@ -52,20 +59,28 @@ export function OrderStats({
     const menuItemName = item.menu_items?.name || "未知品項"
     const menuItemPrice = item.menu_items?.price || 0
 
-    const combinationKey = `noSauce:${item.no_sauce || false},additional:${
+    const parts = (item.selected_options ?? []).map(optionLabel)
+    if (item.no_sauce) parts.push("不醬")
+    const additionalLabel =
       item.additional !== null && item.additional !== undefined
-        ? item.additional
-        : null
-    }`
+        ? restaurantAdditional?.[item.additional]
+        : undefined
+    if (additionalLabel) parts.push(additionalLabel)
+
+    const combinationKey = JSON.stringify(parts)
+    const combinationLabel = parts.join(" ")
 
     if (menuItemCounts.has(menuItemId)) {
       const existing = menuItemCounts.get(menuItemId)!
       existing.totalCount += 1
-      const currentCount = existing.combinations.get(combinationKey) || 0
-      existing.combinations.set(combinationKey, currentCount + 1)
+      const currentCount = existing.combinations.get(combinationKey)?.count ?? 0
+      existing.combinations.set(combinationKey, {
+        count: currentCount + 1,
+        label: combinationLabel,
+      })
     } else {
-      const combinations = new Map<string, number>()
-      combinations.set(combinationKey, 1)
+      const combinations = new Map<string, { count: number; label: string }>()
+      combinations.set(combinationKey, { count: 1, label: combinationLabel })
       menuItemCounts.set(menuItemId, {
         name: menuItemName,
         price: menuItemPrice,
@@ -75,10 +90,13 @@ export function OrderStats({
     }
   })
 
-  const totalPrice = items.reduce(
-    (sum, item) => sum + (item.menu_items?.price || 0),
-    0
-  )
+  const totalPrice = items.reduce((sum, item) => {
+    const optionsPrice = (item.selected_options ?? []).reduce(
+      (s, opt) => s + opt.price_delta,
+      0
+    )
+    return sum + (item.menu_items?.price || 0) + optionsPrice
+  }, 0)
 
   const menuItemsList = Array.from(menuItemCounts.values()).sort(
     (a, b) => b.totalCount - a.totalCount
@@ -111,38 +129,17 @@ export function OrderStats({
               {item.name} <span className="font-medium">{item.totalCount}</span>{" "}
               份
               {Array.from(item.combinations.entries())
-                .sort((a, b) => b[1] - a[1])
-                .map(([combinationKey, count]) => {
-                  const [noSaucePart = "", additionalPart = ""] =
-                    combinationKey.split(",")
-                  const noSauce = noSaucePart.split(":")[1] === "true"
-                  const additionalStr = additionalPart.split(":")[1] ?? "null"
-                  const additional =
-                    additionalStr === "null" ? null : parseInt(additionalStr)
-
-                  const options: string[] = []
-                  if (noSauce) options.push("不醬")
-                  if (
-                    additional !== null &&
-                    restaurantAdditional &&
-                    restaurantAdditional[additional]
-                  ) {
-                    options.push(restaurantAdditional[additional])
-                  }
-
-                  if (options.length > 0) {
-                    return (
-                      <span
-                        key={combinationKey}
-                        className="ml-1 text-[11px] text-muted-foreground"
-                      >
-                        （{options.join(" ")} {count} 份）
-                      </span>
-                    )
-                  }
-                  return null
-                })
-                .filter((item): item is ReactElement => item !== null)}
+                .sort((a, b) => b[1].count - a[1].count)
+                .map(([combinationKey, { count, label }]) =>
+                  label ? (
+                    <span
+                      key={combinationKey}
+                      className="ml-1 text-[11px] text-muted-foreground"
+                    >
+                      （{label} {count} 份）
+                    </span>
+                  ) : null
+                )}
             </Badge>
           ))}
         </div>
