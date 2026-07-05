@@ -159,6 +159,48 @@ export async function deleteGalleryImage(
   return { ok: true }
 }
 
+export async function deleteGalleryImages(
+  items: {
+    id: string
+    imagePath: string
+    posterPath?: string | null
+  }[]
+): Promise<ActionResult> {
+  if (items.length === 0) {
+    return { ok: false, error: "Nothing selected." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const ids = items.map((item) => item.id)
+  const { data: ownedRows, error: fetchError } = await supabase
+    .from("gallery_images")
+    .select("id")
+    .eq("created_by", userId)
+    .in("id", ids)
+
+  if (fetchError) {
+    return { ok: false, error: `Delete failed: ${fetchError.message}` }
+  }
+  if ((ownedRows ?? []).length !== ids.length) {
+    return { ok: false, error: "Some selected works could not be deleted." }
+  }
+
+  for (const item of items) {
+    const result = await deleteGalleryImage(
+      item.id,
+      item.imagePath,
+      item.posterPath
+    )
+    if (!result.ok) return result
+  }
+
+  return { ok: true }
+}
+
 export async function updateGallerySequenceOrder(
   sequenceId: string,
   orderedImageIds: string[]

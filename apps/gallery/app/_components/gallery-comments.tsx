@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
+import { IconPin, IconThumbUp } from "@tabler/icons-react"
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import {
   AlertDialog,
@@ -21,13 +22,14 @@ import { toast } from "sonner"
 import {
   addGalleryComment,
   deleteGalleryComment,
+  setGalleryCommentPin,
+  toggleGalleryCommentLike,
   updateGalleryComment,
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
+import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
-
-type CommentNode = GalleryComment & { depth: number }
 
 export function GalleryComments({
   imageId,
@@ -37,6 +39,7 @@ export function GalleryComments({
   viewerId,
   viewerName,
   members,
+  isAdmin = false,
   highlightCommentId = null,
 }: {
   imageId: string
@@ -46,6 +49,7 @@ export function GalleryComments({
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
+  isAdmin?: boolean
   highlightCommentId?: string | null
 }) {
   const [draft, setDraft] = useState("")
@@ -59,7 +63,7 @@ export function GalleryComments({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const flattened = useMemo(() => flattenComments(comments), [comments])
+  const flattened = useMemo(() => flattenGalleryComments(comments), [comments])
 
   useEffect(() => {
     if (!highlightCommentId) return
@@ -141,6 +145,9 @@ export function GalleryComments({
           ...result.data,
           commenter_name: viewerName,
           updated_at: result.data.updated_at ?? null,
+          pinned_at: result.data.pinned_at ?? null,
+          like_count: result.data.like_count ?? 0,
+          liked_by_me: result.data.liked_by_me ?? false,
         },
       ])
       setDraft("")
@@ -205,6 +212,51 @@ export function GalleryComments({
     })
   }
 
+  const toggleLike = (commentId: string) => {
+    startTransition(async () => {
+      const result = await toggleGalleryCommentLike(commentId)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      onCommentsChange(
+        comments.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                liked_by_me: result.data.liked,
+                like_count: result.data.like_count,
+              }
+            : comment
+        )
+      )
+    })
+  }
+
+  const togglePin = (comment: GalleryComment) => {
+    const nextPinned = !comment.pinned_at
+    startTransition(async () => {
+      const result = await setGalleryCommentPin(comment.id, nextPinned)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      onCommentsChange(
+        comments.map((row) => {
+          if (row.image_id !== comment.image_id || row.parent_id) return row
+          if (row.id === comment.id) {
+            return { ...row, pinned_at: result.data.pinned_at }
+          }
+          if (nextPinned) {
+            return { ...row, pinned_at: null }
+          }
+          return row
+        })
+      )
+      toast.success(nextPinned ? "Comment pinned." : "Comment unpinned.")
+    })
+  }
+
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", gallerySans())}>
       <div
@@ -221,6 +273,8 @@ export function GalleryComments({
               const mine = viewerId === comment.created_by
               const isEditing = editingId === comment.id
               const edited = isCommentEdited(comment)
+              const canPin =
+                isAdmin && comment.parent_id === null && comment.depth === 0
               return (
                 <li
                   key={comment.id}
@@ -228,14 +282,21 @@ export function GalleryComments({
                   className={cn(
                     "rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5 transition-colors duration-700",
                     comment.depth > 0 && "ml-4 border-l-2 border-l-border",
+                    comment.pinned_at && "border-amber-500/30 bg-amber-500/5",
                     highlightedId === comment.id &&
                       "gallery-comment-highlight border-amber-500/40 bg-amber-500/10"
                   )}
                 >
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="font-medium text-foreground">
                       {comment.commenter_name}
                     </span>
+                    {comment.pinned_at ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                        <IconPin className="size-3" aria-hidden />
+                        Pinned
+                      </span>
+                    ) : null}
                     <span aria-hidden>·</span>
                     <time dateTime={comment.created_at}>
                       {new Date(comment.created_at).toLocaleString(undefined, {
@@ -290,7 +351,27 @@ export function GalleryComments({
                     </p>
                   )}
                   {!isEditing ? (
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleLike(comment.id)}
+                        disabled={!isSignedIn || isPending}
+                        className={cn(
+                          galleryPillClass(),
+                          "inline-flex items-center gap-1",
+                          comment.liked_by_me && "text-foreground"
+                        )}
+                        aria-pressed={comment.liked_by_me}
+                      >
+                        <IconThumbUp
+                          className={cn(
+                            "size-3.5",
+                            comment.liked_by_me && "fill-current"
+                          )}
+                          aria-hidden
+                        />
+                        {comment.like_count > 0 ? comment.like_count : "Like"}
+                      </button>
                       {isSignedIn ? (
                         <button
                           type="button"
@@ -298,6 +379,20 @@ export function GalleryComments({
                           className={galleryPillClass()}
                         >
                           Reply
+                        </button>
+                      ) : null}
+                      {canPin ? (
+                        <button
+                          type="button"
+                          onClick={() => togglePin(comment)}
+                          disabled={isPending}
+                          className={cn(
+                            galleryPillClass(),
+                            comment.pinned_at &&
+                              "text-amber-700 dark:text-amber-300"
+                          )}
+                        >
+                          {comment.pinned_at ? "Unpin" : "Pin"}
                         </button>
                       ) : null}
                       {mine ? (
@@ -457,32 +552,6 @@ function isCommentEdited(comment: GalleryComment): boolean {
     new Date(comment.updated_at).getTime() >
     new Date(comment.created_at).getTime()
   )
-}
-
-function flattenComments(comments: GalleryComment[]): CommentNode[] {
-  const byParent = new Map<string | null, GalleryComment[]>()
-  for (const comment of comments) {
-    const bucket = byParent.get(comment.parent_id) ?? []
-    bucket.push(comment)
-    byParent.set(comment.parent_id, bucket)
-  }
-  for (const bucket of byParent.values()) {
-    bucket.sort(
-      (a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    )
-  }
-
-  const out: CommentNode[] = []
-  const walk = (parentId: string | null, depth: number) => {
-    const children = byParent.get(parentId) ?? []
-    for (const child of children) {
-      out.push({ ...child, depth })
-      walk(child.id, depth + 1)
-    }
-  }
-  walk(null, 0)
-  return out
 }
 
 function removeCommentWithDescendants(

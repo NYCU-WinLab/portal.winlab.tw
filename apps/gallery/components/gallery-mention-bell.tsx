@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { IconBell } from "@tabler/icons-react"
+import { IconBell, IconThumbUp } from "@tabler/icons-react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -49,6 +49,9 @@ function notificationSummary(notification: GalleryNotification): string {
   }
   if (notification.kind === "reply") {
     return `${actor} replied to your comment on ${work}`
+  }
+  if (notification.kind === "comment_like") {
+    return `${actor} liked your comment on ${work}`
   }
   return `${actor} reacted to ${work}`
 }
@@ -162,6 +165,22 @@ export function GalleryMentionBell({
       .on(
         "postgres_changes",
         {
+          event: "DELETE",
+          schema: "public",
+          table: "gallery_activity_notifications",
+          filter: `recipient_user_id=eq.${viewerId}`,
+        },
+        (payload) => {
+          const row = payload.old as { id?: string }
+          if (!row.id) return
+          setNotifications((current) =>
+            current.filter((item) => item.activity_id !== row.id)
+          )
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
           event: "UPDATE",
           schema: "public",
           table: "gallery_activity_notifications",
@@ -169,10 +188,28 @@ export function GalleryMentionBell({
         },
         (payload) => {
           const row = payload.new as { id?: string; read_at?: string | null }
-          if (!row.id || !row.read_at) return
-          setNotifications((current) =>
-            current.filter((item) => item.activity_id !== row.id)
-          )
+          if (!row.id) return
+
+          if (row.read_at) {
+            setNotifications((current) =>
+              current.filter((item) => item.activity_id !== row.id)
+            )
+            return
+          }
+
+          void fetchGalleryActivityNotification(
+            supabase,
+            row.id,
+            viewerId
+          ).then((notification) => {
+            if (!notification) return
+            setNotifications((current) => {
+              const without = current.filter(
+                (item) => item.activity_id !== notification.activity_id
+              )
+              return sortGalleryNotifications([notification, ...without])
+            })
+          })
         }
       )
       .subscribe((status, err) => {
@@ -299,6 +336,12 @@ export function GalleryMentionBell({
                   <ReactionGlyph
                     reaction={notification.reaction}
                     className="shrink-0 text-sm"
+                  />
+                ) : null}
+                {notification.kind === "comment_like" ? (
+                  <IconThumbUp
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
                   />
                 ) : null}
                 <span>{notificationSummary(notification)}</span>

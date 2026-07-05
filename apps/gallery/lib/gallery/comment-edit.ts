@@ -12,6 +12,7 @@ export type GalleryCommentRow = {
   created_by: string
   created_at: string
   updated_at?: string | null
+  pinned_at?: string | null
 }
 
 export function isGalleryCommentEditUnavailable(
@@ -24,6 +25,7 @@ export function isGalleryCommentEditUnavailable(
     code === "PGRST204" ||
     code === "42703" ||
     /updated_at/i.test(message) ||
+    /pinned_at/i.test(message) ||
     /gallery_comments_update/i.test(message) ||
     /schema cache/i.test(message)
   )

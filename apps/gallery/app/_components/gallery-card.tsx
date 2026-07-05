@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useTransition,
   type Dispatch,
@@ -18,6 +19,7 @@ import {
   IconChevronUp,
   IconDownload,
   IconLink,
+  IconPin,
   IconX,
 } from "@tabler/icons-react"
 
@@ -38,7 +40,9 @@ import { toast } from "sonner"
 
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
+import { PinWallButton } from "@/app/_components/pin-wall-button"
 import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
+import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import {
   galleryPillClass,
@@ -51,6 +55,11 @@ import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
+import {
+  nextSequenceIndex,
+  resolveLightboxNextStep,
+  resolveLightboxPrevStep,
+} from "@/lib/gallery/lightbox-nav"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
@@ -136,24 +145,32 @@ export function GalleryCard({
   viewerId,
   viewerName,
   members,
+  isAdmin = false,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
   open,
   onOpenChange,
   gridFocused = false,
+  hasWallPrev = false,
+  hasWallNext = false,
+  onWallNavigate,
 }: {
   image: GalleryImage
   isSignedIn: boolean
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
+  isAdmin?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
   open?: boolean
   onOpenChange?: (open: boolean) => void
   gridFocused?: boolean
+  hasWallPrev?: boolean
+  hasWallNext?: boolean
+  onWallNavigate?: (direction: "prev" | "next") => void
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -179,6 +196,7 @@ export function GalleryCard({
     onOpenChange?.(next)
     if (open === undefined) setInternalOpen(next)
     if (next) return
+    if (open !== undefined) return
     if (!searchParams.has("photo")) return
     const params = new URLSearchParams(searchParams.toString())
     params.delete("photo")
@@ -195,18 +213,30 @@ export function GalleryCard({
   const thumbUrl = activeItem ? thumbUrlFromItem(activeItem) : ""
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
+  const [mediaLoaded, setMediaLoaded] = useState(false)
+  const mediaRef = useRef<HTMLDivElement>(null)
   const [isPending, startTransition] = useTransition()
   const [counts, setCounts] = useState(image.reaction_counts)
   const [myReaction, setMyReaction] = useState(image.my_reaction)
   const [namesByReaction, setNamesByReaction] = useState(image.reaction_names)
-  const [comments, setComments] = useState<GalleryComment[]>(image.comments)
+  const [comments, setComments] = useState<GalleryComment[]>([])
+  const [commentsLoaded, setCommentsLoaded] = useState(false)
+  const [commentCountHint, setCommentCountHint] = useState(image.comment_count)
+  const [pinnedAt, setPinnedAt] = useState<string | null>(image.pinned_at)
 
   const canReact = isSignedIn && !isPending
   const reactionTotal = totalReactions(counts)
+  const wallCommentCount = commentsLoaded ? comments.length : commentCountHint
 
   useEffect(() => {
-    setComments(image.comments)
-  }, [image.comments])
+    setCommentCountHint(image.comment_count)
+    setPinnedAt(image.pinned_at)
+  }, [image.comment_count, image.id, image.pinned_at])
+
+  useEffect(() => {
+    if (!commentsLoaded) return
+    setCommentCountHint(comments.length)
+  }, [comments.length, commentsLoaded])
 
   useEffect(() => {
     if (open && highlightCommentId) {
@@ -222,10 +252,22 @@ export function GalleryCard({
     const supabase = createClient()
     const social = await loadLightboxSocial(supabase, image.id, viewerId)
     setComments(social.comments)
+    setCommentsLoaded(true)
     setCounts(social.reaction_counts)
     setNamesByReaction(social.reaction_names)
     setMyReaction(social.my_reaction)
   }, [image.id, viewerId])
+
+  useEffect(() => {
+    if (!isDialogOpen) return
+    void refreshSocial()
+  }, [isDialogOpen, refreshSocial])
+
+  useEffect(() => {
+    if (isDialogOpen) return
+    setComments([])
+    setCommentsLoaded(false)
+  }, [isDialogOpen, image.id])
 
   useEffect(() => {
     if (!isDialogOpen) return
@@ -275,28 +317,86 @@ export function GalleryCard({
 
   useEffect(() => {
     setLightboxFailed(false)
-  }, [activeIndex])
+    setMediaLoaded(false)
+  }, [activeIndex, mediaUrl])
+
+  useEffect(() => {
+    if (!isDialogOpen) return
+    const node = mediaRef.current?.querySelector("img")
+    if (node?.complete) setMediaLoaded(true)
+  }, [isDialogOpen, mediaUrl, activeIndex])
+
+  const goLightboxPrev = useCallback(() => {
+    const step = resolveLightboxPrevStep(
+      activeIndex,
+      sequenceMedia.length,
+      hasWallPrev
+    )
+    if (step === "sequence") {
+      setActiveIndex((idx) => idx - 1)
+      return
+    }
+    if (step === "wall") {
+      onWallNavigate?.("prev")
+      return
+    }
+    setActiveIndex((idx) =>
+      nextSequenceIndex(idx, sequenceMedia.length, "prev")
+    )
+  }, [activeIndex, hasWallPrev, onWallNavigate, sequenceMedia.length])
+
+  const goLightboxNext = useCallback(() => {
+    const step = resolveLightboxNextStep(
+      activeIndex,
+      sequenceMedia.length,
+      hasWallNext
+    )
+    if (step === "sequence") {
+      setActiveIndex((idx) => idx + 1)
+      return
+    }
+    if (step === "wall") {
+      onWallNavigate?.("next")
+      return
+    }
+    setActiveIndex((idx) =>
+      nextSequenceIndex(idx, sequenceMedia.length, "next")
+    )
+  }, [activeIndex, hasWallNext, onWallNavigate, sequenceMedia.length])
+
+  const { gestureProps } = useLightboxGestures(mediaRef, {
+    enabled: isDialogOpen,
+    onPrev: goLightboxPrev,
+    onNext: goLightboxNext,
+    onSwipeUp: () => setMobileDetailsOpen(true),
+  })
 
   useEffect(() => {
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft" && isSequence) {
+      if (event.key === "ArrowLeft") {
         event.preventDefault()
-        setActiveIndex((idx) =>
-          idx === 0 ? sequenceMedia.length - 1 : idx - 1
-        )
+        goLightboxPrev()
         return
       }
-      if (event.key === "ArrowRight" && isSequence) {
+      if (event.key === "ArrowRight") {
         event.preventDefault()
-        setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
+        goLightboxNext()
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [isDialogOpen, isSequence, sequenceMedia.length])
+  }, [goLightboxNext, goLightboxPrev, isDialogOpen])
+
+  const handlePinSuccess = (nextPinnedAt: string | null) => {
+    setPinnedAt(nextPinnedAt)
+    if (nextPinnedAt) {
+      handleDialogOpenChange(false)
+      onOpenChange?.(false)
+    }
+  }
 
   const copyShareLink = async () => {
     const href = buildGalleryPhotoHref({
@@ -395,6 +495,17 @@ export function GalleryCard({
                         onError={() => setThumbFailed(true)}
                       />
                       {activeIsVideo ? <PlayBadge /> : null}
+                      {pinnedAt ? (
+                        <div
+                          className={cn(
+                            gallerySans(),
+                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
+                          )}
+                        >
+                          <IconPin className="size-3" aria-hidden />
+                          Pinned
+                        </div>
+                      ) : null}
                       {isSequence ? (
                         <div
                           className={cn(
@@ -407,7 +518,7 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3 pb-2">
+                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
                     <p
                       className={cn(
                         gallerySerif(),
@@ -419,23 +530,6 @@ export function GalleryCard({
                   </div>
                 </button>
               </DialogTrigger>
-              <p
-                className={cn(
-                  gallerySans(),
-                  "truncate px-3 pb-4 text-center text-[10px] text-muted-foreground"
-                )}
-              >
-                {image.created_by && isSignedIn ? (
-                  <UploaderFilterLink
-                    uploaderId={image.created_by}
-                    className="text-muted-foreground"
-                  >
-                    {image.uploader_name}
-                  </UploaderFilterLink>
-                ) : (
-                  image.uploader_name
-                )}
-              </p>
             </div>
             <DialogContent
               showCloseButton={false}
@@ -452,53 +546,62 @@ export function GalleryCard({
               <DialogTitle className="sr-only">
                 {activeItem?.name ?? image.name}
               </DialogTitle>
-              <DialogClose
-                aria-label="Close"
-                className={cn(
-                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                  "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                  "transition-colors hover:bg-white",
-                  "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                )}
-              >
-                <IconX className="h-5 w-5" />
-              </DialogClose>
-              <button
-                type="button"
-                onClick={() => void copyShareLink()}
-                aria-label="Copy share link"
-                className={cn(
-                  "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
-                  isSignedIn
-                    ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
-                    : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
-                  "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                  "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                  "transition-colors hover:bg-white",
-                  "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                )}
-              >
-                <IconLink className="h-5 w-5" />
-              </button>
-              {isSignedIn ? (
-                <a
-                  href={mediaUrl}
-                  download
-                  aria-label="Save original"
-                  className={cn(
-                    "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
-                    "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                    "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                    "transition-colors hover:bg-white",
-                    "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                  )}
-                >
-                  <IconDownload className="h-5 w-5" />
-                </a>
-              ) : null}
               <div className="gallery-lightbox-layout">
-                <div className="gallery-lightbox-media">
+                <div
+                  {...gestureProps}
+                  className="gallery-lightbox-media relative"
+                >
+                  <DialogClose
+                    aria-label="Close"
+                    className={cn(
+                      "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
+                      "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                      "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                      "transition-colors hover:bg-white",
+                      "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    )}
+                  >
+                    <IconX className="h-5 w-5" />
+                  </DialogClose>
+                  <button
+                    type="button"
+                    onClick={() => void copyShareLink()}
+                    aria-label="Copy share link"
+                    className={cn(
+                      "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
+                      isSignedIn
+                        ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
+                        : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
+                      "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                      "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                      "transition-colors hover:bg-white",
+                      "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                    )}
+                  >
+                    <IconLink className="h-5 w-5" />
+                  </button>
+                  {isSignedIn ? (
+                    <a
+                      href={mediaUrl}
+                      download
+                      aria-label="Save original"
+                      className={cn(
+                        "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
+                        "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                        "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
+                        "transition-colors hover:bg-white",
+                        "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                      )}
+                    >
+                      <IconDownload className="h-5 w-5" />
+                    </a>
+                  ) : null}
+                  {!mediaLoaded && !lightboxFailed ? (
+                    <div
+                      aria-hidden
+                      className="gallery-lightbox-image animate-pulse bg-muted/80"
+                    />
+                  ) : null}
                   {lightboxFailed ? (
                     <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
                       This {activeIsVideo ? "video" : "image"} cannot be
@@ -516,58 +619,60 @@ export function GalleryCard({
                       autoPlay
                       playsInline
                       preload="metadata"
-                      className="gallery-lightbox-image"
+                      className={cn(
+                        "gallery-lightbox-image",
+                        !mediaLoaded && "opacity-0"
+                      )}
+                      onLoadedData={() => setMediaLoaded(true)}
                       onError={() => setLightboxFailed(true)}
                     />
                   ) : (
                     <img
                       src={mediaUrl}
                       alt={activeItem?.name ?? image.name}
-                      className="gallery-lightbox-image"
+                      className={cn(
+                        "gallery-lightbox-image",
+                        !mediaLoaded && "opacity-0"
+                      )}
+                      onLoad={() => setMediaLoaded(true)}
                       onError={() => setLightboxFailed(true)}
                     />
                   )}
+                  {hasWallPrev || isSequence ? (
+                    <button
+                      type="button"
+                      onClick={goLightboxPrev}
+                      className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                      aria-label="Previous"
+                    >
+                      <IconChevronLeft className="h-5 w-5" />
+                    </button>
+                  ) : null}
+                  {hasWallNext || isSequence ? (
+                    <button
+                      type="button"
+                      onClick={goLightboxNext}
+                      className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                      aria-label="Next"
+                    >
+                      <IconChevronRight className="h-5 w-5" />
+                    </button>
+                  ) : null}
                   {isSequence ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveIndex((idx) =>
-                            idx === 0 ? sequenceMedia.length - 1 : idx - 1
-                          )
-                        }
-                        className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                        aria-label="Previous photo"
-                      >
-                        <IconChevronLeft className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveIndex(
-                            (idx) => (idx + 1) % sequenceMedia.length
-                          )
-                        }
-                        className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                        aria-label="Next photo"
-                      >
-                        <IconChevronRight className="h-5 w-5" />
-                      </button>
-                      <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
-                        {sequenceMedia.map((item, idx) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setActiveIndex(idx)}
-                            className={cn(
-                              "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
-                              idx === activeIndex && "bg-white"
-                            )}
-                            aria-label={`View shot ${idx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
+                      {sequenceMedia.map((item, idx) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setActiveIndex(idx)}
+                          className={cn(
+                            "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
+                            idx === activeIndex && "bg-white"
+                          )}
+                          aria-label={`View shot ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
                   ) : null}
                 </div>
                 <aside
@@ -602,11 +707,21 @@ export function GalleryCard({
                             "mt-0.5 block text-[11px] text-muted-foreground"
                           )}
                         >
-                          {comments.length > 0
-                            ? `${comments.length} comment${comments.length === 1 ? "" : "s"}`
+                          {wallCommentCount > 0
+                            ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
                             : "Comments & reactions"}
                         </span>
                       </span>
+                      {isAdmin ? (
+                        <PinWallButton
+                          imageId={image.id}
+                          pinnedAt={pinnedAt}
+                          onPinnedChange={handlePinSuccess}
+                          scrollToWallTop
+                          stopPropagation
+                          className="shrink-0"
+                        />
+                      ) : null}
                       <IconChevronUp
                         className={cn(
                           "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
@@ -617,14 +732,27 @@ export function GalleryCard({
                   </button>
                   <div className="gallery-lightbox-aside-header space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
                     <div className="min-w-0 space-y-0.5">
-                      <h2
-                        className={cn(
-                          gallerySerif(),
-                          "text-lg leading-snug text-foreground sm:text-xl"
-                        )}
-                      >
-                        {activeItem?.name ?? image.name}
-                      </h2>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2
+                          className={cn(
+                            gallerySerif(),
+                            "text-lg leading-snug text-foreground sm:text-xl"
+                          )}
+                        >
+                          {activeItem?.name ?? image.name}
+                        </h2>
+                        {pinnedAt ? (
+                          <span
+                            className={cn(
+                              gallerySans(),
+                              "inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                            )}
+                          >
+                            <IconPin className="size-3" aria-hidden />
+                            Pinned
+                          </span>
+                        ) : null}
+                      </div>
                       <p
                         className={cn(
                           gallerySans(),
@@ -659,6 +787,16 @@ export function GalleryCard({
                         </p>
                       ) : null}
                     </div>
+                    {isAdmin ? (
+                      <div className="flex justify-end">
+                        <PinWallButton
+                          imageId={image.id}
+                          pinnedAt={pinnedAt}
+                          onPinnedChange={handlePinSuccess}
+                          scrollToWallTop
+                        />
+                      </div>
+                    ) : null}
                     <ReactionBar
                       counts={counts}
                       myReaction={myReaction}
@@ -675,6 +813,7 @@ export function GalleryCard({
                       viewerId={viewerId}
                       viewerName={viewerName}
                       members={members}
+                      isAdmin={isAdmin}
                       highlightCommentId={highlightCommentId}
                     />
                   </div>
@@ -705,8 +844,8 @@ export function GalleryCard({
               }}
               className={galleryPillClass()}
             >
-              {comments.length > 0
-                ? `${comments.length} comment${comments.length === 1 ? "" : "s"}`
+              {wallCommentCount > 0
+                ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
                 : "Comment"}
             </button>
             <ReactionBar

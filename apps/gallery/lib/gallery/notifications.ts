@@ -7,7 +7,11 @@ import {
   type GalleryMentionNotification,
 } from "@/lib/gallery/mention-notifications"
 
-export type GalleryNotificationKind = "mention" | "reply" | "reaction"
+export type GalleryNotificationKind =
+  | "mention"
+  | "reply"
+  | "reaction"
+  | "comment_like"
 
 export type GalleryNotification = {
   key: string
@@ -25,7 +29,7 @@ export type GalleryNotification = {
 
 type ActivityRow = {
   id: string
-  kind: "reply" | "reaction"
+  kind: "reply" | "reaction" | "comment_like"
   image_id: string
   comment_id: string | null
   reaction: string | null

@@ -22,6 +22,40 @@ export type GalleryPhotoDeepLink = {
   page: number
 }
 
+async function resolveWallCoverRank(
+  supabase: SupabaseClient,
+  coverId: string,
+  sortCreatedAt: string
+): Promise<number> {
+  const { data: rank, error } = await supabase.rpc("gallery_wall_cover_rank", {
+    p_image_id: coverId,
+  })
+
+  if (!error && rank != null) {
+    const rankNum = typeof rank === "number" ? rank : Number(rank)
+    if (Number.isFinite(rankNum) && rankNum > 0) {
+      return rankNum
+    }
+  }
+
+  if (error) {
+    console.error("[gallery] failed to rank wall photo, falling back", error)
+  }
+
+  const { count, error: countError } = await supabase
+    .from("gallery_images")
+    .select("id", { count: "exact", head: true })
+    .or("sequence_id.is.null,sequence_index.eq.0")
+    .gt("created_at", sortCreatedAt)
+
+  if (countError) {
+    console.error("[gallery] failed to count newer wall photos", countError)
+    return 1
+  }
+
+  return (count ?? 0) + 1
+}
+
 /** Resolve a photo id to its wall cover row and 1-based pagination page. */
 export async function resolveGalleryPhotoDeepLink(
   supabase: SupabaseClient,
@@ -62,18 +96,8 @@ export async function resolveGalleryPhotoDeepLink(
     }
   }
 
-  const { count, error: countError } = await supabase
-    .from("gallery_images")
-    .select("id", { count: "exact", head: true })
-    .or("sequence_id.is.null,sequence_index.eq.0")
-    .gt("created_at", sortCreatedAt)
-
-  if (countError) {
-    console.error("[gallery] failed to count newer wall photos", countError)
-    return { coverId, page: 1 }
-  }
-
-  const page = galleryPhotoPageFromRank((count ?? 0) + 1)
+  const rank = await resolveWallCoverRank(supabase, coverId, sortCreatedAt)
+  const page = galleryPhotoPageFromRank(rank)
   return { coverId, page }
 }
 
