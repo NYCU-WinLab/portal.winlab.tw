@@ -119,29 +119,30 @@ export function OrderStats({
         </span>
       </p>
       {menuItemsList.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {menuItemsList.map((item, index) => (
-            <Badge
-              key={index}
-              variant="outline"
-              className="px-2 py-0.5 text-xs"
-            >
-              {item.name} <span className="font-medium">{item.totalCount}</span>{" "}
-              份
-              {Array.from(item.combinations.entries())
-                .sort((a, b) => b[1].count - a[1].count)
-                .map(([combinationKey, { count, label }]) =>
-                  label ? (
-                    <span
-                      key={combinationKey}
-                      className="ml-1 text-[11px] text-muted-foreground"
-                    >
-                      （{label} {count} 份）
-                    </span>
-                  ) : null
+        <div className="flex flex-col gap-2">
+          {menuItemsList.map((item, index) => {
+            const combos = Array.from(item.combinations.entries())
+              .filter(([, { label }]) => label)
+              .sort((a, b) => b[1].count - a[1].count)
+
+            return (
+              <div key={index} className="flex flex-col gap-1">
+                <Badge variant="outline" className="w-fit px-2 py-0.5 text-xs">
+                  {item.name}{" "}
+                  <span className="font-medium">{item.totalCount}</span> 份
+                </Badge>
+                {combos.length > 0 && (
+                  <ul className="ml-1 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                    {combos.map(([combinationKey, { count, label }]) => (
+                      <li key={combinationKey}>
+                        {label} × {count}
+                      </li>
+                    ))}
+                  </ul>
                 )}
-            </Badge>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
