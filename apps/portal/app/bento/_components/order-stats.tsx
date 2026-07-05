@@ -99,7 +99,7 @@ export function OrderStats({
   }, 0)
 
   const menuItemsList = Array.from(menuItemCounts.values()).sort(
-    (a, b) => b.totalCount - a.totalCount
+    (a, b) => b.totalCount - a.totalCount || a.name.localeCompare(b.name)
   )
 
   return (
@@ -123,7 +123,11 @@ export function OrderStats({
           {menuItemsList.map((item, index) => {
             const combos = Array.from(item.combinations.entries())
               .filter(([, { label }]) => label)
-              .sort((a, b) => b[1].count - a[1].count)
+              .sort(
+                (a, b) =>
+                  b[1].count - a[1].count ||
+                  a[1].label.localeCompare(b[1].label)
+              )
 
             return (
               <div key={index} className="flex flex-col gap-1">
