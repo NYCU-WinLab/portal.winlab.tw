@@ -1,16 +1,19 @@
 import { Suspense } from "react"
-import { redirect } from "next/navigation"
+import type { Metadata } from "next"
+import { headers } from "next/headers"
 
-import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryInfiniteWall } from "@/app/_components/gallery-infinite-wall"
 import { GalleryHomeFiltersBar } from "@/app/_components/gallery-home-filters"
-import { GalleryPagination } from "@/app/_components/gallery-pagination"
+import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
-import { loadGalleryHomePage } from "@/lib/gallery/load-home-page"
+import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import {
-  buildGalleryPhotoHref,
-  resolveGalleryPhotoDeepLink,
-} from "@/lib/gallery/photo-deep-link"
+  buildGalleryPhotoMetadata,
+  DEFAULT_GALLERY_METADATA,
+  resolveGallerySiteOrigin,
+} from "@/lib/gallery/og-metadata"
+import { resolveGalleryPhotoDeepLink } from "@/lib/gallery/photo-deep-link"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -24,14 +27,37 @@ type GalleryHomePageProps = {
     uploader?: string
     media?: string
     after?: string
+    q?: string
   }>
+}
+
+export async function generateMetadata({
+  searchParams,
+}: GalleryHomePageProps): Promise<Metadata> {
+  const { photo } = await searchParams
+  const photoId = photo?.trim()
+  if (!photoId) return DEFAULT_GALLERY_METADATA
+
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("gallery_images")
+    .select("name, image_path, media_type, poster_path")
+    .eq("id", photoId)
+    .maybeSingle()
+
+  if (!data) return DEFAULT_GALLERY_METADATA
+
+  const headerStore = await headers()
+  const origin = resolveGallerySiteOrigin(headerStore.get("host"))
+
+  return buildGalleryPhotoMetadata(data, origin, photoId)
 }
 
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment, uploader, media, after } = await searchParams
-  const filters = parseGalleryHomeFilters({ uploader, media, after })
+  const { page, photo, comment, uploader, media, after, q } = await searchParams
+  const filters = parseGalleryHomeFilters({ uploader, media, after, q })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -43,31 +69,24 @@ export default async function GalleryHomePage({
 
   let openPhotoId = photoId
   let openCommentId = commentId
-  let loadPage = requestedPage
+  let throughPage = requestedPage
 
   if (photoId) {
     const resolved = await resolveGalleryPhotoDeepLink(supabase, photoId)
     if (resolved) {
       openPhotoId = resolved.coverId
-      if (resolved.page !== requestedPage) {
-        redirect(
-          buildGalleryPhotoHref({
-            photoId: resolved.coverId,
-            commentId,
-            page: resolved.page,
-          })
-        )
-      }
-      loadPage = resolved.page
+      throughPage = Math.max(requestedPage, resolved.page)
     }
   }
 
-  const { images, members, totalPages, currentPage } =
-    await loadGalleryHomePage(supabase, {
-      page: loadPage,
+  const { images, members, currentPage, hasMore } = await loadGalleryHomePages(
+    supabase,
+    {
+      throughPage,
       userId: user?.id ?? null,
       filters,
-    })
+    }
+  )
 
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
@@ -85,24 +104,24 @@ export default async function GalleryHomePage({
               viewerId={user?.id ?? null}
               viewerName={user?.name ?? "You"}
               members={members}
+              isAdmin={user?.isAdmin ?? false}
             />
           }
         >
-          <GalleryGrid
-            images={images}
+          <GalleryInfiniteWall
+            initialImages={images}
+            initialPage={currentPage}
+            initialHasMore={hasMore}
+            filters={filters}
             isSignedIn={Boolean(user)}
             viewerId={user?.id ?? null}
             viewerName={user?.name ?? "You"}
             members={members}
+            isAdmin={user?.isAdmin ?? false}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />
         </Suspense>
-        <GalleryPagination
-          page={currentPage}
-          totalPages={totalPages}
-          filters={filters}
-        />
       </div>
     </GalleryThemedShell>
   )
