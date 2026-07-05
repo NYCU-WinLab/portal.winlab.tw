@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useTransition, type ReactNode } from "react"
+import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { IconChevronDown, IconX } from "@tabler/icons-react"
+import { IconChevronDown, IconSearch, IconX } from "@tabler/icons-react"
 
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { galleryNavLinkClass, gallerySans } from "@/components/gallery-chrome"
 import {
   buildGalleryHomeHref,
+  describeGalleryFilterSummary,
   hasActiveGalleryFilters,
   type GalleryHomeFilters,
   type GalleryMediaFilter,
@@ -98,6 +99,7 @@ export function GalleryHomeFiltersBar({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const [searchDraft, setSearchDraft] = useState(filters.query ?? "")
 
   const apply = (next: GalleryHomeFilters) => {
     const photo = searchParams.get("photo")
@@ -114,12 +116,24 @@ export function GalleryHomeFiltersBar({
 
   const datePreset = datePresetFromAfter(filters.uploadedAfter)
   const active = hasActiveGalleryFilters(filters)
+  const summaryParts = useMemo(
+    () => describeGalleryFilterSummary(filters, members),
+    [filters, members]
+  )
 
   const uploaderLabel = useMemo(() => {
     if (!filters.uploaderId) return "Anyone"
     const member = members.find((item) => item.id === filters.uploaderId)
     return member?.name ?? member?.email ?? "Member"
   }, [filters.uploaderId, members])
+
+  const onSearchSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    apply({
+      ...filters,
+      query: searchDraft.trim() || null,
+    })
+  }
 
   return (
     <nav
@@ -129,6 +143,35 @@ export function GalleryHomeFiltersBar({
         "gallery-home-filters mb-9 flex flex-col items-center gap-3 sm:mb-10"
       )}
     >
+      <form
+        onSubmit={onSearchSubmit}
+        className="flex w-full max-w-md items-center gap-2 px-2"
+      >
+        <div className="relative min-w-0 flex-1">
+          <IconSearch
+            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchDraft}
+            onChange={(event) => setSearchDraft(event.target.value)}
+            placeholder="Search titles…"
+            className={cn(
+              gallerySans(),
+              "w-full rounded-full border border-border/60 bg-background/80 py-2 pr-3 pl-9 text-xs text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/20"
+            )}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isPending}
+          className={cn(galleryNavLinkClass(), isPending && "opacity-50")}
+        >
+          Search
+        </button>
+      </form>
+
       <div className="flex flex-wrap items-center justify-center gap-2">
         {MEDIA_OPTIONS.map((option) => (
           <FilterPill
@@ -223,13 +266,15 @@ export function GalleryHomeFiltersBar({
             <button
               type="button"
               disabled={isPending}
-              onClick={() =>
+              onClick={() => {
+                setSearchDraft("")
                 apply({
                   uploaderId: null,
                   media: "all",
                   uploadedAfter: null,
+                  query: null,
                 })
-              }
+              }}
               className={cn(
                 galleryNavLinkClass(),
                 "inline-flex items-center gap-1",
@@ -242,6 +287,17 @@ export function GalleryHomeFiltersBar({
           </>
         ) : null}
       </div>
+
+      {summaryParts.length > 0 ? (
+        <p
+          className={cn(
+            gallerySans(),
+            "rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[11px] text-muted-foreground shadow-sm"
+          )}
+        >
+          {summaryParts.join(" · ")}
+        </p>
+      ) : null}
     </nav>
   )
 }

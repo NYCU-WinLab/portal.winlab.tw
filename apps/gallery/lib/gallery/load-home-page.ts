@@ -57,7 +57,7 @@ export async function loadGalleryHomePage(
   {
     page,
     userId,
-    filters = { uploaderId: null, media: "all", uploadedAfter: null },
+    filters = { uploaderId: null, media: "all", uploadedAfter: null, query: null },
   }: {
     page: number
     userId: string | null
@@ -97,6 +97,9 @@ export async function loadGalleryHomePage(
       }
       if (filters.uploadedAfter) {
         query = query.gte("created_at", filters.uploadedAfter)
+      }
+      if (filters.query) {
+        query = query.ilike("name", `%${filters.query}%`)
       }
 
       return query.order("created_at", { ascending: false }).range(from, to)

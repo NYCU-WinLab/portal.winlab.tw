@@ -1,9 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
+import { GalleryKeyboardHelp } from "@/app/_components/gallery-keyboard-help"
 import { GalleryEmptyState } from "@/components/gallery-chrome"
+import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -34,6 +37,7 @@ export function GalleryGrid({
   openPhotoId?: string | null
   openCommentId?: string | null
 }) {
+  const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
     if (!openPhotoId) return -1
     const index = images.findIndex((image) => image.id === openPhotoId)
@@ -54,6 +58,32 @@ export function GalleryGrid({
       setOpenIndex(index)
     }
   }, [images, openPhotoId])
+
+  const navigateWall = (direction: "prev" | "next") => {
+    if (openIndex === null) return
+    const nextIndex = direction === "prev" ? openIndex - 1 : openIndex + 1
+    if (nextIndex < 0 || nextIndex >= images.length) return
+    const nextImage = images[nextIndex]
+    if (!nextImage) return
+    setOpenIndex(nextIndex)
+    setFocusIndex(nextIndex)
+    router.replace(
+      buildGalleryPhotoHref({
+        photoId: nextImage.id,
+        commentId: null,
+      }),
+      { scroll: false }
+    )
+  }
+
+  const closeLightbox = () => {
+    setOpenIndex(null)
+    const params = new URLSearchParams(window.location.search)
+    params.delete("photo")
+    params.delete("comment")
+    const qs = params.toString()
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -94,32 +124,51 @@ export function GalleryGrid({
   }
 
   return (
-    <div
-      className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12"
-      aria-label="Gallery wall"
-    >
-      {images.map((image, index) => (
-        <div key={image.id} className="w-full max-w-full">
-          <GalleryCard
-            image={image}
-            isSignedIn={isSignedIn}
-            viewerId={viewerId}
-            viewerName={viewerName}
-            members={members}
-            priorityLcp={index === 0}
-            initialOpen={false}
-            highlightCommentId={openPhotoId === image.id ? openCommentId : null}
-            open={openIndex === index}
-            onOpenChange={(open) => {
-              if (open) setOpenIndex(index)
-              else setOpenIndex(null)
-            }}
-            gridFocused={
-              keyboardNavActive && focusIndex === index && openIndex === null
-            }
-          />
-        </div>
-      ))}
-    </div>
+    <>
+      <div
+        className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12"
+        aria-label="Gallery wall"
+      >
+        {images.map((image, index) => (
+          <div key={image.id} className="w-full max-w-full">
+            <GalleryCard
+              image={image}
+              isSignedIn={isSignedIn}
+              viewerId={viewerId}
+              viewerName={viewerName}
+              members={members}
+              priorityLcp={index === 0}
+              initialOpen={false}
+              highlightCommentId={openPhotoId === image.id ? openCommentId : null}
+              open={openIndex === index}
+              onOpenChange={(open) => {
+                if (open) {
+                  setOpenIndex(index)
+                  router.replace(
+                    buildGalleryPhotoHref({
+                      photoId: image.id,
+                      commentId:
+                        openPhotoId === image.id ? openCommentId : null,
+                    }),
+                    { scroll: false }
+                  )
+                } else {
+                  closeLightbox()
+                }
+              }}
+              gridFocused={
+                keyboardNavActive && focusIndex === index && openIndex === null
+              }
+              hasWallPrev={openIndex === index && index > 0}
+              hasWallNext={openIndex === index && index < images.length - 1}
+              onWallNavigate={
+                openIndex === index ? navigateWall : undefined
+              }
+            />
+          </div>
+        ))}
+      </div>
+      <GalleryKeyboardHelp lightboxOpen={openIndex !== null} />
+    </>
   )
 }

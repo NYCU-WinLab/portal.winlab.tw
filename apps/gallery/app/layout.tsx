@@ -8,7 +8,6 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { KonamiWinlabLogo } from "@/app/_components/konami-winlab-logo"
-import { ThemeProvider } from "@/components/theme-provider"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
 import { createClient } from "@/lib/supabase/server"
 
@@ -54,11 +53,9 @@ export default async function RootLayout({
           "overflow-x-hidden bg-background text-foreground"
         )}
       >
-        <ThemeProvider>
-          {children}
-          <KonamiWinlabLogo />
-          <Toaster />
-        </ThemeProvider>
+        {children}
+        <KonamiWinlabLogo />
+        <Toaster />
       </body>
     </html>
   )

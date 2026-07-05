@@ -227,15 +227,6 @@ export function GalleryMentionBell({
     })
   }
 
-  const markAllRead = () => {
-    if (notifications.length === 0) return
-    startTransition(async () => {
-      const ok = await markRead(notifications)
-      if (!ok) return
-      setNotifications([])
-    })
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -268,19 +259,7 @@ export function GalleryMentionBell({
         align="end"
         className={cn(gallerySans(), "w-80 max-w-[calc(100vw-2rem)]")}
       >
-        <DropdownMenuLabel className="flex items-center justify-between gap-2">
-          <span>Notifications</span>
-          {unreadCount > 0 ? (
-            <button
-              type="button"
-              className="text-[10px] tracking-wide text-muted-foreground uppercase transition-colors hover:text-foreground"
-              onClick={markAllRead}
-              disabled={isPending}
-            >
-              Mark all read
-            </button>
-          ) : null}
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {unreadCount === 0 ? (
           <div className="px-2 py-3 text-xs text-muted-foreground">

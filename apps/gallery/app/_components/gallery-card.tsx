@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useTransition,
   type Dispatch,
@@ -39,6 +40,7 @@ import { toast } from "sonner"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
 import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
+import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
 import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import {
   galleryPillClass,
@@ -51,6 +53,11 @@ import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
+import {
+  nextSequenceIndex,
+  resolveLightboxNextStep,
+  resolveLightboxPrevStep,
+} from "@/lib/gallery/lightbox-nav"
 import { getRotation } from "@/lib/gallery/rotation"
 import {
   GALLERY_REACTIONS,
@@ -142,6 +149,9 @@ export function GalleryCard({
   open,
   onOpenChange,
   gridFocused = false,
+  hasWallPrev = false,
+  hasWallNext = false,
+  onWallNavigate,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -154,6 +164,9 @@ export function GalleryCard({
   open?: boolean
   onOpenChange?: (open: boolean) => void
   gridFocused?: boolean
+  hasWallPrev?: boolean
+  hasWallNext?: boolean
+  onWallNavigate?: (direction: "prev" | "next") => void
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -179,6 +192,7 @@ export function GalleryCard({
     onOpenChange?.(next)
     if (open === undefined) setInternalOpen(next)
     if (next) return
+    if (open !== undefined) return
     if (!searchParams.has("photo")) return
     const params = new URLSearchParams(searchParams.toString())
     params.delete("photo")
@@ -195,6 +209,8 @@ export function GalleryCard({
   const thumbUrl = activeItem ? thumbUrlFromItem(activeItem) : ""
   const [thumbFailed, setThumbFailed] = useState(false)
   const [lightboxFailed, setLightboxFailed] = useState(false)
+  const [mediaLoaded, setMediaLoaded] = useState(false)
+  const mediaRef = useRef<HTMLDivElement>(null)
   const [isPending, startTransition] = useTransition()
   const [counts, setCounts] = useState(image.reaction_counts)
   const [myReaction, setMyReaction] = useState(image.my_reaction)
@@ -275,28 +291,78 @@ export function GalleryCard({
 
   useEffect(() => {
     setLightboxFailed(false)
-  }, [activeIndex])
+    setMediaLoaded(false)
+  }, [activeIndex, mediaUrl])
+
+  useEffect(() => {
+    if (!isDialogOpen) return
+    const node = mediaRef.current?.querySelector("img")
+    if (node?.complete) setMediaLoaded(true)
+  }, [isDialogOpen, mediaUrl, activeIndex])
+
+  const goLightboxPrev = useCallback(() => {
+    const step = resolveLightboxPrevStep(
+      activeIndex,
+      sequenceMedia.length,
+      hasWallPrev
+    )
+    if (step === "sequence") {
+      setActiveIndex((idx) => idx - 1)
+      return
+    }
+    if (step === "wall") {
+      onWallNavigate?.("prev")
+      return
+    }
+    setActiveIndex((idx) =>
+      nextSequenceIndex(idx, sequenceMedia.length, "prev")
+    )
+  }, [activeIndex, hasWallPrev, onWallNavigate, sequenceMedia.length])
+
+  const goLightboxNext = useCallback(() => {
+    const step = resolveLightboxNextStep(
+      activeIndex,
+      sequenceMedia.length,
+      hasWallNext
+    )
+    if (step === "sequence") {
+      setActiveIndex((idx) => idx + 1)
+      return
+    }
+    if (step === "wall") {
+      onWallNavigate?.("next")
+      return
+    }
+    setActiveIndex((idx) =>
+      nextSequenceIndex(idx, sequenceMedia.length, "next")
+    )
+  }, [activeIndex, hasWallNext, onWallNavigate, sequenceMedia.length])
+
+  const { gestureProps } = useLightboxGestures(mediaRef, {
+    enabled: isDialogOpen,
+    onPrev: goLightboxPrev,
+    onNext: goLightboxNext,
+    onSwipeUp: () => setMobileDetailsOpen(true),
+  })
 
   useEffect(() => {
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft" && isSequence) {
+      if (event.key === "ArrowLeft") {
         event.preventDefault()
-        setActiveIndex((idx) =>
-          idx === 0 ? sequenceMedia.length - 1 : idx - 1
-        )
+        goLightboxPrev()
         return
       }
-      if (event.key === "ArrowRight" && isSequence) {
+      if (event.key === "ArrowRight") {
         event.preventDefault()
-        setActiveIndex((idx) => (idx + 1) % sequenceMedia.length)
+        goLightboxNext()
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [isDialogOpen, isSequence, sequenceMedia.length])
+  }, [goLightboxNext, goLightboxPrev, isDialogOpen])
 
   const copyShareLink = async () => {
     const href = buildGalleryPhotoHref({
@@ -407,7 +473,7 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3 pb-2">
+                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
                     <p
                       className={cn(
                         gallerySerif(),
@@ -419,23 +485,6 @@ export function GalleryCard({
                   </div>
                 </button>
               </DialogTrigger>
-              <p
-                className={cn(
-                  gallerySans(),
-                  "truncate px-3 pb-4 text-center text-[10px] text-muted-foreground"
-                )}
-              >
-                {image.created_by && isSignedIn ? (
-                  <UploaderFilterLink
-                    uploaderId={image.created_by}
-                    className="text-muted-foreground"
-                  >
-                    {image.uploader_name}
-                  </UploaderFilterLink>
-                ) : (
-                  image.uploader_name
-                )}
-              </p>
             </div>
             <DialogContent
               showCloseButton={false}
@@ -498,7 +547,16 @@ export function GalleryCard({
                 </a>
               ) : null}
               <div className="gallery-lightbox-layout">
-                <div className="gallery-lightbox-media">
+                <div
+                  {...gestureProps}
+                  className="gallery-lightbox-media relative"
+                >
+                  {!mediaLoaded && !lightboxFailed ? (
+                    <div
+                      aria-hidden
+                      className="gallery-lightbox-image animate-pulse bg-muted/80"
+                    />
+                  ) : null}
                   {lightboxFailed ? (
                     <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
                       This {activeIsVideo ? "video" : "image"} cannot be
@@ -516,58 +574,60 @@ export function GalleryCard({
                       autoPlay
                       playsInline
                       preload="metadata"
-                      className="gallery-lightbox-image"
+                      className={cn(
+                        "gallery-lightbox-image",
+                        !mediaLoaded && "opacity-0"
+                      )}
+                      onLoadedData={() => setMediaLoaded(true)}
                       onError={() => setLightboxFailed(true)}
                     />
                   ) : (
                     <img
                       src={mediaUrl}
                       alt={activeItem?.name ?? image.name}
-                      className="gallery-lightbox-image"
+                      className={cn(
+                        "gallery-lightbox-image",
+                        !mediaLoaded && "opacity-0"
+                      )}
+                      onLoad={() => setMediaLoaded(true)}
                       onError={() => setLightboxFailed(true)}
                     />
                   )}
+                  {hasWallPrev || isSequence ? (
+                    <button
+                      type="button"
+                      onClick={goLightboxPrev}
+                      className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                      aria-label="Previous"
+                    >
+                      <IconChevronLeft className="h-5 w-5" />
+                    </button>
+                  ) : null}
+                  {hasWallNext || isSequence ? (
+                    <button
+                      type="button"
+                      onClick={goLightboxNext}
+                      className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                      aria-label="Next"
+                    >
+                      <IconChevronRight className="h-5 w-5" />
+                    </button>
+                  ) : null}
                   {isSequence ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveIndex((idx) =>
-                            idx === 0 ? sequenceMedia.length - 1 : idx - 1
-                          )
-                        }
-                        className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                        aria-label="Previous photo"
-                      >
-                        <IconChevronLeft className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveIndex(
-                            (idx) => (idx + 1) % sequenceMedia.length
-                          )
-                        }
-                        className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                        aria-label="Next photo"
-                      >
-                        <IconChevronRight className="h-5 w-5" />
-                      </button>
-                      <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
-                        {sequenceMedia.map((item, idx) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setActiveIndex(idx)}
-                            className={cn(
-                              "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
-                              idx === activeIndex && "bg-white"
-                            )}
-                            aria-label={`View shot ${idx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
+                      {sequenceMedia.map((item, idx) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setActiveIndex(idx)}
+                          className={cn(
+                            "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
+                            idx === activeIndex && "bg-white"
+                          )}
+                          aria-label={`View shot ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
                   ) : null}
                 </div>
                 <aside
