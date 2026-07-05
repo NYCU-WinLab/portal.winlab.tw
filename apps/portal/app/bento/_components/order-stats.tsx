@@ -1,154 +1,108 @@
 "use client"
 
-import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
 
-interface OrderItemForStats {
-  menu_item_id: string
-  no_sauce?: boolean
-  additional?: number | null
-  selected_options?: {
-    group_name: string
-    label: string
-    price_delta: number
-  }[]
-  menu_items: {
-    name: string
-    price: number
-  }
-  user_id: string | null
-  anonymous_name?: string | null
-}
-
-function optionLabel(opt: { label: string; price_delta: number }): string {
-  return opt.price_delta > 0 ? `${opt.label} +$${opt.price_delta}` : opt.label
-}
+import { computeOrderStats, type StatsOrderItem } from "@/lib/bento/order-stats"
 
 interface OrderStatsProps {
-  orderItems: OrderItemForStats[]
+  orderItems: StatsOrderItem[]
   restaurantAdditional?: string[] | null
+  variant?: "full" | "compact"
   className?: string
 }
 
 export function OrderStats({
   orderItems,
   restaurantAdditional,
+  variant = "full",
   className,
 }: OrderStatsProps) {
-  const items = orderItems || []
-
-  const uniqueUsers = new Set(
-    items.map(
-      (item) => item.user_id ?? `anon:${item.anonymous_name ?? "unknown"}`
-    )
-  )
-  const userCount = uniqueUsers.size
-
-  const menuItemCounts = new Map<
-    string,
-    {
-      name: string
-      price: number
-      totalCount: number
-      combinations: Map<string, { count: number; label: string }>
-    }
-  >()
-
-  items.forEach((item) => {
-    const menuItemId = item.menu_item_id
-    const menuItemName = item.menu_items?.name || "未知品項"
-    const menuItemPrice = item.menu_items?.price || 0
-
-    const parts = (item.selected_options ?? []).map(optionLabel)
-    if (item.no_sauce) parts.push("不醬")
-    const additionalLabel =
-      item.additional !== null && item.additional !== undefined
-        ? restaurantAdditional?.[item.additional]
-        : undefined
-    if (additionalLabel) parts.push(additionalLabel)
-
-    const combinationKey = JSON.stringify(parts)
-    const combinationLabel = parts.join(" ")
-
-    if (menuItemCounts.has(menuItemId)) {
-      const existing = menuItemCounts.get(menuItemId)!
-      existing.totalCount += 1
-      const currentCount = existing.combinations.get(combinationKey)?.count ?? 0
-      existing.combinations.set(combinationKey, {
-        count: currentCount + 1,
-        label: combinationLabel,
-      })
-    } else {
-      const combinations = new Map<string, { count: number; label: string }>()
-      combinations.set(combinationKey, { count: 1, label: combinationLabel })
-      menuItemCounts.set(menuItemId, {
-        name: menuItemName,
-        price: menuItemPrice,
-        totalCount: 1,
-        combinations,
-      })
-    }
-  })
-
-  const totalPrice = items.reduce((sum, item) => {
-    const optionsPrice = (item.selected_options ?? []).reduce(
-      (s, opt) => s + opt.price_delta,
-      0
-    )
-    return sum + (item.menu_items?.price || 0) + optionsPrice
-  }, 0)
-
-  const menuItemsList = Array.from(menuItemCounts.values()).sort(
-    (a, b) => b.totalCount - a.totalCount || a.name.localeCompare(b.name)
+  const { userCount, itemCount, totalPrice, menuItems } = computeOrderStats(
+    orderItems,
+    restaurantAdditional
   )
 
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-3 text-sm text-muted-foreground",
-        className
-      )}
-    >
-      <p>
-        已有 <span className="font-medium text-foreground">{userCount}</span>{" "}
-        人訂餐，
-        <span className="font-medium text-foreground">{items.length}</span>{" "}
-        項餐點，共 NT${" "}
-        <span className="font-medium text-foreground">
-          {totalPrice.toLocaleString()}
+  if (variant === "compact") {
+    return (
+      <p className={cn("text-sm text-muted-foreground", className)}>
+        <span className="font-medium text-foreground">{userCount}</span> 人
+        {" · "}
+        <span className="font-medium text-foreground">{itemCount}</span> 項
+        {" · "}
+        <span className="font-medium text-foreground tabular-nums">
+          NT$ {totalPrice.toLocaleString()}
         </span>
       </p>
-      {menuItemsList.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {menuItemsList.map((item, index) => {
-            const combos = Array.from(item.combinations.entries())
-              .filter(([, { label }]) => label)
-              .sort(
-                (a, b) =>
-                  b[1].count - a[1].count ||
-                  a[1].label.localeCompare(b[1].label)
-              )
+    )
+  }
 
-            return (
-              <div key={index} className="flex flex-col gap-1">
-                <Badge variant="outline" className="w-fit px-2 py-0.5 text-xs">
-                  {item.name}{" "}
-                  <span className="font-medium">{item.totalCount}</span> 份
-                </Badge>
-                {combos.length > 0 && (
-                  <ul className="ml-1 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
-                    {combos.map(([combinationKey, { count, label }]) => (
-                      <li key={combinationKey}>
-                        {label} × {count}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+  return (
+    <div className={cn("flex flex-col gap-4", className)}>
+      <div className="grid grid-cols-3 gap-2">
+        <StatTile value={userCount.toLocaleString()} label="人訂餐" />
+        <StatTile value={itemCount.toLocaleString()} label="項餐點" />
+        <StatTile
+          value={totalPrice.toLocaleString()}
+          prefix="NT$"
+          label="總計"
+        />
+      </div>
+
+      {menuItems.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {menuItems.map((item) => (
+            <li key={item.menu_item_id} className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium text-foreground">
+                  {item.name}
+                </span>
+                <span className="shrink-0 text-sm font-medium text-muted-foreground tabular-nums">
+                  ×{item.totalCount}
+                </span>
               </div>
-            )
-          })}
-        </div>
+              {item.combinations.length > 0 && (
+                <ul className="flex flex-col gap-1 border-l border-border pl-3">
+                  {item.combinations.map((combo) => (
+                    <li
+                      key={combo.key}
+                      className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"
+                    >
+                      <span>{combo.label}</span>
+                      <span className="shrink-0 tabular-nums">
+                        ×{combo.count}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
+    </div>
+  )
+}
+
+function StatTile({
+  value,
+  prefix,
+  label,
+}: {
+  value: string
+  prefix?: string
+  label: string
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-card px-3 py-3">
+      <span className="text-xl font-semibold text-foreground tabular-nums sm:text-2xl">
+        {prefix && (
+          <span className="mr-0.5 text-sm font-normal text-muted-foreground">
+            {prefix}
+          </span>
+        )}
+        {value}
+      </span>
+      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   )
 }

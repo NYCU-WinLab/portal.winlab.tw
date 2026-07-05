@@ -36,6 +36,7 @@ export function OrderCard({ order }: { order: OrderWithStats }) {
       <OrderStats
         orderItems={orderItems}
         restaurantAdditional={order.restaurants?.additional || null}
+        variant="compact"
       />
     </Link>
   )
