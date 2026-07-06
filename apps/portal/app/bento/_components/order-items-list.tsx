@@ -9,7 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { useDeleteOrderItem } from "@/hooks/bento/use-order-items"
 import {
-  formatItemTime,
+  formatItemDateTime,
   groupByPerson,
   itemPersonName,
   sortByTime,
@@ -91,7 +91,7 @@ export function OrderItemsList({
               className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border bg-card px-4 py-3 text-sm"
             >
               <span className="shrink-0 font-medium text-muted-foreground tabular-nums">
-                {formatItemTime(item.created_at)}
+                {formatItemDateTime(item.created_at)}
               </span>
               <span className="shrink-0 text-muted-foreground">
                 {itemPersonName(item)}
@@ -125,7 +125,7 @@ export function OrderItemsList({
                       className="flex flex-wrap items-center gap-2"
                     >
                       <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">
-                        {formatItemTime(item.created_at)}
+                        {formatItemDateTime(item.created_at)}
                       </span>
                       <span>{item.menu_items?.name}</span>
                       <ItemOptionBadges

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import {
-  formatItemTime,
+  formatItemDateTime,
   groupByPerson,
   itemPrice,
   sortByTime,
@@ -127,12 +127,17 @@ describe("sortByTime", () => {
   })
 })
 
-describe("formatItemTime", () => {
-  it("formats a UTC timestamp as HH:mm in Taipei time (+8)", () => {
-    expect(formatItemTime("2026-07-06T06:23:00Z")).toBe("14:23")
+describe("formatItemDateTime", () => {
+  it("formats a UTC timestamp as MM/DD HH:mm in Taipei time (+8)", () => {
+    expect(formatItemDateTime("2026-07-06T06:23:00Z")).toBe("07/06 14:23")
+  })
+
+  it("rolls over the date when +8 crosses midnight", () => {
+    // 22:30 UTC on 07/06 is 06:30 on 07/07 in Taipei.
+    expect(formatItemDateTime("2026-07-06T22:30:00Z")).toBe("07/07 06:30")
   })
 
   it("returns an empty string for an invalid date", () => {
-    expect(formatItemTime("not-a-date")).toBe("")
+    expect(formatItemDateTime("not-a-date")).toBe("")
   })
 })
