@@ -18,7 +18,9 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 | `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`) |
 | `/approve`   | Document signing with PDF field placement + email outbox        |
 | `/bento`     | Lunch-ordering for the lab — orders, menus, realtime            |
+| `/bulletin`  | Lab announcements / bulletin board                              |
 | `/debt`      | Bill-splitting + monthly settlement cron                        |
+| `/games`     | WinLab mini-games with global leaderboards                      |
 | `/leave`     | Monday-meeting attendance sign-ups                              |
 | `/meetings`  | Lab-meeting weekly schedule + teacher papers                    |
 | `/profile`   | Personal account + bento / leave / approve / trip stats         |
@@ -26,10 +28,9 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 | `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
 | `/trip`      | Travel-document uploads with admin folder export                |
 
-Two apps live on their own subdomains because their design system diverges from portal:
+One app lives on its own subdomain because its design system diverges from portal:
 
 - [`apps/gallery`](./apps/gallery) — `gallery.winlab.tw`, the lab's art wall (Instrument Serif, polaroid layout)
-- [`apps/mcp`](./apps/mcp) — `mcp.winlab.tw`, an MCP server exposing portal data over OAuth 2.1
 
 ## Get started
 

@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/bento`, `/leave`, `/meetings`, `/approve`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/profile`, `/admin`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/bento`, `/leave`, `/meetings`, `/approve`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/bulletin`, `/games`, `/profile`, `/admin`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -12,7 +12,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 A business app is `apps/portal/app/<name>/` — a route segment, **not** a separate Turborepo workspace. To add one, drop a folder under `apps/portal/app/`. Don't open a new `apps/*` Next.js project.
 
-**Exception**: when an app's design system genuinely diverges from portal (different fonts, different layout metaphor), break it out into a subdomain workspace. Today that's `apps/gallery` (`gallery.winlab.tw`, Instrument Serif, polaroid scatter) and `apps/mcp` (`mcp.winlab.tw`, MCP server). Ask the maintainer before opening a new workspace — don't open one just to dodge the shared shell. That's an owner-mindset issue.
+**Exception**: when an app's design system genuinely diverges from portal (different fonts, different layout metaphor), break it out into a subdomain workspace. Today that's `apps/gallery` (`gallery.winlab.tw`, Instrument Serif, polaroid scatter). Ask the maintainer before opening a new workspace — don't open one just to dodge the shared shell. That's an owner-mindset issue.
 
 ## Stack
 
@@ -99,9 +99,8 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/bento`, `/approve`, `/leave`, `/meetings`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/profile`, `/admin`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/bento`, `/approve`, `/leave`, `/meetings`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/bulletin`, `/games`, `/profile`, `/admin`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
-- `apps/mcp` — `mcp.winlab.tw`, an MCP server exposing portal data over OAuth 2.1.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
 - `packages/typescript-config` — `base.json` / `nextjs.json` / `react-library.json`.
