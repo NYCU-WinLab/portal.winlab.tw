@@ -100,15 +100,17 @@ export function sortByTime(
   return direction === "desc" ? sorted.reverse() : sorted
 }
 
-// Formats an item's timestamp as HH:mm in Taipei time, independent of the
-// runtime's timezone so it stays correct on servers and deterministic in tests.
-export function formatItemTime(iso: string): string {
+// Formats an item's timestamp as "MM/DD HH:mm" in Taipei time. Taiwan is a
+// fixed UTC+8 with no DST, so shifting the epoch by 8h and reading UTC parts is
+// exact — and unlike toLocaleString it's independent of the runtime's timezone
+// and ICU version, so it stays correct on servers and deterministic in tests.
+export function formatItemDateTime(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ""
-  return date.toLocaleTimeString("zh-TW", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Taipei",
-  })
+  const taipei = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  const mm = String(taipei.getUTCMonth() + 1).padStart(2, "0")
+  const dd = String(taipei.getUTCDate()).padStart(2, "0")
+  const hh = String(taipei.getUTCHours()).padStart(2, "0")
+  const min = String(taipei.getUTCMinutes()).padStart(2, "0")
+  return `${mm}/${dd} ${hh}:${min}`
 }
