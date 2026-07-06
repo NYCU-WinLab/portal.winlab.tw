@@ -36,7 +36,7 @@ export function OrderItemsList({
   restaurantAdditional,
 }: OrderItemsListProps) {
   const deleteItem = useDeleteOrderItem()
-  const [sortMode, setSortMode] = useState<SortMode>("time")
+  const [sortMode, setSortMode] = useState<SortMode>("person")
 
   const handleDelete = async (id: string) => {
     try {
@@ -157,8 +157,8 @@ function SortToggle({
   onChange: (mode: SortMode) => void
 }) {
   const options: { mode: SortMode; label: string }[] = [
-    { mode: "time", label: "依時間" },
     { mode: "person", label: "依人" },
+    { mode: "time", label: "依時間" },
   ]
   return (
     <div className="flex self-end rounded-lg border border-border p-0.5">
