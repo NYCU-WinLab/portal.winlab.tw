@@ -1,7 +1,7 @@
 "use client"
 
 import { Pencil, Upload } from "lucide-react"
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -69,29 +69,59 @@ export function UploadZone({
     }
   }
 
-  const startUpload = async (fileList: FileList | null) => {
-    const files = fileList ? Array.from(fileList) : []
-    if (files.length === 0) return
-
-    setProgress({ done: 0, total: files.length })
-    try {
-      await upload.mutateAsync({
-        userId,
-        files,
-        onProgress: (done, total) => setProgress({ done, total }),
-      })
-      toast.success(
-        files.length === 1 ? "已上傳" : `已上傳 ${files.length} 個檔案`
-      )
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "上傳失敗")
-    } finally {
-      setProgress(null)
-      if (inputRef.current) inputRef.current.value = ""
-    }
-  }
-
   const isUploading = upload.isPending
+
+  const startUpload = useCallback(
+    async (fileList: FileList | null) => {
+      const files = fileList ? Array.from(fileList) : []
+      if (files.length === 0) return
+
+      setProgress({ done: 0, total: files.length })
+      try {
+        await upload.mutateAsync({
+          userId,
+          files,
+          onProgress: (done, total) => setProgress({ done, total }),
+        })
+        toast.success(
+          files.length === 1 ? "已上傳" : `已上傳 ${files.length} 個檔案`
+        )
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "上傳失敗")
+      } finally {
+        setProgress(null)
+        if (inputRef.current) inputRef.current.value = ""
+      }
+    },
+    [upload, userId]
+  )
+
+  // Paste-to-upload: intercept Ctrl+V anywhere on the page while mounted.
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (isUploading) return
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const fileItems = items.filter((item) => item.kind === "file")
+      if (fileItems.length === 0) return
+
+      const dt = new DataTransfer()
+      for (const item of fileItems) {
+        const file = item.getAsFile()
+        if (file) dt.items.add(file)
+      }
+      if (dt.files.length === 0) return
+
+      e.preventDefault()
+      void startUpload(dt.files)
+    }
+
+    document.addEventListener("paste", handlePaste)
+    return () => document.removeEventListener("paste", handlePaste)
+  }, [isUploading, startUpload])
+
+  // Show the checkbox as checked only when prefs say enabled AND a signature
+  // exists — prevents a confusing checked state for users with no signature yet.
+  const autoSignChecked = prefs.enabled && !!signature
 
   return (
     <div className="flex flex-col gap-3">
@@ -116,7 +146,7 @@ export function UploadZone({
           <p className="text-sm font-medium">
             {isUploading
               ? `上傳中… ${progress?.done ?? 0} / ${progress?.total ?? 0}`
-              : "拖檔案進來，或點下方按鈕"}
+              : "拖檔案進來、貼上（⌘V），或點下方按鈕"}
           </p>
           <p className="text-xs text-muted-foreground">
             PDF / JPG / PNG / WebP — 圖片會在前端壓成 PDF 再上傳
@@ -145,14 +175,14 @@ export function UploadZone({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-border bg-card p-4">
         <label className="flex items-center gap-2">
           <Checkbox
-            checked={prefs.enabled}
+            checked={autoSignChecked}
             onCheckedChange={(v) => onAutoSignChange(v === true)}
             disabled={updatePrefs.isPending}
           />
           <span className="text-sm">自動簽名（每頁）</span>
         </label>
 
-        {prefs.enabled && (
+        {autoSignChecked && (
           <div className="flex items-center gap-1">
             {SIGNATURE_POSITIONS.map((p) => (
               <Button
