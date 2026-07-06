@@ -34,9 +34,14 @@ jobs:
       - uses: supabase/setup-cli@v2
         with:
           version: latest
+        env:
+          # Resolving `latest` hits the GitHub API; without a token the
+          # anonymous rate limit intermittently fails the whole job.
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Boots a local Postgres (Docker on the runner) and applies
-      # supabase/migrations/** — i.e. the captured baseline.
+      # supabase/migrations/** — the captured baseline plus any
+      # `<timestamp>_name.sql` migrations (dash-named files are skipped).
       - name: Start local database
         run: supabase db start
 
