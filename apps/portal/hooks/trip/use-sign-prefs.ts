@@ -12,7 +12,7 @@ export type SignPrefs = {
   corner: SignaturePosition
 }
 
-const DEFAULT_PREFS: SignPrefs = { enabled: false, corner: "br" }
+const DEFAULT_PREFS: SignPrefs = { enabled: true, corner: "br" }
 
 const PREFS_KEY = (userId: string) => ["trip", "sign-prefs", userId] as const
 
