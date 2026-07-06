@@ -12,7 +12,10 @@ export const queryKeys = {
   users: {
     all: ["meetings", "users"] as const,
   },
-  groups: {
-    all: ["meeting_groups"] as const,
+  questionPool: {
+    all: ["meetings", "question-pool"] as const,
+  },
+  questioners: {
+    byYear: (year: number) => ["meetings", "questioners", year] as const,
   },
 }

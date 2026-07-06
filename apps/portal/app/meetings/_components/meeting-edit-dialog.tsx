@@ -11,13 +11,6 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
-import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -33,10 +26,10 @@ import {
   useUpdateOwnMeeting,
 } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
-import { useMeetingGroups } from "@/hooks/meetings/use-meeting-groups"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { PresenterSelect } from "./presenter-select"
+import { QuestionersField } from "./questioners-field"
 
 interface Props {
   meeting: Meeting
@@ -123,7 +116,6 @@ export function MeetingEditDialog({
   onOpenChange,
 }: Props) {
   const { data: users = [] } = useLabUsers()
-  const { data: groups = [] } = useMeetingGroups()
   const updateOwn = useUpdateOwnMeeting()
   const updateAdmin = useAdminUpdateMeeting()
 
@@ -132,9 +124,6 @@ export function MeetingEditDialog({
   const [isHoliday, setIsHoliday] = useState(meeting.isHoliday)
   const [location, setLocation] = useState(meeting.location)
   const [startTime, setStartTime] = useState(meeting.startTime)
-  const [questionGroupNumber, setQuestionGroupNumber] = useState<number | null>(
-    meeting.questionGroupNumber
-  )
   const [presenterUserId, setPresenterUserId] = useState(
     meeting.presenterUserId ?? "__none__"
   )
@@ -166,7 +155,6 @@ export function MeetingEditDialog({
     setIsHoliday(meeting.isHoliday)
     setLocation(meeting.location)
     setStartTime(meeting.startTime)
-    setQuestionGroupNumber(meeting.questionGroupNumber)
     setPresenterUserId(meeting.presenterUserId ?? "__none__")
     setPaperTitle(meeting.paperTitle ?? "")
     setPaperLink(meeting.paperLink ?? "")
@@ -226,12 +214,6 @@ export function MeetingEditDialog({
     }
 
     if (isAdmin) {
-      const validGroupNumber =
-        questionGroupNumber !== null &&
-        groups.some((g) => g.groupNumber === questionGroupNumber)
-          ? questionGroupNumber
-          : null
-
       updateAdmin.mutate(
         {
           ...common,
@@ -240,7 +222,6 @@ export function MeetingEditDialog({
           isHoliday,
           location: location || "EC 411",
           startTime: startTime || "15:30",
-          questionGroupNumber: validGroupNumber,
         },
         { onSuccess: () => onOpenChange(false) }
       )
@@ -302,30 +283,7 @@ export function MeetingEditDialog({
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>提問小組</Label>
-                <Select
-                  value={questionGroupNumber?.toString() ?? "none"}
-                  onValueChange={(v) =>
-                    setQuestionGroupNumber(v === "none" ? null : Number(v))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="未指定" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">未指定</SelectItem>
-                    {groups.map((g) => (
-                      <SelectItem
-                        key={g.groupNumber}
-                        value={String(g.groupNumber)}
-                      >
-                        小組 {g.groupNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <QuestionersField meetingId={meeting.id} year={meeting.year} />
             </>
           )}
           {!isHoliday && (

@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -287,71 +307,6 @@ export type Database = {
           },
         ]
       }
-      bento_mcp_auth_codes: {
-        Row: {
-          access_token: string
-          client_id: string
-          code: string
-          code_challenge: string
-          code_challenge_method: string
-          expires_at: string
-          redirect_uri: string
-          refresh_token: string | null
-          state: string | null
-        }
-        Insert: {
-          access_token: string
-          client_id: string
-          code: string
-          code_challenge: string
-          code_challenge_method?: string
-          expires_at?: string
-          redirect_uri: string
-          refresh_token?: string | null
-          state?: string | null
-        }
-        Update: {
-          access_token?: string
-          client_id?: string
-          code?: string
-          code_challenge?: string
-          code_challenge_method?: string
-          expires_at?: string
-          redirect_uri?: string
-          refresh_token?: string | null
-          state?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bento_mcp_auth_codes_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "bento_mcp_clients"
-            referencedColumns: ["client_id"]
-          },
-        ]
-      }
-      bento_mcp_clients: {
-        Row: {
-          client_id: string
-          created_at: string
-          redirect_uris: string[]
-          token_endpoint_auth_method: string
-        }
-        Insert: {
-          client_id?: string
-          created_at?: string
-          redirect_uris: string[]
-          token_endpoint_auth_method?: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          redirect_uris?: string[]
-          token_endpoint_auth_method?: string
-        }
-        Relationships: []
-      }
       bento_menu_items: {
         Row: {
           created_at: string | null
@@ -575,13 +530,6 @@ export type Database = {
             foreignKeyName: "bento_order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: "bento_order_stats"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "bento_order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
             referencedRelation: "bento_orders"
             referencedColumns: ["id"]
           },
@@ -601,6 +549,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           id: string
+          order_date: string
           restaurant_id: string
           status: string
         }
@@ -610,6 +559,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           id: string
+          order_date: string
           restaurant_id: string
           status?: string
         }
@@ -619,6 +569,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           id?: string
+          order_date?: string
           restaurant_id?: string
           status?: string
         }
@@ -743,163 +694,6 @@ export type Database = {
           {
             foreignKeyName: "bulletin_messages_author_id_fkey"
             columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      claims: {
-        Row: {
-          created_at: string
-          id: string
-          status: string
-          title: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          status?: string
-          title: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          status?: string
-          title?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "claims_user_profiles_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debit_expense_items: {
-        Row: {
-          amount: number
-          created_at: string
-          debtor_id: string
-          expense_id: string
-          id: string
-          paid_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          debtor_id: string
-          expense_id: string
-          id?: string
-          paid_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          debtor_id?: string
-          expense_id?: string
-          id?: string
-          paid_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debit_expense_items_debtor_id_fkey"
-            columns: ["debtor_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debit_expense_items_expense_id_fkey"
-            columns: ["expense_id"]
-            isOneToOne: false
-            referencedRelation: "debit_expenses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debit_expenses: {
-        Row: {
-          created_at: string
-          creator_id: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debit_expenses_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debit_settlements: {
-        Row: {
-          amount: number
-          created_at: string
-          from_confirmed: boolean
-          from_user_id: string
-          id: string
-          period: string
-          settled_at: string | null
-          to_confirmed: boolean
-          to_user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id: string
-          id?: string
-          period: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id?: string
-          id?: string
-          period?: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debit_settlements_from_user_id_fkey"
-            columns: ["from_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debit_settlements_to_user_id_fkey"
-            columns: ["to_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
@@ -1031,72 +825,125 @@ export type Database = {
           },
         ]
       }
-      egress: {
+      gallery_activity_notifications: {
         Row: {
-          applicant_name: string
-          created_at: string | null
+          actor_user_id: string
+          body: string | null
+          comment_id: string | null
+          created_at: string
           id: string
-          invoice_date: string
-          invoice_files: string[] | null
-          item_amount: number
-          item_comment: string | null
-          item_name: string
-          status: Database["public"]["Enums"]["egress_status"]
-          transfer_date: string | null
-          transfer_fee: number | null
-          transfer_files: string[] | null
-          updated_at: string | null
-          user_id: string | null
+          image_id: string
+          kind: string
+          reaction: string | null
+          read_at: string | null
+          recipient_user_id: string
         }
         Insert: {
-          applicant_name: string
-          created_at?: string | null
+          actor_user_id: string
+          body?: string | null
+          comment_id?: string | null
+          created_at?: string
           id?: string
-          invoice_date: string
-          invoice_files?: string[] | null
-          item_amount: number
-          item_comment?: string | null
-          item_name: string
-          status?: Database["public"]["Enums"]["egress_status"]
-          transfer_date?: string | null
-          transfer_fee?: number | null
-          transfer_files?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
+          image_id: string
+          kind: string
+          reaction?: string | null
+          read_at?: string | null
+          recipient_user_id: string
         }
         Update: {
-          applicant_name?: string
-          created_at?: string | null
+          actor_user_id?: string
+          body?: string | null
+          comment_id?: string | null
+          created_at?: string
           id?: string
-          invoice_date?: string
-          invoice_files?: string[] | null
-          item_amount?: number
-          item_comment?: string | null
-          item_name?: string
-          status?: Database["public"]["Enums"]["egress_status"]
-          transfer_date?: string | null
-          transfer_fee?: number | null
-          transfer_files?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
+          image_id?: string
+          kind?: string
+          reaction?: string | null
+          read_at?: string | null
+          recipient_user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gallery_activity_notifications_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_activity_notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_activity_notifications_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_activity_notifications_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_comment_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gallery_comment_mentions: {
         Row: {
           comment_id: string
           mentioned_user_id: string
           notified_at: string | null
+          read_at: string | null
         }
         Insert: {
           comment_id: string
           mentioned_user_id: string
           notified_at?: string | null
+          read_at?: string | null
         }
         Update: {
           comment_id?: string
           mentioned_user_id?: string
           notified_at?: string | null
+          read_at?: string | null
         }
         Relationships: [
           {
@@ -1123,6 +970,8 @@ export type Database = {
           id: string
           image_id: string
           parent_id: string | null
+          pinned_at: string | null
+          updated_at: string | null
         }
         Insert: {
           body: string
@@ -1131,6 +980,8 @@ export type Database = {
           id?: string
           image_id: string
           parent_id?: string | null
+          pinned_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           body?: string
@@ -1139,6 +990,8 @@ export type Database = {
           id?: string
           image_id?: string
           parent_id?: string | null
+          pinned_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1209,6 +1062,7 @@ export type Database = {
           image_path: string
           media_type: string
           name: string
+          pinned_at: string | null
           poster_path: string | null
           sequence_id: string | null
           sequence_index: number | null
@@ -1221,6 +1075,7 @@ export type Database = {
           image_path: string
           media_type?: string
           name: string
+          pinned_at?: string | null
           poster_path?: string | null
           sequence_id?: string | null
           sequence_index?: number | null
@@ -1233,6 +1088,7 @@ export type Database = {
           image_path?: string
           media_type?: string
           name?: string
+          pinned_at?: string | null
           poster_path?: string | null
           sequence_id?: string | null
           sequence_index?: number | null
@@ -1306,146 +1162,6 @@ export type Database = {
         }
         Relationships: []
       }
-      images: {
-        Row: {
-          created_at: string
-          filename: string
-          id: string
-          mime_type: string
-          size: number
-          storage_path: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          filename: string
-          id: string
-          mime_type: string
-          size: number
-          storage_path: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          filename?: string
-          id?: string
-          mime_type?: string
-          size?: number
-          storage_path?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      ingress: {
-        Row: {
-          created_at: string | null
-          id: string
-          ingress_amount: number
-          ingress_comment: string | null
-          ingress_date: string
-          ingress_files: string[] | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          ingress_amount: number
-          ingress_comment?: string | null
-          ingress_date: string
-          ingress_files?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          ingress_amount?: number
-          ingress_comment?: string | null
-          ingress_date?: string
-          ingress_files?: string[] | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      invoice: {
-        Row: {
-          created_at: string
-          id: string
-          image_paths: string[]
-          notes: string | null
-          reason: string
-          status: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          image_paths?: string[]
-          notes?: string | null
-          reason: string
-          status?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          image_paths?: string[]
-          notes?: string | null
-          reason?: string
-          status?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_user_profile_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      items: {
-        Row: {
-          content: string | null
-          created_at: string
-          desktop_id: string
-          icon_url: string | null
-          id: string
-          sort_order: number | null
-          title: string
-          type: string
-          url: string | null
-          user_id: string
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string
-          desktop_id: string
-          icon_url?: string | null
-          id?: string
-          sort_order?: number | null
-          title: string
-          type: string
-          url?: string | null
-          user_id: string
-        }
-        Update: {
-          content?: string | null
-          created_at?: string
-          desktop_id?: string
-          icon_url?: string | null
-          id?: string
-          sort_order?: number | null
-          title?: string
-          type?: string
-          url?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       leaves: {
         Row: {
           created_at: string | null
@@ -1473,54 +1189,6 @@ export type Database = {
         }
         Relationships: []
       }
-      mcp_oauth_auth_codes: {
-        Row: {
-          code: string
-          created_at: string
-          data: Json
-          expires_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          data: Json
-          expires_at?: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          data?: Json
-          expires_at?: string
-        }
-        Relationships: []
-      }
-      mcp_oauth_clients: {
-        Row: {
-          client_id: string
-          client_name: string
-          created_at: string
-          grant_types: Json
-          redirect_uris: Json
-          response_types: Json
-        }
-        Insert: {
-          client_id: string
-          client_name: string
-          created_at?: string
-          grant_types: Json
-          redirect_uris: Json
-          response_types: Json
-        }
-        Update: {
-          client_id?: string
-          client_name?: string
-          created_at?: string
-          grant_types?: Json
-          redirect_uris?: Json
-          response_types?: Json
-        }
-        Relationships: []
-      }
       meeting_groups: {
         Row: {
           group_number: number
@@ -1538,6 +1206,65 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      meeting_question_pool: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_question_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_questioners: {
+        Row: {
+          assigned_at: string
+          meeting_id: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          meeting_id: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          meeting_id?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_questioners_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_questioners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meetings: {
         Row: {
@@ -1694,41 +1421,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      pending_bot_bindings: {
-        Row: {
-          code: string
-          created_at: string
-          expires_at: string
-          id: string
-          platform: string
-          user_id: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          platform: string
-          user_id: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          platform?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pending_bot_bindings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       receipt_tag_assignments: {
         Row: {
@@ -2160,28 +1852,20 @@ export type Database = {
       }
     }
     Views: {
-      bento_order_stats: {
+      meeting_question_rotation: {
         Row: {
-          order_id: string | null
-          total_items: number | null
-          total_price: number | null
-          user_count: number | null
-        }
-        Relationships: []
-      }
-      bento_user_rankings: {
-        Row: {
-          order_count: number | null
-          total_spending: number | null
-          unique_items: number | null
+          email: string | null
+          last_asked_date: string | null
+          name: string | null
+          pool_added_at: string | null
+          times_asked: number | null
           user_id: string | null
-          user_name: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "bento_order_items_user_profile_fkey"
+            foreignKeyName: "meeting_question_pool_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
@@ -2232,17 +1916,6 @@ export type Database = {
         Returns: undefined
       }
       bento_profile_stats: { Args: { p_user_id: string }; Returns: Json }
-      can_sign_document: { Args: { doc_id: string }; Returns: boolean }
-      can_view_document_signers: { Args: { doc_id: string }; Returns: boolean }
-      can_view_signature_boxes: { Args: { doc_id: string }; Returns: boolean }
-      confirm_settlement_from: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
-      confirm_settlement_to: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
       create_bento_order: {
         Args: {
           p_auto_close_at?: string
@@ -2255,6 +1928,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           id: string
+          order_date: string
           restaurant_id: string
           status: string
         }
@@ -2264,10 +1938,6 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
-      }
-      create_expense: {
-        Args: { p_description?: string; p_items?: Json; p_name: string }
-        Returns: string
       }
       debt_confirm_settlement_from: {
         Args: { p_settlement_id: string }
@@ -2295,8 +1965,15 @@ export type Database = {
         }
         Returns: undefined
       }
-      generate_monthly_settlements: { Args: never; Returns: undefined }
-      generate_short_id: { Args: { length?: number }; Returns: string }
+      gallery_admin_set_comment_pin: {
+        Args: { p_comment_id: string; p_pinned: boolean }
+        Returns: undefined
+      }
+      gallery_admin_set_image_pin: {
+        Args: { p_image_id: string; p_pinned: boolean }
+        Returns: undefined
+      }
+      gallery_wall_cover_rank: { Args: { p_image_id: string }; Returns: number }
       get_game_leaderboard: {
         Args: {
           p_game_type: Database["public"]["Enums"]["game_type"]
@@ -2312,10 +1989,6 @@ export type Database = {
       }
       get_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       get_user_email: { Args: never; Returns: string }
-      has_any_role_in_system: {
-        Args: { system_name: string; user_id_param: string }
-        Returns: boolean
-      }
       has_role: {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
@@ -2324,22 +1997,25 @@ export type Database = {
         Args: { expense_uuid: string }
         Returns: boolean
       }
-      is_expense_debtor: { Args: { expense_uuid: string }; Returns: boolean }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }
       is_receipts_admin: { Args: never; Returns: boolean }
       is_reimburse_admin: { Args: never; Returns: boolean }
       is_trip_admin: { Args: never; Returns: boolean }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
-      mark_item_paid: {
-        Args: { p_item_id: string; p_paid: boolean }
+      meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_replace_questioner: {
+        Args: {
+          p_meeting_id: string
+          p_remove_user: string
+          p_replacement?: string
+        }
         Returns: undefined
       }
-      mcp_create_oauth_auth_code: {
-        Args: { p_code: string; p_data: Json }
+      meetings_sync_questioners: {
+        Args: { p_meeting_id: string }
         Returns: undefined
       }
-      mcp_exchange_oauth_auth_code: { Args: { p_code: string }; Returns: Json }
       portal_admin_get_users: {
         Args: never
         Returns: {
@@ -2373,15 +2049,6 @@ export type Database = {
         }[]
       }
       trip_profile_stats: { Args: { p_user_id: string }; Returns: Json }
-      update_expense: {
-        Args: {
-          p_description?: string
-          p_expense_id: string
-          p_items?: Json
-          p_name: string
-        }
-        Returns: undefined
-      }
       upsert_user_profile: {
         Args: { p_email: string; p_name: string }
         Returns: string
@@ -2522,6 +2189,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       egress_status: ["pending", "approved", "rejected", "transferred"],

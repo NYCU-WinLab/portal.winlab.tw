@@ -70,9 +70,16 @@ export function useUpdateOwnMeeting() {
         })
         .eq("id", id)
       if (error) throw new Error(error.message || "更新失敗")
+
+      const { error: syncError } = await supabase.rpc(
+        "meetings_sync_questioners",
+        { p_meeting_id: id }
+      )
+      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("已儲存")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -84,23 +91,15 @@ export function useClaimMeeting() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      presenter,
-      presenterUserId,
-    }: {
-      id: string
-      presenter: string
-      presenterUserId: string
-    }) => {
-      const { error } = await supabase
-        .from(TABLE)
-        .update({ presenter, presenter_user_id: presenterUserId })
-        .eq("id", id)
+    mutationFn: async (meetingId: string) => {
+      const { error } = await supabase.rpc("meetings_claim", {
+        p_meeting_id: meetingId,
+      })
       if (error) throw new Error(error.message || "認領失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("已認領")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -128,7 +127,6 @@ export function useAdminUpdateMeeting() {
       notes,
       location,
       startTime,
-      questionGroupNumber,
     }: {
       id: string
       weekLabel: string | null
@@ -145,7 +143,6 @@ export function useAdminUpdateMeeting() {
       notes: string | null
       location: string
       startTime: string
-      questionGroupNumber: number | null
     }) => {
       const { error } = await supabase
         .from(TABLE)
@@ -164,13 +161,19 @@ export function useAdminUpdateMeeting() {
           notes,
           location,
           start_time: startTime,
-          question_group_number: questionGroupNumber,
         })
         .eq("id", id)
       if (error) throw new Error(error.message || "更新失敗")
+
+      const { error: syncError } = await supabase.rpc(
+        "meetings_sync_questioners",
+        { p_meeting_id: id }
+      )
+      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("已儲存")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -190,18 +193,29 @@ export function useAddMeeting() {
       presenter: string | null
       presenterUserId: string | null
     }) => {
-      const { error } = await supabase.from(TABLE).insert({
-        year: row.year,
-        week_label: row.weekLabel,
-        scheduled_date: row.scheduledDate,
-        is_holiday: row.isHoliday,
-        presenter: row.presenter,
-        presenter_user_id: row.presenterUserId,
-      })
+      const { data, error } = await supabase
+        .from(TABLE)
+        .insert({
+          year: row.year,
+          week_label: row.weekLabel,
+          scheduled_date: row.scheduledDate,
+          is_holiday: row.isHoliday,
+          presenter: row.presenter,
+          presenter_user_id: row.presenterUserId,
+        })
+        .select("id")
+        .single()
       if (error) throw new Error(error.message || "新增失敗")
+
+      const { error: syncError } = await supabase.rpc(
+        "meetings_sync_questioners",
+        { p_meeting_id: data.id }
+      )
+      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("週次已新增")
     },
     onError: (e: Error) => toast.error(e.message),

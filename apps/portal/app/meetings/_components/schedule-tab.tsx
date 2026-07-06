@@ -20,9 +20,8 @@ import {
   useDeleteMeeting,
   useClaimMeeting,
 } from "@/hooks/meetings/use-meetings"
-import { useMeetingGroups } from "@/hooks/meetings/use-meeting-groups"
+import { useQuestionersByYear } from "@/hooks/meetings/use-questioners"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
-import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { MeetingEditDialog } from "./meeting-edit-dialog"
@@ -55,8 +54,7 @@ export function ScheduleTab({ year }: { year: number }) {
   const { user } = useAuth()
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
-  const { data: labUsers = [] } = useLabUsers()
-  const { data: groups = [] } = useMeetingGroups()
+  const { data: questioners } = useQuestionersByYear(year)
   const deleteMeeting = useDeleteMeeting()
   const claimMeeting = useClaimMeeting()
 
@@ -86,7 +84,7 @@ export function ScheduleTab({ year }: { year: number }) {
               <TableHead className="w-12 text-center">PPT</TableHead>
               <TableHead className="w-12 text-center">錄影</TableHead>
               <TableHead className="min-w-[200px]">Paper</TableHead>
-              <TableHead className="min-w-[120px]">小組</TableHead>
+              <TableHead className="min-w-[120px]">提問小組</TableHead>
               <TableHead className="w-32">備註</TableHead>
               <TableHead className="w-24" />
             </TableRow>
@@ -148,21 +146,18 @@ export function ScheduleTab({ year }: { year: number }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {m.questionGroupNumber ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          G{m.questionGroupNumber}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {groups
-                            .find(
-                              (g) => g.groupNumber === m.questionGroupNumber
-                            )
-                            ?.members.join("　") ?? ""}
-                        </span>
-                      </div>
-                    ) : (
+                    {m.isHoliday || !m.presenterUserId ? (
                       <span className="text-xs text-muted-foreground">—</span>
+                    ) : (questioners?.get(m.id) ?? []).length === 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        尚無提問小組成員
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {(questioners?.get(m.id) ?? [])
+                          .map((q) => q.name ?? "")
+                          .join("　")}
+                      </span>
                     )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -176,14 +171,7 @@ export function ScheduleTab({ year }: { year: number }) {
                           variant="ghost"
                           className="h-7 px-2 text-xs"
                           disabled={claimMeeting.isPending}
-                          onClick={() => {
-                            const me = labUsers.find((u) => u.id === user.id)
-                            claimMeeting.mutate({
-                              id: m.id,
-                              presenter: me?.name ?? user.email ?? user.id,
-                              presenterUserId: user.id,
-                            })
-                          }}
+                          onClick={() => claimMeeting.mutate(m.id)}
                         >
                           認領
                         </Button>

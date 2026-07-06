@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-import { GroupsPanel } from "./groups-panel"
+import { QuestionPoolPanel } from "./question-pool-panel"
 
 const INFO = [
   { label: "地點", value: "EC 411" },
@@ -55,7 +55,7 @@ export function InfoTab({ isAdmin }: { isAdmin: boolean }) {
           </Card>
         ))}
       </div>
-      <GroupsPanel isAdmin={isAdmin} />
+      <QuestionPoolPanel isAdmin={isAdmin} />
     </div>
   )
 }
