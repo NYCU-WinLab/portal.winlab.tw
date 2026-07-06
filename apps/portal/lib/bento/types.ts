@@ -50,6 +50,7 @@ export interface OrderItem {
   user_id: string | null
   no_sauce: boolean
   additional: number | null
+  created_at: string
   anonymous_name?: string | null
   anonymous_contact?: string | null
   menu_items: {
