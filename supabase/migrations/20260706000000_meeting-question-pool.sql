@@ -300,15 +300,31 @@ revoke all on function public.meetings_replace_questioner(uuid, uuid, uuid) from
 grant execute on function public.meetings_replace_questioner(uuid, uuid, uuid) to authenticated;
 
 -- 6. Backfill: pool membership from the legacy meeting_groups.members --------
--- Matches user_profiles.name exactly. clock_timestamp() (not now(), which is
--- frozen for the whole transaction) gives strictly increasing created_at
--- values in name order, so the very first rotation is deterministic instead
--- of an arbitrary tie across everyone backfilled in the same instant.
+-- meeting_groups.members are DISPLAY NAMES, and in prod that name is not 1:1
+-- with user_profiles: a name can match a stale duplicate account as well as the
+-- active one. Resolve each name to a SINGLE canonical profile — preferring the
+-- account that has actually presented, then an admin account, then the oldest
+-- row — and reuse that EXACT rule for the history warm-start (section 7), so
+-- the pool and the seeded history can never disagree. (Previously section 6
+-- took an arbitrary `order by id limit 1` while section 7 joined by name and
+-- seeded history onto EVERY matching profile, including ones the pool skipped —
+-- leaving dead rows that were invisible in the rotation view but could skew
+-- fairness if that profile were ever pooled later.)
+--
+-- Diagnostics: warn about names that match zero, or more than one, profile so a
+-- human can reconcile them (e.g. merge duplicate accounts) after applying.
+--
+-- clock_timestamp() (not now(), which is frozen for the whole transaction) gives
+-- strictly increasing created_at values in name order via the loop below, so the
+-- very first rotation is deterministic instead of an arbitrary tie across
+-- everyone backfilled in the same instant.
 do $$
 declare
   v_name       text;
   v_user_id    uuid;
+  v_matches    int;
   v_unmatched  text[] := '{}';
+  v_ambiguous  text[] := '{}';
 begin
   for v_name in
     select distinct member_name
@@ -317,16 +333,26 @@ begin
     ) all_members
     order by member_name
   loop
-    select id into v_user_id
-    from public.user_profiles
-    where name = v_name
-    order by id
+    -- Canonical pick: most presentations, then admin, then oldest id. Same rule
+    -- as the lateral in section 7 below — keep the two in sync.
+    select up.id into v_user_id
+    from public.user_profiles up
+    where up.name = v_name
+    order by
+      (select count(*) from public.meetings m where m.presenter_user_id = up.id) desc,
+      up.is_admin desc,
+      up.id asc
     limit 1;
 
     if v_user_id is not null then
       insert into public.meeting_question_pool (user_id, created_at)
       values (v_user_id, clock_timestamp())
       on conflict (user_id) do nothing;
+
+      select count(*) into v_matches from public.user_profiles up where up.name = v_name;
+      if v_matches > 1 then
+        v_ambiguous := array_append(v_ambiguous, v_name);
+      end if;
     else
       v_unmatched := array_append(v_unmatched, v_name);
     end if;
@@ -336,19 +362,35 @@ begin
     raise notice 'meeting_question_pool backfill: % name(s) not matched to a user_profiles row: %',
       cardinality(v_unmatched), v_unmatched;
   end if;
+  if cardinality(v_ambiguous) > 0 then
+    raise notice 'meeting_question_pool backfill: % name(s) matched MULTIPLE user_profiles rows; picked most-presentations then admin then oldest. Reconcile duplicate accounts: %',
+      cardinality(v_ambiguous), v_ambiguous;
+  end if;
 end $$;
 
 -- 7. Backfill: history warm start ---------------------------------------------
 -- For every meeting that had a question_group_number, seed meeting_questioners
 -- with that group's name-matched members (excluding that meeting's own
 -- presenter) so fairness has real history from day one instead of every
--- member starting tied at "never asked". Intentionally NOT capped at 3 — this
--- is historical record, not the live 3-per-week invariant.
+-- member starting tied at "never asked". Resolves each name through the SAME
+-- canonical rule as the pool backfill above (the lateral below mirrors the
+-- loop's ORDER BY), so a duplicate display name never seeds history onto a
+-- profile the pool didn't pick. Intentionally NOT capped at 3 — this is
+-- historical record, not the live 3-per-week invariant.
 insert into public.meeting_questioners (meeting_id, user_id, source)
-select distinct m.id, up.id, 'auto'
+select distinct m.id, canon.id, 'auto'
 from public.meetings m
 join public.meeting_groups g on g.group_number = m.question_group_number
 join lateral unnest(g.members) as member_name on true
-join public.user_profiles up on up.name = member_name
-where m.presenter_user_id is null or up.id <> m.presenter_user_id
+join lateral (
+  select up.id
+  from public.user_profiles up
+  where up.name = member_name
+  order by
+    (select count(*) from public.meetings mm where mm.presenter_user_id = up.id) desc,
+    up.is_admin desc,
+    up.id asc
+  limit 1
+) canon on true
+where m.presenter_user_id is null or canon.id <> m.presenter_user_id
 on conflict (meeting_id, user_id) do nothing;
