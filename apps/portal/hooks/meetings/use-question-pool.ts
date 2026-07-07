@@ -61,14 +61,18 @@ export function useRemovePoolMember() {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from(TABLE)
-        .delete()
-        .eq("user_id", userId)
+      // RPC, not a direct delete: it also evicts the member from FUTURE
+      // meetings' questioner rosters and backfills those slots from the pool,
+      // all in one transaction. Past meetings are left as history.
+      const { error } = await supabase.rpc("meetings_remove_from_pool", {
+        p_user: userId,
+      })
       if (error) throw new Error(error.message || "移出成員池失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
+      // Upcoming rosters may have changed — refresh questioners too.
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("已移出成員池")
     },
     onError: (e: Error) => toast.error(e.message),

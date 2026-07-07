@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(26);
+select plan(31);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -49,7 +49,11 @@ insert into auth.users (id) values
   ('00000000-0000-0000-0000-000000000053'),
   ('00000000-0000-0000-0000-000000000054'),
   ('00000000-0000-0000-0000-000000000071'), -- s7 pool
-  ('00000000-0000-0000-0000-000000000072');
+  ('00000000-0000-0000-0000-000000000072'),
+  ('00000000-0000-0000-0000-000000000091'), -- s9 pool (removal cleanup)
+  ('00000000-0000-0000-0000-000000000092'),
+  ('00000000-0000-0000-0000-000000000093'),
+  ('00000000-0000-0000-0000-000000000094');
 
 insert into public.user_profiles (id, email, name, roles) values
   ('00000000-0000-0000-0000-000000000001', 'admin@test.local', 'Admin', '{"meetings":["admin"]}'::jsonb),
@@ -81,7 +85,11 @@ insert into public.user_profiles (id, email, name, roles) values
   ('00000000-0000-0000-0000-000000000053', 's6u3@test.local', 'S6 Pool 3', '{}'::jsonb),
   ('00000000-0000-0000-0000-000000000054', 's6u4@test.local', 'S6 Pool 4', '{}'::jsonb),
   ('00000000-0000-0000-0000-000000000071', 's7u1@test.local', 'S7 Pool 1', '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000072', 's7u2@test.local', 'S7 Pool 2', '{}'::jsonb);
+  ('00000000-0000-0000-0000-000000000072', 's7u2@test.local', 'S7 Pool 2', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000091', 's9a@test.local', 'S9 Pool A', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000092', 's9b@test.local', 'S9 Pool B', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000093', 's9c@test.local', 'S9 Pool C', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000094', 's9d@test.local', 'S9 Pool D', '{}'::jsonb);
 
 -- meetings for each scenario, distinct scheduled_date values throughout.
 insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
@@ -424,6 +432,85 @@ select throws_ok(
   'a non-admin cannot directly INSERT into meeting_questioners (must go through the RPCs)'
 );
 reset role;
+
+-- ═══ Scenario 9: removing a pool member cleans FUTURE rosters, keeps PAST ═══
+-- The only scenario that depends on future-vs-past, so meeting dates are
+-- relative to current_date (not fixed literals like the others).
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000009', 2026, current_date + 30, false, '00000000-0000-0000-0000-000000000002'), -- mFuture
+  ('10000000-0000-0000-0000-00000000000a', 2026, current_date - 30, false, '00000000-0000-0000-0000-000000000003'); -- mPast
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('00000000-0000-0000-0000-000000000091', '2020-09-01 00:00:01+00'),
+  ('00000000-0000-0000-0000-000000000092', '2020-09-01 00:00:02+00'),
+  ('00000000-0000-0000-0000-000000000093', '2020-09-01 00:00:03+00'),
+  ('00000000-0000-0000-0000-000000000094', '2020-09-01 00:00:04+00');
+
+-- Assign the future meeting first (A, B, C picked; D spare), while A has no
+-- history so it still qualifies.
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000009');
+
+-- A also carries a PAST questioner row — history that must survive removal.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('10000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-000000000091', 'auto');
+
+-- A non-admin cannot remove from the pool.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000009","role":"authenticated"}',
+  true
+);
+select throws_ok(
+  $$ select public.meetings_remove_from_pool('00000000-0000-0000-0000-000000000091') $$,
+  '42501',
+  NULL,
+  'a non-admin cannot remove a member from the question pool'
+);
+reset role;
+
+-- An admin removes A.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$ select public.meetings_remove_from_pool('00000000-0000-0000-0000-000000000091') $$,
+  'an admin can remove a member from the question pool'
+);
+reset role;
+
+select ok(
+  not exists (
+    select 1 from public.meeting_question_pool
+    where user_id = '00000000-0000-0000-0000-000000000091'
+  ),
+  'the removed member is gone from the pool'
+);
+select is(
+  (select array_agg(user_id order by user_id) from public.meeting_questioners
+   where meeting_id = '10000000-0000-0000-0000-000000000009'),
+  array[
+    '00000000-0000-0000-0000-000000000092', '00000000-0000-0000-0000-000000000093',
+    '00000000-0000-0000-0000-000000000094'
+  ]::uuid[],
+  'future meeting: the removed member is evicted and the slot is backfilled from the pool'
+);
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = '10000000-0000-0000-0000-00000000000a'
+      and user_id = '00000000-0000-0000-0000-000000000091'
+  ),
+  'past meeting: the removed member''s historical questioner row is preserved'
+);
+
+delete from public.meeting_question_pool where user_id in (
+  '00000000-0000-0000-0000-000000000092', '00000000-0000-0000-0000-000000000093',
+  '00000000-0000-0000-0000-000000000094'
+);
 
 select * from finish();
 rollback;
