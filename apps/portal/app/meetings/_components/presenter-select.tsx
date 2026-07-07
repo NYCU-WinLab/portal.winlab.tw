@@ -22,9 +22,17 @@ interface PresenterSelectProps {
   users: { id: string; name: string | null }[]
   value: string
   onSelect: (userId: string) => void
+  searchPlaceholder?: string
+  noneLabel?: string
 }
 
-export function PresenterSelect({ users, value, onSelect }: PresenterSelectProps) {
+export function PresenterSelect({
+  users,
+  value,
+  onSelect,
+  searchPlaceholder = "搜尋報告人",
+  noneLabel = "（未指定）",
+}: PresenterSelectProps) {
   const [open, setOpen] = useState(false)
   const selected = users.find((u) => u.id === value) ?? null
 
@@ -38,14 +46,14 @@ export function PresenterSelect({ users, value, onSelect }: PresenterSelectProps
           className="w-full justify-between font-normal"
         >
           <span className={selected ? "" : "text-muted-foreground"}>
-            {selected?.name ?? "（未指定）"}
+            {selected?.name ?? noneLabel}
           </span>
           <IconChevronDown data-icon="inline-end" className="opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
         <Command>
-          <CommandInput placeholder="搜尋報告人" />
+          <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>找不到成員</CommandEmpty>
             <CommandGroup>
@@ -56,7 +64,7 @@ export function PresenterSelect({ users, value, onSelect }: PresenterSelectProps
                   setOpen(false)
                 }}
               >
-                （未指定）
+                {noneLabel}
               </CommandItem>
               {users.map((u) => (
                 <CommandItem

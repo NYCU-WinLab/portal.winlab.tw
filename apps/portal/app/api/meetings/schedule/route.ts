@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/lib/supabase/server"
-import type { DbMeeting, DbMeetingGroup } from "@/lib/meetings/types"
+import type { DbMeeting } from "@/lib/meetings/types"
 
 function createServiceClient() {
   return createServiceRoleClient(
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   const [
     { data: meetingData, error },
     { data: upcomingData },
-    { data: allGroupsData },
+    { data: poolData },
   ] = await Promise.all([
     supabase
       .from("meetings")
@@ -83,9 +83,9 @@ export async function GET(request: NextRequest) {
       .order("scheduled_date", { ascending: true })
       .limit(12),
     supabase
-      .from("meeting_groups")
-      .select("group_number, members")
-      .order("group_number"),
+      .from("meeting_question_pool")
+      .select("user_profiles(name)")
+      .order("created_at"),
   ])
 
   if (error || !meetingData) {
@@ -120,19 +120,28 @@ export async function GET(request: NextRequest) {
     presenterEmail = profile?.email ?? null
   }
 
-  // Fetch question group members if assigned
-  let questionGroup: { number: number; members: string[] } | null = null
-  if (m.question_group_number) {
-    const { data: group } = await supabase
-      .from("meeting_groups")
-      .select("group_number, members")
-      .eq("group_number", m.question_group_number)
-      .maybeSingle()
-    if (group) {
-      const g = group as Pick<DbMeetingGroup, "group_number" | "members">
-      questionGroup = { number: g.group_number, members: g.members }
-    }
-  }
+  // Fetch this week's questioners (runs after the meeting row is loaded)
+  const { data: questionersData } = await supabase
+    .from("meeting_questioners")
+    .select("user_id, user_profiles(name, email)")
+    .eq("meeting_id", m.id)
+
+  const questioners = (
+    (questionersData ?? []) as unknown as Array<{
+      user_id: string
+      user_profiles: { name: string | null; email: string | null } | null
+    }>
+  ).map((row) => ({
+    name: row.user_profiles?.name ?? null,
+    email: row.user_profiles?.email ?? null,
+  }))
+
+  // Backward-compatible shape for the Apps Script mailer: null when the week
+  // has no questioners assigned yet, otherwise the questioner names.
+  const questionGroup: { number: null; members: string[] } | null =
+    questioners.length === 0
+      ? null
+      : { number: null, members: questioners.map((q) => q.name ?? "") }
 
   // Deduplicate presenter_order (keep first occurrence per name)
   const upcoming = (upcomingData ?? []) as Array<{
@@ -148,11 +157,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const questionGroups = (
-    (allGroupsData ?? []) as Pick<DbMeetingGroup, "group_number" | "members">[]
-  )
-    .sort((a, b) => a.group_number - b.group_number)
-    .map((g) => g.members)
+  // Backward-compatible array-of-arrays shape: a single element wrapping the
+  // full question pool (fixed groups no longer exist).
+  const poolNames = (
+    (poolData ?? []) as unknown as Array<{
+      user_profiles: { name: string | null } | null
+    }>
+  ).map((row) => row.user_profiles?.name ?? "")
+  const questionGroups = [poolNames]
 
   return NextResponse.json(
     {
@@ -165,6 +177,7 @@ export async function GET(request: NextRequest) {
       start_time: m.start_time,
       question_group: questionGroup,
       question_groups: questionGroups,
+      questioners,
       next_presenter: presenterOrder[0] ?? null,
       presenter_order: presenterOrder,
     },

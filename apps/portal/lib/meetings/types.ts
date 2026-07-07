@@ -15,7 +15,6 @@ export interface Meeting {
   notes: string | null
   location: string
   startTime: string
-  questionGroupNumber: number | null
   createdAt: string
 }
 
@@ -28,9 +27,20 @@ export interface TeacherPaper {
   createdAt: string
 }
 
-export interface MeetingGroup {
-  groupNumber: number
-  members: string[]
+export interface QuestionPoolMember {
+  userId: string
+  name: string | null
+  email: string | null
+  poolAddedAt: string
+  lastAskedDate: string | null
+  timesAsked: number
+}
+
+export interface MeetingQuestioner {
+  meetingId: string
+  userId: string
+  name: string | null
+  source: "auto" | "manual"
 }
 
 export interface DbMeeting {
@@ -50,7 +60,6 @@ export interface DbMeeting {
   notes: string | null
   location: string
   start_time: string
-  question_group_number: number | null
   created_at: string
 }
 
@@ -63,10 +72,13 @@ export interface DbTeacherPaper {
   created_at: string
 }
 
-export interface DbMeetingGroup {
-  group_number: number
-  members: string[]
-  updated_at: string
+export interface DbQuestionPoolMember {
+  user_id: string
+  name: string | null
+  email: string | null
+  pool_added_at: string
+  last_asked_date: string | null
+  times_asked: number
 }
 
 export function toMeeting(row: DbMeeting): Meeting {
@@ -87,7 +99,6 @@ export function toMeeting(row: DbMeeting): Meeting {
     notes: row.notes,
     location: row.location,
     startTime: row.start_time,
-    questionGroupNumber: row.question_group_number,
     createdAt: row.created_at,
   }
 }
@@ -103,9 +114,15 @@ export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
   }
 }
 
-export function toMeetingGroup(row: DbMeetingGroup): MeetingGroup {
+export function toQuestionPoolMember(
+  row: DbQuestionPoolMember
+): QuestionPoolMember {
   return {
-    groupNumber: row.group_number,
-    members: row.members,
+    userId: row.user_id,
+    name: row.name,
+    email: row.email,
+    poolAddedAt: row.pool_added_at,
+    lastAskedDate: row.last_asked_date,
+    timesAsked: row.times_asked,
   }
 }
