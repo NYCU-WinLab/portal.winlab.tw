@@ -2004,6 +2004,10 @@ export type Database = {
       is_trip_admin: { Args: never; Returns: boolean }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_remove_from_pool: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
       meetings_replace_questioner: {
         Args: {
           p_meeting_id: string
