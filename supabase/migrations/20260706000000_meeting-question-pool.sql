@@ -159,7 +159,15 @@ begin
 end;
 $function$;
 
-revoke all on function public.meetings_sync_questioners(uuid) from public;
+-- `revoke ... from public` is NOT enough to keep anon out: Supabase's default
+-- privileges (ALTER DEFAULT PRIVILEGES ... GRANT EXECUTE ... TO anon,
+-- authenticated, service_role) auto-grant EXECUTE to anon DIRECTLY on every new
+-- function, and revoking from PUBLIC doesn't touch a direct grant. So revoke
+-- anon explicitly. This matters most for meetings_sync_questioners: unlike
+-- meetings_claim (auth.uid() check) and meetings_replace_questioner
+-- (is_meetings_admin() check), it has NO internal authz, so the grant is its
+-- only gate against unauthenticated /rest/v1/rpc calls.
+revoke all on function public.meetings_sync_questioners(uuid) from public, anon;
 grant execute on function public.meetings_sync_questioners(uuid) to authenticated, service_role;
 
 -- Non-admin "claim a week" path. Row-locks the meeting to serialize
@@ -213,7 +221,7 @@ begin
 end;
 $function$;
 
-revoke all on function public.meetings_claim(uuid) from public;
+revoke all on function public.meetings_claim(uuid) from public, anon;
 grant execute on function public.meetings_claim(uuid) to authenticated;
 
 -- Admin-only manual override: remove one questioner and either install a
@@ -296,7 +304,7 @@ begin
 end;
 $function$;
 
-revoke all on function public.meetings_replace_questioner(uuid, uuid, uuid) from public;
+revoke all on function public.meetings_replace_questioner(uuid, uuid, uuid) from public, anon;
 grant execute on function public.meetings_replace_questioner(uuid, uuid, uuid) to authenticated;
 
 -- 6. Backfill: pool membership from the legacy meeting_groups.members --------
