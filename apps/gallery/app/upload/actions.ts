@@ -71,10 +71,12 @@ export async function registerGalleryImage(
     expectedPaths.map((p) => p.slice(userId.length + 1))
   )
 
+  // Supabase Storage listing can be slightly delayed on mobile networks.
+  // Retry a bit longer to reduce intermittent "File not found" failures.
   let uploaded = false
-  for (let attempt = 0; attempt < 5 && !uploaded; attempt++) {
+  for (let attempt = 0; attempt < 9 && !uploaded; attempt++) {
     if (attempt > 0) {
-      await new Promise((r) => setTimeout(r, 120))
+      await new Promise((r) => setTimeout(r, 200))
     }
     const { data: files, error: listError } = await supabase.storage
       .from("gallery")
@@ -272,17 +274,73 @@ export async function renameGalleryImage(
   }
 
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("gallery_images")
-    .update({ name: trimmed })
-    .eq("id", id)
-    .select("id")
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
 
-  if (error) {
-    return { ok: false, error: `Rename failed: ${error.message}` }
+  const { data: currentRow, error: currentRowError } = await supabase
+    .from("gallery_images")
+    .select("id, sequence_id, sequence_index")
+    .eq("id", id)
+    .eq("created_by", userId)
+    .single()
+
+  if (currentRowError) {
+    return {
+      ok: false,
+      error: `Could not load this work: ${currentRowError.message}`,
+    }
   }
-  if (!data?.length) {
-    return { ok: false, error: "Could not update this work." }
+
+  // If renaming the cover shot of a burst sequence, apply the base name to
+  // the whole sequence so users see consistent names.
+  const shouldRenameSequence =
+    Boolean(currentRow?.sequence_id) && currentRow.sequence_index === 0
+
+  if (shouldRenameSequence) {
+    const sequenceId = currentRow.sequence_id as string
+
+    const { data: sequenceRows, error: seqLoadError } = await supabase
+      .from("gallery_images")
+      .select("id, sequence_index")
+      .eq("created_by", userId)
+      .eq("sequence_id", sequenceId)
+      .order("sequence_index", { ascending: true })
+
+    if (seqLoadError) {
+      return {
+        ok: false,
+        error: `Rename sequence failed: ${seqLoadError.message}`,
+      }
+    }
+
+    for (let idx = 0; idx < (sequenceRows ?? []).length; idx++) {
+      const row = sequenceRows[idx]!
+      const sequenceIndex =
+        typeof row.sequence_index === "number" ? row.sequence_index : idx
+      const nextName =
+        sequenceIndex === 0 ? trimmed : `${trimmed}${sequenceIndex}`
+
+      const { error: updateError } = await supabase
+        .from("gallery_images")
+        .update({ name: nextName })
+        .eq("id", row.id)
+        .eq("created_by", userId)
+
+      if (updateError) {
+        return { ok: false, error: `Rename failed: ${updateError.message}` }
+      }
+    }
+  } else {
+    const { error: updateError } = await supabase
+      .from("gallery_images")
+      .update({ name: trimmed })
+      .eq("id", id)
+      .eq("created_by", userId)
+
+    if (updateError) {
+      return { ok: false, error: `Rename failed: ${updateError.message}` }
+    }
   }
 
   revalidatePath("/")

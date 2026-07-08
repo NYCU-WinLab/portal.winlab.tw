@@ -221,22 +221,32 @@ export function GalleryCard({
   const [namesByReaction, setNamesByReaction] = useState(image.reaction_names)
   const [comments, setComments] = useState<GalleryComment[]>([])
   const [commentsLoaded, setCommentsLoaded] = useState(false)
-  const [commentCountHint, setCommentCountHint] = useState(image.comment_count)
   const [pinnedAt, setPinnedAt] = useState<string | null>(image.pinned_at)
+  const viewerIdRef = useRef(viewerId)
+  const isDialogOpenRef = useRef(isDialogOpen)
+
+  // Coalesce realtime bursts into a single refresh.
+  const refreshTimerRef = useRef<number | null>(null)
+  const refreshInFlightRef = useRef(false)
+  const refreshQueuedRef = useRef(false)
 
   const canReact = isSignedIn && !isPending
   const reactionTotal = totalReactions(counts)
-  const wallCommentCount = commentsLoaded ? comments.length : commentCountHint
+  const wallCommentCount = commentsLoaded
+    ? comments.length
+    : image.comment_count
 
   useEffect(() => {
-    setCommentCountHint(image.comment_count)
+    viewerIdRef.current = viewerId
+  }, [viewerId])
+
+  useEffect(() => {
+    isDialogOpenRef.current = isDialogOpen
+  }, [isDialogOpen])
+
+  useEffect(() => {
     setPinnedAt(image.pinned_at)
-  }, [image.comment_count, image.id, image.pinned_at])
-
-  useEffect(() => {
-    if (!commentsLoaded) return
-    setCommentCountHint(comments.length)
-  }, [comments.length, commentsLoaded])
+  }, [image.pinned_at])
 
   useEffect(() => {
     if (open && highlightCommentId) {
@@ -249,14 +259,56 @@ export function GalleryCard({
   }
 
   const refreshSocial = useCallback(async () => {
+    if (!isDialogOpenRef.current) return
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true
+      return
+    }
+
+    refreshInFlightRef.current = true
     const supabase = createClient()
-    const social = await loadLightboxSocial(supabase, image.id, viewerId)
-    setComments(social.comments)
-    setCommentsLoaded(true)
-    setCounts(social.reaction_counts)
-    setNamesByReaction(social.reaction_names)
-    setMyReaction(social.my_reaction)
-  }, [image.id, viewerId])
+    try {
+      const social = await loadLightboxSocial(
+        supabase,
+        image.id,
+        viewerIdRef.current
+      )
+      // Dialog might have been closed while the request was in-flight.
+      if (!isDialogOpenRef.current) return
+
+      setComments(social.comments)
+      setCommentsLoaded(true)
+      setCounts(social.reaction_counts)
+      setNamesByReaction(social.reaction_names)
+      setMyReaction(social.my_reaction)
+    } finally {
+      refreshInFlightRef.current = false
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false
+        void refreshSocial()
+      }
+    }
+  }, [image.id])
+
+  const scheduleRefreshSocial = useCallback(() => {
+    if (!isDialogOpenRef.current) return
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current)
+    }
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      void refreshSocial()
+    }, 150)
+  }, [refreshSocial])
+
+  useEffect(() => {
+    if (isDialogOpen) return
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+    refreshQueuedRef.current = false
+  }, [isDialogOpen])
 
   useEffect(() => {
     if (!isDialogOpen) return
@@ -267,7 +319,7 @@ export function GalleryCard({
     if (isDialogOpen) return
     setComments([])
     setCommentsLoaded(false)
-  }, [isDialogOpen, image.id])
+  }, [isDialogOpen])
 
   useEffect(() => {
     if (!isDialogOpen) return
@@ -277,7 +329,7 @@ export function GalleryCard({
     const channel = supabase.channel(channelName)
 
     const onChange = () => {
-      void refreshSocial()
+      scheduleRefreshSocial()
     }
 
     channel
@@ -306,7 +358,7 @@ export function GalleryCard({
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [isDialogOpen, image.id, refreshSocial])
+  }, [isDialogOpen, image.id, refreshSocial, scheduleRefreshSocial])
 
   useEffect(() => {
     if (isDialogOpen) return
