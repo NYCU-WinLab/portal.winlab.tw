@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog"
+import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import {
@@ -287,6 +288,43 @@ export function UploadManageList({
     () => groupManageUploads(images),
     [images]
   )
+  const [sortMode, setSortMode] = useState<"date" | "name">("date")
+  const nameCollator = useMemo(
+    () => new Intl.Collator(undefined, { sensitivity: "base", numeric: true }),
+    []
+  )
+
+  const timeline = useMemo(() => {
+    const sequenceEntries = sequences.map((sequence) => {
+      const groupCreatedAt = sequence.items.reduce((max, item) => {
+        const t = new Date(item.created_at).getTime()
+        return t > max ? t : max
+      }, 0)
+      const sortName = sequence.items[0]?.name ?? ""
+
+      return {
+        kind: "sequence" as const,
+        sequence,
+        groupCreatedAt,
+        sortName,
+      }
+    })
+
+    const singleEntries = singles.map((row) => ({
+      kind: "single" as const,
+      row,
+      groupCreatedAt: new Date(row.created_at).getTime(),
+      sortName: row.name,
+    }))
+
+    return [...sequenceEntries, ...singleEntries].sort((a, b) => {
+      if (sortMode === "name") {
+        const byName = nameCollator.compare(a.sortName, b.sortName)
+        if (byName !== 0) return byName
+      }
+      return b.groupCreatedAt - a.groupCreatedAt
+    })
+  }, [nameCollator, singles, sequences, sortMode])
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -344,6 +382,18 @@ export function UploadManageList({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
+        <Tabs
+          value={sortMode}
+          onValueChange={(value) => {
+            if (value === "date" || value === "name") setSortMode(value)
+          }}
+          className="gap-0"
+        >
+          <TabsList>
+            <TabsTrigger value="date">Newest</TabsTrigger>
+            <TabsTrigger value="name">Name</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <button
           type="button"
           onClick={toggleSelectionMode}
@@ -363,34 +413,39 @@ export function UploadManageList({
         ) : null}
       </div>
 
-      {sequences.map((sequence) => (
-        <UploadSequenceGroup
-          key={sequence.sequenceId}
-          sequenceId={sequence.sequenceId}
-          items={sequence.items}
-          allImages={images}
-          selectionMode={selectionMode}
-          selectedIds={selectedIds}
-          onToggleSelected={toggleSelected}
-          isAdmin={isAdmin}
-        />
-      ))}
-      {singles.length > 0 ? (
-        <ul className="flex flex-col gap-3">
-          {singles.map((image) => (
+      {timeline.map((entry) => {
+        if (entry.kind === "sequence") {
+          return (
+            <UploadSequenceGroup
+              key={entry.sequence.sequenceId}
+              sequenceId={entry.sequence.sequenceId}
+              items={entry.sequence.items}
+              allImages={images}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+              isAdmin={isAdmin}
+            />
+          )
+        }
+
+        return (
+          <ul
+            key={entry.row.id}
+            className="flex flex-col gap-3"
+          >
             <UploadListItem
-              key={image.id}
-              image={image}
+              image={entry.row}
               siblings={images}
-              selected={selectedIds.has(image.id)}
-              onToggleSelected={() => toggleSelected(image.id)}
+              selected={selectedIds.has(entry.row.id)}
+              onToggleSelected={() => toggleSelected(entry.row.id)}
               selectionMode={selectionMode}
               isAdmin={isAdmin}
               showWallPin
             />
-          ))}
-        </ul>
-      ) : null}
+          </ul>
+        )
+      })}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
