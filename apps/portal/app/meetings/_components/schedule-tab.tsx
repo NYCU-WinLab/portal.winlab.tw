@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { IconPaperclip } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -22,19 +22,10 @@ import {
 } from "@/hooks/meetings/use-meetings"
 import { useQuestionersByYear } from "@/hooks/meetings/use-questioners"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
+import { getCurrentMeetingId } from "@/lib/meetings/schedule"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { MeetingEditDialog } from "./meeting-edit-dialog"
-
-function getCurrentWeekId(meetings: Meeting[]): string | null {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const upcoming = meetings.filter((m) => {
-    const d = new Date(m.scheduledDate)
-    return d >= today && !m.isHoliday
-  })
-  return upcoming[0]?.id ?? null
-}
 
 function FileCell({ link }: { link: string | null }) {
   if (!link) return <span className="text-xs text-muted-foreground">—</span>
@@ -60,7 +51,15 @@ export function ScheduleTab({ year }: { year: number }) {
 
   const [editTarget, setEditTarget] = useState<Meeting | null>(null)
 
-  const currentWeekId = getCurrentWeekId(meetings)
+  const currentWeekId = getCurrentMeetingId(meetings)
+  const currentRowRef = useRef<HTMLTableRowElement>(null)
+
+  // Land on the current week instead of January: bring the nearest upcoming
+  // session into view once the roster has loaded.
+  useEffect(() => {
+    if (isLoading || !currentWeekId) return
+    currentRowRef.current?.scrollIntoView({ block: "center" })
+  }, [isLoading, currentWeekId])
 
   if (isLoading) {
     return (
@@ -97,6 +96,7 @@ export function ScheduleTab({ year }: { year: number }) {
               return (
                 <TableRow
                   key={m.id}
+                  ref={isCurrent ? currentRowRef : undefined}
                   className={
                     m.isHoliday
                       ? "opacity-40"
