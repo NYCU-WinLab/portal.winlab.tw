@@ -1,0 +1,22 @@
+# winfra-paas service descriptor for portal (test deploy).
+# Domain is the zero-config test domain — NOT the prod portal.winlab.tw hostname.
+name: portal
+port: 3000
+health: /            # Next app has no /health route; "/" renders (unauthenticated home)
+expose:
+  - portal.app.winlab.tw
+# RUNTIME secrets — set via `set_secret` (values never in git). Build-time
+# NEXT_PUBLIC_* are baked in the Dockerfile instead (public, not listed here).
+env:
+  - SUPABASE_SECRET_KEY        # prod Supabase service key (server) — RLS-bypassing
+  - BULLETIN_API_SECRET
+  - MEETINGS_API_SECRET
+  - CRON_SECRET
+  - NEXTCLOUD_URL
+  - NEXTCLOUD_USERNAME
+  - NEXTCLOUD_APP_PASSWORD
+  - RESEND_API_KEY
+resources:
+  cpu: "1"
+  memory: 1Gi
+  replicas: 1
