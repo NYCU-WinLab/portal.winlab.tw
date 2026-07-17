@@ -12,6 +12,7 @@ export interface Meeting {
   videoLink: string | null
   paperTitle: string | null
   paperLink: string | null
+  teacherPaperId: string | null
   notes: string | null
   location: string
   startTime: string
@@ -57,6 +58,7 @@ export interface DbMeeting {
   video_link: string | null
   paper_title: string | null
   paper_link: string | null
+  teacher_paper_id: string | null
   notes: string | null
   location: string
   start_time: string
@@ -96,6 +98,7 @@ export function toMeeting(row: DbMeeting): Meeting {
     videoLink: row.video_link,
     paperTitle: row.paper_title,
     paperLink: row.paper_link,
+    teacherPaperId: row.teacher_paper_id,
     notes: row.notes,
     location: row.location,
     startTime: row.start_time,

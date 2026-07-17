@@ -6,6 +6,9 @@ export const queryKeys = {
   teacherPapers: {
     all: ["meetings", "teacher-papers"] as const,
   },
+  paperAssignments: {
+    all: ["meetings", "paper-assignments"] as const,
+  },
   admin: {
     status: ["meetings", "admin"] as const,
   },

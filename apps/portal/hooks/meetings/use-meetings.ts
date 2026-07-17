@@ -10,6 +10,24 @@ import { queryKeys } from "./query-keys"
 
 const TABLE = "meetings"
 
+// The DB enforces two paper rules (see the reading-list migration). Turn the
+// raw Postgres violations into something a student can act on:
+//   * 23P01 exclusion → the 365-day cooldown window (meetings_paper_cooldown).
+//   * 23505 unique on meetings_presenter_paper_uniq → same student, same paper.
+function paperErrorMessage(error: { code?: string; message?: string }): string {
+  const msg = error.message ?? ""
+  if (error.code === "23P01" || msg.includes("meetings_paper_cooldown")) {
+    return "這篇 paper 一年內剛被報告過，冷卻中，請改選其他 paper"
+  }
+  if (error.code === "23505" && msg.includes("presenter_paper")) {
+    return "你已經報告過這篇 paper 了，不能再選同一篇"
+  }
+  if (error.code === "23505") {
+    return "這篇 paper 已被其他人選走了，請選別篇"
+  }
+  return msg || "更新失敗"
+}
+
 export function useMeetings(year: number) {
   const supabase = createClient()
 
@@ -36,8 +54,7 @@ export function useUpdateOwnMeeting() {
       id,
       presenter,
       presenterUserId,
-      paperTitle,
-      paperLink,
+      teacherPaperId,
       pptUploaded,
       pptLink,
       videoUploaded,
@@ -47,8 +64,7 @@ export function useUpdateOwnMeeting() {
       id: string
       presenter: string | null
       presenterUserId: string | null
-      paperTitle: string | null
-      paperLink: string | null
+      teacherPaperId: string | null
       pptUploaded: boolean
       pptLink: string | null
       videoUploaded: boolean
@@ -60,8 +76,7 @@ export function useUpdateOwnMeeting() {
         .update({
           presenter,
           presenter_user_id: presenterUserId,
-          paper_title: paperTitle,
-          paper_link: paperLink,
+          teacher_paper_id: teacherPaperId,
           ppt_uploaded: pptUploaded,
           ppt_link: pptLink,
           video_uploaded: videoUploaded,
@@ -69,7 +84,7 @@ export function useUpdateOwnMeeting() {
           notes,
         })
         .eq("id", id)
-      if (error) throw new Error(error.message || "更新失敗")
+      if (error) throw new Error(paperErrorMessage(error))
 
       const { error: syncError } = await supabase.rpc(
         "meetings_sync_questioners",
@@ -80,6 +95,7 @@ export function useUpdateOwnMeeting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已儲存")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -100,6 +116,7 @@ export function useClaimMeeting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已認領")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -118,8 +135,7 @@ export function useAdminUpdateMeeting() {
       isHoliday,
       presenter,
       presenterUserId,
-      paperTitle,
-      paperLink,
+      teacherPaperId,
       pptUploaded,
       pptLink,
       videoUploaded,
@@ -134,8 +150,7 @@ export function useAdminUpdateMeeting() {
       isHoliday: boolean
       presenter: string | null
       presenterUserId: string | null
-      paperTitle: string | null
-      paperLink: string | null
+      teacherPaperId: string | null
       pptUploaded: boolean
       pptLink: string | null
       videoUploaded: boolean
@@ -152,8 +167,7 @@ export function useAdminUpdateMeeting() {
           is_holiday: isHoliday,
           presenter,
           presenter_user_id: presenterUserId,
-          paper_title: paperTitle,
-          paper_link: paperLink,
+          teacher_paper_id: teacherPaperId,
           ppt_uploaded: pptUploaded,
           ppt_link: pptLink,
           video_uploaded: videoUploaded,
@@ -163,7 +177,7 @@ export function useAdminUpdateMeeting() {
           start_time: startTime,
         })
         .eq("id", id)
-      if (error) throw new Error(error.message || "更新失敗")
+      if (error) throw new Error(paperErrorMessage(error))
 
       const { error: syncError } = await supabase.rpc(
         "meetings_sync_questioners",
@@ -174,6 +188,7 @@ export function useAdminUpdateMeeting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已儲存")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -216,6 +231,7 @@ export function useAddMeeting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("週次已新增")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -233,6 +249,7 @@ export function useDeleteMeeting() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已刪除")
     },
     onError: (e: Error) => toast.error(e.message),
