@@ -19,6 +19,13 @@ export interface Meeting {
   createdAt: string
 }
 
+export interface Tag {
+  id: string
+  name: string
+  color: string | null
+  createdAt: string
+}
+
 export interface TeacherPaper {
   id: string
   providedDate: string
@@ -26,6 +33,7 @@ export interface TeacherPaper {
   fileLink: string | null
   source: string | null
   createdAt: string
+  tags: Tag[]
 }
 
 export interface QuestionPoolMember {
@@ -74,6 +82,13 @@ export interface DbTeacherPaper {
   created_at: string
 }
 
+export interface DbTag {
+  id: string
+  name: string
+  color: string | null
+  created_at: string
+}
+
 export interface DbQuestionPoolMember {
   user_id: string
   name: string | null
@@ -106,7 +121,19 @@ export function toMeeting(row: DbMeeting): Meeting {
   }
 }
 
-export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
+export function toTag(row: DbTag): Tag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: row.created_at,
+  }
+}
+
+export function toTeacherPaper(
+  row: DbTeacherPaper,
+  tags: Tag[] = []
+): TeacherPaper {
   return {
     id: row.id,
     providedDate: row.provided_date,
@@ -114,6 +141,7 @@ export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
     fileLink: row.file_link,
     source: row.source,
     createdAt: row.created_at,
+    tags,
   }
 }
 

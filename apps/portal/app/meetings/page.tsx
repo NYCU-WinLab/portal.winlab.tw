@@ -18,6 +18,7 @@ import { useSyncMeetingFiles } from "@/hooks/meetings/use-meetings"
 import { AddMeetingDialog } from "./_components/add-meeting-dialog"
 import { AddPaperDialog } from "./_components/add-paper-dialog"
 import { InfoTab } from "./_components/info-tab"
+import { ManageTagsDialog } from "./_components/manage-tags-dialog"
 import { PapersTab } from "./_components/papers-tab"
 import { ScheduleTab } from "./_components/schedule-tab"
 
@@ -34,6 +35,7 @@ export default function MeetingsPage() {
   const [activeTab, setActiveTab] = useState("schedule")
   const [addMeetingOpen, setAddMeetingOpen] = useState(false)
   const [addPaperOpen, setAddPaperOpen] = useState(false)
+  const [manageTagsOpen, setManageTagsOpen] = useState(false)
 
   function setYear(y: number) {
     const params = new URLSearchParams(searchParams.toString())
@@ -64,9 +66,18 @@ export default function MeetingsPage() {
           </div>
         )}
         {isAdmin && activeTab === "papers" && (
-          <Button size="sm" onClick={() => setAddPaperOpen(true)}>
-            新增 Paper
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManageTagsOpen(true)}
+            >
+              管理標籤
+            </Button>
+            <Button size="sm" onClick={() => setAddPaperOpen(true)}>
+              新增 Paper
+            </Button>
+          </div>
         )}
       </div>
 
@@ -119,6 +130,10 @@ export default function MeetingsPage() {
             onOpenChange={setAddMeetingOpen}
           />
           <AddPaperDialog open={addPaperOpen} onOpenChange={setAddPaperOpen} />
+          <ManageTagsDialog
+            open={manageTagsOpen}
+            onOpenChange={setManageTagsOpen}
+          />
         </>
       )}
     </div>

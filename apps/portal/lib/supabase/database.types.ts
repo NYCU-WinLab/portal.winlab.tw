@@ -1266,6 +1266,27 @@ export type Database = {
           },
         ]
       }
+      meeting_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           created_at: string
@@ -1669,6 +1690,39 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_paper_tags: {
+        Row: {
+          created_at: string
+          tag_id: string
+          teacher_paper_id: string
+        }
+        Insert: {
+          created_at?: string
+          tag_id: string
+          teacher_paper_id: string
+        }
+        Update: {
+          created_at?: string
+          tag_id?: string
+          teacher_paper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_paper_tags_teacher_paper_id_fkey"
+            columns: ["teacher_paper_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_paper_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_tags"
             referencedColumns: ["id"]
           },
         ]
