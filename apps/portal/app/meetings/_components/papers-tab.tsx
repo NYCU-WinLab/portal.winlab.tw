@@ -21,7 +21,9 @@ import {
 } from "@/hooks/meetings/use-teacher-papers"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { paperCooldownStatus } from "@/lib/meetings/papers"
+import type { TeacherPaper } from "@/lib/meetings/types"
 
+import { EditPaperDialog } from "./edit-paper-dialog"
 import { TagChip } from "./tag-chip"
 
 export function PapersTab() {
@@ -31,12 +33,16 @@ export function PapersTab() {
   const { data: tags = [] } = useTags()
   const deletePaper = useDeleteTeacherPaper()
 
+  const [editTarget, setEditTarget] = useState<TeacherPaper | null>(null)
+
   const today = new Date().toISOString().slice(0, 10)
 
   // OR filter: a paper shows if it carries any of the selected tags.
   const [selected, setSelected] = useState<string[]>([])
   function toggle(id: string) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+    setSelected((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
+    )
   }
 
   if (isLoading) {
@@ -96,7 +102,7 @@ export function PapersTab() {
               <TableHead className="min-w-[160px]">標籤</TableHead>
               <TableHead className="w-40">狀態</TableHead>
               <TableHead className="w-20">來源</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-32" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -166,14 +172,24 @@ export function PapersTab() {
                     </TableCell>
                     <TableCell>
                       {isAdmin && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                          onClick={() => deletePaper.mutate(p.id)}
-                        >
-                          刪除
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setEditTarget(p)}
+                          >
+                            編輯
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                            onClick={() => deletePaper.mutate(p.id)}
+                          >
+                            刪除
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -183,6 +199,16 @@ export function PapersTab() {
           </TableBody>
         </Table>
       </div>
+
+      {editTarget && (
+        <EditPaperDialog
+          paper={editTarget}
+          open={!!editTarget}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null)
+          }}
+        />
+      )}
     </div>
   )
 }
