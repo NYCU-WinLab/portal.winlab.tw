@@ -30,7 +30,9 @@ export function usePaperAssignments() {
     queryFn: async (): Promise<PaperAssignment[]> => {
       const { data, error } = await supabase
         .from("meetings")
-        .select("id, scheduled_date, presenter, presenter_user_id, teacher_paper_id")
+        .select(
+          "id, scheduled_date, presenter, presenter_user_id, teacher_paper_id"
+        )
         .not("teacher_paper_id", "is", null)
       if (error) throw new Error(error.message || "讀取 paper 認領狀態失敗")
       return (
@@ -123,6 +125,56 @@ export function useAddTeacherPaper() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.teacherPapers.all })
       toast.success("Paper 已新增")
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useUpdateTeacherPaper() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (paper: {
+      id: string
+      providedDate: string
+      paperName: string
+      fileLink: string | null
+      source: string | null
+      tagIds: string[]
+    }) => {
+      const { error } = await supabase
+        .from(TABLE)
+        .update({
+          provided_date: paper.providedDate,
+          paper_name: paper.paperName,
+          file_link: paper.fileLink,
+          source: paper.source,
+        })
+        .eq("id", paper.id)
+      if (error) throw new Error(error.message || "更新失敗")
+
+      // Re-sync tag links: drop the old set, insert the new one. Simpler and
+      // just as correct as diffing for a handful of tags per paper.
+      const { error: unlinkError } = await supabase
+        .from(LINKS_TABLE)
+        .delete()
+        .eq("teacher_paper_id", paper.id)
+      if (unlinkError) throw new Error(unlinkError.message || "標籤更新失敗")
+
+      if (paper.tagIds.length > 0) {
+        const { error: linkError } = await supabase.from(LINKS_TABLE).insert(
+          paper.tagIds.map((tag_id) => ({
+            teacher_paper_id: paper.id,
+            tag_id,
+          }))
+        )
+        if (linkError) throw new Error(linkError.message || "標籤連結失敗")
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.teacherPapers.all })
+      toast.success("Paper 已更新")
     },
     onError: (e: Error) => toast.error(e.message),
   })
