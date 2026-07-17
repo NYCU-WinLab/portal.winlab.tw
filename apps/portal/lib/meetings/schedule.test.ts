@@ -17,6 +17,7 @@ function meeting(partial: Partial<Meeting> & { id: string }): Meeting {
     videoLink: null,
     paperTitle: null,
     paperLink: null,
+    teacherPaperId: null,
     notes: null,
     location: "",
     startTime: "",

@@ -1282,6 +1282,7 @@ export type Database = {
           question_group_number: number | null
           scheduled_date: string
           start_time: string
+          teacher_paper_id: string | null
           video_link: string | null
           video_uploaded: boolean
           week_label: string | null
@@ -1302,6 +1303,7 @@ export type Database = {
           question_group_number?: number | null
           scheduled_date: string
           start_time?: string
+          teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
@@ -1322,6 +1324,7 @@ export type Database = {
           question_group_number?: number | null
           scheduled_date?: string
           start_time?: string
+          teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
@@ -1340,6 +1343,13 @@ export type Database = {
             columns: ["presenter_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_teacher_paper_id_fkey"
+            columns: ["teacher_paper_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_papers"
             referencedColumns: ["id"]
           },
         ]

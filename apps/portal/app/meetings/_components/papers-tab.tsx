@@ -14,13 +14,18 @@ import {
 import {
   useTeacherPapers,
   useDeleteTeacherPaper,
+  usePaperAssignments,
 } from "@/hooks/meetings/use-teacher-papers"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
+import { paperCooldownStatus } from "@/lib/meetings/papers"
 
 export function PapersTab() {
   const { isAdmin } = useMeetingsAdmin()
   const { data: papers = [], isLoading } = useTeacherPapers()
+  const { data: assignments = [] } = usePaperAssignments()
   const deletePaper = useDeleteTeacherPaper()
+
+  const today = new Date().toISOString().slice(0, 10)
 
   if (isLoading) {
     return (
@@ -45,51 +50,69 @@ export function PapersTab() {
           <TableRow>
             <TableHead className="w-24">日期</TableHead>
             <TableHead>Paper 名稱</TableHead>
+            <TableHead className="w-40">狀態</TableHead>
             <TableHead className="w-20">來源</TableHead>
             <TableHead className="w-16" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {papers.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="text-xs text-muted-foreground">
-                {new Date(p.providedDate).toLocaleDateString("zh-TW", {
-                  year: "numeric",
-                  month: "numeric",
-                  day: "numeric",
-                })}
-              </TableCell>
-              <TableCell>
-                {p.fileLink ? (
-                  <a
-                    href={p.fileLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm hover:underline"
-                  >
-                    {p.paperName}
-                  </a>
-                ) : (
-                  <span className="text-sm">{p.paperName}</span>
-                )}
-              </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {p.source ?? "—"}
-              </TableCell>
-              <TableCell>
-                {isAdmin && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                    onClick={() => deletePaper.mutate(p.id)}
-                  >
-                    刪除
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
+          {papers.map((p) => {
+            const status = paperCooldownStatus(p.id, assignments, today)
+            return (
+              <TableRow
+                key={p.id}
+                className={status.inCooldown ? "opacity-50" : undefined}
+              >
+                <TableCell className="text-xs text-muted-foreground">
+                  {new Date(p.providedDate).toLocaleDateString("zh-TW", {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                  })}
+                </TableCell>
+                <TableCell>
+                  {p.fileLink ? (
+                    <a
+                      href={p.fileLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm hover:underline"
+                    >
+                      {p.paperName}
+                    </a>
+                  ) : (
+                    <span className="text-sm">{p.paperName}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {status.inCooldown ? (
+                    <span className="text-muted-foreground">
+                      {status.blockedBy?.presenter ?? "已"}報過 · {status.cooldownUntil} 解鎖
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      可選
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {p.source ?? "—"}
+                </TableCell>
+                <TableCell>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={() => deletePaper.mutate(p.id)}
+                    >
+                      刪除
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

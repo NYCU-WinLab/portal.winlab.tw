@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
   IconPaperclip,
@@ -26,8 +26,17 @@ import {
   useUpdateOwnMeeting,
 } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
+import {
+  useTeacherPapers,
+  usePaperAssignments,
+} from "@/hooks/meetings/use-teacher-papers"
+import {
+  paperAvailabilityForMeeting,
+  type PaperAvailability,
+} from "@/lib/meetings/papers"
 import type { Meeting } from "@/lib/meetings/types"
 
+import { PaperSelect } from "./paper-select"
 import { PresenterSelect } from "./presenter-select"
 import { QuestionersField } from "./questioners-field"
 
@@ -116,6 +125,8 @@ export function MeetingEditDialog({
   onOpenChange,
 }: Props) {
   const { data: users = [] } = useLabUsers()
+  const { data: papers = [] } = useTeacherPapers()
+  const { data: assignments = [] } = usePaperAssignments()
   const updateOwn = useUpdateOwnMeeting()
   const updateAdmin = useAdminUpdateMeeting()
 
@@ -127,13 +138,37 @@ export function MeetingEditDialog({
   const [presenterUserId, setPresenterUserId] = useState(
     meeting.presenterUserId ?? "__none__"
   )
-  const [paperTitle, setPaperTitle] = useState(meeting.paperTitle ?? "")
-  const [paperLink, setPaperLink] = useState(meeting.paperLink ?? "")
+  const [teacherPaperId, setTeacherPaperId] = useState(
+    meeting.teacherPaperId ?? "__none__"
+  )
   const [pptLink, setPptLink] = useState<string | null>(meeting.pptLink)
   const [videoLink, setVideoLink] = useState<string | null>(meeting.videoLink)
   const [notes, setNotes] = useState(meeting.notes ?? "")
   const [pptUploading, setPptUploading] = useState(false)
   const [videoChecking, setVideoChecking] = useState(false)
+
+  const selectedPaper = papers.find((p) => p.id === teacherPaperId) ?? null
+  const paperTitle = selectedPaper?.paperName ?? ""
+
+  // Which reading-list papers this meeting can pick, given its date + presenter:
+  // 365-day cooldown against every other meeting holding the paper, plus the
+  // no-self-repeat rule. Recomputed as the admin changes the date / presenter.
+  const availability = useMemo(() => {
+    const resolvedPresenter =
+      presenterUserId === "__none__" ? null : presenterUserId
+    const map = new Map<string, PaperAvailability>()
+    for (const p of papers) {
+      map.set(
+        p.id,
+        paperAvailabilityForMeeting(p.id, assignments, {
+          forDate: date,
+          presenterUserId: resolvedPresenter,
+          currentMeetingId: meeting.id,
+        })
+      )
+    }
+    return map
+  }, [papers, assignments, date, presenterUserId, meeting.id])
 
   function checkVideo() {
     setVideoChecking(true)
@@ -156,8 +191,7 @@ export function MeetingEditDialog({
     setLocation(meeting.location)
     setStartTime(meeting.startTime)
     setPresenterUserId(meeting.presenterUserId ?? "__none__")
-    setPaperTitle(meeting.paperTitle ?? "")
-    setPaperLink(meeting.paperLink ?? "")
+    setTeacherPaperId(meeting.teacherPaperId ?? "__none__")
     setPptLink(meeting.pptLink)
     setVideoLink(meeting.videoLink)
     setNotes(meeting.notes ?? "")
@@ -204,8 +238,7 @@ export function MeetingEditDialog({
       id: meeting.id,
       presenter: selectedUser?.name ?? null,
       presenterUserId: presenterUserId === "__none__" ? null : presenterUserId,
-      paperTitle: paperTitle || null,
-      paperLink: paperLink || null,
+      teacherPaperId: teacherPaperId === "__none__" ? null : teacherPaperId,
       pptUploaded: !!pptLink,
       pptLink,
       videoUploaded: !!videoLink,
@@ -298,20 +331,24 @@ export function MeetingEditDialog({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label>Paper 標題</Label>
-            <Input
-              value={paperTitle}
-              onChange={(e) => setPaperTitle(e.target.value)}
-              placeholder="論文名稱"
+            <Label>Paper（限老師 Papers 清單）</Label>
+            <PaperSelect
+              papers={papers}
+              availability={availability}
+              currentPaperId={meeting.teacherPaperId}
+              value={teacherPaperId}
+              onSelect={setTeacherPaperId}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>論文連結</Label>
-            <Input
-              value={paperLink}
-              onChange={(e) => setPaperLink(e.target.value)}
-              placeholder="https://..."
-            />
+            {selectedPaper?.fileLink && (
+              <a
+                href={selectedPaper.fileLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                開啟論文連結
+              </a>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 rounded-md border p-3">
