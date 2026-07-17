@@ -15,6 +15,8 @@ import { Label } from "@workspace/ui/components/label"
 
 import { useAddTeacherPaper } from "@/hooks/meetings/use-teacher-papers"
 
+import { TagPicker } from "./tag-picker"
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -27,6 +29,7 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
   const [name, setName] = useState("")
   const [link, setLink] = useState("")
   const [source, setSource] = useState("")
+  const [tagIds, setTagIds] = useState<string[]>([])
 
   function handleAdd() {
     if (!date || !name) return
@@ -36,6 +39,7 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
         paperName: name,
         fileLink: link || null,
         source: source || null,
+        tagIds,
       },
       {
         onSuccess: () => {
@@ -43,6 +47,7 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
           setName("")
           setLink("")
           setSource("")
+          setTagIds([])
           onOpenChange(false)
         },
       }
@@ -90,6 +95,10 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
               onChange={(e) => setSource(e.target.value)}
               placeholder="LINE / email"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>標籤（選填）</Label>
+            <TagPicker value={tagIds} onChange={setTagIds} />
           </div>
         </div>
 
