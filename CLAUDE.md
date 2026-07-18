@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/debt`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -99,7 +99,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/debt`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
@@ -182,7 +182,7 @@ await supabase.auth.signOut()
 Two layers:
 
 - **Super admin** — `user_profiles.is_admin = true`. Only super admins can manage roles via the `/admin` panel. The `prevent_role_escalation` BEFORE UPDATE trigger blocks direct writes to `roles` / `is_admin` from anyone but `service_role`, which is why the admin RPCs elevate role inside `SECURITY DEFINER` functions before mutating.
-- **App-scoped roles** — `user_profiles.roles` is `jsonb` shaped like `{ "<app>": ["admin", ...] }`. The generic `has_role(user_id, system_name, role_name)` SQL function is the real primitive — most apps' RLS policies call it inline, e.g. bento: `has_role(auth.uid(), 'bento', 'admin')`. A handful of apps additionally have a no-arg convenience wrapper bound to `auth.uid()` — currently `is_meetings_admin()`, `is_portal_admin()`, `is_receipts_admin()`, `is_reimburse_admin()`, `is_trip_admin()` — but **not every app has one** (bento, debt, games, leave, approve, bulletin don't); check the migrations before assuming a wrapper exists rather than reaching for `has_role()` directly. `useAdmin()`-style hooks (`hooks/<app>/use-admin.ts`) read the same `roles` jsonb on the client.
+- **App-scoped roles** — `user_profiles.roles` is `jsonb` shaped like `{ "<app>": ["admin", ...] }`. The generic `has_role(user_id, system_name, role_name)` SQL function is the real primitive — most apps' RLS policies call it inline, e.g. bento: `has_role(auth.uid(), 'bento', 'admin')`. A handful of apps additionally have a no-arg convenience wrapper bound to `auth.uid()` — currently `is_meetings_admin()`, `is_portal_admin()`, `is_receipts_admin()`, `is_reimburse_admin()`, `is_trip_admin()` — but **not every app has one** (bento, games, leave, approve, bulletin don't); check the migrations before assuming a wrapper exists rather than reaching for `has_role()` directly. `useAdmin()`-style hooks (`hooks/<app>/use-admin.ts`) read the same `roles` jsonb on the client.
 
 When adding a new admin-controlled action, write the SECURITY DEFINER RPC + helper first, then the hook. Don't gate writes purely on the client.
 
@@ -199,7 +199,7 @@ RLS is the data-layer line of defense. Don't wrap a Supabase call in an API rout
 
 Real examples of each, all under `apps/portal/app/api/`:
 
-- **Cron** (declared in root `vercel.json`'s `crons` array) — `cron/approve-emails`, `cron/receipts-emails`, `cron/debt-monthly-settlements`.
+- **Cron** (declared in root `vercel.json`'s `crons` array) — `cron/approve-emails`, `cron/receipts-emails`.
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
 
@@ -246,10 +246,10 @@ apps/portal/
 └─ lib/bento/                             # bento types and pure helpers (types.ts, date.ts, menu.ts)
 ```
 
-- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `debt`, `games`, `leave`, `meetings`, `receipts`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and debt's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
-- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `debt`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `trip`). Don't double-mount within one layout tree.
+- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
+- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `trip`). Don't double-mount within one layout tree.
 - **`AuthProvider` lives in root layout** because user state is shared. Bento hooks consume `@/hooks/use-auth`.
-- **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. debt, games, leave, approve, bulletin gate purely via RLS + `has_role()`).
+- **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. games, leave, approve, bulletin gate purely via RLS + `has_role()`).
 
 ### Feedback UX
 

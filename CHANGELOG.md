@@ -10,7 +10,6 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - `/receipts` admin-only receipt review wall — uploads any image or PDF, archives it as a single PDF per row, status workflow (pending / approved / rejected), preview dialog, row actions for renaming and deleting
 - `/meetings` lab-meeting scheduler — weekly schedule, presenter sign-up, teacher-paper sharing
 - `/trip` travel-document app — file uploads, admin folder export, dynamic signature stamping at view time
-- `/debt` bill-splitting app with monthly-settlement Vercel Cron
 - `/reimburse` lab cash-flow bookkeeping (egress + ingress, schema migrated from the legacy `egress` / `ingress` tables)
 - `/approve` document signing with PDF field placement and Resend email outbox via Vercel Cron
 - `/leave` Monday-meeting attendance sign-ups
