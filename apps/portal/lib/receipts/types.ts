@@ -14,6 +14,15 @@ export const STATUS_LABELS: Record<ReceiptStatus, string> = {
   rejected: "已拒絕",
 }
 
+export type DepositAccount = "post" | "esun"
+
+export const DEPOSIT_ACCOUNTS: DepositAccount[] = ["post", "esun"]
+
+export const DEPOSIT_ACCOUNT_LABELS: Record<DepositAccount, string> = {
+  post: "郵局",
+  esun: "玉山",
+}
+
 export type TagVariant = "default" | "secondary" | "outline"
 
 export const TAG_VARIANTS: TagVariant[] = ["default", "secondary", "outline"]
@@ -41,26 +50,31 @@ export interface DatabaseReceipt {
   name: string
   image_path: string
   status: ReceiptStatus
+  deposit_account: DepositAccount | null
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
-// Shape returned when we embed tags via PostgREST:
-//   select(*, receipt_tag_assignments(receipt_tags(*)))
+// Shape returned when we embed tags + the uploader's profile via PostgREST:
+//   select(*, receipt_tag_assignments(receipt_tags(*)),
+//          uploader:user_profiles!receipts_created_by_fkey(name))
 export interface DatabaseReceiptWithTags extends DatabaseReceipt {
   receipt_tag_assignments: { receipt_tags: DatabaseTag | null }[] | null
+  uploader: { name: string | null } | null
 }
 
 export interface InsertReceipt {
   name: string
   image_path: string
   status?: ReceiptStatus
+  deposit_account: DepositAccount
 }
 
 export interface UpdateReceipt {
   name?: string
   status?: ReceiptStatus
+  deposit_account?: DepositAccount
 }
 
 export interface Receipt {
@@ -68,6 +82,8 @@ export interface Receipt {
   name: string
   imagePath: string
   status: ReceiptStatus
+  depositAccount: DepositAccount | null
+  uploaderName: string | null
   createdAt: string
   tags: Tag[]
 }
@@ -82,6 +98,8 @@ export function toReceipt(row: DatabaseReceiptWithTags): Receipt {
     name: row.name,
     imagePath: row.image_path,
     status: row.status,
+    depositAccount: row.deposit_account,
+    uploaderName: row.uploader?.name ?? null,
     createdAt: row.created_at,
     tags,
   }

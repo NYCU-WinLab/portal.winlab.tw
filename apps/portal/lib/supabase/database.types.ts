@@ -1397,6 +1397,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          deposit_account: string | null
           id: string
           image_path: string
           name: string
@@ -1406,6 +1407,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          deposit_account?: string | null
           id?: string
           image_path: string
           name: string
@@ -1415,6 +1417,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          deposit_account?: string | null
           id?: string
           image_path?: string
           name?: string

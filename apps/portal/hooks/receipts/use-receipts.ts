@@ -14,6 +14,7 @@ import {
   RECEIPTS_BUCKET,
   toReceipt,
   type DatabaseReceiptWithTags,
+  type DepositAccount,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
 
@@ -53,7 +54,15 @@ export function useUploadReceipt() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ name, file }: { name: string; file: File }) => {
+    mutationFn: async ({
+      name,
+      file,
+      depositAccount,
+    }: {
+      name: string
+      file: File
+      depositAccount: DepositAccount
+    }) => {
       const id = crypto.randomUUID()
       const path = `${id}/${id}.${RECEIPT_FILE_EXT}`
       const pdfBlob = await fileToReceiptPdf(file)
@@ -68,7 +77,12 @@ export function useUploadReceipt() {
 
       const { data, error } = await supabase
         .from(TABLE)
-        .insert({ id, name, image_path: path })
+        .insert({
+          id,
+          name,
+          image_path: path,
+          deposit_account: depositAccount,
+        })
         .select()
         .single()
       if (error) {
@@ -97,17 +111,25 @@ export function useUploadReceipt() {
   })
 }
 
-export function useUpdateReceiptName() {
+export function useUpdateReceipt() {
   const supabase = createClient()
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({
+      id,
+      name,
+      depositAccount,
+    }: {
+      id: string
+      name: string
+      depositAccount: DepositAccount
+    }) => {
       const trimmed = name.trim()
       if (!trimmed) throw new Error("名稱不能空白")
       const { data, error } = await supabase
         .from(TABLE)
-        .update({ name: trimmed })
+        .update({ name: trimmed, deposit_account: depositAccount })
         .eq("id", id)
         .select()
         .single()
