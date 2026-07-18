@@ -700,131 +700,6 @@ export type Database = {
           },
         ]
       }
-      debt_expense_items: {
-        Row: {
-          amount: number
-          created_at: string
-          debtor_id: string
-          expense_id: string
-          id: string
-          paid_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          debtor_id: string
-          expense_id: string
-          id?: string
-          paid_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          debtor_id?: string
-          expense_id?: string
-          id?: string
-          paid_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_expense_items_debtor_id_fkey"
-            columns: ["debtor_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debt_expense_items_expense_id_fkey"
-            columns: ["expense_id"]
-            isOneToOne: false
-            referencedRelation: "debt_expenses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debt_expenses: {
-        Row: {
-          created_at: string
-          creator_id: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_expenses_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debt_settlements: {
-        Row: {
-          amount: number
-          created_at: string
-          from_confirmed: boolean
-          from_user_id: string
-          id: string
-          period: string
-          settled_at: string | null
-          to_confirmed: boolean
-          to_user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id: string
-          id?: string
-          period: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id?: string
-          id?: string
-          period?: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_settlements_from_user_id_fkey"
-            columns: ["from_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debt_settlements_to_user_id_fkey"
-            columns: ["to_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       gallery_activity_notifications: {
         Row: {
           actor_user_id: string
@@ -2003,32 +1878,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      debt_confirm_settlement_from: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
-      debt_confirm_settlement_to: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
-      debt_create_expense: {
-        Args: { p_description: string; p_items: Json; p_name: string }
-        Returns: string
-      }
-      debt_generate_monthly_settlements: { Args: never; Returns: undefined }
-      debt_mark_item_paid: {
-        Args: { p_item_id: string; p_paid: boolean }
-        Returns: undefined
-      }
-      debt_update_expense: {
-        Args: {
-          p_description: string
-          p_expense_id: string
-          p_items: Json
-          p_name: string
-        }
-        Returns: undefined
-      }
       gallery_admin_set_comment_pin: {
         Args: { p_comment_id: string; p_pinned: boolean }
         Returns: undefined
@@ -2055,10 +1904,6 @@ export type Database = {
       get_user_email: { Args: never; Returns: string }
       has_role: {
         Args: { role_name: string; system_name: string; user_id_param: string }
-        Returns: boolean
-      }
-      is_debt_expense_debtor: {
-        Args: { expense_uuid: string }
         Returns: boolean
       }
       is_meetings_admin: { Args: never; Returns: boolean }
