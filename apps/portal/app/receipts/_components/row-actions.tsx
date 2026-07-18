@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 
+import type { DepositAccount } from "@/lib/receipts/types"
+
 import { DeleteReceiptDialog } from "./delete-receipt-dialog"
 import { EditReceiptDialog } from "./edit-receipt-dialog"
 
@@ -17,10 +19,12 @@ export function ReceiptRowActions({
   id,
   name,
   path,
+  depositAccount,
 }: {
   id: string
   name: string
   path: string
+  depositAccount: DepositAccount | null
 }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -40,7 +44,7 @@ export function ReceiptRowActions({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>
             <Pencil className="size-4" />
-            編輯名稱
+            編輯
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => setDeleteOpen(true)}
@@ -56,6 +60,7 @@ export function ReceiptRowActions({
         <EditReceiptDialog
           id={id}
           name={name}
+          depositAccount={depositAccount}
           onClose={() => setEditOpen(false)}
         />
       )}

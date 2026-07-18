@@ -7,13 +7,15 @@ import {
   type Receipt,
 } from "@/lib/receipts/types"
 
-// Embed tags via the assignments join table; PostgREST returns
-// { receipt_tag_assignments: [{ receipt_tags: {...} }, ...] }
+// Embed tags via the assignments join table, plus the uploader's profile via
+// the created_by FK — same "uploader" alias + explicit FK name as
+// email-drain.ts's query, so both reads of this relationship agree.
 const RECEIPT_WITH_TAGS_SELECT = `
   *,
   receipt_tag_assignments (
     receipt_tags ( id, name, variant, created_by, created_at )
-  )
+  ),
+  uploader:user_profiles!receipts_created_by_fkey ( name )
 `
 
 // Shared by the client hook and the server prefetch — same query + same

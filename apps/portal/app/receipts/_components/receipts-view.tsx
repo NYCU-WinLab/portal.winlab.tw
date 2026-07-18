@@ -15,7 +15,9 @@ import {
 
 import { useReceipts } from "@/hooks/receipts/use-receipts"
 import {
+  DEPOSIT_ACCOUNT_LABELS,
   STATUS_LABELS,
+  type DepositAccount,
   type Receipt,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
@@ -42,6 +44,9 @@ export function ReceiptsView() {
     new Set()
   )
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<DepositAccount>>(
+    new Set()
+  )
 
   const filtered = useMemo(
     () =>
@@ -49,17 +54,23 @@ export function ReceiptsView() {
         search,
         selectedStatuses,
         selectedTagIds,
+        selectedAccounts,
       }),
-    [receipts, search, selectedStatuses, selectedTagIds]
+    [receipts, search, selectedStatuses, selectedTagIds, selectedAccounts]
   )
 
   const toggleStatus = (s: ReceiptStatus) =>
     setSelectedStatuses((prev) => toggleSet(prev, s))
   const toggleTag = (id: string) =>
     setSelectedTagIds((prev) => toggleSet(prev, id))
+  const toggleAccount = (a: DepositAccount) =>
+    setSelectedAccounts((prev) => toggleSet(prev, a))
 
   const hasActiveFilter =
-    !!search.trim() || selectedStatuses.size > 0 || selectedTagIds.size > 0
+    !!search.trim() ||
+    selectedStatuses.size > 0 ||
+    selectedTagIds.size > 0 ||
+    selectedAccounts.size > 0
 
   return (
     <div className="flex flex-col gap-10">
@@ -80,6 +91,8 @@ export function ReceiptsView() {
           onToggleStatus={toggleStatus}
           selectedTagIds={selectedTagIds}
           onToggleTag={toggleTag}
+          selectedAccounts={selectedAccounts}
+          onToggleAccount={toggleAccount}
         />
       </div>
 
@@ -88,8 +101,10 @@ export function ReceiptsView() {
           <TableHeader>
             <TableRow>
               <TableHead>名稱</TableHead>
+              <TableHead className="w-28">上傳者</TableHead>
               <TableHead className="w-20">檔案</TableHead>
               <TableHead className="min-w-48">標籤</TableHead>
+              <TableHead className="w-20">帳戶</TableHead>
               <TableHead className="w-40">狀態</TableHead>
               <TableHead className="w-12 text-right">動作</TableHead>
             </TableRow>
@@ -100,7 +115,7 @@ export function ReceiptsView() {
             ) : !receipts || receipts.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   {error ? (
@@ -120,7 +135,7 @@ export function ReceiptsView() {
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   {hasActiveFilter
@@ -132,6 +147,9 @@ export function ReceiptsView() {
               filtered.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {r.uploaderName ?? "未知成員"}
+                  </TableCell>
                   <TableCell>
                     <ReceiptPreviewDialog path={r.imagePath} name={r.name} />
                   </TableCell>
@@ -159,6 +177,11 @@ export function ReceiptsView() {
                       }
                     />
                   </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {r.depositAccount
+                      ? DEPOSIT_ACCOUNT_LABELS[r.depositAccount]
+                      : "—"}
+                  </TableCell>
                   <TableCell>
                     <StatusSelect id={r.id} value={r.status} />
                   </TableCell>
@@ -167,6 +190,7 @@ export function ReceiptsView() {
                       id={r.id}
                       name={r.name}
                       path={r.imagePath}
+                      depositAccount={r.depositAccount}
                     />
                   </TableCell>
                 </TableRow>
@@ -185,10 +209,12 @@ function filterReceipts(
     search,
     selectedStatuses,
     selectedTagIds,
+    selectedAccounts,
   }: {
     search: string
     selectedStatuses: Set<ReceiptStatus>
     selectedTagIds: Set<string>
+    selectedAccounts: Set<DepositAccount>
   }
 ): Receipt[] {
   const q = search.trim().toLowerCase()
@@ -200,11 +226,18 @@ function filterReceipts(
       const anyHit = [...selectedTagIds].some((id) => owned.has(id))
       if (!anyHit) return false
     }
+    if (
+      selectedAccounts.size > 0 &&
+      (!r.depositAccount || !selectedAccounts.has(r.depositAccount))
+    )
+      return false
     if (!q) return true
     const haystack = [
       r.name,
       STATUS_LABELS[r.status],
       r.status,
+      r.uploaderName ?? "",
+      r.depositAccount ? DEPOSIT_ACCOUNT_LABELS[r.depositAccount] : "",
       ...r.tags.map((t) => t.name),
     ]
       .join(" ")
@@ -229,10 +262,16 @@ function SkeletonRows() {
             <Skeleton className="h-4 w-32" />
           </TableCell>
           <TableCell>
+            <Skeleton className="h-4 w-20" />
+          </TableCell>
+          <TableCell>
             <Skeleton className="size-9 rounded-md" />
           </TableCell>
           <TableCell>
             <Skeleton className="h-5 w-24 rounded-full" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-12" />
           </TableCell>
           <TableCell>
             <Skeleton className="h-9 w-32" />

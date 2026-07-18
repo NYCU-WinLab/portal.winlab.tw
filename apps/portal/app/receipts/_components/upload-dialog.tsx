@@ -16,19 +16,33 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 
 import { useUploadReceipt } from "@/hooks/receipts/use-receipts"
 import { isSupportedReceiptFile } from "@/lib/receipts/file"
+import {
+  DEPOSIT_ACCOUNT_LABELS,
+  DEPOSIT_ACCOUNTS,
+  type DepositAccount,
+} from "@/lib/receipts/types"
 
 export function UploadDialog() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [file, setFile] = useState<File | null>(null)
+  const [depositAccount, setDepositAccount] = useState<DepositAccount | "">("")
   const upload = useUploadReceipt()
 
   const reset = () => {
     setName("")
     setFile(null)
+    setDepositAccount("")
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -41,9 +55,13 @@ export function UploadDialog() {
       toast.error("只支援 JPG / PNG / WebP / PDF — HEIC 請先轉檔")
       return
     }
+    if (!depositAccount) {
+      toast.error("請選擇入帳帳戶")
+      return
+    }
 
     upload.mutate(
-      { name: name.trim(), file },
+      { name: name.trim(), file, depositAccount },
       {
         onSuccess: () => {
           toast.success("已上傳")
@@ -104,6 +122,26 @@ export function UploadDialog() {
               <p className="text-xs text-muted-foreground">
                 JPG / PNG / WebP / PDF
               </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="receipt-deposit-account">
+                入帳帳戶 <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={depositAccount}
+                onValueChange={(v) => setDepositAccount(v as DepositAccount)}
+              >
+                <SelectTrigger id="receipt-deposit-account" className="w-full">
+                  <SelectValue placeholder="選擇入帳帳戶" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPOSIT_ACCOUNTS.map((account) => (
+                    <SelectItem key={account} value={account}>
+                      {DEPOSIT_ACCOUNT_LABELS[account]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

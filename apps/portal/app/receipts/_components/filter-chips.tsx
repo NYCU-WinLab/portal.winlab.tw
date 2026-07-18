@@ -4,7 +4,10 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import { useTags } from "@/hooks/receipts/use-tags"
 import {
+  DEPOSIT_ACCOUNT_LABELS,
+  DEPOSIT_ACCOUNTS,
   STATUS_LABELS,
+  type DepositAccount,
   type ReceiptStatus,
   type Tag,
 } from "@/lib/receipts/types"
@@ -16,11 +19,15 @@ export function ReceiptsFilterChips({
   onToggleStatus,
   selectedTagIds,
   onToggleTag,
+  selectedAccounts,
+  onToggleAccount,
 }: {
   selectedStatuses: Set<ReceiptStatus>
   onToggleStatus: (status: ReceiptStatus) => void
   selectedTagIds: Set<string>
   onToggleTag: (tagId: string) => void
+  selectedAccounts: Set<DepositAccount>
+  onToggleAccount: (account: DepositAccount) => void
 }) {
   const { data: tags, isLoading } = useTags()
 
@@ -33,6 +40,17 @@ export function ReceiptsFilterChips({
             label={STATUS_LABELS[s]}
             active={selectedStatuses.has(s)}
             onClick={() => onToggleStatus(s)}
+          />
+        ))}
+      </FilterRow>
+
+      <FilterRow label="帳戶">
+        {DEPOSIT_ACCOUNTS.map((account) => (
+          <Chip
+            key={account}
+            label={DEPOSIT_ACCOUNT_LABELS[account]}
+            active={selectedAccounts.has(account)}
+            onClick={() => onToggleAccount(account)}
           />
         ))}
       </FilterRow>
