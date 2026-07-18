@@ -19,7 +19,6 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 | `/approve`   | Document signing with PDF field placement + email outbox        |
 | `/bento`     | Lunch-ordering for the lab — orders, menus, realtime            |
 | `/bulletin`  | Announcements board                                             |
-| `/debt`      | Bill-splitting + monthly settlement cron                        |
 | `/games`     | Mini-games (2048, snake, …) with global leaderboards            |
 | `/leave`     | Monday-meeting attendance sign-ups                              |
 | `/meetings`  | Lab-meeting weekly schedule + teacher papers                    |

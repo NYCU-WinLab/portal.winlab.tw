@@ -9,10 +9,6 @@
     {
       "path": "/api/cron/receipts-emails",
       "schedule": "15 4 * * *"
-    },
-    {
-      "path": "/api/cron/debt-monthly-settlements",
-      "schedule": "0 0 10 * *"
     }
   ]
 }
