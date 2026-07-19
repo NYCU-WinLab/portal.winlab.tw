@@ -12,17 +12,16 @@ const WANG_XIAO_MING = "王小明"
 
 describe("EDITABLE_PROFILE_FIELDS", () => {
   test("is exactly the seven user-editable Keycloak fields", () => {
-    expect([...EDITABLE_PROFILE_FIELDS].sort()).toEqual(
-      [
-        "chinese_name",
-        "firstName",
-        "lastName",
-        "phone",
-        "position",
-        "gitlabUsername",
-        "student_id",
-      ].sort()
-    )
+    const expected = [
+      "chinese_name",
+      "firstName",
+      "lastName",
+      "phone",
+      "position",
+      "gitlabUsername",
+      "student_id",
+    ] as const
+    expect([...EDITABLE_PROFILE_FIELDS].sort()).toEqual([...expected].sort())
   })
 
   test("does not include email, role, or username", () => {

@@ -1,12 +1,18 @@
 import Link from "next/link"
 
+import { Toaster } from "@workspace/ui/components/sonner"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { UserCard } from "@/components/user-card"
+import {
+  getEditableProfile,
+  keycloakSubFromIdentities,
+} from "@/lib/profile/keycloak"
 import type { ProfileStats } from "@/lib/profile/stats"
 import { createClient } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/user"
+import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
+import { ProfileEditForm } from "./_components/profile-edit-form"
 import { ProfileStatsView } from "./_components/profile-stats"
 
 export default async function ProfilePage() {
@@ -17,6 +23,12 @@ export default async function ProfilePage() {
   })
   if (error) throw error
   const stats = data as ProfileStats | null
+
+  // Editable fields come from Keycloak, not Supabase. Hidden entirely when
+  // the session has no Keycloak identity or the admin env isn't configured.
+  const authUser = await getCurrentAuthUser()
+  const sub = keycloakSubFromIdentities(authUser?.identities)
+  const editable = sub ? await getEditableProfile(sub) : null
 
   return (
     <PortalShell
@@ -42,6 +54,8 @@ export default async function ProfilePage() {
           avatarUrl={user.avatarUrl}
         />
 
+        {editable ? <ProfileEditForm initial={editable} /> : null}
+
         {stats ? (
           <ProfileStatsView stats={stats} />
         ) : (
@@ -52,6 +66,7 @@ export default async function ProfilePage() {
           <SignOutButton />
         </div>
       </div>
+      <Toaster />
     </PortalShell>
   )
 }
