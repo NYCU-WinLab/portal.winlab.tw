@@ -50,6 +50,10 @@ cd apps/portal && bun test       # one workspace
 
 Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP via `supabase test db`, see `.github/workflows/db-tests.yml`), not by `bun test`.
 
+### Adding a Supabase migration
+
+Name every new file `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` — the Supabase CLI's `db reset` / `db start` (what `db-tests` CI runs against) only replays files matching that exact timestamp pattern and silently **skips** anything else (e.g. dash-dated names like `2026-07-17-thing.sql`). A skipped migration still applies fine to prod via `apply_migration`, but the local/CI test database silently diverges from prod — that's what #332 was.
+
 ### Git hooks (husky)
 
 `bun install` activates the hooks:
