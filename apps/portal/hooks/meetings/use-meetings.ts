@@ -256,6 +256,68 @@ export function useDeleteMeeting() {
   })
 }
 
+export function useSwapMeetings() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ a, b }: { a: string; b: string }) => {
+      const { error } = await supabase.rpc("meetings_swap", {
+        p_a: a,
+        p_b: b,
+      })
+      if (error) throw new Error(error.message || "互換失敗")
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useInsertMeetingWeek() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (atMeetingId: string): Promise<string | null> => {
+      const { data, error } = await supabase.rpc("meetings_insert_week", {
+        p_at_meeting_id: atMeetingId,
+      })
+      if (error) throw new Error(error.message || "插入週次失敗")
+      return data as string | null
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useRemoveMeetingWeek() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (atMeetingId: string) => {
+      const { error } = await supabase.rpc("meetings_remove_week", {
+        p_at_meeting_id: atMeetingId,
+      })
+      if (error) throw new Error(error.message || "刪除週次失敗")
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export function useSyncMeetingFiles() {
   const qc = useQueryClient()
 

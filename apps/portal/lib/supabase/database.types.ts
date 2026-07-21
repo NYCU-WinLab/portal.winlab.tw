@@ -1916,8 +1916,16 @@ export type Database = {
       is_trip_admin: { Args: never; Returns: boolean }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_insert_week: {
+        Args: { p_at_meeting_id: string }
+        Returns: string
+      }
       meetings_remove_from_pool: {
         Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_remove_week: {
+        Args: { p_at_meeting_id: string }
         Returns: undefined
       }
       meetings_replace_questioner: {
@@ -1928,6 +1936,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      meetings_swap: { Args: { p_a: string; p_b: string }; Returns: undefined }
       meetings_sync_questioners: {
         Args: { p_meeting_id: string }
         Returns: undefined
