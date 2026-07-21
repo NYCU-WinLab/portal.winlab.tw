@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
+import { useDialogPopoverScroll } from "@workspace/ui/hooks/use-dialog-popover-scroll"
 
 import type { PaperAvailability } from "@/lib/meetings/papers"
 import type { TeacherPaper } from "@/lib/meetings/types"
@@ -50,6 +51,7 @@ export function PaperSelect({
   onSelect,
 }: PaperSelectProps) {
   const [open, setOpen] = useState(false)
+  const scrollRef = useDialogPopoverScroll<HTMLDivElement>()
   const selected = papers.find((p) => p.id === value) ?? null
 
   return (
@@ -69,7 +71,10 @@ export function PaperSelect({
           <IconChevronDown data-icon="inline-end" className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+      <PopoverContent
+        ref={scrollRef}
+        className="w-(--radix-popover-trigger-width) p-0"
+      >
         <Command>
           <CommandInput placeholder="搜尋 paper" />
           <CommandList>
