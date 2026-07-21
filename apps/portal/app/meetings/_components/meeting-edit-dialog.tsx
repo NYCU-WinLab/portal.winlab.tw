@@ -272,7 +272,7 @@ export function MeetingEditDialog({
           <DialogTitle>{isAdmin ? "編輯週次" : "更新報告資訊"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {isAdmin && (
             <>
               <div className="flex flex-col gap-1.5">
