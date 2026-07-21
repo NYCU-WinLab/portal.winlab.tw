@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
+import { useDialogPopoverScroll } from "@workspace/ui/hooks/use-dialog-popover-scroll"
 
 interface PresenterSelectProps {
   users: { id: string; name: string | null }[]
@@ -34,6 +35,7 @@ export function PresenterSelect({
   noneLabel = "（未指定）",
 }: PresenterSelectProps) {
   const [open, setOpen] = useState(false)
+  const scrollRef = useDialogPopoverScroll<HTMLDivElement>()
   const selected = users.find((u) => u.id === value) ?? null
 
   return (
@@ -51,7 +53,10 @@ export function PresenterSelect({
           <IconChevronDown data-icon="inline-end" className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+      <PopoverContent
+        ref={scrollRef}
+        className="w-(--radix-popover-trigger-width) p-0"
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>

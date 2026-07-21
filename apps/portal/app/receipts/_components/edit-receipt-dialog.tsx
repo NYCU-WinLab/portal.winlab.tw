@@ -14,31 +14,52 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 
-import { useUpdateReceiptName } from "@/hooks/receipts/use-receipts"
+import { useUpdateReceipt } from "@/hooks/receipts/use-receipts"
+import {
+  DEPOSIT_ACCOUNT_LABELS,
+  DEPOSIT_ACCOUNTS,
+  type DepositAccount,
+} from "@/lib/receipts/types"
 
 export function EditReceiptDialog({
   id,
   name,
+  depositAccount,
   onClose,
 }: {
   id: string
   name: string
+  depositAccount: DepositAccount | null
   onClose: () => void
 }) {
   const [draft, setDraft] = useState(name)
-  const update = useUpdateReceiptName()
+  const [draftAccount, setDraftAccount] = useState<DepositAccount | "">(
+    depositAccount ?? ""
+  )
+  const update = useUpdateReceipt()
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!draftAccount) {
+      toast.error("請選擇入帳帳戶")
+      return
+    }
     update.mutate(
-      { id, name: draft },
+      { id, name: draft, depositAccount: draftAccount },
       {
         onSuccess: () => {
-          toast.success("已更名")
+          toast.success("已更新")
           onClose()
         },
-        onError: (err) => toast.error(`更名失敗：${err.message}`),
+        onError: (err) => toast.error(`更新失敗：${err.message}`),
       }
     )
   }
@@ -48,23 +69,49 @@ export function EditReceiptDialog({
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>編輯名稱</DialogTitle>
+            <DialogTitle>編輯收據</DialogTitle>
             <DialogDescription>
-              改的是顯示用的名稱；檔案不會動到。
+              改的是顯示用的名稱與入帳帳戶；檔案不會動到。
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2 py-4">
-            <Label htmlFor="receipt-name-edit">
-              名稱 <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="receipt-name-edit"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={update.isPending}
-              required
-              autoFocus
-            />
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="receipt-name-edit">
+                名稱 <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="receipt-name-edit"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={update.isPending}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="receipt-deposit-account-edit">
+                入帳帳戶 <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={draftAccount}
+                onValueChange={(v) => setDraftAccount(v as DepositAccount)}
+                disabled={update.isPending}
+              >
+                <SelectTrigger
+                  id="receipt-deposit-account-edit"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="選擇入帳帳戶" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPOSIT_ACCOUNTS.map((account) => (
+                    <SelectItem key={account} value={account}>
+                      {DEPOSIT_ACCOUNT_LABELS[account]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button

@@ -13,44 +13,38 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 
-import { useAddTeacherPaper } from "@/hooks/meetings/use-teacher-papers"
+import { useUpdateTeacherPaper } from "@/hooks/meetings/use-teacher-papers"
+import type { TeacherPaper } from "@/lib/meetings/types"
 
 import { TagPicker } from "./tag-picker"
 
 interface Props {
+  paper: TeacherPaper
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function AddPaperDialog({ open, onOpenChange }: Props) {
-  const addPaper = useAddTeacherPaper()
+export function EditPaperDialog({ paper, open, onOpenChange }: Props) {
+  const updatePaper = useUpdateTeacherPaper()
 
-  const [date, setDate] = useState("")
-  const [name, setName] = useState("")
-  const [link, setLink] = useState("")
-  const [source, setSource] = useState("")
-  const [tagIds, setTagIds] = useState<string[]>([])
+  const [date, setDate] = useState(paper.providedDate)
+  const [name, setName] = useState(paper.paperName)
+  const [link, setLink] = useState(paper.fileLink ?? "")
+  const [source, setSource] = useState(paper.source ?? "")
+  const [tagIds, setTagIds] = useState(paper.tags.map((t) => t.id))
 
-  function handleAdd() {
+  function handleSave() {
     if (!date || !name) return
-    addPaper.mutate(
+    updatePaper.mutate(
       {
+        id: paper.id,
         providedDate: date,
         paperName: name,
         fileLink: link || null,
         source: source || null,
         tagIds,
       },
-      {
-        onSuccess: () => {
-          setDate("")
-          setName("")
-          setLink("")
-          setSource("")
-          setTagIds([])
-          onOpenChange(false)
-        },
-      }
+      { onSuccess: () => onOpenChange(false) }
     )
   }
 
@@ -58,7 +52,7 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>新增老師提供 Paper</DialogTitle>
+          <DialogTitle>編輯老師提供 Paper</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -106,15 +100,15 @@ export function AddPaperDialog({ open, onOpenChange }: Props) {
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={addPaper.isPending}
+            disabled={updatePaper.isPending}
           >
             取消
           </Button>
           <Button
-            onClick={handleAdd}
-            disabled={!date || !name || addPaper.isPending}
+            onClick={handleSave}
+            disabled={!date || !name || updatePaper.isPending}
           >
-            {addPaper.isPending ? "新增中…" : "新增"}
+            {updatePaper.isPending ? "儲存中…" : "儲存"}
           </Button>
         </DialogFooter>
       </DialogContent>

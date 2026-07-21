@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/bento`, `/leave`, `/meetings`, `/approve`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/profile`, `/admin`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -12,7 +12,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 A business app is `apps/portal/app/<name>/` — a route segment, **not** a separate Turborepo workspace. To add one, drop a folder under `apps/portal/app/`. Don't open a new `apps/*` Next.js project.
 
-**Exception**: when an app's design system genuinely diverges from portal (different fonts, different layout metaphor), break it out into a subdomain workspace. Today that's `apps/gallery` (`gallery.winlab.tw`, Instrument Serif, polaroid scatter) and `apps/mcp` (`mcp.winlab.tw`, MCP server). Ask the maintainer before opening a new workspace — don't open one just to dodge the shared shell. That's an owner-mindset issue.
+**Exception**: when an app's design system genuinely diverges from portal (different fonts, different layout metaphor), break it out into a subdomain workspace. Today that's `apps/gallery` (`gallery.winlab.tw`, Instrument Serif, polaroid scatter). Ask the maintainer before opening a new workspace — don't open one just to dodge the shared shell. That's an owner-mindset issue.
 
 ## Stack
 
@@ -50,6 +50,10 @@ cd apps/portal && bun test       # one workspace
 
 Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP via `supabase test db`, see `.github/workflows/db-tests.yml`), not by `bun test`.
 
+### Adding a Supabase migration
+
+Name every new file `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` — the Supabase CLI's `db reset` / `db start` (what `db-tests` CI runs against) only replays files matching that exact timestamp pattern and silently **skips** anything else (e.g. dash-dated names like `2026-07-17-thing.sql`). A skipped migration still applies fine to prod via `apply_migration`, but the local/CI test database silently diverges from prod — that's what #332 was.
+
 ### Git hooks (husky)
 
 `bun install` activates the hooks:
@@ -76,7 +80,7 @@ gh issue create \
 ```
 
 Available labels: `bug`, `enhancement`, `documentation`, `duplicate`, `question`, `help wanted`, `good first issue`, `invalid`, `wontfix`, `dependencies`, `javascript`, `github_actions`.  
-Known collaborators: `beenson`, `Tim7179`, `stanleyshen2003`, `N0Ball`, `JaeggerJose`, `zyx1121`, `Metabolism2003`, `qqqqq4545`.
+Known collaborators: `beenson`, `Tim7179`, `stanleyshen2003`, `N0Ball`, `JaeggerJose`, `zyx1121`, `Metabolism2003`, `qqqqq4545`, `Benedict-CS`.
 
 3. **Reference the issue in the PR body** using `Closes #<number>` so GitHub auto-closes it on merge.
 
@@ -99,9 +103,8 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/bento`, `/approve`, `/leave`, `/meetings`, `/trip`, `/debt`, `/reimburse`, `/receipts`, `/profile`, `/admin`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
-- `apps/mcp` — `mcp.winlab.tw`, an MCP server exposing portal data over OAuth 2.1.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
 - `packages/typescript-config` — `base.json` / `nextjs.json` / `react-library.json`.
@@ -183,7 +186,7 @@ await supabase.auth.signOut()
 Two layers:
 
 - **Super admin** — `user_profiles.is_admin = true`. Only super admins can manage roles via the `/admin` panel. The `prevent_role_escalation` BEFORE UPDATE trigger blocks direct writes to `roles` / `is_admin` from anyone but `service_role`, which is why the admin RPCs elevate role inside `SECURITY DEFINER` functions before mutating.
-- **App-scoped roles** — `user_profiles.roles` is `jsonb` shaped like `{ "<app>": ["admin", ...] }`. Each app has a SQL helper such as `is_bento_admin()` / `is_meetings_admin()` / `is_receipts_admin()` returning `true` if the caller has the relevant role. Apps RLS-gate themselves with these helpers; `useAdmin()` hooks read the same data on the client.
+- **App-scoped roles** — `user_profiles.roles` is `jsonb` shaped like `{ "<app>": ["admin", ...] }`. The generic `has_role(user_id, system_name, role_name)` SQL function is the real primitive — most apps' RLS policies call it inline, e.g. bento: `has_role(auth.uid(), 'bento', 'admin')`. A handful of apps additionally have a no-arg convenience wrapper bound to `auth.uid()` — currently `is_meetings_admin()`, `is_portal_admin()`, `is_receipts_admin()`, `is_reimburse_admin()`, `is_trip_admin()` — but **not every app has one** (bento, games, leave, approve, bulletin don't); check the migrations before assuming a wrapper exists rather than reaching for `has_role()` directly. `useAdmin()`-style hooks (`hooks/<app>/use-admin.ts`) read the same `roles` jsonb on the client.
 
 When adding a new admin-controlled action, write the SECURITY DEFINER RPC + helper first, then the hook. Don't gate writes purely on the client.
 
@@ -194,9 +197,15 @@ When adding a new admin-controlled action, write the SECURITY DEFINER RPC + help
 1. **Server Component + `server.ts`'s `createClient()`** — reads
 2. **Server Action** — writes / mutations
 3. **Client Component + `client.ts`** — when interactivity is needed (realtime subscribe, optimistic UI)
-4. **Route Handler** — only for: webhook receivers, third-party OAuth callbacks, non-Supabase cookie/header work, file streaming
+4. **Route Handler** — only for: webhook receivers, third-party OAuth callbacks, non-Supabase cookie/header work, file streaming, Vercel Cron targets, bearer-token-gated endpoints for external bots/integrations
 
 RLS is the data-layer line of defense. Don't wrap a Supabase call in an API route to "make it secure" — write the RLS policy correctly instead.
+
+Real examples of each, all under `apps/portal/app/api/`:
+
+- **Cron** (declared in root `vercel.json`'s `crons` array) — `cron/approve-emails`, `cron/receipts-emails`.
+- **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
+- **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
 
 ## Coding style (aligned with https://supabase.com/ui)
 
@@ -241,10 +250,10 @@ apps/portal/
 └─ lib/bento/                             # bento types and pure helpers (types.ts, date.ts, menu.ts)
 ```
 
-- **TanStack Query is bento-only** today — `QueryProvider` lives in `bento/layout.tsx`, not in root layout.
-- **`<Toaster />` lives in bento's layout** too. Other apps that need toasts hoist it into their own layouts when needed (YAGNI for now).
+- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
+- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `trip`). Don't double-mount within one layout tree.
 - **`AuthProvider` lives in root layout** because user state is shared. Bento hooks consume `@/hooks/use-auth`.
-- **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. The receipts and meetings apps follow the same pattern with their own `useReceiptsAdmin()` / `useMeetingsAdmin()`.
+- **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. games, leave, approve, bulletin gate purely via RLS + `has_role()`).
 
 ### Feedback UX
 

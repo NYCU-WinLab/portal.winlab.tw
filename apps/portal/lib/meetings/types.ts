@@ -12,9 +12,17 @@ export interface Meeting {
   videoLink: string | null
   paperTitle: string | null
   paperLink: string | null
+  teacherPaperId: string | null
   notes: string | null
   location: string
   startTime: string
+  createdAt: string
+}
+
+export interface Tag {
+  id: string
+  name: string
+  color: string | null
   createdAt: string
 }
 
@@ -25,6 +33,7 @@ export interface TeacherPaper {
   fileLink: string | null
   source: string | null
   createdAt: string
+  tags: Tag[]
 }
 
 export interface QuestionPoolMember {
@@ -57,6 +66,7 @@ export interface DbMeeting {
   video_link: string | null
   paper_title: string | null
   paper_link: string | null
+  teacher_paper_id: string | null
   notes: string | null
   location: string
   start_time: string
@@ -69,6 +79,13 @@ export interface DbTeacherPaper {
   paper_name: string
   file_link: string | null
   source: string | null
+  created_at: string
+}
+
+export interface DbTag {
+  id: string
+  name: string
+  color: string | null
   created_at: string
 }
 
@@ -96,6 +113,7 @@ export function toMeeting(row: DbMeeting): Meeting {
     videoLink: row.video_link,
     paperTitle: row.paper_title,
     paperLink: row.paper_link,
+    teacherPaperId: row.teacher_paper_id,
     notes: row.notes,
     location: row.location,
     startTime: row.start_time,
@@ -103,7 +121,19 @@ export function toMeeting(row: DbMeeting): Meeting {
   }
 }
 
-export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
+export function toTag(row: DbTag): Tag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: row.created_at,
+  }
+}
+
+export function toTeacherPaper(
+  row: DbTeacherPaper,
+  tags: Tag[] = []
+): TeacherPaper {
   return {
     id: row.id,
     providedDate: row.provided_date,
@@ -111,6 +141,7 @@ export function toTeacherPaper(row: DbTeacherPaper): TeacherPaper {
     fileLink: row.file_link,
     source: row.source,
     createdAt: row.created_at,
+    tags,
   }
 }
 

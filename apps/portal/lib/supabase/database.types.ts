@@ -700,131 +700,6 @@ export type Database = {
           },
         ]
       }
-      debt_expense_items: {
-        Row: {
-          amount: number
-          created_at: string
-          debtor_id: string
-          expense_id: string
-          id: string
-          paid_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          debtor_id: string
-          expense_id: string
-          id?: string
-          paid_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          debtor_id?: string
-          expense_id?: string
-          id?: string
-          paid_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_expense_items_debtor_id_fkey"
-            columns: ["debtor_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debt_expense_items_expense_id_fkey"
-            columns: ["expense_id"]
-            isOneToOne: false
-            referencedRelation: "debt_expenses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debt_expenses: {
-        Row: {
-          created_at: string
-          creator_id: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_expenses_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      debt_settlements: {
-        Row: {
-          amount: number
-          created_at: string
-          from_confirmed: boolean
-          from_user_id: string
-          id: string
-          period: string
-          settled_at: string | null
-          to_confirmed: boolean
-          to_user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id: string
-          id?: string
-          period: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          from_confirmed?: boolean
-          from_user_id?: string
-          id?: string
-          period?: string
-          settled_at?: string | null
-          to_confirmed?: boolean
-          to_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_settlements_from_user_id_fkey"
-            columns: ["from_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debt_settlements_to_user_id_fkey"
-            columns: ["to_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       gallery_activity_notifications: {
         Row: {
           actor_user_id: string
@@ -1266,6 +1141,27 @@ export type Database = {
           },
         ]
       }
+      meeting_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           created_at: string
@@ -1282,6 +1178,7 @@ export type Database = {
           question_group_number: number | null
           scheduled_date: string
           start_time: string
+          teacher_paper_id: string | null
           video_link: string | null
           video_uploaded: boolean
           week_label: string | null
@@ -1302,6 +1199,7 @@ export type Database = {
           question_group_number?: number | null
           scheduled_date: string
           start_time?: string
+          teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
@@ -1322,6 +1220,7 @@ export type Database = {
           question_group_number?: number | null
           scheduled_date?: string
           start_time?: string
+          teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
@@ -1340,6 +1239,13 @@ export type Database = {
             columns: ["presenter_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_teacher_paper_id_fkey"
+            columns: ["teacher_paper_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_papers"
             referencedColumns: ["id"]
           },
         ]
@@ -1491,6 +1397,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          deposit_account: string | null
           id: string
           image_path: string
           name: string
@@ -1500,6 +1407,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          deposit_account?: string | null
           id?: string
           image_path: string
           name: string
@@ -1509,6 +1417,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          deposit_account?: string | null
           id?: string
           image_path?: string
           name?: string
@@ -1659,6 +1568,39 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_paper_tags: {
+        Row: {
+          created_at: string
+          tag_id: string
+          teacher_paper_id: string
+        }
+        Insert: {
+          created_at?: string
+          tag_id: string
+          teacher_paper_id: string
+        }
+        Update: {
+          created_at?: string
+          tag_id?: string
+          teacher_paper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_paper_tags_teacher_paper_id_fkey"
+            columns: ["teacher_paper_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_paper_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_tags"
             referencedColumns: ["id"]
           },
         ]
@@ -1939,32 +1881,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      debt_confirm_settlement_from: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
-      debt_confirm_settlement_to: {
-        Args: { p_settlement_id: string }
-        Returns: undefined
-      }
-      debt_create_expense: {
-        Args: { p_description: string; p_items: Json; p_name: string }
-        Returns: string
-      }
-      debt_generate_monthly_settlements: { Args: never; Returns: undefined }
-      debt_mark_item_paid: {
-        Args: { p_item_id: string; p_paid: boolean }
-        Returns: undefined
-      }
-      debt_update_expense: {
-        Args: {
-          p_description: string
-          p_expense_id: string
-          p_items: Json
-          p_name: string
-        }
-        Returns: undefined
-      }
       gallery_admin_set_comment_pin: {
         Args: { p_comment_id: string; p_pinned: boolean }
         Returns: undefined
@@ -1993,10 +1909,6 @@ export type Database = {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
       }
-      is_debt_expense_debtor: {
-        Args: { expense_uuid: string }
-        Returns: boolean
-      }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }
       is_receipts_admin: { Args: never; Returns: boolean }
@@ -2004,6 +1916,18 @@ export type Database = {
       is_trip_admin: { Args: never; Returns: boolean }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_insert_week: {
+        Args: { p_at_meeting_id: string }
+        Returns: string
+      }
+      meetings_remove_from_pool: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_remove_week: {
+        Args: { p_at_meeting_id: string }
+        Returns: undefined
+      }
       meetings_replace_questioner: {
         Args: {
           p_meeting_id: string
@@ -2012,6 +1936,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      meetings_swap: { Args: { p_a: string; p_b: string }; Returns: undefined }
       meetings_sync_questioners: {
         Args: { p_meeting_id: string }
         Returns: undefined
