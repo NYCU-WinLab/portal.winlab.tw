@@ -37,7 +37,13 @@ import { ScheduleEditRow } from "./schedule-edit-row"
 function addOneWeek(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`)
   d.setDate(d.getDate() + 7)
-  return d.toISOString().slice(0, 10)
+  // Format in LOCAL time: toISOString() converts to UTC, which rolls the date
+  // back a day in UTC+ timezones (e.g. Asia/Taipei), so "+7 days" from a Friday
+  // would land on the Thursday and break the weekly cadence.
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 function nextWeekLabel(meetings: Meeting[]): string {
