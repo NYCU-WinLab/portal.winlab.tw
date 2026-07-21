@@ -1,7 +1,7 @@
 // Pure logic for "can this reading-list paper be picked" — no React, no I/O, so
 // it's unit-testable and shared by the edit dialog (per-meeting availability)
 // and the papers tab (global cooldown status). Mirrors the DB rules in
-// 2026-07-17-meetings-paper-from-reading-list.sql: a 365-day cooldown between
+// 20260717051239_meetings-paper-from-reading-list.sql: a 365-day cooldown between
 // any two meetings sharing a paper, plus no-self-repeat per student.
 
 export const COOLDOWN_DAYS = 365
@@ -59,7 +59,8 @@ export function paperAvailabilityForMeeting(
   // Self-repeat is permanent, so it takes precedence over a cooldown window.
   if (opts.presenterUserId) {
     const mine = others.find((a) => a.presenterUserId === opts.presenterUserId)
-    if (mine) return { available: false, reason: "self-repeat", blockedBy: mine }
+    if (mine)
+      return { available: false, reason: "self-repeat", blockedBy: mine }
   }
 
   // Cooldown: any sharing meeting strictly within 365 days (past or future).
@@ -112,6 +113,7 @@ export function paperCooldownStatus(
       until = free
     }
   }
-  if (blocker) return { inCooldown: true, blockedBy: blocker, cooldownUntil: until }
+  if (blocker)
+    return { inCooldown: true, blockedBy: blocker, cooldownUntil: until }
   return { inCooldown: false }
 }
