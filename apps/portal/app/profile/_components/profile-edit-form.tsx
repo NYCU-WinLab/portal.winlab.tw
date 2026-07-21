@@ -44,14 +44,22 @@ export function ProfileEditForm({
     if (Object.keys(update).length === 0) return
 
     startTransition(async () => {
-      const result = await updateMyProfile(update)
-      if (result.ok) {
-        setErrors({})
-        toast.success("個人資料已更新")
-        return
+      try {
+        const result = await updateMyProfile(update)
+        if (result.ok) {
+          setErrors({})
+          toast.success("個人資料已更新")
+          return
+        }
+        setErrors(result.errors)
+        toast.error(result.errors._form ?? "部分欄位未通過驗證")
+      } catch (err) {
+        // The action itself rejecting (network drop, deploy skew) escapes the
+        // transition and hits the root error boundary — which would replace
+        // all of /profile over a failed save. Keep it a toast.
+        console.error("[profile] update action failed", err)
+        toast.error("儲存失敗,請檢查網路後再試。")
       }
-      setErrors(result.errors)
-      toast.error(result.errors._form ?? "部分欄位未通過驗證")
     })
   }
 

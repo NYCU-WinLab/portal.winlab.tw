@@ -39,6 +39,40 @@ export function keycloakAdminConfigured(): boolean {
   return adminEnv() !== null
 }
 
+// Carries which leg of the admin round trip failed. The distinction matters to
+// the caller: a 4xx on the PUT means Keycloak rejected the user's data and
+// retrying changes nothing, while anything else is an infrastructure problem
+// the user can reasonably retry.
+export class KeycloakAdminError extends Error {
+  constructor(
+    readonly operation: "token" | "get" | "put",
+    readonly status: number,
+    readonly detail?: string
+  ) {
+    super(
+      `keycloak ${operation} failed: ${status}${detail ? ` — ${detail}` : ""}`
+    )
+    this.name = "KeycloakAdminError"
+  }
+}
+
+export function isRejectedByKeycloak(err: unknown): boolean {
+  return (
+    err instanceof KeycloakAdminError &&
+    err.operation === "put" &&
+    err.status >= 400 &&
+    err.status < 500
+  )
+}
+
+async function errorDetail(res: Response): Promise<string | undefined> {
+  try {
+    return (await res.text()).slice(0, 500) || undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function adminToken(env: KeycloakAdminEnv): Promise<string> {
   const res = await fetch(
     `${env.url}/realms/${encodeURIComponent(env.realm)}/protocol/openid-connect/token`,
@@ -53,10 +87,9 @@ async function adminToken(env: KeycloakAdminEnv): Promise<string> {
       cache: "no-store",
     }
   )
-  if (!res.ok) throw new Error(`keycloak token request failed: ${res.status}`)
+  if (!res.ok) throw new KeycloakAdminError("token", res.status)
   const data = (await res.json()) as { access_token?: string }
-  if (!data.access_token)
-    throw new Error("keycloak token response missing access_token")
+  if (!data.access_token) throw new KeycloakAdminError("token", res.status)
   return data.access_token
 }
 
@@ -64,20 +97,43 @@ function adminUserUrl(env: KeycloakAdminEnv, sub: string): string {
   return `${env.url}/admin/realms/${encodeURIComponent(env.realm)}/users/${encodeURIComponent(sub)}`
 }
 
+// Three states, because "no edit section" and "edit section is temporarily
+// broken" are different things to a member staring at the page. Never throws:
+// /profile must render even when Keycloak is unreachable, otherwise an IdP
+// blip takes down the stats and the sign-out button with it.
+export type EditableProfileResult =
+  | { status: "ok"; profile: Record<EditableProfileField, string> }
+  | { status: "unconfigured" }
+  | { status: "unavailable" }
+
 export async function getEditableProfile(
   sub: string
-): Promise<Record<EditableProfileField, string> | null> {
+): Promise<EditableProfileResult> {
   const env = adminEnv()
-  if (!env) return null
-  const token = await adminToken(env)
-  const res = await fetch(adminUserUrl(env, sub), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  })
-  if (!res.ok) return null
-  return profileFromRepresentation(
-    (await res.json()) as KeycloakUserRepresentation
-  )
+  if (!env) return { status: "unconfigured" }
+  try {
+    const token = await adminToken(env)
+    const res = await fetch(adminUserUrl(env, sub), {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+    if (!res.ok) {
+      console.error(
+        "[profile] keycloak read failed",
+        new KeycloakAdminError("get", res.status, await errorDetail(res))
+      )
+      return { status: "unavailable" }
+    }
+    return {
+      status: "ok",
+      profile: profileFromRepresentation(
+        (await res.json()) as KeycloakUserRepresentation
+      ),
+    }
+  } catch (err) {
+    console.error("[profile] keycloak read failed", err)
+    return { status: "unavailable" }
+  }
 }
 
 // GET-merge-PUT because Keycloak's admin PUT replaces the attribute map
@@ -95,7 +151,11 @@ export async function updateKeycloakProfile(
     cache: "no-store",
   })
   if (!getRes.ok)
-    throw new Error(`keycloak user fetch failed: ${getRes.status}`)
+    throw new KeycloakAdminError(
+      "get",
+      getRes.status,
+      await errorDetail(getRes)
+    )
   const rep = (await getRes.json()) as KeycloakUserRepresentation
   const putRes = await fetch(adminUserUrl(env, sub), {
     method: "PUT",
@@ -106,7 +166,11 @@ export async function updateKeycloakProfile(
     body: JSON.stringify(applyProfileToRepresentation(rep, update)),
   })
   if (!putRes.ok)
-    throw new Error(`keycloak user update failed: ${putRes.status}`)
+    throw new KeycloakAdminError(
+      "put",
+      putRes.status,
+      await errorDetail(putRes)
+    )
 }
 
 export function profileFromRepresentation(

@@ -75,6 +75,38 @@ describe("validateProfileUpdate — unknown keys are rejected", () => {
       expect(result.errors.firstName).toBeUndefined()
     }
   })
+
+  // Regression: with a plain-object error bag, errors["__proto__"] = "…" hits
+  // the inherited setter, creates no own key, and the whole payload passes.
+  // JSON.parse is what produces an own __proto__ property — an object literal
+  // would not reproduce the bug.
+  test("__proto__ is rejected, not silently swallowed", () => {
+    const result = validateProfileUpdate(
+      JSON.parse('{"__proto__":"evil","phone":"0912345678"}')
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.errors.__proto__).toBeDefined()
+    }
+  })
+
+  test("__proto__ as the only key is rejected", () => {
+    const result = validateProfileUpdate(JSON.parse('{"__proto__":"evil"}'))
+    expect(result.ok).toBe(false)
+  })
+
+  test("constructor is rejected", () => {
+    const result = validateProfileUpdate(JSON.parse('{"constructor":"x"}'))
+    expect(result.ok).toBe(false)
+  })
+
+  test("account-takeover-shaped keys are rejected", () => {
+    for (const key of ["sub", "id", "user_id", "enabled", "emailVerified"]) {
+      const result = validateProfileUpdate({ [key]: "victim" })
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.errors[key]).toBeDefined()
+    }
+  })
 })
 
 describe("validateProfileUpdate — non-string values", () => {

@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import {
   applyProfileToRepresentation,
+  isRejectedByKeycloak,
+  KeycloakAdminError,
   keycloakSubFromIdentities,
   profileFromRepresentation,
   type KeycloakUserRepresentation,
@@ -127,5 +129,36 @@ describe("keycloakSubFromIdentities", () => {
     )
     expect(keycloakSubFromIdentities([])).toBe(null)
     expect(keycloakSubFromIdentities(undefined)).toBe(null)
+  })
+})
+
+describe("isRejectedByKeycloak", () => {
+  test("a 4xx on the write is a permanent rejection", () => {
+    expect(isRejectedByKeycloak(new KeycloakAdminError("put", 400))).toBe(true)
+    expect(isRejectedByKeycloak(new KeycloakAdminError("put", 409))).toBe(true)
+  })
+
+  test("a 5xx on the write is retryable, not a rejection", () => {
+    expect(isRejectedByKeycloak(new KeycloakAdminError("put", 502))).toBe(false)
+  })
+
+  // A 401 from the token endpoint is a misconfigured service account, not bad
+  // user input — telling the member to fix their field formats would misdirect.
+  test("token and read failures are never data rejections", () => {
+    expect(isRejectedByKeycloak(new KeycloakAdminError("token", 401))).toBe(
+      false
+    )
+    expect(isRejectedByKeycloak(new KeycloakAdminError("get", 404))).toBe(false)
+  })
+
+  test("unrelated errors are not rejections", () => {
+    expect(isRejectedByKeycloak(new Error("boom"))).toBe(false)
+    expect(isRejectedByKeycloak(undefined)).toBe(false)
+  })
+
+  test("carries the detail into the message for server-side logs", () => {
+    const err = new KeycloakAdminError("put", 400, "attribute not declared")
+    expect(err.message).toContain("400")
+    expect(err.message).toContain("attribute not declared")
   })
 })

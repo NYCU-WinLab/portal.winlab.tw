@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import {
+  isRejectedByKeycloak,
   keycloakAdminConfigured,
   keycloakSubFromIdentities,
   updateKeycloakProfile,
@@ -42,7 +43,17 @@ export async function updateMyProfile(
     await updateKeycloakProfile(sub, validated.value)
   } catch (err) {
     console.error("[profile] keycloak update failed", err)
-    return { ok: false, errors: { _form: "更新失敗,請稍後再試。" } }
+    // A 4xx on the write is Keycloak rejecting the data itself (realm-level
+    // user-profile validation) — telling the member to retry later would be a
+    // lie, it will fail identically forever.
+    return {
+      ok: false,
+      errors: {
+        _form: isRejectedByKeycloak(err)
+          ? "Keycloak 拒絕了這筆資料,請確認欄位格式後再試。"
+          : "更新失敗,請稍後再試。",
+      },
+    }
   }
 
   revalidatePath("/profile")

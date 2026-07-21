@@ -4,6 +4,7 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { UserCard } from "@/components/user-card"
+import type { EditableProfileResult } from "@/lib/profile/keycloak"
 import {
   getEditableProfile,
   keycloakSubFromIdentities,
@@ -14,6 +15,7 @@ import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
 import { ProfileEditForm } from "./_components/profile-edit-form"
 import { ProfileStatsView } from "./_components/profile-stats"
+import { Section } from "./_components/profile-ui"
 
 export default async function ProfilePage() {
   const user = (await getCurrentUser())!
@@ -24,11 +26,15 @@ export default async function ProfilePage() {
   if (error) throw error
   const stats = data as ProfileStats | null
 
-  // Editable fields come from Keycloak, not Supabase. Hidden entirely when
-  // the session has no Keycloak identity or the admin env isn't configured.
+  // Editable fields come from Keycloak, not Supabase. Hidden entirely when the
+  // session has no Keycloak identity or the admin env isn't configured; shown
+  // as a disabled notice when Keycloak is configured but unreachable, so an IdP
+  // outage costs the edit section and nothing else on this page.
   const authUser = await getCurrentAuthUser()
   const sub = keycloakSubFromIdentities(authUser?.identities)
-  const editable = sub ? await getEditableProfile(sub) : null
+  const editable: EditableProfileResult = sub
+    ? await getEditableProfile(sub)
+    : { status: "unconfigured" }
 
   return (
     <PortalShell
@@ -54,7 +60,16 @@ export default async function ProfilePage() {
           avatarUrl={user.avatarUrl}
         />
 
-        {editable ? <ProfileEditForm initial={editable} /> : null}
+        {editable.status === "ok" ? (
+          <ProfileEditForm initial={editable.profile} />
+        ) : null}
+        {editable.status === "unavailable" ? (
+          <Section title="基本資料">
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              目前無法讀取 Keycloak 帳號資料,暫時不能編輯。稍後再試一次。
+            </p>
+          </Section>
+        ) : null}
 
         {stats ? (
           <ProfileStatsView stats={stats} />

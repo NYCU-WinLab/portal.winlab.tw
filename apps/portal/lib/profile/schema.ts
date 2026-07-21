@@ -131,7 +131,10 @@ export function validateProfileUpdate(
 ):
   | { ok: true; value: ProfileUpdate }
   | { ok: false; errors: Record<string, string> } {
-  const errors: Record<string, string> = {}
+  // Null-prototype: on a plain object literal, errors["__proto__"] = "…" hits
+  // the inherited setter instead of creating an own property, so a payload
+  // whose only bad key is __proto__ would count zero errors and pass.
+  const errors = Object.create(null) as Record<string, string>
   const value: ProfileUpdate = {}
 
   for (const key of Object.keys(input)) {
@@ -157,7 +160,9 @@ export function validateProfileUpdate(
   }
 
   if (Object.keys(errors).length > 0) {
-    return { ok: false, errors }
+    // Spread back onto a normal object — this crosses the Server Action
+    // boundary and a null-prototype object has no business being serialized.
+    return { ok: false, errors: { ...errors } }
   }
   return { ok: true, value }
 }
