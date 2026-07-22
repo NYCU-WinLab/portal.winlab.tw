@@ -10,7 +10,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(19);
+select plan(25);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -41,6 +41,9 @@ select throws_ok(
 select throws_ok(
   $$ select public.meetings_generate_semester(2040, '2040-09-06', 61, '[]'::jsonb) $$,
   'P0001', '週數必須介於 1 與 60 之間', 'rejects p_weeks above 60');
+select throws_ok(
+  $$ select public.meetings_generate_semester(2040, NULL::date, 4, '[]'::jsonb) $$,
+  'P0001', '缺少起始日期', 'rejects a null start date');
 reset role;
 
 -- ═══ basic 4-week generate (Thursday start, no holidays) ════════════════════
@@ -70,9 +73,11 @@ select is(
 -- ═══ holidays applied, neighbours stay normal ═══════════════════════════════
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+-- two on-cadence holidays (weeks 2 & 4) + one off-cadence date (a Friday that is
+-- not any generated week) to prove non-matching holidays are silently ignored.
 select public.meetings_generate_semester(
   2041, '2041-09-05', 4,
-  '[{"date":"2041-09-12","label":"月考週"},{"date":"2041-09-26","label":"教師節"}]'::jsonb);
+  '[{"date":"2041-09-12","label":"月考週"},{"date":"2041-09-26","label":"教師節"},{"date":"2041-09-13","label":"颱風假"}]'::jsonb);
 reset role;
 
 select is(
@@ -85,11 +90,20 @@ select is(
   (select presenter from public.meetings where year = 2041 and scheduled_date = '2041-09-12'),
   NULL, 'a holiday week has no presenter (reason lives in week_label)');
 select is(
+  (select week_label from public.meetings where year = 2041 and scheduled_date = '2041-09-26'),
+  '第4週(教師節)', 'the SECOND listed holiday is also applied: 第4週(教師節)');
+select is(
+  (select is_holiday from public.meetings where year = 2041 and scheduled_date = '2041-09-26'),
+  true, 'the second holiday date is flagged is_holiday too');
+select is(
   (select week_label from public.meetings where year = 2041 and scheduled_date = '2041-09-19'),
   '第3週', 'a week not in the holiday list stays a plain 第N週');
 select is(
   (select is_holiday from public.meetings where year = 2041 and scheduled_date = '2041-09-19'),
   false, 'a week not in the holiday list is not a holiday');
+select is(
+  (select count(*)::int from public.meetings where year = 2041 and scheduled_date = '2041-09-13'),
+  0, 'an off-cadence holiday date (matches no generated week) is silently ignored');
 
 -- ═══ skip existing rows (never overwrite), then idempotent re-run ═══════════
 insert into public.meetings (year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id)
@@ -107,6 +121,9 @@ select is(
   (select presenter from public.meetings where year = 2042 and scheduled_date = '2042-09-04'),
   '既有報告人', 'the pre-existing presenter is never overwritten');
 select is(
+  (select week_label from public.meetings where year = 2042 and scheduled_date = '2042-09-11'),
+  '第2週', 'numbering stays continuous across the skipped week (第2週, not restarted at 第1週)');
+select is(
   (select count(*)::int from public.meetings where year = 2042),
   3, 'the existing date is not duplicated (3 rows total, not 4)');
 
@@ -117,6 +134,7 @@ create temp table gen_again as
 reset role;
 
 select is((select (ret->>'inserted')::int from gen_again), 0, 're-running the same generate inserts nothing (idempotent)');
+select is((select (ret->>'skipped')::int from gen_again), 3, 're-running reports all 3 dates skipped');
 
 select * from finish();
 rollback;

@@ -15,13 +15,24 @@
 --
 -- Note: the CI db-test baseline does not contain these seeded rows, so this
 -- UPDATE matches zero rows there (a harmless no-op); it only reshapes prod data.
+--
+-- Deliberately conservative: only the two shapes we know exist are rewritten —
+--   * an exact 第N週 label (anchored ^第\d+週$) + reason in presenter → 第N週(原因)
+--   * an empty/null label + reason in presenter                      → 原因
+-- Any other holiday row (a non-empty label that is NOT a bare 第N週, e.g. a
+-- free-text activity name, sitting next to a different presenter value) is left
+-- untouched rather than risk (a) folding a real name into week_label and erasing
+-- it, or (b) double-wrapping an already-decorated 第N週(原因) label. The anchor +
+-- WHERE guard make the transform lossless and idempotent (re-runs match nothing
+-- once presenter is null).
 update public.meetings
 set
   week_label = case
-    when week_label ~ '第\d+週' then week_label || '(' || presenter || ')'
-    else coalesce(nullif(week_label, ''), presenter)
+    when week_label ~ '^第\d+週$' then week_label || '(' || presenter || ')'
+    else presenter
   end,
   presenter = null
 where is_holiday = true
   and presenter is not null
-  and presenter_user_id is null;
+  and presenter_user_id is null
+  and (week_label ~ '^第\d+週$' or nullif(week_label, '') is null);

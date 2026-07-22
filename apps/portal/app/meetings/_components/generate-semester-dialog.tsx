@@ -15,6 +15,7 @@ import { Label } from "@workspace/ui/components/label"
 
 import {
   useGenerateSemester,
+  useMeetings,
   type SemesterHoliday,
 } from "@/hooks/meetings/use-meetings"
 
@@ -45,21 +46,49 @@ function formatMd(dateStr: string): string {
 
 export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   const generate = useGenerateSemester()
+  // Cache hit — schedule-tab already fetched this year. Used to show which
+  // weeks the RPC will skip (dates that already exist) so a mis-picked start
+  // date can't silently produce a duplicate 第N週 schedule.
+  const { data: existing = [] } = useMeetings(year)
 
   const [startDate, setStartDate] = useState("")
   const [weeks, setWeeks] = useState(16)
   const [holidays, setHolidays] = useState<SemesterHoliday[]>([])
 
+  const weeksValid = Number.isInteger(weeks) && weeks >= 1 && weeks <= 60
+  const canSubmit = !!startDate && weeksValid && !generate.isPending
+
+  const existingDates = useMemo(
+    () => new Set(existing.map((m) => m.scheduledDate)),
+    [existing]
+  )
+
   const preview = useMemo(() => {
-    if (!startDate || weeks < 1) return []
-    const byDate = new Map(
-      holidays.filter((h) => h.date).map((h) => [h.date, h.label])
-    )
-    return Array.from({ length: Math.min(weeks, 60) }, (_, i) => {
+    if (!startDate || !weeksValid) return []
+    // First-occurrence wins per date, matching the server's `limit 1` scan, and
+    // the same (date + non-blank label) predicate submit() uses — so the preview
+    // never promises a holiday the server won't create.
+    const byDate = new Map<string, string>()
+    for (const h of holidays) {
+      const label = h.label.trim()
+      if (h.date && label && !byDate.has(h.date)) byDate.set(h.date, label)
+    }
+    return Array.from({ length: weeks }, (_, i) => {
       const date = addDays(startDate, i * 7)
-      return { no: i + 1, date, reason: byDate.get(date) ?? null }
+      return {
+        no: i + 1,
+        date,
+        reason: byDate.get(date) ?? null,
+        skip: existingDates.has(date),
+      }
     })
-  }, [startDate, weeks, holidays])
+  }, [startDate, weeks, weeksValid, holidays, existingDates])
+
+  // The year already has rows but none of them line up with the chosen cadence:
+  // the strongest signal that the start date is wrong and generate would append
+  // a parallel, duplicate-numbered schedule instead of filling this one.
+  const misaligned =
+    existing.length > 0 && preview.length > 0 && preview.every((w) => !w.skip)
 
   function setHoliday(i: number, patch: Partial<SemesterHoliday>) {
     setHolidays((hs) =>
@@ -68,7 +97,7 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   }
 
   function submit() {
-    if (!startDate || weeks < 1) return
+    if (!canSubmit) return
     generate.mutate(
       {
         year,
@@ -133,7 +162,7 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
             {holidays.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 無假期週。命中的日期會標成 <code>第N週(原因)</code>
-                、不排報告人。
+                ，不排報告人。
               </p>
             ) : (
               <div className="flex flex-col gap-2">
@@ -168,6 +197,13 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
             )}
           </div>
 
+          {misaligned && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              此 {year} 年度已有 {existing.length}{" "}
+              週排在其他日期，但沒有一週落在你選的日期上——請確認「第一週日期」，以免產生重複週次。
+            </p>
+          )}
+
           {preview.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <Label>預覽（已存在的日期會自動略過，不覆寫）</Label>
@@ -177,13 +213,18 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
                     key={w.no}
                     className={
                       "flex items-center justify-between border-b px-3 py-1 text-xs last:border-b-0 " +
-                      (w.reason ? "text-muted-foreground" : "")
+                      (w.skip || w.reason ? "text-muted-foreground" : "")
                     }
                   >
                     <span className="font-medium">
-                      第{w.no}週{w.reason ? `（${w.reason}）` : ""}
+                      第{w.no}週{w.reason ? `(${w.reason})` : ""}
                     </span>
-                    <span>{formatMd(w.date)}</span>
+                    <span className="flex items-center gap-2">
+                      {w.skip && (
+                        <span className="text-[10px]">已存在・略過</span>
+                      )}
+                      {formatMd(w.date)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -199,10 +240,7 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
           >
             取消
           </Button>
-          <Button
-            onClick={submit}
-            disabled={!startDate || weeks < 1 || generate.isPending}
-          >
+          <Button onClick={submit} disabled={!canSubmit}>
             {generate.isPending ? "產生中…" : "產生"}
           </Button>
         </DialogFooter>
