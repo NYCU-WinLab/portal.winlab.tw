@@ -1,7 +1,8 @@
 // The three schedule row kinds, derived from two mutually-exclusive booleans
-// (is_holiday / is_speaker). This is the single source of truth for the 3-way
-// type used by the add dialog, the edit dialog, and the inline edit row — so the
-// "which flag means what" logic lives in exactly one place.
+// (is_holiday / is_speaker). Single source of truth for the 3-way type used by
+// the add- and edit-meeting dialogs, so the "which flag means what" logic lives
+// in one place. (The inline edit row branches on the raw flags directly, since
+// it only needs the anchored / not-anchored distinction.)
 
 export type MeetingType = "presentation" | "speaker" | "holiday"
 

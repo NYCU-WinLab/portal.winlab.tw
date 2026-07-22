@@ -12,21 +12,11 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { useAddMeeting } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
-import {
-  MEETING_TYPE_LABELS,
-  typeFlags,
-  type MeetingType,
-} from "@/lib/meetings/meeting-type"
+import { typeFlags, type MeetingType } from "@/lib/meetings/meeting-type"
 
+import { MeetingTypeSelect } from "./meeting-type-select"
 import { PresenterSelect } from "./presenter-select"
 
 interface Props {
@@ -104,25 +94,7 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>類型</Label>
-            <Select
-              value={type}
-              onValueChange={(v) => setType(v as MeetingType)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="presentation">
-                  {MEETING_TYPE_LABELS.presentation}
-                </SelectItem>
-                <SelectItem value="speaker">
-                  {MEETING_TYPE_LABELS.speaker}(外部講者)
-                </SelectItem>
-                <SelectItem value="holiday">
-                  {MEETING_TYPE_LABELS.holiday} / 暫停
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <MeetingTypeSelect value={type} onValueChange={setType} />
           </div>
 
           <div className="flex flex-col gap-1.5">

@@ -39,6 +39,50 @@ alter table public.meetings drop constraint if exists meetings_type_mutex;
 alter table public.meetings add constraint meetings_type_mutex
   check (not (is_holiday and is_speaker));
 
+-- Data-layer invariant: a speaker week is an external person with no account,
+-- so it must have a null presenter_user_id. This also closes an RLS gap — the
+-- meetings_update_own policy only pins presenter_user_id (not which columns
+-- change), so without this a non-admin could hand-craft a PATCH setting
+-- is_speaker=true on their own row; such a row (is_speaker=true + non-null
+-- presenter_user_id) is now rejected by this CHECK. Every legit write path sets
+-- presenter_user_id=null for speaker weeks, so they pass.
+alter table public.meetings drop constraint if exists meetings_speaker_no_user;
+alter table public.meetings add constraint meetings_speaker_no_user
+  check (not is_speaker or presenter_user_id is null);
+
+-- ── talk title survives the presentation→speaker switch ──────────────────────
+-- A speaker week keeps its talk title in paper_title with teacher_paper_id null.
+-- The reading-list sync trigger (20260717051239) cleared paper_title on ANY
+-- teacher_paper_id non-null→null transition, which silently wiped the talk title
+-- when an admin converted a paper-backed presentation straight into a speaker
+-- week (both changes land in one UPDATE, and this BEFORE trigger overrides NEW).
+-- Guard the clear with `not new.is_speaker` so a speaker week's app-supplied
+-- title survives; an ordinary un-pick (row stays a presentation) still clears.
+create or replace function public.meetings_sync_paper_from_teacher()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if new.teacher_paper_id is not null then
+    select tp.paper_name, tp.file_link
+      into new.paper_title, new.paper_link
+      from public.teacher_papers tp
+      where tp.id = new.teacher_paper_id;
+  elsif tg_op = 'UPDATE'
+        and old.teacher_paper_id is not null
+        and new.teacher_paper_id is null
+        and not new.is_speaker then
+    -- Paper un-picked (and not a switch to a speaker week, which carries its own
+    -- talk title in paper_title): clear the stale mirror.
+    new.paper_title := null;
+    new.paper_link := null;
+  end if;
+  return new;
+end;
+$function$;
+
 -- ── claim: a speaker week is not an open slot ────────────────────────────────
 create or replace function public.meetings_claim(p_meeting_id uuid)
 returns void
@@ -226,10 +270,10 @@ begin
   v_k := coalesce(array_length(v_ids, 1), 0);
   if v_k = 0 then return null; end if;
 
-  -- mint the trailing slot: last date + 7 (preserves the schedule's weekday, no
-  -- hard-coded Monday), skipping any already-occupied date (e.g. a holiday row).
-  -- from the last real PRESENTATION slot (exclude holidays AND speaker weeks,
-  -- which may sit chronologically after it), so the minted week keeps the
+  -- mint the trailing slot from the last real PRESENTATION slot: its date + 7
+  -- (preserves the schedule's weekday, no hard-coded Monday), skipping any
+  -- already-occupied date. Exclude holidays AND speaker weeks, which may sit
+  -- chronologically after the last presentation, so the minted week keeps the
   -- schedule's cadence.
   select max(scheduled_date) into v_max_date
   from public.meetings where year = v_year and not is_holiday and not is_speaker;

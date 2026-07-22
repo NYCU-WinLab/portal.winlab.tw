@@ -19,13 +19,6 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { toast } from "sonner"
 
 import {
@@ -38,7 +31,6 @@ import {
   usePaperAssignments,
 } from "@/hooks/meetings/use-teacher-papers"
 import {
-  MEETING_TYPE_LABELS,
   meetingType,
   typeFlags,
   type MeetingType,
@@ -49,6 +41,7 @@ import {
 } from "@/lib/meetings/papers"
 import type { Meeting } from "@/lib/meetings/types"
 
+import { MeetingTypeSelect } from "./meeting-type-select"
 import { PaperSelect } from "./paper-select"
 import { PresenterSelect } from "./presenter-select"
 import { QuestionersField } from "./questioners-field"
@@ -288,7 +281,15 @@ export function MeetingEditDialog({
             isPresentation && teacherPaperId !== "__none__"
               ? teacherPaperId
               : null,
-          paperTitle: isSpeaker ? talkTitle.trim() || null : undefined,
+          // Speaker → store the talk title. Leaving speaker mode → clear the
+          // stale talk title (else it lingers in the Paper column). Otherwise
+          // omit, so a normal week's paper_title stays trigger-derived from
+          // teacher_paper_id (and legacy free-text titles are untouched).
+          paperTitle: isSpeaker
+            ? talkTitle.trim() || null
+            : meeting.isSpeaker
+              ? null
+              : undefined,
           pptUploaded: !!pptLink,
           pptLink,
           videoUploaded: !!videoLink,
@@ -333,25 +334,7 @@ export function MeetingEditDialog({
             <>
               <div className="flex flex-col gap-1.5">
                 <Label>類型</Label>
-                <Select
-                  value={type}
-                  onValueChange={(v) => setType(v as MeetingType)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="presentation">
-                      {MEETING_TYPE_LABELS.presentation}
-                    </SelectItem>
-                    <SelectItem value="speaker">
-                      {MEETING_TYPE_LABELS.speaker}(外部講者)
-                    </SelectItem>
-                    <SelectItem value="holiday">
-                      {MEETING_TYPE_LABELS.holiday} / 暫停
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <MeetingTypeSelect value={type} onValueChange={setType} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>週次標籤</Label>

@@ -11,7 +11,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(45);
+select plan(53);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -392,6 +392,84 @@ select is(
   (select count(*)::int from public.meetings where year = 2032),
   4,
   'insert then remove leaves the original 2032 row count (speaker week never counted)');
+
+-- ═══ speaker weeks: invariant, questioners, trailing-mint, talk-title trigger ═
+-- CHECK meetings_speaker_no_user: a speaker week can't carry a presenter_user_id
+-- (closes the RLS gap where a non-admin PATCHes is_speaker onto their own row —
+-- that row would have a non-null presenter_user_id and is now rejected).
+select throws_ok(
+  $$ insert into public.meetings (year, scheduled_date, is_speaker, presenter, presenter_user_id)
+     values (2098, '2098-01-01', true, 'X', 'aaaaaaaa-0000-0000-0000-000000000002') $$,
+  '23514', NULL, 'a speaker week cannot have a presenter_user_id (CHECK meetings_speaker_no_user)');
+
+-- a speaker week is never assigned questioners
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
+  ('88888888-0000-0000-0000-000000000001', 2038, '演講', '2038-02-01', false, true, '講者A', null);
+select public.meetings_sync_questioners('88888888-0000-0000-0000-000000000001');
+select is(
+  (select count(*)::int from public.meeting_questioners where meeting_id = '88888888-0000-0000-0000-000000000001'),
+  0,
+  'meetings_sync_questioners never assigns questioners to a speaker week');
+
+-- trailing-slot mint excludes a speaker sitting AFTER the last presentation
+-- (mirror of the holiday regression): year 2037, speaker on 6/25.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
+  ('88888888-0000-0000-0000-000000000011', 2037, '第1週', '2037-03-05', false, false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('88888888-0000-0000-0000-000000000012', 2037, '第2週', '2037-03-12', false, false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('88888888-0000-0000-0000-000000000013', 2037, '演講', '2037-06-25', false, true,  '講者B', null);
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('88888888-0000-0000-0000-000000000011');
+reset role;
+select is(
+  (select scheduled_date from public.meetings where id = '88888888-0000-0000-0000-000000000012'),
+  '2037-03-19'::date,
+  'trailing week is minted from the last presentation (3/12 + 7), NOT the later speaker week (6/25)');
+select is(
+  (select scheduled_date from public.meetings where id = '88888888-0000-0000-0000-000000000013'),
+  '2037-06-25'::date,
+  'the later speaker week stays anchored to its real date through an insert');
+
+-- talk-title trigger — the load-bearing paper_title behavior for speaker weeks
+insert into public.teacher_papers (id, provided_date, paper_name, file_link) values
+  ('eeeeeeee-0000-0000-0000-000000000003', '2038-01-01', 'Paper Gamma', 'http://x/gamma'),
+  ('eeeeeeee-0000-0000-0000-000000000004', '2038-01-01', 'Paper Delta', 'http://x/delta');
+
+-- (a) a paper-backed presentation converted to a speaker week in ONE update keeps
+--     the app-supplied talk title (the trigger no longer clobbers it).
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('77777777-0000-0000-0000-000000000001', 2038, '第1週', '2038-03-04', false, 'P1', 'aaaaaaaa-0000-0000-0000-000000000002');
+update public.meetings set teacher_paper_id = 'eeeeeeee-0000-0000-0000-000000000003' where id = '77777777-0000-0000-0000-000000000001';
+update public.meetings set
+  teacher_paper_id = null, is_speaker = true, presenter = '講者C', presenter_user_id = null, paper_title = '演講題目C'
+  where id = '77777777-0000-0000-0000-000000000001';
+select is(
+  (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000001'),
+  '演講題目C',
+  'presentation→speaker in one UPDATE keeps the talk title (trigger guarded by not is_speaker)');
+
+-- (b) regression: un-picking a paper on a row that STAYS a presentation still clears
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('77777777-0000-0000-0000-000000000002', 2038, '第2週', '2038-03-11', false, 'P2', 'aaaaaaaa-0000-0000-0000-000000000003');
+update public.meetings set teacher_paper_id = 'eeeeeeee-0000-0000-0000-000000000004' where id = '77777777-0000-0000-0000-000000000002';
+update public.meetings set teacher_paper_id = null where id = '77777777-0000-0000-0000-000000000002';
+select is(
+  (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000002'),
+  NULL,
+  'un-picking a paper on a row that stays a presentation still clears paper_title');
+
+-- (c) a speaker week's free-text talk title survives insert and a later title edit
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id, paper_title) values
+  ('77777777-0000-0000-0000-000000000003', 2038, '演講', '2038-03-18', false, true, '講者E', null, '講題X');
+select is(
+  (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000003'),
+  '講題X',
+  'a speaker week keeps its talk title in paper_title on insert (teacher_paper_id null)');
+update public.meetings set paper_title = '講題Y' where id = '77777777-0000-0000-0000-000000000003';
+select is(
+  (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000003'),
+  '講題Y',
+  'editing a speaker week talk title persists (trigger leaves it, teacher_paper_id null)');
 
 select * from finish();
 rollback;
