@@ -336,6 +336,47 @@ export function useRemoveMeetingWeek() {
   })
 }
 
+// A `type` (not `interface`) so it satisfies the generated RPC's `Json` arg —
+// interfaces lack the implicit index signature that Json's object shape needs.
+export type SemesterHoliday = {
+  date: string
+  label: string
+}
+
+export function useGenerateSemester() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: {
+      year: number
+      startDate: string
+      weeks: number
+      holidays: SemesterHoliday[]
+    }): Promise<{ inserted: number; skipped: number }> => {
+      const { data, error } = await supabase.rpc("meetings_generate_semester", {
+        p_year: input.year,
+        p_start_date: input.startDate,
+        p_weeks: input.weeks,
+        p_holidays: input.holidays,
+      })
+      if (error) throw new Error(error.message || "產生排班失敗")
+      return data as { inserted: number; skipped: number }
+    },
+    onSuccess: ({ inserted, skipped }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+      toast.success(
+        skipped > 0
+          ? `已產生 ${inserted} 週（略過 ${skipped} 週已存在）`
+          : `已產生 ${inserted} 週`
+      )
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export function useSyncMeetingFiles() {
   const qc = useQueryClient()
 
