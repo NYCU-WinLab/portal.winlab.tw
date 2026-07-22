@@ -4,6 +4,7 @@ import { useState, type DragEvent } from "react"
 
 import { useQueryClient } from "@tanstack/react-query"
 import { IconDots, IconGripVertical } from "@tabler/icons-react"
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -122,6 +123,7 @@ export function ScheduleEditRow({
         weekLabel: next.weekLabel,
         scheduledDate: next.scheduledDate,
         isHoliday: next.isHoliday,
+        isSpeaker: next.isSpeaker,
         presenter: next.presenter,
         presenterUserId: next.presenterUserId,
         teacherPaperId: next.teacherPaperId,
@@ -144,7 +146,10 @@ export function ScheduleEditRow({
     )
   }
 
-  const draggable = !meeting.isHoliday && armed
+  // Holidays and speaker weeks are both anchored calendar events: not draggable,
+  // not swappable, and excluded from insert/remove shifts.
+  const anchored = meeting.isHoliday || meeting.isSpeaker
+  const draggable = !anchored && armed
 
   return (
     <TableRow
@@ -157,7 +162,7 @@ export function ScheduleEditRow({
         setArmed(false)
         onDragEnd()
       }}
-      onDragOver={(e) => onRowDragOver(e, meeting.id, meeting.isHoliday)}
+      onDragOver={(e) => onRowDragOver(e, meeting.id, anchored)}
       onDragLeave={() => onRowDragLeave(meeting.id)}
       onDrop={(e) => onRowDrop(e, meeting.id)}
       className={
@@ -176,13 +181,13 @@ export function ScheduleEditRow({
     >
       <TableCell
         className="w-8 p-0 text-center"
-        title={meeting.isHoliday ? undefined : "拖曳互換"}
+        title={anchored ? undefined : "拖曳互換"}
         onMouseDown={() => {
-          if (!meeting.isHoliday) setArmed(true)
+          if (!anchored) setArmed(true)
         }}
         onMouseUp={() => setArmed(false)}
       >
-        {!meeting.isHoliday && (
+        {!anchored && (
           <IconGripVertical className="mx-auto h-4 w-4 cursor-grab text-muted-foreground active:cursor-grabbing" />
         )}
       </TableCell>
@@ -210,19 +215,27 @@ export function ScheduleEditRow({
       </TableCell>
 
       <TableCell>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Switch
-            size="sm"
-            checked={meeting.isHoliday}
-            onCheckedChange={(v) => commit({ isHoliday: v })}
-          />
-          假期
-        </label>
+        {meeting.isSpeaker ? (
+          <Badge variant="secondary" className="font-normal">
+            演講
+          </Badge>
+        ) : (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Switch
+              size="sm"
+              checked={meeting.isHoliday}
+              onCheckedChange={(v) => commit({ isHoliday: v })}
+            />
+            假期
+          </label>
+        )}
       </TableCell>
 
       <TableCell className="font-medium">
         {meeting.isHoliday ? (
           <span className="text-xs text-muted-foreground">—</span>
+        ) : meeting.isSpeaker ? (
+          <span className="text-xs">{meeting.presenter ?? "—"}</span>
         ) : (
           <PresenterSelect
             users={users}
@@ -296,7 +309,7 @@ export function ScheduleEditRow({
             <DropdownMenuContent align="end">
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger
-                  disabled={meeting.isHoliday || otherWeeks.length === 0}
+                  disabled={anchored || otherWeeks.length === 0}
                 >
                   與…互換
                 </DropdownMenuSubTrigger>
@@ -316,7 +329,7 @@ export function ScheduleEditRow({
               </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                disabled={meeting.isHoliday}
+                disabled={anchored}
                 onSelect={() => onInsert(meeting.id)}
               >
                 在此插入一週
@@ -325,7 +338,7 @@ export function ScheduleEditRow({
                 trigger={
                   <DropdownMenuItem
                     variant="destructive"
-                    disabled={meeting.isHoliday}
+                    disabled={anchored}
                     onSelect={(e) => e.preventDefault()}
                   >
                     刪除此週(遞補)

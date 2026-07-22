@@ -11,7 +11,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(33);
+select plan(45);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -310,6 +310,88 @@ select is(
   (select scheduled_date from public.meetings where id = 'bbbbbbbb-0000-0000-0000-000000000003'),
   '2036-06-20'::date,
   'the trailing holiday stays anchored to its real date');
+
+-- ═══ speaker weeks (外部講者演講) ════════════════════════════════════════════
+-- A speaker week (is_speaker=true) is an anchored calendar event with no
+-- presenter_user_id — like a holiday it can't be claimed / swapped / shifted,
+-- but unlike a holiday it carries content. Year 2032 (Wednesday cadence) with a
+-- speaker (SK, 3/10) sitting between student weeks S1/S2/S3.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
+  ('99999999-0000-0000-0000-000000000001', 2032, '第1週', '2032-03-03', false, false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'), -- S1
+  ('99999999-0000-0000-0000-000000000002', 2032, '演講',  '2032-03-10', false, true,  '吳凱強老師', null),                          -- SK (speaker)
+  ('99999999-0000-0000-0000-000000000003', 2032, '第2週', '2032-03-17', false, false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'), -- S2
+  ('99999999-0000-0000-0000-000000000004', 2032, '第3週', '2032-03-24', false, false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'); -- S3
+
+-- CHECK: a row cannot be both holiday and speaker
+select throws_ok(
+  $$ insert into public.meetings (year, scheduled_date, is_holiday, is_speaker)
+     values (2099, '2099-01-01', true, true) $$,
+  '23514', NULL, 'a row cannot be both holiday and speaker (CHECK meetings_type_mutex)');
+
+-- a speaker week cannot be claimed (any authenticated user)
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000009","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_claim('99999999-0000-0000-0000-000000000002') $$,
+  'P0001', '演講週無法認領', 'a speaker week cannot be claimed');
+reset role;
+
+-- admin-gated: a speaker week can't be swapped, inserted-at, or removed
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_swap('99999999-0000-0000-0000-000000000002','99999999-0000-0000-0000-000000000001') $$,
+  'P0001', '演講週不可互換', 'a speaker week cannot be swapped');
+select throws_ok(
+  $$ select public.meetings_insert_week('99999999-0000-0000-0000-000000000002') $$,
+  'P0001', '不能在演講週插入', 'cannot insert at a speaker week');
+select throws_ok(
+  $$ select public.meetings_remove_week('99999999-0000-0000-0000-000000000002') $$,
+  'P0001', '不能刪除演講週', 'cannot remove a speaker week');
+
+-- insert at S1: postpone student weeks; the speaker week stays anchored
+select public.meetings_insert_week('99999999-0000-0000-0000-000000000001');
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '99999999-0000-0000-0000-000000000002'),
+  '2032-03-10'::date,
+  'the speaker week stays anchored to its real date through an insert');
+select is(
+  (select scheduled_date from public.meetings where id = '99999999-0000-0000-0000-000000000001'),
+  '2032-03-17'::date,
+  'S1 is postponed past the anchored speaker week (jumps 3/03 -> 3/17)');
+select is(
+  (select scheduled_date from public.meetings where id = '99999999-0000-0000-0000-000000000004'),
+  '2032-03-31'::date,
+  'the trailing week is minted from the last presentation (3/24 + 7), not the speaker week');
+select is(
+  (select count(*)::int from public.meetings
+   where year = 2032 and scheduled_date = '2032-03-03' and presenter_user_id is null
+     and not is_holiday and not is_speaker),
+  1,
+  'a blank presentation week is inserted at the freed earliest slot');
+
+-- remove the inserted blank: student weeks pull back, speaker still anchored
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_remove_week(
+  (select id from public.meetings
+   where year = 2032 and scheduled_date = '2032-03-03' and presenter_user_id is null and not is_speaker));
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '99999999-0000-0000-0000-000000000002'),
+  '2032-03-10'::date,
+  'the speaker week is still anchored after the pull-up');
+select is(
+  (select scheduled_date from public.meetings where id = '99999999-0000-0000-0000-000000000001'),
+  '2032-03-03'::date,
+  'remove pulls S1 back to its original date (insert/remove is the inverse, speaker untouched)');
+select is(
+  (select count(*)::int from public.meetings where year = 2032),
+  4,
+  'insert then remove leaves the original 2032 row count (speaker week never counted)');
 
 select * from finish();
 rollback;

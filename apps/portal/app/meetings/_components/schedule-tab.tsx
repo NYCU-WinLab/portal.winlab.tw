@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type DragEvent } from "react"
 
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import {
@@ -74,7 +75,11 @@ export function ScheduleTab({ year }: { year: number }) {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
   const showEditMode = isAdmin && editMode
-  const nonHolidayMeetings = meetings.filter((m) => !m.isHoliday)
+  // Swap candidates: only real student-presentation weeks — holidays and
+  // speaker weeks are anchored and can't be swapped.
+  const presentationMeetings = meetings.filter(
+    (m) => !m.isHoliday && !m.isSpeaker
+  )
 
   const currentWeekId = getCurrentMeetingId(meetings)
   const currentRowRef = useRef<HTMLTableRowElement>(null)
@@ -249,7 +254,9 @@ export function ScheduleTab({ year }: { year: number }) {
                     isCurrent={isCurrent}
                     isOwn={isOwn}
                     questioners={questioners?.get(m.id) ?? []}
-                    otherWeeks={nonHolidayMeetings.filter((o) => o.id !== m.id)}
+                    otherWeeks={presentationMeetings.filter(
+                      (o) => o.id !== m.id
+                    )}
                     users={users}
                     isDragging={dragId === m.id}
                     isDropTarget={dropTargetId === m.id}
@@ -289,7 +296,14 @@ export function ScheduleTab({ year }: { year: number }) {
                     })}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {m.presenter ?? "—"}
+                    <span className="flex items-center gap-1.5">
+                      {m.presenter ?? "—"}
+                      {m.isSpeaker && (
+                        <Badge variant="secondary" className="font-normal">
+                          演講
+                        </Badge>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell className="text-center">
                     <FileCell link={m.pptLink} />
@@ -337,17 +351,20 @@ export function ScheduleTab({ year }: { year: number }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      {user && !m.isHoliday && !m.presenterUserId && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                          disabled={claimMeeting.isPending}
-                          onClick={() => claimMeeting.mutate(m.id)}
-                        >
-                          認領
-                        </Button>
-                      )}
+                      {user &&
+                        !m.isHoliday &&
+                        !m.isSpeaker &&
+                        !m.presenterUserId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            disabled={claimMeeting.isPending}
+                            onClick={() => claimMeeting.mutate(m.id)}
+                          >
+                            認領
+                          </Button>
+                        )}
                       {(isAdmin || isOwn) && !m.isHoliday && (
                         <Button
                           size="sm"
