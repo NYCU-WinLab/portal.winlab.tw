@@ -4,6 +4,7 @@ export interface Meeting {
   weekLabel: string | null
   scheduledDate: string
   isHoliday: boolean
+  isSpeaker: boolean
   presenter: string | null
   presenterUserId: string | null
   pptUploaded: boolean
@@ -58,6 +59,7 @@ export interface DbMeeting {
   week_label: string | null
   scheduled_date: string
   is_holiday: boolean
+  is_speaker: boolean
   presenter: string | null
   presenter_user_id: string | null
   ppt_uploaded: boolean
@@ -105,6 +107,7 @@ export function toMeeting(row: DbMeeting): Meeting {
     weekLabel: row.week_label,
     scheduledDate: row.scheduled_date,
     isHoliday: row.is_holiday,
+    isSpeaker: row.is_speaker,
     presenter: row.presenter,
     presenterUserId: row.presenter_user_id,
     pptUploaded: row.ppt_uploaded,

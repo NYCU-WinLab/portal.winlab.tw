@@ -3,7 +3,6 @@
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,9 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useAddMeeting } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
+import { typeFlags, type MeetingType } from "@/lib/meetings/meeting-type"
 
+import { MeetingTypeSelect } from "./meeting-type-select"
 import { PresenterSelect } from "./presenter-select"
 
 interface Props {
@@ -30,35 +31,53 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
 
   const [weekLabel, setWeekLabel] = useState("")
   const [date, setDate] = useState("")
-  const [isHoliday, setIsHoliday] = useState(false)
+  const [type, setType] = useState<MeetingType>("presentation")
   const [presenterUserId, setPresenterUserId] = useState("__none__")
+  const [speakerName, setSpeakerName] = useState("")
+  const [talkTitle, setTalkTitle] = useState("")
+
+  const canSubmit =
+    !!date &&
+    !addMeeting.isPending &&
+    (type !== "speaker" || !!speakerName.trim())
+
+  function reset() {
+    setWeekLabel("")
+    setDate("")
+    setType("presentation")
+    setPresenterUserId("__none__")
+    setSpeakerName("")
+    setTalkTitle("")
+  }
 
   function handleAdd() {
-    if (!date) return
-    const selectedUser =
-      isHoliday || presenterUserId === "__none__"
-        ? null
-        : users.find((u) => u.id === presenterUserId)
+    if (!canSubmit) return
+    const flags = typeFlags(type)
+
+    const presenter =
+      type === "speaker"
+        ? speakerName.trim()
+        : type === "presentation" && presenterUserId !== "__none__"
+          ? (users.find((u) => u.id === presenterUserId)?.name ?? null)
+          : null
 
     addMeeting.mutate(
       {
         year,
         weekLabel: weekLabel || null,
         scheduledDate: date,
-        isHoliday,
-        presenter: selectedUser?.name ?? null,
-        presenterUserId: isHoliday
-          ? null
-          : presenterUserId === "__none__"
-            ? null
-            : presenterUserId,
+        isHoliday: flags.isHoliday,
+        isSpeaker: flags.isSpeaker,
+        presenter,
+        presenterUserId:
+          type === "presentation" && presenterUserId !== "__none__"
+            ? presenterUserId
+            : null,
+        paperTitle: type === "speaker" ? talkTitle.trim() || null : undefined,
       },
       {
         onSuccess: () => {
-          setWeekLabel("")
-          setDate("")
-          setIsHoliday(false)
-          setPresenterUserId("__none__")
+          reset()
           onOpenChange(false)
         },
       }
@@ -73,6 +92,11 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label>類型</Label>
+            <MeetingTypeSelect value={type} onValueChange={setType} />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label>週次標籤（選填）</Label>
             <Input
@@ -90,14 +114,8 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
               required
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={isHoliday}
-              onCheckedChange={(v) => setIsHoliday(!!v)}
-            />
-            假日 / 暫停（不需要報告人）
-          </label>
-          {!isHoliday && (
+
+          {type === "presentation" && (
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
               <PresenterSelect
@@ -106,6 +124,27 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
                 onSelect={setPresenterUserId}
               />
             </div>
+          )}
+
+          {type === "speaker" && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label>講者姓名</Label>
+                <Input
+                  value={speakerName}
+                  onChange={(e) => setSpeakerName(e.target.value)}
+                  placeholder="吳凱強老師"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>講題（選填）</Label>
+                <Input
+                  value={talkTitle}
+                  onChange={(e) => setTalkTitle(e.target.value)}
+                  placeholder="演講主題"
+                />
+              </div>
+            </>
           )}
         </div>
 
@@ -117,7 +156,7 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
           >
             取消
           </Button>
-          <Button onClick={handleAdd} disabled={!date || addMeeting.isPending}>
+          <Button onClick={handleAdd} disabled={!canSubmit}>
             {addMeeting.isPending ? "新增中…" : "新增"}
           </Button>
         </DialogFooter>

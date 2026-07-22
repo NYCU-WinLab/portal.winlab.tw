@@ -31,11 +31,17 @@ import {
   usePaperAssignments,
 } from "@/hooks/meetings/use-teacher-papers"
 import {
+  meetingType,
+  typeFlags,
+  type MeetingType,
+} from "@/lib/meetings/meeting-type"
+import {
   paperAvailabilityForMeeting,
   type PaperAvailability,
 } from "@/lib/meetings/papers"
 import type { Meeting } from "@/lib/meetings/types"
 
+import { MeetingTypeSelect } from "./meeting-type-select"
 import { PaperSelect } from "./paper-select"
 import { PresenterSelect } from "./presenter-select"
 import { QuestionersField } from "./questioners-field"
@@ -132,11 +138,17 @@ export function MeetingEditDialog({
 
   const [weekLabel, setWeekLabel] = useState(meeting.weekLabel ?? "")
   const [date, setDate] = useState(meeting.scheduledDate)
-  const [isHoliday, setIsHoliday] = useState(meeting.isHoliday)
+  const [type, setType] = useState<MeetingType>(meetingType(meeting))
   const [location, setLocation] = useState(meeting.location)
   const [startTime, setStartTime] = useState(meeting.startTime)
   const [presenterUserId, setPresenterUserId] = useState(
     meeting.presenterUserId ?? "__none__"
+  )
+  const [speakerName, setSpeakerName] = useState(
+    meeting.isSpeaker ? (meeting.presenter ?? "") : ""
+  )
+  const [talkTitle, setTalkTitle] = useState(
+    meeting.isSpeaker ? (meeting.paperTitle ?? "") : ""
   )
   const [teacherPaperId, setTeacherPaperId] = useState(
     meeting.teacherPaperId ?? "__none__"
@@ -147,8 +159,16 @@ export function MeetingEditDialog({
   const [pptUploading, setPptUploading] = useState(false)
   const [videoChecking, setVideoChecking] = useState(false)
 
+  // In the read-only view students only reach the edit button for their own
+  // presentation week, so the 3-way type selector is admin-only; a non-admin
+  // always edits a plain presentation.
+  const effectiveType: MeetingType = isAdmin ? type : "presentation"
+  const isPresentation = effectiveType === "presentation"
+  const isSpeaker = effectiveType === "speaker"
+
   const selectedPaper = papers.find((p) => p.id === teacherPaperId) ?? null
   const paperTitle = selectedPaper?.paperName ?? ""
+  const uploadTitle = isSpeaker ? talkTitle : paperTitle
 
   // Which reading-list papers this meeting can pick, given its date + presenter:
   // 365-day cooldown against every other meeting holding the paper, plus the
@@ -187,10 +207,12 @@ export function MeetingEditDialog({
     if (!open) return
     setWeekLabel(meeting.weekLabel ?? "")
     setDate(meeting.scheduledDate)
-    setIsHoliday(meeting.isHoliday)
+    setType(meetingType(meeting))
     setLocation(meeting.location)
     setStartTime(meeting.startTime)
     setPresenterUserId(meeting.presenterUserId ?? "__none__")
+    setSpeakerName(meeting.isSpeaker ? (meeting.presenter ?? "") : "")
+    setTalkTitle(meeting.isSpeaker ? (meeting.paperTitle ?? "") : "")
     setTeacherPaperId(meeting.teacherPaperId ?? "__none__")
     setPptLink(meeting.pptLink)
     setVideoLink(meeting.videoLink)
@@ -200,7 +222,7 @@ export function MeetingEditDialog({
 
   async function uploadFile(
     file: File,
-    type: "ppt" | "video",
+    fileType: "ppt" | "video",
     setUploading: (v: boolean) => void,
     setLink: (url: string) => void
   ) {
@@ -209,9 +231,9 @@ export function MeetingEditDialog({
       const fd = new FormData()
       fd.append("file", file)
       fd.append("year", String(meeting.year))
-      fd.append("type", type)
-      if (type === "ppt") {
-        fd.append("paperTitle", paperTitle)
+      fd.append("type", fileType)
+      if (fileType === "ppt") {
+        fd.append("paperTitle", uploadTitle)
         fd.append("date", date)
       }
       const res = await fetch("/api/meetings/upload", {
@@ -234,36 +256,71 @@ export function MeetingEditDialog({
       presenterUserId === "__none__"
         ? null
         : users.find((u) => u.id === presenterUserId)
-    const common = {
-      id: meeting.id,
-      presenter: selectedUser?.name ?? null,
-      presenterUserId: presenterUserId === "__none__" ? null : presenterUserId,
-      teacherPaperId: teacherPaperId === "__none__" ? null : teacherPaperId,
-      pptUploaded: !!pptLink,
-      pptLink,
-      videoUploaded: !!videoLink,
-      videoLink,
-      notes: notes || null,
-    }
 
     if (isAdmin) {
+      const flags = typeFlags(effectiveType)
+      const resolvedPresenter = isSpeaker
+        ? speakerName.trim() || null
+        : isPresentation
+          ? (selectedUser?.name ?? null)
+          : null
+
       updateAdmin.mutate(
         {
-          ...common,
+          id: meeting.id,
           weekLabel: weekLabel || null,
           scheduledDate: date,
-          isHoliday,
+          isHoliday: flags.isHoliday,
+          isSpeaker: flags.isSpeaker,
+          presenter: resolvedPresenter,
+          presenterUserId:
+            isPresentation && presenterUserId !== "__none__"
+              ? presenterUserId
+              : null,
+          teacherPaperId:
+            isPresentation && teacherPaperId !== "__none__"
+              ? teacherPaperId
+              : null,
+          // Speaker → store the talk title. Leaving speaker mode → clear the
+          // stale talk title (else it lingers in the Paper column). Otherwise
+          // omit, so a normal week's paper_title stays trigger-derived from
+          // teacher_paper_id (and legacy free-text titles are untouched).
+          paperTitle: isSpeaker
+            ? talkTitle.trim() || null
+            : meeting.isSpeaker
+              ? null
+              : undefined,
+          pptUploaded: !!pptLink,
+          pptLink,
+          videoUploaded: !!videoLink,
+          videoLink,
+          notes: notes || null,
           location: location || "EC 411",
           startTime: startTime || "15:30",
         },
         { onSuccess: () => onOpenChange(false) }
       )
     } else {
-      updateOwn.mutate(common, { onSuccess: () => onOpenChange(false) })
+      updateOwn.mutate(
+        {
+          id: meeting.id,
+          presenter: selectedUser?.name ?? null,
+          presenterUserId:
+            presenterUserId === "__none__" ? null : presenterUserId,
+          teacherPaperId: teacherPaperId === "__none__" ? null : teacherPaperId,
+          pptUploaded: !!pptLink,
+          pptLink,
+          videoUploaded: !!videoLink,
+          videoLink,
+          notes: notes || null,
+        },
+        { onSuccess: () => onOpenChange(false) }
+      )
     }
   }
 
   const isPending = updateOwn.isPending || updateAdmin.isPending
+  const canSave = !isSpeaker || !!speakerName.trim()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -275,6 +332,10 @@ export function MeetingEditDialog({
         <div className="flex min-w-0 flex-col gap-4">
           {isAdmin && (
             <>
+              <div className="flex flex-col gap-1.5">
+                <Label>類型</Label>
+                <MeetingTypeSelect value={type} onValueChange={setType} />
+              </div>
               <div className="flex flex-col gap-1.5">
                 <Label>週次標籤</Label>
                 <Input
@@ -291,13 +352,6 @@ export function MeetingEditDialog({
                   onChange={(e) => setDate(e.target.value)}
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={isHoliday}
-                  onCheckedChange={(v) => setIsHoliday(!!v)}
-                />
-                假日 / 暫停（不需要報告人）
-              </label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <Label>地點</Label>
@@ -316,10 +370,13 @@ export function MeetingEditDialog({
                   />
                 </div>
               </div>
-              <QuestionersField meetingId={meeting.id} year={meeting.year} />
+              {isPresentation && (
+                <QuestionersField meetingId={meeting.id} year={meeting.year} />
+              )}
             </>
           )}
-          {!isHoliday && (
+
+          {isPresentation && (
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
               <PresenterSelect
@@ -330,26 +387,49 @@ export function MeetingEditDialog({
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Paper（限老師 Papers 清單）</Label>
-            <PaperSelect
-              papers={papers}
-              availability={availability}
-              currentPaperId={meeting.teacherPaperId}
-              value={teacherPaperId}
-              onSelect={setTeacherPaperId}
-            />
-            {selectedPaper?.fileLink && (
-              <a
-                href={selectedPaper.fileLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:underline"
-              >
-                開啟論文連結
-              </a>
-            )}
-          </div>
+          {isSpeaker && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label>講者姓名</Label>
+                <Input
+                  value={speakerName}
+                  onChange={(e) => setSpeakerName(e.target.value)}
+                  placeholder="吳凱強老師"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>講題（選填）</Label>
+                <Input
+                  value={talkTitle}
+                  onChange={(e) => setTalkTitle(e.target.value)}
+                  placeholder="演講主題"
+                />
+              </div>
+            </>
+          )}
+
+          {isPresentation && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Paper（限老師 Papers 清單）</Label>
+              <PaperSelect
+                papers={papers}
+                availability={availability}
+                currentPaperId={meeting.teacherPaperId}
+                value={teacherPaperId}
+                onSelect={setTeacherPaperId}
+              />
+              {selectedPaper?.fileLink && (
+                <a
+                  href={selectedPaper.fileLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:underline"
+                >
+                  開啟論文連結
+                </a>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 rounded-md border p-3">
             <FileUploadField
@@ -418,7 +498,7 @@ export function MeetingEditDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isPending || pptUploading || videoChecking}
+            disabled={isPending || pptUploading || videoChecking || !canSave}
           >
             {isPending ? "儲存中…" : "儲存"}
           </Button>

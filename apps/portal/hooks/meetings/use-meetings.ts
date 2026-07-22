@@ -133,9 +133,11 @@ export function useAdminUpdateMeeting() {
       weekLabel,
       scheduledDate,
       isHoliday,
+      isSpeaker,
       presenter,
       presenterUserId,
       teacherPaperId,
+      paperTitle,
       pptUploaded,
       pptLink,
       videoUploaded,
@@ -148,9 +150,11 @@ export function useAdminUpdateMeeting() {
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
+      isSpeaker: boolean
       presenter: string | null
       presenterUserId: string | null
       teacherPaperId: string | null
+      paperTitle?: string | null
       pptUploaded: boolean
       pptLink: string | null
       videoUploaded: boolean
@@ -165,6 +169,7 @@ export function useAdminUpdateMeeting() {
           week_label: weekLabel,
           scheduled_date: scheduledDate,
           is_holiday: isHoliday,
+          is_speaker: isSpeaker,
           presenter,
           presenter_user_id: presenterUserId,
           teacher_paper_id: teacherPaperId,
@@ -175,6 +180,10 @@ export function useAdminUpdateMeeting() {
           notes,
           location,
           start_time: startTime,
+          // Speaker weeks keep their talk title in paper_title (teacher_paper_id
+          // null → sync trigger leaves it). Only sent when provided so a normal
+          // week's paper_title stays trigger-derived from teacher_paper_id.
+          ...(paperTitle !== undefined ? { paper_title: paperTitle } : {}),
         })
         .eq("id", id)
       if (error) throw new Error(paperErrorMessage(error))
@@ -205,8 +214,10 @@ export function useAddMeeting() {
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
+      isSpeaker?: boolean
       presenter: string | null
       presenterUserId: string | null
+      paperTitle?: string | null
     }) => {
       const { data, error } = await supabase
         .from(TABLE)
@@ -215,8 +226,15 @@ export function useAddMeeting() {
           week_label: row.weekLabel,
           scheduled_date: row.scheduledDate,
           is_holiday: row.isHoliday,
+          is_speaker: row.isSpeaker ?? false,
           presenter: row.presenter,
           presenter_user_id: row.presenterUserId,
+          // Talk title lives in paper_title for a speaker week (teacher_paper_id
+          // stays null, so the sync trigger leaves this value alone). Only sent
+          // when provided so a normal week's paper_title is trigger-governed.
+          ...(row.paperTitle !== undefined
+            ? { paper_title: row.paperTitle }
+            : {}),
         })
         .select("id")
         .single()

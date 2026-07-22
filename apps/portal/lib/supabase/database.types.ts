@@ -1167,6 +1167,7 @@ export type Database = {
           created_at: string
           id: string
           is_holiday: boolean
+          is_speaker: boolean
           location: string
           notes: string | null
           paper_link: string | null
@@ -1188,6 +1189,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_holiday?: boolean
+          is_speaker?: boolean
           location?: string
           notes?: string | null
           paper_link?: string | null
@@ -1209,6 +1211,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_holiday?: boolean
+          is_speaker?: boolean
           location?: string
           notes?: string | null
           paper_link?: string | null

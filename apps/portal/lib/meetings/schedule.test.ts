@@ -9,6 +9,7 @@ function meeting(partial: Partial<Meeting> & { id: string }): Meeting {
     weekLabel: null,
     scheduledDate: "2026-01-01",
     isHoliday: false,
+    isSpeaker: false,
     presenter: null,
     presenterUserId: null,
     pptUploaded: false,
