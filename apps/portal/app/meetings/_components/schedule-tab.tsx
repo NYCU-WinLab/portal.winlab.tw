@@ -32,6 +32,7 @@ import { getCurrentMeetingId } from "@/lib/meetings/schedule"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { FileCell } from "./file-cell"
+import { GenerateSemesterDialog } from "./generate-semester-dialog"
 import { MeetingEditDialog } from "./meeting-edit-dialog"
 import { ScheduleEditRow } from "./schedule-edit-row"
 
@@ -71,6 +72,7 @@ export function ScheduleTab({ year }: { year: number }) {
 
   const [editTarget, setEditTarget] = useState<Meeting | null>(null)
   const [editMode, setEditMode] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
@@ -194,13 +196,24 @@ export function ScheduleTab({ year }: { year: number }) {
     <div className="flex flex-col gap-4">
       {isAdmin && (
         <div className="flex items-center justify-between gap-2">
-          <Button
-            size="sm"
-            variant={editMode ? "default" : "outline"}
-            onClick={toggleEditMode}
-          >
-            編輯模式
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={editMode ? "default" : "outline"}
+              onClick={toggleEditMode}
+            >
+              編輯模式
+            </Button>
+            {showEditMode && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setGenerateOpen(true)}
+              >
+                產生整學期
+              </Button>
+            )}
+          </div>
           {editMode && (
             <span className="text-xs text-muted-foreground">
               拖曳把手互換兩週，或用「⋯」選單互換／插入一週
@@ -417,6 +430,14 @@ export function ScheduleTab({ year }: { year: number }) {
           onOpenChange={(open) => {
             if (!open) setEditTarget(null)
           }}
+        />
+      )}
+
+      {isAdmin && (
+        <GenerateSemesterDialog
+          year={year}
+          open={generateOpen}
+          onOpenChange={setGenerateOpen}
         />
       )}
     </div>

@@ -1919,6 +1919,15 @@ export type Database = {
       is_trip_admin: { Args: never; Returns: boolean }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_generate_semester: {
+        Args: {
+          p_year: number
+          p_start_date: string
+          p_weeks: number
+          p_holidays?: Json
+        }
+        Returns: Json
+      }
       meetings_insert_week: {
         Args: { p_at_meeting_id: string }
         Returns: string
