@@ -103,7 +103,11 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
         year,
         startDate,
         weeks,
-        holidays: holidays.filter((h) => h.date && h.label.trim()),
+        // Trim the label in the payload too, so the stored week_label matches
+        // the (already-trimmed) preview exactly — no "第2週(月考週 )" drift.
+        holidays: holidays
+          .filter((h) => h.date && h.label.trim())
+          .map((h) => ({ date: h.date, label: h.label.trim() })),
       },
       {
         onSuccess: () => {

@@ -10,7 +10,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(25);
+select plan(26);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -104,6 +104,9 @@ select is(
 select is(
   (select count(*)::int from public.meetings where year = 2041 and scheduled_date = '2041-09-13'),
   0, 'an off-cadence holiday date (matches no generated week) is silently ignored');
+select is(
+  (select count(*)::int from public.meetings where year = 2041),
+  4, 'exactly 4 rows generated for 2041 — no phantom row from the off-cadence holiday');
 
 -- ═══ skip existing rows (never overwrite), then idempotent re-run ═══════════
 insert into public.meetings (year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id)
