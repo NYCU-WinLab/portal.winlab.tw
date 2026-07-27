@@ -124,16 +124,16 @@ export function computeDayAvailability(
 export type SlotTier = "free" | "lab" | "paid-only" | "none"
 
 /**
- * Which of the four at-a-glance states a slot is in. A free-tier opening is
- * always the most actionable fact, so it wins even if the lab also has
- * something booked elsewhere in the same slot; "lab" only shows once there's
- * no free room left, as the next most useful thing to know.
+ * Which of the four at-a-glance states a slot is in. "lab" wins outright,
+ * even over a free-tier opening elsewhere — the lab already having a room in
+ * this slot is the single most useful thing to know, ahead of "you could
+ * also book a different one."
  */
 export function slotTier(
   slot: Pick<AvailabilitySlot, "freeRooms" | "paidRooms" | "labRooms">
 ): SlotTier {
-  if (slot.freeRooms.length > 0) return "free"
   if (slot.labRooms.length > 0) return "lab"
+  if (slot.freeRooms.length > 0) return "free"
   if (slot.paidRooms.length > 0) return "paid-only"
   return "none"
 }

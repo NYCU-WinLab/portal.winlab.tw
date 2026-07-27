@@ -151,19 +151,19 @@ describe("computeDayAvailability", () => {
 })
 
 describe("slotTier", () => {
-  test("free when any free-tier room is open, regardless of paid or lab rooms", () => {
-    expect(
-      slotTier({ freeRooms: ["500A"], paidRooms: ["334"], labRooms: [] })
-    ).toBe("free")
-    expect(
-      slotTier({ freeRooms: ["500A"], paidRooms: [], labRooms: ["500B"] })
-    ).toBe("free")
-  })
-
-  test("lab when no free-tier room is open but the lab account holds one", () => {
+  test("lab wins outright, even over a free-tier room open elsewhere", () => {
     expect(
       slotTier({ freeRooms: [], paidRooms: ["334"], labRooms: ["500A"] })
     ).toBe("lab")
+    expect(
+      slotTier({ freeRooms: ["500B"], paidRooms: [], labRooms: ["500A"] })
+    ).toBe("lab")
+  })
+
+  test("free when no lab room, but a free-tier room is open", () => {
+    expect(
+      slotTier({ freeRooms: ["500A"], paidRooms: ["334"], labRooms: [] })
+    ).toBe("free")
   })
 
   test("paid-only when no free-tier or lab room, but a paid one is open", () => {
