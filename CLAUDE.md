@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -103,7 +103,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
@@ -250,8 +250,8 @@ apps/portal/
 └─ lib/bento/                             # bento types and pure helpers (types.ts, date.ts, menu.ts)
 ```
 
-- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
-- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `trip`). Don't double-mount within one layout tree.
+- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `rooms`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
+- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `rooms`, `trip`). Don't double-mount within one layout tree.
 - **`AuthProvider` lives in root layout** because user state is shared. Bento hooks consume `@/hooks/use-auth`.
 - **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. games, leave, approve, bulletin gate purely via RLS + `has_role()`).
 

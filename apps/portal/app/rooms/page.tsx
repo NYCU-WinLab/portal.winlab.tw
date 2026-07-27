@@ -7,13 +7,13 @@ import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useRoomAvailability } from "@/hooks/meetings/use-room-availability"
-import { addDays, todayInTaipei } from "@/lib/meetingroom/date"
+import { useRoomAvailability } from "@/hooks/rooms/use-room-availability"
+import { addDays, todayInTaipei } from "@/lib/rooms/date"
 
-// Which room is free doesn't matter (see #337-adjacent request) — only
-// whether the 免費 tier has an opening, with the paid tier as a
-// de-emphasized fallback. So each tier renders as one merged strip, not a
-// per-room grid.
+// Which room is free doesn't matter (see the feature request this
+// implements) — only whether the 免費 tier has an opening, with the paid
+// tier shown as a de-emphasized fallback. So each tier renders as one merged
+// strip, not a per-room grid.
 function AvailabilityStrip({
   label,
   slots,
@@ -70,12 +70,19 @@ function AvailabilityStrip({
   )
 }
 
-export function RoomAvailabilityTab() {
+export default function RoomsPage() {
   const [date, setDate] = useState(todayInTaipei())
   const { data: slots, isLoading, isError } = useRoomAvailability(date)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-1">
+        <h1 className="font-medium">教室空檔</h1>
+        <p className="text-sm text-muted-foreground">
+          資工系研討室預約系統的即時空檔查詢
+        </p>
+      </div>
+
       <div className="flex items-center gap-2">
         <Button
           size="icon"

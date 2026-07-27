@@ -25,6 +25,7 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 | `/profile`   | Personal account + bento / leave / approve / trip stats         |
 | `/receipts`  | Admin-only receipt review (PDF archive workflow)                |
 | `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
+| `/rooms`     | CS dept. meeting room availability query                        |
 | `/trip`      | Travel-document uploads with admin folder export                |
 
 One app lives on its own subdomain because its design system diverges from portal:

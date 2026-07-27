@@ -53,6 +53,7 @@ const baseApps = [
   { href: "/meetings", label: "Meetings", note: "組會排班" },
   { href: "/profile", label: "Profile", note: "個人帳號" },
   { href: "/reimburse", label: "Reimburse", note: "收支記帳" },
+  { href: "/rooms", label: "Rooms", note: "教室空檔" },
   { href: "/trip", label: "Trip", note: "出差文件" },
 ]
 
