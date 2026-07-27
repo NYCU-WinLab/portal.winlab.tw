@@ -9,7 +9,7 @@ import {
   computeDayAvailability,
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
-import { fetchBusySlotsForRooms, fetchRooms } from "@/lib/rooms/client"
+import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays } from "@/lib/rooms/date"
 
 const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
@@ -19,27 +19,23 @@ export interface DayAvailability {
   slots: AvailabilitySlot[]
 }
 
-/**
- * `days` calendar days starting at `startDate`. Fetched one date at a time
- * (each date itself parallel across rooms) rather than all-at-once — this
- * queries a university system we don't own, and a 14-room x 14-day burst of
- * concurrent requests is a worse citizen than ~14 sequential batches.
- */
+/** `days` calendar days starting at `startDate`. */
 export async function getRoomAvailabilityRange(
   startDate: string,
   days: number
 ): Promise<DayAvailability[]> {
   const rooms = await fetchRooms()
   const activeRoomNames = rooms.filter((r) => r.active).map((r) => r.name)
+  const dates = Array.from({ length: days }, (_, i) => addDays(startDate, i))
 
-  const result: DayAvailability[] = []
-  for (let i = 0; i < days; i++) {
-    const date = addDays(startDate, i)
-    const busy = await fetchBusySlotsForRooms(activeRoomNames, date)
-    result.push({
+  const busyByDate = await fetchBusySlotsForDates(activeRoomNames, dates)
+  return dates.map((date) => ({
+    date,
+    slots: computeDayAvailability(
+      rooms,
+      busyByDate.get(date) ?? [],
       date,
-      slots: computeDayAvailability(rooms, busy, date, DAY_WINDOW),
-    })
-  }
-  return result
+      DAY_WINDOW
+    ),
+  }))
 }

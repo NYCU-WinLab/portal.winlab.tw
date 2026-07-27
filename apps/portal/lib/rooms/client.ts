@@ -25,18 +25,29 @@ interface RawReservation {
 
 import type { BusySlot, Room } from "./types"
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}/${path}`, {
-    headers: { Accept: "application/json" },
-    // Room list barely changes; per-date reservations change often but a
-    // short revalidate window keeps the external site from being hammered
-    // by every page load.
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) {
-    throw new Error(`meetingroom API ${path} failed: ${res.status}`)
+// A range query fans out to dozens of these in flight (see
+// fetchBusySlotsForDates below); at that volume, this system's occasional
+// transient timeout (observed live: a 504 on an otherwise-healthy request)
+// would otherwise take down the whole range with it. One retry after a short
+// backoff is enough to ride those out without masking a real outage.
+async function getJson<T>(path: string, attempt = 0): Promise<T> {
+  try {
+    const res = await fetch(`${BASE}/${path}`, {
+      headers: { Accept: "application/json" },
+      // Room list barely changes; per-date reservations change often but a
+      // short revalidate window keeps the external site from being hammered
+      // by every page load.
+      next: { revalidate: 60 },
+    })
+    if (!res.ok) {
+      throw new Error(`meetingroom API ${path} failed: ${res.status}`)
+    }
+    return (await res.json()) as T
+  } catch (err) {
+    if (attempt >= 2) throw err
+    await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)))
+    return getJson<T>(path, attempt + 1)
   }
-  return res.json() as Promise<T>
 }
 
 export async function fetchRooms(): Promise<Room[]> {
@@ -72,4 +83,28 @@ export async function fetchBusySlotsForRooms(
     rooms.map((room) => fetchBusySlots(room, date))
   )
   return perRoom.flat()
+}
+
+// There's no bulk "all rooms for one date" endpoint on this system (checked
+// its shipped JS — the only reservation route is per-room, per-date), so a
+// multi-day query is inherently rooms x dates requests. Running every date
+// fully sequentially was safe but slow (~450ms/date, ~6s for 14 days);
+// running all of them at once is a bigger burst than a university system we
+// don't own deserves. This caps how many dates are in flight at once, each
+// still fanning out across rooms in parallel underneath.
+const DATE_CONCURRENCY = 4
+
+export async function fetchBusySlotsForDates(
+  rooms: string[],
+  dates: string[]
+): Promise<Map<string, BusySlot[]>> {
+  const result = new Map<string, BusySlot[]>()
+  for (let i = 0; i < dates.length; i += DATE_CONCURRENCY) {
+    const batch = dates.slice(i, i + DATE_CONCURRENCY)
+    const busyPerDate = await Promise.all(
+      batch.map((date) => fetchBusySlotsForRooms(rooms, date))
+    )
+    batch.forEach((date, idx) => result.set(date, busyPerDate[idx]!))
+  }
+  return result
 }
