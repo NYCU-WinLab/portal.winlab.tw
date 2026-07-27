@@ -53,6 +53,20 @@ const DURATION_OPTIONS = [
 ]
 const SLOT_MINUTES = 30
 
+// Time-axis labels shown between the start/end ends of the strip. Positioned
+// by finding the matching slot's index rather than a hardcoded percentage,
+// so this stays correct if DAY_WINDOW's hours ever change.
+const AXIS_MID_TICKS = ["12:00", "18:00"]
+
+function axisTickPercent(
+  slots: AvailabilitySlot[] | undefined,
+  time: string
+): number | null {
+  if (!slots || slots.length === 0) return null
+  const index = slots.findIndex((s) => s.start === time)
+  return index === -1 ? null : (index / slots.length) * 100
+}
+
 interface Selected {
   date: string
   slotIndex: number
@@ -250,9 +264,25 @@ export default function RoomsPage() {
                 onSelectSlot={setSelected}
               />
             ))}
-            <div className="ml-[6.75rem] flex justify-between text-[10px] text-muted-foreground">
-              <span>{days[0]?.slots[0]?.start}</span>
-              <span>{days[0]?.slots.at(-1)?.end}</span>
+            <div className="relative ml-[6.75rem] h-3 text-[10px] text-muted-foreground">
+              <span className="absolute left-0">
+                {days[0]?.slots[0]?.start}
+              </span>
+              {AXIS_MID_TICKS.map((time) => {
+                const percent = axisTickPercent(days[0]?.slots, time)
+                return percent === null ? null : (
+                  <span
+                    key={time}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${percent}%` }}
+                  >
+                    {time}
+                  </span>
+                )
+              })}
+              <span className="absolute right-0">
+                {days[0]?.slots.at(-1)?.end}
+              </span>
             </div>
           </div>
 
