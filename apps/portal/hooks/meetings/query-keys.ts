@@ -24,4 +24,7 @@ export const queryKeys = {
   questioners: {
     byYear: (year: number) => ["meetings", "questioners", year] as const,
   },
+  roomAvailability: {
+    byDate: (date: string) => ["meetings", "room-availability", date] as const,
+  },
 }

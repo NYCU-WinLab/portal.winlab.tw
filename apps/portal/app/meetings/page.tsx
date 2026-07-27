@@ -20,6 +20,7 @@ import { AddPaperDialog } from "./_components/add-paper-dialog"
 import { InfoTab } from "./_components/info-tab"
 import { ManageTagsDialog } from "./_components/manage-tags-dialog"
 import { PapersTab } from "./_components/papers-tab"
+import { RoomAvailabilityTab } from "./_components/room-availability-tab"
 import { ScheduleTab } from "./_components/schedule-tab"
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -85,6 +86,7 @@ export default function MeetingsPage() {
         <TabsList>
           <TabsTrigger value="schedule">排班表</TabsTrigger>
           <TabsTrigger value="papers">老師 Papers</TabsTrigger>
+          <TabsTrigger value="rooms">教室空檔</TabsTrigger>
           <TabsTrigger value="info">Meeting 資訊</TabsTrigger>
         </TabsList>
         <TabsContent value="schedule" className="mt-4">
@@ -116,6 +118,9 @@ export default function MeetingsPage() {
         </TabsContent>
         <TabsContent value="papers" className="mt-4">
           <PapersTab />
+        </TabsContent>
+        <TabsContent value="rooms" className="mt-4">
+          <RoomAvailabilityTab />
         </TabsContent>
         <TabsContent value="info" className="mt-4">
           <InfoTab isAdmin={isAdmin} />
