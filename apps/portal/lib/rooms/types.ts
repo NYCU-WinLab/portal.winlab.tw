@@ -11,4 +11,6 @@ export interface BusySlot {
   room: string
   start: string
   end: string
+  /** The booking account's user_id, e.g. "cctseng". */
+  subscriber: string
 }

@@ -7,12 +7,21 @@
 
 import type { BusySlot, Room } from "./types"
 
+/**
+ * The department's shared lab account this reservation system reserves
+ * under. Its bookings are the lab's own, not a stranger's — worth calling
+ * out separately from "someone else has this room."
+ */
+const LAB_SUBSCRIBER = "cctseng"
+
 export interface AvailabilitySlot {
   /** "HH:mm", Asia/Taipei local time. */
   start: string
   end: string
   freeRooms: string[]
   paidRooms: string[]
+  /** Rooms busy in this slot because the lab's own account booked them. */
+  labRooms: string[]
 }
 
 export interface AvailabilityOptions {
@@ -52,10 +61,17 @@ export function computeDayAvailability(
   const freeTier = active.filter((r) => r.charge === 0)
   const paidTier = active.filter((r) => r.charge > 0)
 
-  const busyByRoom = new Map<string, { start: Date; end: Date }[]>()
+  const busyByRoom = new Map<
+    string,
+    { start: Date; end: Date; subscriber: string }[]
+  >()
   for (const slot of busySlots) {
     const entry = busyByRoom.get(slot.room) ?? []
-    entry.push({ start: new Date(slot.start), end: new Date(slot.end) })
+    entry.push({
+      start: new Date(slot.start),
+      end: new Date(slot.end),
+      subscriber: slot.subscriber,
+    })
     busyByRoom.set(slot.room, entry)
   }
 
@@ -64,6 +80,19 @@ export function computeDayAvailability(
       .filter((room) => {
         const busy = busyByRoom.get(room.name) ?? []
         return !busy.some((b) => overlaps(start, end, b.start, b.end))
+      })
+      .map((room) => room.name)
+  }
+
+  function labRoomsInWindow(tier: Room[], start: Date, end: Date): string[] {
+    return tier
+      .filter((room) => {
+        const busy = busyByRoom.get(room.name) ?? []
+        return busy.some(
+          (b) =>
+            overlaps(start, end, b.start, b.end) &&
+            b.subscriber === LAB_SUBSCRIBER
+        )
       })
       .map((room) => room.name)
   }
@@ -85,19 +114,81 @@ export function computeDayAvailability(
       end: formatHHmm(endHour, endMinute),
       freeRooms: freeRoomsInWindow(freeTier, start, end),
       paidRooms: freeRoomsInWindow(paidTier, start, end),
+      labRooms: labRoomsInWindow(active, start, end),
     })
   }
 
   return slots
 }
 
-export type SlotTier = "free" | "paid-only" | "none"
+export type SlotTier = "free" | "lab" | "paid-only" | "none"
 
-/** Which of the three at-a-glance states a slot is in. */
+/**
+ * Which of the four at-a-glance states a slot is in. A free-tier opening is
+ * always the most actionable fact, so it wins even if the lab also has
+ * something booked elsewhere in the same slot; "lab" only shows once there's
+ * no free room left, as the next most useful thing to know.
+ */
 export function slotTier(
-  slot: Pick<AvailabilitySlot, "freeRooms" | "paidRooms">
+  slot: Pick<AvailabilitySlot, "freeRooms" | "paidRooms" | "labRooms">
 ): SlotTier {
   if (slot.freeRooms.length > 0) return "free"
+  if (slot.labRooms.length > 0) return "lab"
   if (slot.paidRooms.length > 0) return "paid-only"
   return "none"
+}
+
+// Room-selection priority when suggesting where to book: free tier before
+// paid, and within a tier, prefer by room-number prefix in this order.
+const ROOM_PREFIX_PRIORITY = ["600", "500", "300", "200", "100", "700"]
+
+function roomPriorityRank(roomName: string): number {
+  const rank = ROOM_PREFIX_PRIORITY.findIndex((prefix) =>
+    roomName.startsWith(prefix)
+  )
+  return rank === -1 ? ROOM_PREFIX_PRIORITY.length : rank
+}
+
+function bestByPriority(roomNames: string[]): string | undefined {
+  return [...roomNames].sort(
+    (a, b) => roomPriorityRank(a) - roomPriorityRank(b)
+  )[0]
+}
+
+export interface RoomSuggestion {
+  room: string
+  tier: "free" | "paid"
+}
+
+/**
+ * The room to request for a `durationSlots`-slot booking starting at
+ * `daySlots[startIndex]`. A room only qualifies if it's open across every
+ * slot in that span — a booking can't straddle a gap — then the free tier
+ * wins over paid, and ties break by room-number priority.
+ */
+export function suggestRoom(
+  daySlots: AvailabilitySlot[],
+  startIndex: number,
+  durationSlots: number
+): RoomSuggestion | null {
+  const span = daySlots.slice(startIndex, startIndex + durationSlots)
+  if (span.length < durationSlots) return null
+
+  function openAcrossSpan(pickRooms: (slot: AvailabilitySlot) => string[]) {
+    return span.reduce<string[] | null>(
+      (acc, slot) =>
+        acc === null
+          ? pickRooms(slot)
+          : acc.filter((r) => pickRooms(slot).includes(r)),
+      null
+    )
+  }
+
+  const bestFree = bestByPriority(openAcrossSpan((s) => s.freeRooms) ?? [])
+  if (bestFree) return { room: bestFree, tier: "free" }
+
+  const bestPaid = bestByPriority(openAcrossSpan((s) => s.paidRooms) ?? [])
+  if (bestPaid) return { room: bestPaid, tier: "paid" }
+
+  return null
 }

@@ -21,6 +21,7 @@ interface RawReservation {
   room: string
   start: string
   end: string
+  subscriber: string
 }
 
 import type { BusySlot, Room } from "./types"
@@ -72,6 +73,7 @@ export async function fetchBusySlots(
     room: r.room,
     start: new Date(Number(r.start)).toISOString(),
     end: new Date(Number(r.end)).toISOString(),
+    subscriber: r.subscriber,
   }))
 }
 

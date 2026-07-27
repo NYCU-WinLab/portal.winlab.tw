@@ -17,6 +17,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
+  suggestRoom,
   type AvailabilitySlot,
   type SlotTier,
 } from "@/lib/rooms/availability"
@@ -27,6 +28,7 @@ const LABEL_WIDTH = "w-24"
 
 const TIER_STYLE: Record<SlotTier, string> = {
   free: "bg-emerald-500/70 hover:bg-emerald-500/90 dark:bg-emerald-500/60 dark:hover:bg-emerald-500/80",
+  lab: "bg-violet-500/60 hover:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-500/70",
   "paid-only":
     "bg-amber-500/60 hover:bg-amber-500/80 dark:bg-amber-500/50 dark:hover:bg-amber-500/70",
   none: "bg-rose-400/30 hover:bg-rose-400/50 dark:bg-rose-500/25 dark:hover:bg-rose-500/45",
@@ -34,13 +36,27 @@ const TIER_STYLE: Record<SlotTier, string> = {
 
 const TIER_LEGEND: { tier: SlotTier; label: string }[] = [
   { tier: "free", label: "有免費教室" },
+  { tier: "lab", label: "本實驗室已借用" },
   { tier: "paid-only", label: "只剩付費教室" },
   { tier: "none", label: "已滿" },
 ]
 
+// Duration options offered in the picker, in minutes — must be multiples of
+// the 30-minute grid so they map onto a whole number of slots.
+const DURATION_OPTIONS = [
+  { minutes: 30, label: "30 分" },
+  { minutes: 60, label: "1 hr" },
+  { minutes: 90, label: "1.5 hr" },
+  { minutes: 120, label: "2 hr" },
+  { minutes: 150, label: "2.5 hr" },
+  { minutes: 180, label: "3 hr" },
+]
+const SLOT_MINUTES = 30
+
 interface Selected {
   date: string
-  slot: AvailabilitySlot
+  slotIndex: number
+  daySlots: AvailabilitySlot[]
 }
 
 function DayRow({
@@ -63,18 +79,22 @@ function DayRow({
         {formatDayLabel(date)}
       </span>
       <div className="flex flex-1 overflow-hidden rounded-md border">
-        {slots.map((slot) => {
+        {slots.map((slot, slotIndex) => {
           const tier = slotTier(slot)
           const detail =
             tier === "none"
               ? "已滿"
-              : (tier === "free" ? slot.freeRooms : slot.paidRooms).join("、")
+              : tier === "free"
+                ? slot.freeRooms.join("、")
+                : tier === "lab"
+                  ? `本實驗室：${slot.labRooms.join("、")}`
+                  : slot.paidRooms.join("、")
           return (
             <button
               key={slot.start}
               type="button"
               title={`${slot.start}–${slot.end}：${detail}`}
-              onClick={() => onSelectSlot({ date, slot })}
+              onClick={() => onSelectSlot({ date, slotIndex, daySlots: slots })}
               className={cn(
                 "h-6 flex-1 cursor-pointer border-r transition-colors last:border-r-0",
                 TIER_STYLE[tier]
@@ -83,6 +103,60 @@ function DayRow({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function BookingSuggestion({
+  daySlots,
+  slotIndex,
+}: {
+  daySlots: AvailabilitySlot[]
+  slotIndex: number
+}) {
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
+  const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
+  const suggestion = durationMinutes
+    ? suggestRoom(daySlots, slotIndex, durationSlots)
+    : null
+
+  return (
+    <div className="flex flex-col gap-2 border-t pt-4">
+      <span className="text-xs font-medium text-muted-foreground">
+        想借多久?
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {DURATION_OPTIONS.map((opt) => (
+          <Button
+            key={opt.minutes}
+            size="sm"
+            variant={durationMinutes === opt.minutes ? "default" : "outline"}
+            className="h-7"
+            onClick={() => setDurationMinutes(opt.minutes)}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+      {durationMinutes && (
+        <p className="text-sm">
+          {suggestion
+            ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
+            : "這個時長內沒有教室從頭到尾都空著,試試縮短時間或換個起始時段。"}
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        自動預約功能還在開發中,目前請依建議教室,自行到
+        <a
+          href="https://www.cs.nycu.edu.tw/csauto/meetingroom/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mx-1 underline"
+        >
+          資工系研討室預約系統
+        </a>
+        操作。
+      </p>
     </div>
   )
 }
@@ -96,7 +170,8 @@ export default function RoomsPage() {
     isError,
   } = useRoomAvailabilityRange(rangeStart, RANGE_DAYS)
 
-  const selectedTier = selected ? slotTier(selected.slot) : null
+  const selectedSlot = selected?.daySlots[selected.slotIndex]
+  const selectedTier = selectedSlot ? slotTier(selectedSlot) : null
 
   return (
     <div className="flex flex-col gap-8">
@@ -200,27 +275,32 @@ export default function RoomsPage() {
         open={!!selected}
         onOpenChange={(open) => !open && setSelected(null)}
       >
-        <DialogContent>
+        <DialogContent
+          key={selected ? `${selected.date}-${selected.slotIndex}` : "empty"}
+        >
           <DialogHeader>
             <DialogTitle>
               {selected &&
-                `${formatDayLabel(selected.date)} ${selected.slot.start}–${selected.slot.end}`}
+                selectedSlot &&
+                `${formatDayLabel(selected.date)} ${selectedSlot.start}–${selectedSlot.end}`}
             </DialogTitle>
             <DialogDescription>
               {selectedTier === "none"
                 ? "此時段所有教室都已被借用"
-                : "此時段可選擇的教室"}
+                : selectedTier === "lab"
+                  ? "此時段已被本實驗室借用"
+                  : "此時段可選擇的教室"}
             </DialogDescription>
           </DialogHeader>
-          {selected && (
+          {selected && selectedSlot && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
                   免費教室
                 </span>
                 <p className="text-sm">
-                  {selected.slot.freeRooms.length > 0
-                    ? selected.slot.freeRooms.join("、")
+                  {selectedSlot.freeRooms.length > 0
+                    ? selectedSlot.freeRooms.join("、")
                     : "無"}
                 </p>
               </div>
@@ -229,11 +309,23 @@ export default function RoomsPage() {
                   付費教室
                 </span>
                 <p className="text-sm">
-                  {selected.slot.paidRooms.length > 0
-                    ? selected.slot.paidRooms.join("、")
+                  {selectedSlot.paidRooms.length > 0
+                    ? selectedSlot.paidRooms.join("、")
                     : "無"}
                 </p>
               </div>
+              {selectedSlot.labRooms.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    本實驗室已借用
+                  </span>
+                  <p className="text-sm">{selectedSlot.labRooms.join("、")}</p>
+                </div>
+              )}
+              <BookingSuggestion
+                daySlots={selected.daySlots}
+                slotIndex={selected.slotIndex}
+              />
             </div>
           )}
         </DialogContent>
