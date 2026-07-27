@@ -1,5 +1,6 @@
 export const queryKeys = {
   availability: {
-    byDate: (date: string) => ["rooms", "availability", date] as const,
+    range: (startDate: string, days: number) =>
+      ["rooms", "availability", "range", startDate, days] as const,
   },
 }

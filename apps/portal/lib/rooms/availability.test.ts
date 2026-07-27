@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { computeDayAvailability } from "./availability"
+import { computeDayAvailability, slotTier } from "./availability"
 import type { Room } from "./types"
 
 const ROOMS: Room[] = [
@@ -101,5 +101,20 @@ describe("computeDayAvailability", () => {
       OPTS
     )
     expect(slots[0]!.freeRooms).toContain("500A")
+  })
+})
+
+describe("slotTier", () => {
+  test("free when any free-tier room is open, regardless of paid rooms", () => {
+    expect(slotTier({ freeRooms: ["500A"], paidRooms: ["334"] })).toBe("free")
+    expect(slotTier({ freeRooms: ["500A"], paidRooms: [] })).toBe("free")
+  })
+
+  test("paid-only when no free-tier room is open but a paid one is", () => {
+    expect(slotTier({ freeRooms: [], paidRooms: ["334"] })).toBe("paid-only")
+  })
+
+  test("none when nothing is open", () => {
+    expect(slotTier({ freeRooms: [], paidRooms: [] })).toBe("none")
   })
 })

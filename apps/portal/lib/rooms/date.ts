@@ -25,3 +25,18 @@ export function addDays(dateStr: string, n: number): string {
     day: "2-digit",
   }).format(shifted)
 }
+
+/** `dateStr` (YYYY-MM-DD) as "MM/DD（週X）" in Asia/Taipei. */
+export function formatDayLabel(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00+08:00`)
+  const md = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d)
+  const weekday = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    weekday: "short",
+  }).format(d)
+  return `${md}（${weekday}）`
+}

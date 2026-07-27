@@ -90,3 +90,14 @@ export function computeDayAvailability(
 
   return slots
 }
+
+export type SlotTier = "free" | "paid-only" | "none"
+
+/** Which of the three at-a-glance states a slot is in. */
+export function slotTier(
+  slot: Pick<AvailabilitySlot, "freeRooms" | "paidRooms">
+): SlotTier {
+  if (slot.freeRooms.length > 0) return "free"
+  if (slot.paidRooms.length > 0) return "paid-only"
+  return "none"
+}
