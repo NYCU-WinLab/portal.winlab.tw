@@ -1,15 +1,22 @@
 import { describe, expect, test } from "bun:test"
 
-import { mergeAttendees, toPickableGroups } from "./attendee-groups"
+import {
+  groupLabel,
+  groupMeetingTitle,
+  mergeAttendees,
+  toPickableGroups,
+} from "./attendee-groups"
 import type { AttendeeGroup } from "./keycloak-groups"
 
 function group(
   name: string,
-  members: { email: string | null; name?: string }[]
+  members: { email: string | null; name?: string }[],
+  description: string | null = null
 ): AttendeeGroup {
   return {
     id: `g-${name}`,
     name,
+    description,
     path: `/winlab-projects/${name}`,
     members: members.map((m, i) => ({
       id: `kc-${name}-${i}`,
@@ -83,5 +90,19 @@ describe("mergeAttendees", () => {
     expect(mergeAttendees(once, [{ name: "A", email: "A@WINLAB.TW" }])).toEqual(
       once
     )
+  })
+})
+
+describe("groupLabel / groupMeetingTitle", () => {
+  test("prefers the description — group names are path slugs, not labels", () => {
+    const g = { name: "o-ran-sc", description: "O-RAN 軟體社群" }
+    expect(groupLabel(g)).toBe("O-RAN 軟體社群")
+    expect(groupMeetingTitle(g)).toBe("O-RAN 軟體社群 會議")
+  })
+
+  test("falls back to the name when a group has no description", () => {
+    const g = { name: "o-ran-sc", description: null }
+    expect(groupLabel(g)).toBe("o-ran-sc")
+    expect(groupMeetingTitle(g)).toBe("o-ran-sc 會議")
   })
 })

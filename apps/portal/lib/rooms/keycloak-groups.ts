@@ -30,6 +30,13 @@ export interface AttendeeGroup {
   id: string
   /** Just this group's own name, e.g. "ai". */
   name: string
+  /**
+   * Human-readable label, when the group carries one. Keycloak only gained
+   * a native `description` on GroupRepresentation recently; before that the
+   * convention was an attribute of the same name. Read both, since which
+   * one this realm uses isn't something to guess at.
+   */
+  description: string | null
   /** Full path including parents, e.g. "/winlab-projects/ai". */
   path: string
   members: KeycloakGroupMember[]
@@ -50,8 +57,17 @@ type RawGroup = {
   id: string
   name: string
   path: string
+  description?: string
+  attributes?: Record<string, string[]>
   subGroups?: RawGroup[]
   subGroupCount?: number
+}
+
+function groupDescription(group: RawGroup): string | null {
+  const native = group.description?.trim()
+  if (native) return native
+  const attribute = group.attributes?.description?.[0]?.trim()
+  return attribute || null
 }
 
 type RawMember = {
@@ -157,6 +173,7 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
       subGroups.map(async (group) => ({
         id: group.id,
         name: group.name,
+        description: groupDescription(group),
         path: group.path,
         members: await fetchGroupMembers(env, token, group.id),
       }))

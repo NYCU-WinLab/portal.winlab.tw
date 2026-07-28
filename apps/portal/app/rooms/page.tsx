@@ -34,7 +34,11 @@ import {
   type SlotTier,
 } from "@/lib/rooms/availability"
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
-import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
+import {
+  groupMeetingTitle,
+  type AttendeeContact,
+  type PickableGroup,
+} from "@/lib/rooms/attendee-groups"
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -190,6 +194,10 @@ function BookingSuggestion({
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [title, setTitle] = useState("")
+  // Only titles this component filled in may be replaced by a later group
+  // pick. Anything typed by hand is the user's, and silently overwriting it
+  // would be worse than not helping at all.
+  const [autoTitle, setAutoTitle] = useState<string | null>(null)
   const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
   const suggestion = durationMinutes
@@ -266,7 +274,10 @@ function BookingSuggestion({
                 <Input
                   id="booking-title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value)
+                    setAutoTitle(null)
+                  }}
                   placeholder="例:Weekly sync"
                 />
               </div>
@@ -281,6 +292,12 @@ function BookingSuggestion({
                   groupsNote={groupsNote(attendeeGroupsQuery)}
                   value={attendees}
                   onChange={setAttendees}
+                  onGroupPicked={(group: PickableGroup) => {
+                    if (title !== "" && title !== autoTitle) return
+                    const next = groupMeetingTitle(group)
+                    setTitle(next)
+                    setAutoTitle(next)
+                  }}
                 />
               </div>
 

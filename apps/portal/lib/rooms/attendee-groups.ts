@@ -19,6 +19,7 @@ export interface AttendeeContact {
 export interface PickableGroup {
   id: string
   name: string
+  description: string | null
   path: string
   members: AttendeeContact[]
   /**
@@ -52,6 +53,7 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
       return {
         id: group.id,
         name: group.name,
+        description: group.description,
         path: group.path,
         members,
         unmailable,
@@ -59,6 +61,25 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
     })
     .filter((g) => g.members.length > 0)
     .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+/**
+ * What to call a group in the UI. Keycloak group names are slugs meant for
+ * paths, so the description is the one written for people to read; fall
+ * back to the name when a group has no description rather than showing
+ * nothing.
+ */
+export function groupLabel(
+  group: Pick<PickableGroup, "name" | "description">
+): string {
+  return group.description ?? group.name
+}
+
+/** The title to pre-fill when a whole group is invited. */
+export function groupMeetingTitle(
+  group: Pick<PickableGroup, "name" | "description">
+): string {
+  return `${groupLabel(group)} 會議`
 }
 
 /**

@@ -27,7 +27,11 @@ import type {
   AttendeeContact,
   PickableGroup,
 } from "@/lib/rooms/attendee-groups"
-import { ADVISOR_USERNAME, mergeAttendees } from "@/lib/rooms/attendee-groups"
+import {
+  ADVISOR_USERNAME,
+  groupLabel,
+  mergeAttendees,
+} from "@/lib/rooms/attendee-groups"
 import type { LabUser } from "@/hooks/rooms/use-lab-users"
 
 function label(u: LabUser): string {
@@ -40,6 +44,7 @@ export function AttendeeSelect({
   groupsNote,
   value,
   onChange,
+  onGroupPicked,
 }: {
   users: LabUser[]
   groups?: PickableGroup[]
@@ -51,6 +56,8 @@ export function AttendeeSelect({
   groupsNote?: string | null
   value: AttendeeContact[]
   onChange: (next: AttendeeContact[]) => void
+  /** Fired when a whole group is added, so the title can be pre-filled. */
+  onGroupPicked?: (group: PickableGroup) => void
 }) {
   const [open, setOpen] = useState(false)
   // Reset after every pick so the next name can be typed straight away —
@@ -102,9 +109,12 @@ export function AttendeeSelect({
                   ? `${g.members.length} 人；${g.unmailable.length} 人在 Keycloak 沒有 email,無法邀請:${g.unmailable.join("、")}`
                   : `${g.members.length} 人`
               }
-              onClick={() => onChange(mergeAttendees(value, g.members))}
+              onClick={() => {
+                onChange(mergeAttendees(value, g.members))
+                onGroupPicked?.(g)
+              }}
             >
-              {g.name}
+              {groupLabel(g)}
               <span className="ml-1 opacity-60">{g.members.length}</span>
             </Button>
           ))}
