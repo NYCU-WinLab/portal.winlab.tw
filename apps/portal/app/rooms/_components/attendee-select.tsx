@@ -25,7 +25,7 @@ import type { PortalAttendeeGroup } from "@/lib/rooms/attendee-groups"
 import type { LabUser } from "@/hooks/rooms/use-lab-users"
 
 function label(u: LabUser): string {
-  return u.name ?? u.accountId ?? u.id
+  return u.name ?? u.username ?? u.id
 }
 
 export function AttendeeSelect({
@@ -47,6 +47,9 @@ export function AttendeeSelect({
   onChange: (next: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
+  // Reset after every pick so the next name can be typed straight away —
+  // otherwise the previous query keeps the list filtered down to one person.
+  const [search, setSearch] = useState("")
   const scrollRef = useDialogPopoverScroll<HTMLDivElement>()
 
   function addGroup(group: PortalAttendeeGroup) {
@@ -61,6 +64,7 @@ export function AttendeeSelect({
     onChange(
       value.includes(id) ? value.filter((v) => v !== id) : [...value, id]
     )
+    setSearch("")
   }
 
   return (
@@ -112,7 +116,11 @@ export function AttendeeSelect({
           className="w-(--radix-popover-trigger-width) p-0"
         >
           <Command>
-            <CommandInput placeholder="搜尋姓名或帳號 id" />
+            <CommandInput
+              placeholder="搜尋姓名或帳號"
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
               <CommandEmpty>找不到成員</CommandEmpty>
               <CommandGroup>
@@ -122,9 +130,7 @@ export function AttendeeSelect({
                     // cmdk matches against this string, so both the display
                     // name and the account id have to be in it for either to
                     // be searchable.
-                    value={[u.name, u.accountId, u.id]
-                      .filter(Boolean)
-                      .join(" ")}
+                    value={[u.name, u.username, u.id].filter(Boolean).join(" ")}
                     onSelect={() => toggle(u.id)}
                   >
                     <span
@@ -134,9 +140,9 @@ export function AttendeeSelect({
                     >
                       {label(u)}
                     </span>
-                    {u.accountId && u.name && (
+                    {u.username && u.name && (
                       <span className="ml-2 text-xs text-muted-foreground">
-                        {u.accountId}
+                        {u.username}
                       </span>
                     )}
                     {value.includes(u.id) && (

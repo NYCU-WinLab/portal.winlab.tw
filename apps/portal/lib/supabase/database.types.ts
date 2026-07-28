@@ -1778,6 +1778,7 @@ export type Database = {
           name: string | null
           roles: Json | null
           telegram_user_id: string | null
+          username: string | null
         }
         Insert: {
           active_workflow?: Json | null
@@ -1792,6 +1793,7 @@ export type Database = {
           name?: string | null
           roles?: Json | null
           telegram_user_id?: string | null
+          username?: string | null
         }
         Update: {
           active_workflow?: Json | null
@@ -1806,6 +1808,7 @@ export type Database = {
           name?: string | null
           roles?: Json | null
           telegram_user_id?: string | null
+          username?: string | null
         }
         Relationships: []
       }

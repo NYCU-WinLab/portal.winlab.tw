@@ -11,8 +11,8 @@ export interface LabUser {
   id: string
   name: string | null
   email: string | null
-  /** The 系計中 account id — the local part of the email, e.g. "cctseng". */
-  accountId: string | null
+  /** Keycloak account name (`preferred_username`), e.g. "n0ball". */
+  username: string | null
 }
 
 /**
@@ -28,14 +28,14 @@ export function useLabUsers() {
     queryFn: async (): Promise<LabUser[]> => {
       const { data, error } = await supabase
         .from("user_profiles")
-        .select("id, name, email")
+        .select("id, name, email, username")
         .order("name")
       if (error) throw error
       return (data ?? []).map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,
-        accountId: u.email ? (u.email.split("@")[0] ?? null) : null,
+        username: u.username,
       }))
     },
     staleTime: 5 * 60_000,
