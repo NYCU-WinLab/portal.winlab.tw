@@ -12,4 +12,7 @@ export const queryKeys = {
   attendeeGroups: {
     all: ["rooms", "attendee-groups"] as const,
   },
+  recurring: {
+    all: ["rooms", "recurring"] as const,
+  },
 }

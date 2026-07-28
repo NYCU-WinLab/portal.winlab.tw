@@ -1555,6 +1555,59 @@ export type Database = {
           },
         ]
       }
+      rooms_recurring_meetings: {
+        Row: {
+          active: boolean
+          anchor_date: string
+          attendees: Json
+          created_at: string
+          created_by: string
+          duration_minutes: number
+          id: string
+          include_advisor: boolean
+          interval_weeks: number
+          start_time: string
+          title: string
+          weekday: number
+        }
+        Insert: {
+          active?: boolean
+          anchor_date: string
+          attendees?: Json
+          created_at?: string
+          created_by: string
+          duration_minutes: number
+          id?: string
+          include_advisor?: boolean
+          interval_weeks?: number
+          start_time: string
+          title: string
+          weekday: number
+        }
+        Update: {
+          active?: boolean
+          anchor_date?: string
+          attendees?: Json
+          created_at?: string
+          created_by?: string
+          duration_minutes?: number
+          id?: string
+          include_advisor?: boolean
+          interval_weeks?: number
+          start_time?: string
+          title?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_recurring_meetings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms_bookings: {
         Row: {
           attendees: Json
@@ -1565,6 +1618,7 @@ export type Database = {
           end_time: string
           external_reservation_id: string
           id: string
+          recurring_id: string | null
           requested_by: string
           room: string
           start_time: string
@@ -1580,6 +1634,7 @@ export type Database = {
           end_time: string
           external_reservation_id: string
           id?: string
+          recurring_id: string | null
           requested_by: string
           room: string
           start_time: string
@@ -1595,6 +1650,7 @@ export type Database = {
           end_time?: string
           external_reservation_id?: string
           id?: string
+          recurring_id?: string | null
           requested_by?: string
           room?: string
           start_time?: string

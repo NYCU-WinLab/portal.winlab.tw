@@ -20,9 +20,11 @@ import {
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
 import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
-import { bookRoom, cancelRoomBooking } from "@/lib/rooms/booking-client"
+import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
+import { placeBooking } from "@/lib/rooms/book"
+import { cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
-import { addDays, taipeiIso } from "@/lib/rooms/date"
+import { addDays, taipeiIso, todayInTaipei } from "@/lib/rooms/date"
 import { sendBookingInvite } from "@/lib/rooms/invite-mail"
 
 const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
@@ -160,57 +162,19 @@ export async function confirmBooking(
   const title = input.title.trim()
   if (!title) throw new Error("請填寫會議標題")
 
-  const subscriber = requireServiceAccount()
-  const start = taipeiIso(input.date, input.startTime)
-  const end = taipeiIso(input.date, input.endTime)
-
-  const externalId = await bookRoom({
-    room: input.room,
-    start,
-    end,
-    subscriber,
-  })
-
   const supabase = await createClient()
-  const { data: inserted, error } = await supabase
-    .from("rooms_bookings")
-    .insert({
-      external_reservation_id: externalId,
-      room: input.room,
-      date: input.date,
-      start_time: input.startTime,
-      end_time: input.endTime,
-      requested_by: user.id,
-      title,
-      attendees: input.attendees as unknown as Json,
-    })
-    .select("id")
-    .single()
-
-  if (error || !inserted) {
-    throw new Error(
-      `已在外部系統訂到教室(訂位編號 ${externalId}),但寫入 Portal 稽核紀錄失敗:${error?.message ?? "unknown"}——請通知管理員手動補登,避免之後被誤判成可取消`
-    )
-  }
-
-  revalidatePath("/rooms")
-
-  // The room is booked either way — a mail failure is reported back, not
-  // thrown, so it can't read as "the booking didn't happen".
-  const sent = await sendBookingInvite({
-    bookingId: inserted.id,
-    title,
-    room: input.room,
+  const outcome = await placeBooking(supabase, requireServiceAccount(), {
     date: input.date,
+    room: input.room,
     startTime: input.startTime,
     endTime: input.endTime,
-    start,
-    end,
-    organizer: { name: user.name, email: user.email ?? "" },
+    title,
     attendees: input.attendees,
+    organizer: { id: user.id, name: user.name, email: user.email ?? "" },
   })
 
-  return sent.ok ? {} : { inviteError: sent.error }
+  revalidatePath("/rooms")
+  return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
 }
 
 export async function cancelBooking(bookingId: string): Promise<BookingResult> {
@@ -275,4 +239,107 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
   })
 
   return sent.ok ? {} : { inviteError: sent.error }
+}
+
+export interface RecurringMeeting {
+  id: string
+  title: string
+  weekday: number
+  startTime: string
+  durationMinutes: number
+  intervalWeeks: number
+  anchorDate: string
+  attendees: AttendeeContact[]
+  includeAdvisor: boolean
+  active: boolean
+  createdBy: string
+}
+
+export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("rooms_recurring_meetings")
+    .select("*")
+    .order("weekday")
+    .order("start_time")
+  if (error) throw new Error(`讀取固定會議失敗:${error.message}`)
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    weekday: row.weekday,
+    startTime: row.start_time,
+    durationMinutes: row.duration_minutes,
+    intervalWeeks: row.interval_weeks,
+    anchorDate: row.anchor_date,
+    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
+    includeAdvisor: row.include_advisor,
+    active: row.active,
+    createdBy: row.created_by,
+  }))
+}
+
+export interface CreateRecurringInput {
+  title: string
+  weekday: number
+  startTime: string
+  durationMinutes: number
+  intervalWeeks: number
+  attendees: AttendeeContact[]
+  includeAdvisor: boolean
+}
+
+export async function createRecurringMeeting(
+  input: CreateRecurringInput
+): Promise<void> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("請先登入")
+
+  const title = input.title.trim()
+  if (!title) throw new Error("請填寫會議標題")
+
+  // The anchor fixes which week a fortnightly series lands on. Using the
+  // next matching weekday (rather than today) means "every other Monday"
+  // starts from the Monday the user is thinking of, not from whenever the
+  // form happened to be submitted.
+  const anchorDate = nextWeekdayOnOrAfter(todayInTaipei(), input.weekday)
+
+  const supabase = await createClient()
+  const { error } = await supabase.from("rooms_recurring_meetings").insert({
+    title,
+    weekday: input.weekday,
+    start_time: input.startTime,
+    duration_minutes: input.durationMinutes,
+    interval_weeks: input.intervalWeeks,
+    anchor_date: anchorDate,
+    attendees: input.attendees as unknown as Json,
+    include_advisor: input.includeAdvisor,
+    created_by: user.id,
+  })
+  if (error) throw new Error(`建立固定會議失敗:${error.message}`)
+
+  revalidatePath("/rooms")
+}
+
+export async function setRecurringActive(
+  id: string,
+  active: boolean
+): Promise<void> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("rooms_recurring_meetings")
+    .update({ active })
+    .eq("id", id)
+  if (error) throw new Error(`更新失敗:${error.message}`)
+  revalidatePath("/rooms")
+}
+
+export async function deleteRecurringMeeting(id: string): Promise<void> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("rooms_recurring_meetings")
+    .delete()
+    .eq("id", id)
+  if (error) throw new Error(`刪除失敗:${error.message}`)
+  revalidatePath("/rooms")
 }

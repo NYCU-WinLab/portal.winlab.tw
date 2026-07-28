@@ -16,6 +16,12 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
@@ -26,6 +32,7 @@ import {
 } from "@/hooks/rooms/use-room-booking"
 
 import { AttendeeSelect } from "./_components/attendee-select"
+import { RecurringTab } from "./_components/recurring-tab"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
@@ -435,110 +442,127 @@ export default function RoomsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => setRangeStart((d) => addDays(d, -RANGE_DAYS))}
-          >
-            <IconChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium">
-            {formatDayLabel(rangeStart)} 起 {RANGE_DAYS} 天
-          </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => setRangeStart((d) => addDays(d, RANGE_DAYS))}
-          >
-            <IconChevronRight className="h-4 w-4" />
-          </Button>
-          {rangeStart !== todayInTaipei() && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7"
-              onClick={() => setRangeStart(todayInTaipei())}
-            >
-              今天
-            </Button>
-          )}
-        </div>
+      <Tabs defaultValue="availability">
+        <TabsList>
+          <TabsTrigger value="availability">空檔查詢</TabsTrigger>
+          <TabsTrigger value="recurring">固定會議</TabsTrigger>
+        </TabsList>
 
-        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-          {TIER_LEGEND.map(({ tier, label }) => (
-            <span key={tier} className="flex items-center gap-1.5">
-              <span className={cn("h-3 w-3 rounded-sm", TIER_STYLE[tier])} />
-              {label}
-            </span>
-          ))}
-        </div>
-      </div>
+        <TabsContent value="recurring" className="mt-4">
+          <RecurringTab />
+        </TabsContent>
 
-      {isLoading && (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: RANGE_DAYS }, (_, i) => (
-            <Skeleton key={i} className="h-6 w-full rounded-md" />
-          ))}
-        </div>
-      )}
-
-      {isError && (
-        <p className="text-sm text-muted-foreground">
-          讀取教室空檔失敗,系上借用系統可能暫時無法連線。
-        </p>
-      )}
-
-      {days && days.length > 0 && (
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            {days.map(({ date, slots }) => (
-              <DayRow
-                key={date}
-                date={date}
-                slots={slots}
-                onSelectSlot={setSelected}
-              />
-            ))}
-            <div className="relative ml-[6.75rem] h-3 text-[10px] text-muted-foreground">
-              <span className="absolute left-0">
-                {days[0]?.slots[0]?.start}
-              </span>
-              {AXIS_MID_TICKS.map((time) => {
-                const percent = axisTickPercent(days[0]?.slots, time)
-                return percent === null ? null : (
-                  <span
-                    key={time}
-                    className="absolute -translate-x-1/2"
-                    style={{ left: `${percent}%` }}
+        <TabsContent value="availability" className="mt-4">
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setRangeStart((d) => addDays(d, -RANGE_DAYS))}
+                >
+                  <IconChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium">
+                  {formatDayLabel(rangeStart)} 起 {RANGE_DAYS} 天
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setRangeStart((d) => addDays(d, RANGE_DAYS))}
+                >
+                  <IconChevronRight className="h-4 w-4" />
+                </Button>
+                {rangeStart !== todayInTaipei() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    onClick={() => setRangeStart(todayInTaipei())}
                   >
-                    {time}
-                  </span>
-                )
-              })}
-              <span className="absolute right-0">
-                {days[0]?.slots.at(-1)?.end}
-              </span>
-            </div>
-          </div>
+                    今天
+                  </Button>
+                )}
+              </div>
 
-          <p className="text-xs text-muted-foreground">
-            資料來源:
-            <a
-              href="https://www.cs.nycu.edu.tw/csauto/meetingroom/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-1 underline"
-            >
-              資工系研討室預約系統
-            </a>
-            (非官方 API,僅供參考,實際借用請至該系統操作)
-          </p>
-        </div>
-      )}
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                {TIER_LEGEND.map(({ tier, label }) => (
+                  <span key={tier} className="flex items-center gap-1.5">
+                    <span
+                      className={cn("h-3 w-3 rounded-sm", TIER_STYLE[tier])}
+                    />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {isLoading && (
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: RANGE_DAYS }, (_, i) => (
+                  <Skeleton key={i} className="h-6 w-full rounded-md" />
+                ))}
+              </div>
+            )}
+
+            {isError && (
+              <p className="text-sm text-muted-foreground">
+                讀取教室空檔失敗,系上借用系統可能暫時無法連線。
+              </p>
+            )}
+
+            {days && days.length > 0 && (
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
+                  {days.map(({ date, slots }) => (
+                    <DayRow
+                      key={date}
+                      date={date}
+                      slots={slots}
+                      onSelectSlot={setSelected}
+                    />
+                  ))}
+                  <div className="relative ml-[6.75rem] h-3 text-[10px] text-muted-foreground">
+                    <span className="absolute left-0">
+                      {days[0]?.slots[0]?.start}
+                    </span>
+                    {AXIS_MID_TICKS.map((time) => {
+                      const percent = axisTickPercent(days[0]?.slots, time)
+                      return percent === null ? null : (
+                        <span
+                          key={time}
+                          className="absolute -translate-x-1/2"
+                          style={{ left: `${percent}%` }}
+                        >
+                          {time}
+                        </span>
+                      )
+                    })}
+                    <span className="absolute right-0">
+                      {days[0]?.slots.at(-1)?.end}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  資料來源:
+                  <a
+                    href="https://www.cs.nycu.edu.tw/csauto/meetingroom/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 underline"
+                  >
+                    資工系研討室預約系統
+                  </a>
+                  (非官方 API,僅供參考,實際借用請至該系統操作)
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog
         open={!!selected}

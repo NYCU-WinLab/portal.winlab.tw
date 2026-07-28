@@ -1,14 +1,10 @@
 import { render } from "@react-email/render"
 
 import { BookingInvite } from "@/emails/rooms/booking-invite"
-import { getResend } from "@/lib/email/resend"
+import { getResend, MAIL_FROM_ROOMS } from "@/lib/email/resend"
 
 import { buildCalendarInvite } from "./ics"
 import { formatDayLabel } from "./date"
-
-// The From identity is per-app in this repo (approve@ for Approve); rooms
-// gets its own so replies and filters stay separable.
-const MAIL_FROM = "WinLab Rooms <rooms@notifications.winlab.tw>"
 
 export interface InviteRecipient {
   name: string
@@ -73,7 +69,7 @@ export async function sendBookingInvite(
     )
 
     const { error } = await getResend().emails.send({
-      from: MAIL_FROM,
+      from: MAIL_FROM_ROOMS,
       to: input.attendees.map((a) => a.email),
       // RSVPs go back to whoever made the booking — a real mailbox, unlike
       // the notifications sender.
