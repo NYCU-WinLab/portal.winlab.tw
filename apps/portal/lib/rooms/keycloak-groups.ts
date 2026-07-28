@@ -169,8 +169,12 @@ async function fetchGroupMembers(
   token: string,
   groupId: string
 ): Promise<KeycloakGroupMember[]> {
+  // briefRepresentation=false is what makes Keycloak include `email` on each
+  // member. The brief form carries id/username/name only, and email is the
+  // key everything downstream matches Portal accounts on — without it every
+  // member looks like someone with no Portal account.
   const raw = await getJson<RawMember[]>(
-    `${adminRealmUrl(env)}/groups/${encodeURIComponent(groupId)}/members?max=500`,
+    `${adminRealmUrl(env)}/groups/${encodeURIComponent(groupId)}/members?briefRepresentation=false&max=500`,
     token
   )
   return raw.map((m) => ({

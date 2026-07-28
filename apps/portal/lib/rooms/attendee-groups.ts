@@ -42,7 +42,13 @@ export function mapGroupsToPortalUsers(
       if (id) {
         if (!userIds.includes(id)) userIds.push(id)
       } else {
-        unmatched.push(member.name ?? member.email ?? member.id)
+        // Label which of the two failures this is. "Keycloak didn't give us
+        // an email" and "the email doesn't match any Portal account" look
+        // identical in a bare name list but need completely different fixes.
+        const who = member.name ?? member.id
+        unmatched.push(
+          member.email ? `${who} <${member.email}>` : `${who}(無 email)`
+        )
       }
     }
 

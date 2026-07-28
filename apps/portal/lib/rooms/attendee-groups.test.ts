@@ -54,16 +54,20 @@ describe("mapGroupsToPortalUsers", () => {
       PORTAL_USERS
     )
     expect(mapped!.userIds).toEqual(["uuid-a"])
-    expect(mapped!.unmatched).toEqual(["Ghost"])
+    // Labelled with the email, so "no Portal account for this address" is
+    // distinguishable from "Keycloak never sent an address".
+    expect(mapped!.unmatched).toEqual(["Ghost <ghost@winlab.tw>"])
   })
 
-  test("a member with no email at all counts as unmatched", () => {
+  test("a member with no email at all is flagged as such, not just unmatched", () => {
     const [mapped] = mapGroupsToPortalUsers(
       [group("ai", [{ email: null, name: "No Mail" }])],
       PORTAL_USERS
     )
     expect(mapped!.userIds).toEqual([])
-    expect(mapped!.unmatched).toEqual(["No Mail"])
+    // The distinction that matters: this is a Keycloak-side data problem,
+    // not a missing Portal account.
+    expect(mapped!.unmatched).toEqual(["No Mail(無 email)"])
   })
 
   test("the same portal user listed twice is only added once", () => {
