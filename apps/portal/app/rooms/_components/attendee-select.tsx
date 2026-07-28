@@ -28,14 +28,34 @@ function label(u: LabUser): string {
   return u.name ?? u.accountId ?? u.id
 }
 
+/** Why the group shortcuts couldn't be offered, when they couldn't. */
+export type GroupsProblem =
+  | { status: "unconfigured" }
+  | { status: "forbidden"; detail: string }
+  | { status: "error"; detail: string }
+
+function problemMessage(problem: GroupsProblem): string | null {
+  switch (problem.status) {
+    // Keycloak isn't wired up at all — nothing to say to a member about it.
+    case "unconfigured":
+      return null
+    case "forbidden":
+      return "無法讀取 Keycloak 群組:admin client 權限不足(需要 view-users)"
+    case "error":
+      return `無法讀取 Keycloak 群組:${problem.detail}`
+  }
+}
+
 export function AttendeeSelect({
   users,
   groups = [],
+  groupsProblem,
   value,
   onChange,
 }: {
   users: LabUser[]
   groups?: PortalAttendeeGroup[]
+  groupsProblem?: GroupsProblem
   value: string[]
   onChange: (next: string[]) => void
 }) {
@@ -58,6 +78,12 @@ export function AttendeeSelect({
 
   return (
     <div className="flex flex-col gap-1.5">
+      {groupsProblem && problemMessage(groupsProblem) && (
+        <p className="text-xs text-muted-foreground">
+          {problemMessage(groupsProblem)}
+        </p>
+      )}
+
       {groups.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">整組加入:</span>

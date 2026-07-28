@@ -234,7 +234,14 @@ function BookingSuggestion({
                 <Label className="text-xs">與會人員</Label>
                 <AttendeeSelect
                   users={labUsers ?? []}
-                  groups={attendeeGroups ?? []}
+                  groups={
+                    attendeeGroups?.status === "ok" ? attendeeGroups.groups : []
+                  }
+                  groupsProblem={
+                    attendeeGroups && attendeeGroups.status !== "ok"
+                      ? attendeeGroups
+                      : undefined
+                  }
                   value={attendees}
                   onChange={setAttendees}
                 />

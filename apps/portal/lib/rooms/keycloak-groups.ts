@@ -2,10 +2,11 @@
 // everyone in this subgroup" instead of making people click members one by
 // one. Read-only — nothing here writes back to Keycloak.
 //
-// Needs the admin client to hold `query-groups` and `view-users` on top of
-// the `manage-users` it already had for /profile. Without them Keycloak
-// answers 403 and this degrades to "no groups offered" rather than breaking
-// the picker.
+// Needs the admin client to hold `view-users` (a composite that includes
+// `query-groups`) on top of the `manage-users` it already had for /profile.
+// Without it Keycloak answers 403, which is reported back rather than
+// swallowed — a silently empty group list is indistinguishable from "the
+// realm has no groups", and that cost real debugging time once already.
 
 import {
   adminEnv,
@@ -32,11 +33,18 @@ export interface AttendeeGroup {
   members: KeycloakGroupMember[]
 }
 
+export type AttendeeGroupsResult =
+  | { status: "ok"; groups: AttendeeGroup[] }
+  | { status: "unconfigured" }
+  | { status: "forbidden"; detail: string }
+  | { status: "error"; detail: string }
+
 type RawGroup = {
   id: string
   name: string
   path: string
   subGroups?: RawGroup[]
+  subGroupCount?: number
 }
 
 type RawMember = {
@@ -58,50 +66,63 @@ async function getJson<T>(url: string, token: string): Promise<T> {
   return (await res.json()) as T
 }
 
-/**
- * Every group that has a parent — i.e. the leaf-ish groups people actually
- * belong to, not the top-level containers. Keycloak nests arbitrarily deep,
- * so this walks the whole tree rather than assuming exactly two levels.
- */
-function flattenSubGroups(roots: RawGroup[]): RawGroup[] {
-  const out: RawGroup[] = []
-  const walk = (group: RawGroup, depth: number) => {
-    if (depth > 0) out.push(group)
-    for (const child of group.subGroups ?? []) walk(child, depth + 1)
-  }
-  for (const root of roots) walk(root, 0)
-  return out
-}
-
 function displayName(member: RawMember): string | null {
   const full = [member.firstName, member.lastName].filter(Boolean).join(" ")
   return full || member.username || member.email || null
 }
 
 /**
- * Subgroups and their members. Returns null when the admin client isn't
- * configured or Keycloak refuses — the caller treats that as "this feature
- * isn't available", never as an error worth failing a booking over.
+ * Every group below the top level — the ones people actually belong to,
+ * not the containers.
+ *
+ * Keycloak 23 stopped populating `subGroups` on the group-list response and
+ * moved children to their own endpoint, so this walks with an explicit
+ * `/children` fetch and only falls back to the inline `subGroups` when the
+ * server still sends it. Handling both keeps this working across versions
+ * instead of silently returning nothing on one of them.
  */
-export async function fetchAttendeeGroups(): Promise<AttendeeGroup[] | null> {
+async function collectSubGroups(
+  env: KeycloakAdminEnv,
+  token: string,
+  group: RawGroup,
+  depth: number,
+  out: RawGroup[]
+): Promise<void> {
+  if (depth > 0) out.push(group)
+
+  let children = group.subGroups
+  if (children === undefined) {
+    children = await getJson<RawGroup[]>(
+      `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
+      token
+    ).catch(() => [])
+  }
+
+  for (const child of children) {
+    await collectSubGroups(env, token, child, depth + 1, out)
+  }
+}
+
+export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
   const env = adminEnv()
-  if (!env) return null
+  if (!env) return { status: "unconfigured" }
 
   try {
     const token = await adminToken(env)
     const base = adminRealmUrl(env)
 
-    // `briefRepresentation=false` is what makes Keycloak include subGroups on
-    // the tree response; without it newer versions return only the top level.
     const roots = await getJson<RawGroup[]>(
       `${base}/groups?briefRepresentation=false&max=500`,
       token
     )
 
-    const subGroups = flattenSubGroups(roots)
-    if (subGroups.length === 0) return []
+    const subGroups: RawGroup[] = []
+    for (const root of roots) {
+      await collectSubGroups(env, token, root, 0, subGroups)
+    }
+    if (subGroups.length === 0) return { status: "ok", groups: [] }
 
-    return await Promise.all(
+    const groups = await Promise.all(
       subGroups.map(async (group) => ({
         id: group.id,
         name: group.name,
@@ -109,9 +130,20 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroup[] | null> {
         members: await fetchGroupMembers(env, token, group.id),
       }))
     )
+    return { status: "ok", groups }
   } catch (err) {
+    const detail =
+      err instanceof KeycloakAdminError
+        ? `${err.status}${err.detail ? ` — ${err.detail}` : ""}`
+        : err instanceof Error
+          ? err.message
+          : "unknown"
     console.error("[rooms] keycloak group read failed", err)
-    return null
+
+    if (err instanceof KeycloakAdminError && err.status === 403) {
+      return { status: "forbidden", detail }
+    }
+    return { status: "error", detail }
   }
 }
 

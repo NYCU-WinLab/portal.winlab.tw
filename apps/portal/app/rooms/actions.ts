@@ -79,22 +79,35 @@ async function resolveRecipients(
     .map((u) => ({ name: u.name ?? u.email, email: u.email }))
 }
 
+export type AttendeeGroupsResponse =
+  | { status: "ok"; groups: PortalAttendeeGroup[] }
+  | { status: "unconfigured" }
+  | { status: "forbidden"; detail: string }
+  | { status: "error"; detail: string }
+
 /**
  * Keycloak subgroups mapped onto portal users, for the picker's "add
- * everyone in this group" shortcut. Returns an empty list when Keycloak
- * isn't configured or refuses — the picker simply doesn't offer groups
- * rather than erroring.
+ * everyone in this group" shortcut.
+ *
+ * Reports why the list is empty instead of just returning nothing: an empty
+ * array could mean "no groups", "no permission", or "not configured", and
+ * collapsing those into one silent case made a real misconfiguration take a
+ * round trip to diagnose.
  */
-export async function getAttendeeGroups(): Promise<PortalAttendeeGroup[]> {
-  const groups = await fetchAttendeeGroups()
-  if (!groups || groups.length === 0) return []
+export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
+  const result = await fetchAttendeeGroups()
+  if (result.status !== "ok") return result
+  if (result.groups.length === 0) return { status: "ok", groups: [] }
 
   const supabase = await createClient()
   const { data: users } = await supabase
     .from("user_profiles")
     .select("id, email")
 
-  return usableGroups(mapGroupsToPortalUsers(groups, users ?? []))
+  return {
+    status: "ok",
+    groups: usableGroups(mapGroupsToPortalUsers(result.groups, users ?? [])),
+  }
 }
 
 export interface PortalBooking {
