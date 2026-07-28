@@ -13,14 +13,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { useLabUsers } from "@/hooks/rooms/use-lab-users"
 import {
   useCancelBooking,
   useConfirmBooking,
   usePortalBookingsForDate,
 } from "@/hooks/rooms/use-room-booking"
+
+import { AttendeeSelect } from "./_components/attendee-select"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
@@ -144,11 +149,14 @@ function BookingSuggestion({
   onBooked: () => void
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
+  const [title, setTitle] = useState("")
+  const [attendees, setAttendees] = useState<string[]>([])
   const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
   const suggestion = durationMinutes
     ? suggestRoom(daySlots, slotIndex, durationSlots)
     : null
   const confirmBooking = useConfirmBooking()
+  const { data: labUsers } = useLabUsers()
 
   function handleConfirm() {
     if (!suggestion || !durationMinutes) return
@@ -162,6 +170,8 @@ function BookingSuggestion({
         room: suggestion.room,
         startTime: startSlot.start,
         endTime: endSlot.end,
+        title,
+        attendees,
       },
       {
         onSuccess: () => {
@@ -192,21 +202,45 @@ function BookingSuggestion({
         ))}
       </div>
       {durationMinutes && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-3">
           <p className="text-sm">
             {suggestion
               ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
               : "這個時長內沒有教室從頭到尾都空著,試試縮短時間或換個起始時段。"}
           </p>
+
           {suggestion && (
-            <Button
-              size="sm"
-              className="h-7"
-              disabled={confirmBooking.isPending}
-              onClick={handleConfirm}
-            >
-              {confirmBooking.isPending ? "預約中…" : "確認預約"}
-            </Button>
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="booking-title" className="text-xs">
+                  會議標題
+                </Label>
+                <Input
+                  id="booking-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="例:Weekly sync"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">與會人員</Label>
+                <AttendeeSelect
+                  users={labUsers ?? []}
+                  value={attendees}
+                  onChange={setAttendees}
+                />
+              </div>
+
+              <Button
+                size="sm"
+                className="h-7 self-end"
+                disabled={confirmBooking.isPending || !title.trim()}
+                onClick={handleConfirm}
+              >
+                {confirmBooking.isPending ? "預約中…" : "確認預約"}
+              </Button>
+            </>
           )}
         </div>
       )}
@@ -238,6 +272,7 @@ function LabBookingCancel({
   end: string
 }) {
   const { data: portalBookings, isLoading } = usePortalBookingsForDate(date)
+  const { data: labUsers } = useLabUsers()
   const cancelBooking = useCancelBooking()
 
   if (isLoading) return null
@@ -254,21 +289,33 @@ function LabBookingCancel({
     )
   }
 
+  const attendeeNames = match.attendees
+    .map((id) => labUsers?.find((u) => u.id === id)?.name)
+    .filter((name): name is string => !!name)
+
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-7 self-start"
-      disabled={cancelBooking.isPending}
-      onClick={() =>
-        cancelBooking.mutate(match.id, {
-          onSuccess: () => toast.success(`已取消 ${room} 的預約`),
-          onError: (err) => toast.error(errorMessage(err, "取消失敗")),
-        })
-      }
-    >
-      {cancelBooking.isPending ? "取消中…" : `取消 ${room} 的 Portal 預約`}
-    </Button>
+    <div className="flex flex-col gap-1.5">
+      {match.title && <p className="text-sm">{match.title}</p>}
+      {attendeeNames.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          與會:{attendeeNames.join("、")}
+        </p>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 self-start"
+        disabled={cancelBooking.isPending}
+        onClick={() =>
+          cancelBooking.mutate(match.id, {
+            onSuccess: () => toast.success(`已取消 ${room} 的預約`),
+            onError: (err) => toast.error(errorMessage(err, "取消失敗")),
+          })
+        }
+      >
+        {cancelBooking.isPending ? "取消中…" : `取消 ${room} 的 Portal 預約`}
+      </Button>
+    </div>
   )
 }
 

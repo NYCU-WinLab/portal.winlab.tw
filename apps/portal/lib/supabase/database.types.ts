@@ -1557,6 +1557,7 @@ export type Database = {
       }
       rooms_bookings: {
         Row: {
+          attendees: string[]
           cancelled_at: string | null
           cancelled_by: string | null
           created_at: string
@@ -1568,8 +1569,10 @@ export type Database = {
           room: string
           start_time: string
           status: string
+          title: string | null
         }
         Insert: {
+          attendees?: string[]
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
@@ -1581,8 +1584,10 @@ export type Database = {
           room: string
           start_time: string
           status?: string
+          title?: string | null
         }
         Update: {
+          attendees?: string[]
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
@@ -1594,6 +1599,7 @@ export type Database = {
           room?: string
           start_time?: string
           status?: string
+          title?: string | null
         }
         Relationships: [
           {

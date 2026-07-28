@@ -60,6 +60,8 @@ export interface PortalBooking {
   startTime: string
   endTime: string
   requestedBy: string
+  title: string | null
+  attendees: string[]
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
@@ -69,7 +71,9 @@ export async function getPortalBookingsForDate(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("rooms_bookings")
-    .select("id, room, date, start_time, end_time, requested_by")
+    .select(
+      "id, room, date, start_time, end_time, requested_by, title, attendees"
+    )
     .eq("date", date)
     .eq("status", "booked")
 
@@ -84,6 +88,8 @@ export async function getPortalBookingsForDate(
     startTime: row.start_time,
     endTime: row.end_time,
     requestedBy: row.requested_by,
+    title: row.title,
+    attendees: row.attendees,
   }))
 }
 
@@ -92,6 +98,8 @@ export interface ConfirmBookingInput {
   room: string
   startTime: string
   endTime: string
+  title: string
+  attendees: string[]
 }
 
 export async function confirmBooking(
@@ -99,6 +107,9 @@ export async function confirmBooking(
 ): Promise<void> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
+
+  const title = input.title.trim()
+  if (!title) throw new Error("請填寫會議標題")
 
   const subscriber = requireServiceAccount()
   const start = taipeiIso(input.date, input.startTime)
@@ -119,6 +130,8 @@ export async function confirmBooking(
     start_time: input.startTime,
     end_time: input.endTime,
     requested_by: user.id,
+    title,
+    attendees: input.attendees,
   })
 
   if (error) {
