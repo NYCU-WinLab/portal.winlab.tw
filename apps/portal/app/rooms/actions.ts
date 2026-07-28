@@ -10,9 +10,15 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 import {
+  mapGroupsToPortalUsers,
+  usableGroups,
+  type PortalAttendeeGroup,
+} from "@/lib/rooms/attendee-groups"
+import {
   computeDayAvailability,
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
+import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { bookRoom, cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso } from "@/lib/rooms/date"
@@ -71,6 +77,24 @@ async function resolveRecipients(
   return (data ?? [])
     .filter((u): u is typeof u & { email: string } => !!u.email)
     .map((u) => ({ name: u.name ?? u.email, email: u.email }))
+}
+
+/**
+ * Keycloak subgroups mapped onto portal users, for the picker's "add
+ * everyone in this group" shortcut. Returns an empty list when Keycloak
+ * isn't configured or refuses — the picker simply doesn't offer groups
+ * rather than erroring.
+ */
+export async function getAttendeeGroups(): Promise<PortalAttendeeGroup[]> {
+  const groups = await fetchAttendeeGroups()
+  if (!groups || groups.length === 0) return []
+
+  const supabase = await createClient()
+  const { data: users } = await supabase
+    .from("user_profiles")
+    .select("id, email")
+
+  return usableGroups(mapGroupsToPortalUsers(groups, users ?? []))
 }
 
 export interface PortalBooking {

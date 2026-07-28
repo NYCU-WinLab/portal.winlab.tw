@@ -18,7 +18,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useLabUsers } from "@/hooks/rooms/use-lab-users"
+import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
 import {
   useCancelBooking,
   useConfirmBooking,
@@ -157,6 +157,7 @@ function BookingSuggestion({
     : null
   const confirmBooking = useConfirmBooking()
   const { data: labUsers } = useLabUsers()
+  const { data: attendeeGroups } = useAttendeeGroups()
 
   function handleConfirm() {
     if (!suggestion || !durationMinutes) return
@@ -233,6 +234,7 @@ function BookingSuggestion({
                 <Label className="text-xs">與會人員</Label>
                 <AttendeeSelect
                   users={labUsers ?? []}
+                  groups={attendeeGroups ?? []}
                   value={attendees}
                   onChange={setAttendees}
                 />

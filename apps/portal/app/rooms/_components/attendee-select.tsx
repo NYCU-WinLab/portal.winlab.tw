@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components/popover"
 import { useDialogPopoverScroll } from "@workspace/ui/hooks/use-dialog-popover-scroll"
 
+import type { PortalAttendeeGroup } from "@/lib/rooms/attendee-groups"
 import type { LabUser } from "@/hooks/rooms/use-lab-users"
 
 function label(u: LabUser): string {
@@ -29,15 +30,21 @@ function label(u: LabUser): string {
 
 export function AttendeeSelect({
   users,
+  groups = [],
   value,
   onChange,
 }: {
   users: LabUser[]
+  groups?: PortalAttendeeGroup[]
   value: string[]
   onChange: (next: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
   const scrollRef = useDialogPopoverScroll<HTMLDivElement>()
+
+  function addGroup(group: PortalAttendeeGroup) {
+    onChange([...new Set([...value, ...group.userIds])])
+  }
 
   const selected = value
     .map((id) => users.find((u) => u.id === id))
@@ -51,6 +58,30 @@ export function AttendeeSelect({
 
   return (
     <div className="flex flex-col gap-1.5">
+      {groups.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">整組加入:</span>
+          {groups.map((g) => (
+            <Button
+              key={g.id}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs"
+              title={
+                g.unmatched.length > 0
+                  ? `${g.userIds.length} 人；${g.unmatched.length} 人沒有 Portal 帳號:${g.unmatched.join("、")}`
+                  : `${g.userIds.length} 人`
+              }
+              onClick={() => addGroup(g)}
+            >
+              {g.name}
+              <span className="ml-1 opacity-60">{g.userIds.length}</span>
+            </Button>
+          ))}
+        </div>
+      )}
+
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button

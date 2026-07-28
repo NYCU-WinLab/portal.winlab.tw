@@ -9,4 +9,7 @@ export const queryKeys = {
   labUsers: {
     all: ["rooms", "lab-users"] as const,
   },
+  attendeeGroups: {
+    all: ["rooms", "attendee-groups"] as const,
+  },
 }

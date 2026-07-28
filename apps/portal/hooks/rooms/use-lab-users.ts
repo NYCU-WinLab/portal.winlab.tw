@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
+import { getAttendeeGroups } from "@/app/rooms/actions"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -37,6 +38,19 @@ export function useLabUsers() {
         accountId: u.email ? (u.email.split("@")[0] ?? null) : null,
       }))
     },
+    staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * Keycloak subgroups mapped onto portal users. Empty when Keycloak isn't
+ * configured or the admin client lacks group-read permission — the picker
+ * just doesn't show the group shortcuts in that case.
+ */
+export function useAttendeeGroups() {
+  return useQuery({
+    queryKey: queryKeys.attendeeGroups.all,
+    queryFn: () => getAttendeeGroups(),
     staleTime: 5 * 60_000,
   })
 }
