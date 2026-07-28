@@ -10,6 +10,13 @@ import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
@@ -128,51 +135,57 @@ export function RecurringTab() {
             <Label htmlFor="recurring-start" className="text-xs">
               開始時間
             </Label>
-            <select
-              id="recurring-start"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="h-9 rounded-md border bg-transparent px-3 text-sm"
-            >
-              {START_TIMES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            <Select value={startTime} onValueChange={setStartTime}>
+              <SelectTrigger id="recurring-start" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {START_TIMES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="recurring-duration" className="text-xs">
               時長
             </Label>
-            <select
-              id="recurring-duration"
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            <Select
+              value={String(durationMinutes)}
+              onValueChange={(v) => setDurationMinutes(Number(v))}
             >
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d} 分鐘
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="recurring-duration" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DURATIONS.map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    {d} 分鐘
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="recurring-interval" className="text-xs">
               頻率
             </Label>
-            <select
-              id="recurring-interval"
-              value={intervalWeeks}
-              onChange={(e) => setIntervalWeeks(Number(e.target.value))}
-              className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            <Select
+              value={String(intervalWeeks)}
+              onValueChange={(v) => setIntervalWeeks(Number(v))}
             >
-              <option value={1}>每週</option>
-              <option value={2}>隔週</option>
-            </select>
+              <SelectTrigger id="recurring-interval" className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">每週</SelectItem>
+                <SelectItem value="2">隔週</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
