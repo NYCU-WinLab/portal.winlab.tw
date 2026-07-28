@@ -21,12 +21,18 @@ import {
 } from "@workspace/ui/components/popover"
 import { useDialogPopoverScroll } from "@workspace/ui/hooks/use-dialog-popover-scroll"
 
+import type { LabUser } from "@/hooks/rooms/use-lab-users"
+
+function label(u: LabUser): string {
+  return u.name ?? u.accountId ?? u.id
+}
+
 export function AttendeeSelect({
   users,
   value,
   onChange,
 }: {
-  users: { id: string; name: string | null }[]
+  users: LabUser[]
   value: string[]
   onChange: (next: string[]) => void
 }) {
@@ -35,7 +41,7 @@ export function AttendeeSelect({
 
   const selected = value
     .map((id) => users.find((u) => u.id === id))
-    .filter((u): u is { id: string; name: string | null } => u !== undefined)
+    .filter((u): u is LabUser => u !== undefined)
 
   function toggle(id: string) {
     onChange(
@@ -64,14 +70,19 @@ export function AttendeeSelect({
           className="w-(--radix-popover-trigger-width) p-0"
         >
           <Command>
-            <CommandInput placeholder="搜尋成員" />
+            <CommandInput placeholder="搜尋姓名或帳號 id" />
             <CommandList>
               <CommandEmpty>找不到成員</CommandEmpty>
               <CommandGroup>
                 {users.map((u) => (
                   <CommandItem
                     key={u.id}
-                    value={u.name ?? u.id}
+                    // cmdk matches against this string, so both the display
+                    // name and the account id have to be in it for either to
+                    // be searchable.
+                    value={[u.name, u.accountId, u.id]
+                      .filter(Boolean)
+                      .join(" ")}
                     onSelect={() => toggle(u.id)}
                   >
                     <span
@@ -79,8 +90,13 @@ export function AttendeeSelect({
                         value.includes(u.id) ? "font-medium" : undefined
                       }
                     >
-                      {u.name ?? u.id}
+                      {label(u)}
                     </span>
+                    {u.accountId && u.name && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {u.accountId}
+                      </span>
+                    )}
                     {value.includes(u.id) && (
                       <span className="ml-auto text-xs text-muted-foreground">
                         已選
@@ -98,10 +114,10 @@ export function AttendeeSelect({
         <div className="flex flex-wrap gap-1">
           {selected.map((u) => (
             <Badge key={u.id} variant="secondary" className="gap-1">
-              {u.name ?? u.id}
+              {label(u)}
               <button
                 type="button"
-                aria-label={`移除 ${u.name ?? u.id}`}
+                aria-label={`移除 ${label(u)}`}
                 onClick={() => toggle(u.id)}
                 className="cursor-pointer opacity-60 hover:opacity-100"
               >

@@ -174,8 +174,14 @@ function BookingSuggestion({
         attendees,
       },
       {
-        onSuccess: () => {
-          toast.success(`已預約 ${suggestion.room}`)
+        onSuccess: (result) => {
+          if (result.inviteError) {
+            toast.warning(
+              `已預約 ${suggestion.room},但邀請信寄送失敗:${result.inviteError}`
+            )
+          } else {
+            toast.success(`已預約 ${suggestion.room}`)
+          }
           onBooked()
         },
         onError: (err) => toast.error(errorMessage(err, "預約失敗")),
@@ -308,7 +314,12 @@ function LabBookingCancel({
         disabled={cancelBooking.isPending}
         onClick={() =>
           cancelBooking.mutate(match.id, {
-            onSuccess: () => toast.success(`已取消 ${room} 的預約`),
+            onSuccess: (result) =>
+              result.inviteError
+                ? toast.warning(
+                    `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`
+                  )
+                : toast.success(`已取消 ${room} 的預約`),
             onError: (err) => toast.error(errorMessage(err, "取消失敗")),
           })
         }

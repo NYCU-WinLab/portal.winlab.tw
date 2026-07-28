@@ -16,6 +16,10 @@ import {
 import { bookRoom, cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso } from "@/lib/rooms/date"
+import {
+  sendBookingInvite,
+  type InviteRecipient,
+} from "@/lib/rooms/invite-mail"
 
 const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
 
@@ -51,6 +55,22 @@ function requireServiceAccount(): string {
     throw new Error("自動預約尚未設定服務帳號(MEETINGROOM_SERVICE_USER)")
   }
   return user
+}
+
+/** Attendee ids -> mailable recipients, dropping anyone without an email. */
+async function resolveRecipients(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userIds: string[]
+): Promise<InviteRecipient[]> {
+  if (userIds.length === 0) return []
+  const { data } = await supabase
+    .from("user_profiles")
+    .select("id, name, email")
+    .in("id", userIds)
+
+  return (data ?? [])
+    .filter((u): u is typeof u & { email: string } => !!u.email)
+    .map((u) => ({ name: u.name ?? u.email, email: u.email }))
 }
 
 export interface PortalBooking {
@@ -102,9 +122,11 @@ export interface ConfirmBookingInput {
   attendees: string[]
 }
 
+export type BookingResult = { inviteError?: string }
+
 export async function confirmBooking(
   input: ConfirmBookingInput
-): Promise<void> {
+): Promise<BookingResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
@@ -123,27 +145,49 @@ export async function confirmBooking(
   })
 
   const supabase = await createClient()
-  const { error } = await supabase.from("rooms_bookings").insert({
-    external_reservation_id: externalId,
-    room: input.room,
-    date: input.date,
-    start_time: input.startTime,
-    end_time: input.endTime,
-    requested_by: user.id,
-    title,
-    attendees: input.attendees,
-  })
+  const { data: inserted, error } = await supabase
+    .from("rooms_bookings")
+    .insert({
+      external_reservation_id: externalId,
+      room: input.room,
+      date: input.date,
+      start_time: input.startTime,
+      end_time: input.endTime,
+      requested_by: user.id,
+      title,
+      attendees: input.attendees,
+    })
+    .select("id")
+    .single()
 
-  if (error) {
+  if (error || !inserted) {
     throw new Error(
-      `已在外部系統訂到教室(訂位編號 ${externalId}),但寫入 Portal 稽核紀錄失敗:${error.message}——請通知管理員手動補登,避免之後被誤判成可取消`
+      `已在外部系統訂到教室(訂位編號 ${externalId}),但寫入 Portal 稽核紀錄失敗:${error?.message ?? "unknown"}——請通知管理員手動補登,避免之後被誤判成可取消`
     )
   }
 
   revalidatePath("/rooms")
+
+  // The room is booked either way — a mail failure is reported back, not
+  // thrown, so it can't read as "the booking didn't happen".
+  const recipients = await resolveRecipients(supabase, input.attendees)
+  const sent = await sendBookingInvite({
+    bookingId: inserted.id,
+    title,
+    room: input.room,
+    date: input.date,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    start,
+    end,
+    organizer: { name: user.name, email: user.email ?? "" },
+    attendees: recipients,
+  })
+
+  return sent.ok ? {} : { inviteError: sent.error }
 }
 
-export async function cancelBooking(bookingId: string): Promise<void> {
+export async function cancelBooking(bookingId: string): Promise<BookingResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
@@ -187,4 +231,23 @@ export async function cancelBooking(bookingId: string): Promise<void> {
   }
 
   revalidatePath("/rooms")
+
+  // Same reasoning as confirmBooking: the cancellation already went through,
+  // so a mail failure is reported rather than thrown.
+  const recipients = await resolveRecipients(supabase, booking.attendees)
+  const sent = await sendBookingInvite({
+    bookingId: booking.id,
+    title: booking.title ?? `${booking.room} 借用`,
+    room: booking.room,
+    date: booking.date,
+    startTime: booking.start_time,
+    endTime: booking.end_time,
+    start: taipeiIso(booking.date, booking.start_time),
+    end: taipeiIso(booking.date, booking.end_time),
+    organizer: { name: user.name, email: user.email ?? "" },
+    attendees: recipients,
+    cancelled: true,
+  })
+
+  return sent.ok ? {} : { inviteError: sent.error }
 }

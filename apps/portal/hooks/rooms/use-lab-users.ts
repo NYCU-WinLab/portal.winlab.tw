@@ -6,6 +6,14 @@ import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
 
+export interface LabUser {
+  id: string
+  name: string | null
+  email: string | null
+  /** The 系計中 account id — the local part of the email, e.g. "cctseng". */
+  accountId: string | null
+}
+
 /**
  * Lab members, for the attendee picker. Deliberately a rooms-local copy of
  * the same shape meetings uses — the two features just happen to need the
@@ -16,13 +24,18 @@ export function useLabUsers() {
 
   return useQuery({
     queryKey: queryKeys.labUsers.all,
-    queryFn: async () => {
+    queryFn: async (): Promise<LabUser[]> => {
       const { data, error } = await supabase
         .from("user_profiles")
-        .select("id, name")
+        .select("id, name, email")
         .order("name")
       if (error) throw error
-      return data as { id: string; name: string | null }[]
+      return (data ?? []).map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        accountId: u.email ? (u.email.split("@")[0] ?? null) : null,
+      }))
     },
     staleTime: 5 * 60_000,
   })
