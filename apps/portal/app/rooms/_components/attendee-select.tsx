@@ -21,11 +21,15 @@ import {
 } from "@workspace/ui/components/popover"
 import { useDialogPopoverScroll } from "@workspace/ui/hooks/use-dialog-popover-scroll"
 
-import type { PortalAttendeeGroup } from "@/lib/rooms/attendee-groups"
+import type {
+  AttendeeContact,
+  PickableGroup,
+} from "@/lib/rooms/attendee-groups"
+import { mergeAttendees } from "@/lib/rooms/attendee-groups"
 import type { LabUser } from "@/hooks/rooms/use-lab-users"
 
 function label(u: LabUser): string {
-  return u.name ?? u.username ?? u.id
+  return u.name ?? u.username ?? u.email ?? u.id
 }
 
 export function AttendeeSelect({
@@ -36,15 +40,15 @@ export function AttendeeSelect({
   onChange,
 }: {
   users: LabUser[]
-  groups?: PortalAttendeeGroup[]
+  groups?: PickableGroup[]
   /**
    * Why there are no group buttons, when there are none. Always set unless
    * the groups actually loaded: "no buttons and no explanation" is the one
    * outcome that can't be debugged from a screenshot.
    */
   groupsNote?: string | null
-  value: string[]
-  onChange: (next: string[]) => void
+  value: AttendeeContact[]
+  onChange: (next: AttendeeContact[]) => void
 }) {
   const [open, setOpen] = useState(false)
   // Reset after every pick so the next name can be typed straight away —
@@ -52,20 +56,23 @@ export function AttendeeSelect({
   const [search, setSearch] = useState("")
   const scrollRef = useDialogPopoverScroll<HTMLDivElement>()
 
-  function addGroup(group: PortalAttendeeGroup) {
-    onChange([...new Set([...value, ...group.userIds])])
-  }
+  const selectedEmails = new Set(value.map((a) => a.email.toLowerCase()))
 
-  const selected = value
-    .map((id) => users.find((u) => u.id === id))
-    .filter((u): u is LabUser => u !== undefined)
-
-  function toggle(id: string) {
+  function toggle(contact: AttendeeContact) {
+    const key = contact.email.toLowerCase()
     onChange(
-      value.includes(id) ? value.filter((v) => v !== id) : [...value, id]
+      selectedEmails.has(key)
+        ? value.filter((a) => a.email.toLowerCase() !== key)
+        : [...value, contact]
     )
     setSearch("")
   }
+
+  // Only members with an address can be invited; the rest are surfaced in
+  // the button's tooltip rather than quietly shrinking the group.
+  const mailable = users.filter(
+    (u): u is LabUser & { email: string } => !!u.email
+  )
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -84,14 +91,14 @@ export function AttendeeSelect({
               variant="outline"
               className="h-6 text-xs"
               title={
-                g.unmatched.length > 0
-                  ? `${g.userIds.length} 人；${g.unmatched.length} 人沒有 Portal 帳號:${g.unmatched.join("、")}`
-                  : `${g.userIds.length} 人`
+                g.unmailable.length > 0
+                  ? `${g.members.length} 人；${g.unmailable.length} 人在 Keycloak 沒有 email,無法邀請:${g.unmailable.join("、")}`
+                  : `${g.members.length} 人`
               }
-              onClick={() => addGroup(g)}
+              onClick={() => onChange(mergeAttendees(value, g.members))}
             >
               {g.name}
-              <span className="ml-1 opacity-60">{g.userIds.length}</span>
+              <span className="ml-1 opacity-60">{g.members.length}</span>
             </Button>
           ))}
         </div>
@@ -124,18 +131,22 @@ export function AttendeeSelect({
             <CommandList>
               <CommandEmpty>找不到成員</CommandEmpty>
               <CommandGroup>
-                {users.map((u) => (
+                {mailable.map((u) => (
                   <CommandItem
                     key={u.id}
                     // cmdk matches against this string, so both the display
-                    // name and the account id have to be in it for either to
-                    // be searchable.
-                    value={[u.name, u.username, u.id].filter(Boolean).join(" ")}
-                    onSelect={() => toggle(u.id)}
+                    // name and the account name have to be in it for either
+                    // to be searchable.
+                    value={[u.name, u.username, u.email]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onSelect={() => toggle({ name: label(u), email: u.email })}
                   >
                     <span
                       className={
-                        value.includes(u.id) ? "font-medium" : undefined
+                        selectedEmails.has(u.email.toLowerCase())
+                          ? "font-medium"
+                          : undefined
                       }
                     >
                       {label(u)}
@@ -145,7 +156,7 @@ export function AttendeeSelect({
                         {u.username}
                       </span>
                     )}
-                    {value.includes(u.id) && (
+                    {selectedEmails.has(u.email.toLowerCase()) && (
                       <span className="ml-auto text-xs text-muted-foreground">
                         已選
                       </span>
@@ -158,15 +169,15 @@ export function AttendeeSelect({
         </PopoverContent>
       </Popover>
 
-      {selected.length > 0 && (
+      {value.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {selected.map((u) => (
-            <Badge key={u.id} variant="secondary" className="gap-1">
-              {label(u)}
+          {value.map((a) => (
+            <Badge key={a.email} variant="secondary" className="gap-1">
+              {a.name}
               <button
                 type="button"
-                aria-label={`移除 ${label(u)}`}
-                onClick={() => toggle(u.id)}
+                aria-label={`移除 ${a.name}`}
+                onClick={() => toggle(a)}
                 className="cursor-pointer opacity-60 hover:opacity-100"
               >
                 <IconX className="h-3 w-3" />

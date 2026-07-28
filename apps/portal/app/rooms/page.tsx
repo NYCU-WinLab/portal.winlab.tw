@@ -34,6 +34,7 @@ import {
   type SlotTier,
 } from "@/lib/rooms/availability"
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
+import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -108,8 +109,8 @@ function groupsNote(
       if (data.subGroupCount === 0) {
         return `Keycloak 有 ${data.rootGroupCount} 個頂層群組,但它們都沒有子群組`
       }
-      const who = data.unmatchedSample.join("、")
-      return `找到 ${data.subGroupCount} 個子群組,但成員都沒有對應的 Portal 帳號${
+      const who = data.unmailableSample.join("、")
+      return `找到 ${data.subGroupCount} 個子群組,但裡面沒有任何人有 email 可以邀請${
         who ? `(例如:${who})` : ""
       }`
     }
@@ -189,7 +190,7 @@ function BookingSuggestion({
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [title, setTitle] = useState("")
-  const [attendees, setAttendees] = useState<string[]>([])
+  const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
   const suggestion = durationMinutes
     ? suggestRoom(daySlots, slotIndex, durationSlots)
@@ -323,7 +324,6 @@ function LabBookingCancel({
   end: string
 }) {
   const { data: portalBookings, isLoading } = usePortalBookingsForDate(date)
-  const { data: labUsers } = useLabUsers()
   const cancelBooking = useCancelBooking()
 
   if (isLoading) return null
@@ -340,9 +340,7 @@ function LabBookingCancel({
     )
   }
 
-  const attendeeNames = match.attendees
-    .map((id) => labUsers?.find((u) => u.id === id)?.name)
-    .filter((name): name is string => !!name)
+  const attendeeNames = match.attendees.map((a) => a.name)
 
   return (
     <div className="flex flex-col gap-1.5">

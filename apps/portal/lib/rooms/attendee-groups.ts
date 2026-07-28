@@ -1,72 +1,78 @@
-// Pure logic mapping Keycloak groups onto portal users. Kept out of the
-// Keycloak client so it can be unit tested without any admin credential.
+// A Keycloak subgroup, ready to drop into the attendee list.
+//
+// There is deliberately no mapping step here any more. This used to resolve
+// each Keycloak member to a Portal account by email so the booking could
+// store user_profiles ids — which meant anyone who had never signed into
+// Portal was silently dropped from their own project group, and every
+// mismatch surfaced as "this member has no Portal account" rather than as
+// what it was. An invite only needs a name and an address, and Keycloak
+// supplies both, so the group's members are the attendees.
 
 import type { AttendeeGroup } from "./keycloak-groups"
 
-export interface PortalAttendeeGroup {
+/** Who an invite goes to. No Portal account required. */
+export interface AttendeeContact {
+  name: string
+  email: string
+}
+
+export interface PickableGroup {
   id: string
   name: string
   path: string
-  /** portal user_profiles ids for members we could match. */
-  userIds: string[]
+  members: AttendeeContact[]
   /**
-   * Group members with no matching portal account. Surfaced rather than
-   * silently dropped — "I picked the group but Alice didn't get the invite"
-   * is exactly the kind of thing that should be visible up front.
+   * Group members Keycloak gave us with no email address — they can't be
+   * invited, and saying so beats quietly shrinking the group.
    */
-  unmatched: string[]
+  unmailable: string[]
 }
 
-/**
- * Email is the join key: Keycloak is the IdP portal accounts are created
- * from, so a member's email is the same string on both sides. Compared
- * case-insensitively since neither system normalises it.
- */
-export function mapGroupsToPortalUsers(
-  groups: AttendeeGroup[],
-  portalUsers: { id: string; email: string | null }[]
-): PortalAttendeeGroup[] {
-  const byEmail = new Map<string, string>()
-  for (const user of portalUsers) {
-    if (user.email) byEmail.set(user.email.toLowerCase(), user.id)
-  }
-
-  return groups.map((group) => {
-    const userIds: string[] = []
-    const unmatched: string[] = []
-
-    for (const member of group.members) {
-      const id = member.email
-        ? byEmail.get(member.email.toLowerCase())
-        : undefined
-      if (id) {
-        if (!userIds.includes(id)) userIds.push(id)
-      } else {
-        // Label which of the two failures this is. "Keycloak didn't give us
-        // an email" and "the email doesn't match any Portal account" look
-        // identical in a bare name list but need completely different fixes.
-        const who = member.name ?? member.id
-        unmatched.push(
-          member.email ? `${who} <${member.email}>` : `${who}(無 email)`
-        )
-      }
-    }
-
-    return {
-      id: group.id,
-      name: group.name,
-      path: group.path,
-      userIds,
-      unmatched,
-    }
-  })
-}
-
-/** Groups with at least one matched member, sorted by path for stable UI. */
-export function usableGroups(
-  groups: PortalAttendeeGroup[]
-): PortalAttendeeGroup[] {
+export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
   return groups
-    .filter((g) => g.userIds.length > 0)
+    .map((group) => {
+      const members: AttendeeContact[] = []
+      const unmailable: string[] = []
+      const seen = new Set<string>()
+
+      for (const member of group.members) {
+        if (!member.email) {
+          unmailable.push(member.name ?? member.id)
+          continue
+        }
+        const key = member.email.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        members.push({
+          name: member.name ?? member.email,
+          email: member.email,
+        })
+      }
+
+      return {
+        id: group.id,
+        name: group.name,
+        path: group.path,
+        members,
+        unmailable,
+      }
+    })
+    .filter((g) => g.members.length > 0)
     .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+/** Merge picks into an existing list, de-duplicating on email. */
+export function mergeAttendees(
+  current: AttendeeContact[],
+  incoming: AttendeeContact[]
+): AttendeeContact[] {
+  const seen = new Set(current.map((a) => a.email.toLowerCase()))
+  const next = [...current]
+  for (const contact of incoming) {
+    const key = contact.email.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    next.push(contact)
+  }
+  return next
 }

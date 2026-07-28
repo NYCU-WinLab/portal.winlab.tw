@@ -8,11 +8,12 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
+import type { Json } from "@/lib/supabase/database.types"
 import { getCurrentUser } from "@/lib/user"
 import {
-  mapGroupsToPortalUsers,
-  usableGroups,
-  type PortalAttendeeGroup,
+  toPickableGroups,
+  type AttendeeContact,
+  type PickableGroup,
 } from "@/lib/rooms/attendee-groups"
 import {
   computeDayAvailability,
@@ -22,10 +23,7 @@ import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { bookRoom, cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso } from "@/lib/rooms/date"
-import {
-  sendBookingInvite,
-  type InviteRecipient,
-} from "@/lib/rooms/invite-mail"
+import { sendBookingInvite } from "@/lib/rooms/invite-mail"
 
 const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
 
@@ -63,30 +61,14 @@ function requireServiceAccount(): string {
   return user
 }
 
-/** Attendee ids -> mailable recipients, dropping anyone without an email. */
-async function resolveRecipients(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userIds: string[]
-): Promise<InviteRecipient[]> {
-  if (userIds.length === 0) return []
-  const { data } = await supabase
-    .from("user_profiles")
-    .select("id, name, email")
-    .in("id", userIds)
-
-  return (data ?? [])
-    .filter((u): u is typeof u & { email: string } => !!u.email)
-    .map((u) => ({ name: u.name ?? u.email, email: u.email }))
-}
-
 export type AttendeeGroupsResponse =
   | {
       status: "ok"
-      groups: PortalAttendeeGroup[]
+      groups: PickableGroup[]
       /** Diagnostics, so an empty result can say which step came up empty. */
       rootGroupCount: number
       subGroupCount: number
-      unmatchedSample: string[]
+      unmailableSample: string[]
     }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
@@ -104,28 +86,14 @@ export type AttendeeGroupsResponse =
 export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
   const result = await fetchAttendeeGroups()
   if (result.status !== "ok") return result
-  if (result.groups.length === 0) {
-    return {
-      status: "ok",
-      groups: [],
-      rootGroupCount: result.rootGroupCount,
-      subGroupCount: 0,
-      unmatchedSample: [],
-    }
-  }
 
-  const supabase = await createClient()
-  const { data: users } = await supabase
-    .from("user_profiles")
-    .select("id, email")
-
-  const mapped = mapGroupsToPortalUsers(result.groups, users ?? [])
+  const groups = toPickableGroups(result.groups)
   return {
     status: "ok",
-    groups: usableGroups(mapped),
+    groups,
     rootGroupCount: result.rootGroupCount,
     subGroupCount: result.groups.length,
-    unmatchedSample: [...new Set(mapped.flatMap((g) => g.unmatched))].slice(
+    unmailableSample: [...new Set(groups.flatMap((g) => g.unmailable))].slice(
       0,
       5
     ),
@@ -140,7 +108,7 @@ export interface PortalBooking {
   endTime: string
   requestedBy: string
   title: string | null
-  attendees: string[]
+  attendees: AttendeeContact[]
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
@@ -168,7 +136,7 @@ export async function getPortalBookingsForDate(
     endTime: row.end_time,
     requestedBy: row.requested_by,
     title: row.title,
-    attendees: row.attendees,
+    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
   }))
 }
 
@@ -178,7 +146,7 @@ export interface ConfirmBookingInput {
   startTime: string
   endTime: string
   title: string
-  attendees: string[]
+  attendees: AttendeeContact[]
 }
 
 export type BookingResult = { inviteError?: string }
@@ -214,7 +182,7 @@ export async function confirmBooking(
       end_time: input.endTime,
       requested_by: user.id,
       title,
-      attendees: input.attendees,
+      attendees: input.attendees as unknown as Json,
     })
     .select("id")
     .single()
@@ -229,7 +197,6 @@ export async function confirmBooking(
 
   // The room is booked either way — a mail failure is reported back, not
   // thrown, so it can't read as "the booking didn't happen".
-  const recipients = await resolveRecipients(supabase, input.attendees)
   const sent = await sendBookingInvite({
     bookingId: inserted.id,
     title,
@@ -240,7 +207,7 @@ export async function confirmBooking(
     start,
     end,
     organizer: { name: user.name, email: user.email ?? "" },
-    attendees: recipients,
+    attendees: input.attendees,
   })
 
   return sent.ok ? {} : { inviteError: sent.error }
@@ -293,7 +260,6 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
 
   // Same reasoning as confirmBooking: the cancellation already went through,
   // so a mail failure is reported rather than thrown.
-  const recipients = await resolveRecipients(supabase, booking.attendees)
   const sent = await sendBookingInvite({
     bookingId: booking.id,
     title: booking.title ?? `${booking.room} 借用`,
@@ -304,7 +270,7 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     start: taipeiIso(booking.date, booking.start_time),
     end: taipeiIso(booking.date, booking.end_time),
     organizer: { name: user.name, email: user.email ?? "" },
-    attendees: recipients,
+    attendees: (booking.attendees ?? []) as unknown as AttendeeContact[],
     cancelled: true,
   })
 
