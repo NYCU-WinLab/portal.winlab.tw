@@ -61,6 +61,13 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
     .sort((a, b) => a.path.localeCompare(b.path))
 }
 
+/**
+ * The lab's advisor. Keycloak's project subgroups list students only, so
+ * inviting him is a per-meeting decision rather than something the group
+ * membership can answer — hence the explicit toggle in the picker.
+ */
+export const ADVISOR_USERNAME = "cctseng"
+
 /** Merge picks into an existing list, de-duplicating on email. */
 export function mergeAttendees(
   current: AttendeeContact[],

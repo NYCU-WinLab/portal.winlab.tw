@@ -374,6 +374,13 @@ function LabBookingCancel({
 }
 
 export default function RoomsPage() {
+  // Kick these off with the calendar rather than on dialog open. Both are
+  // shared by query key, so the dialog reads them from cache — the Keycloak
+  // walk in particular is several round trips and was the whole wait
+  // between picking a duration and the group buttons appearing.
+  useAttendeeGroups()
+  useLabUsers()
+
   const [rangeStart, setRangeStart] = useState(todayInTaipei())
   const [selected, setSelected] = useState<Selected | null>(null)
   const {

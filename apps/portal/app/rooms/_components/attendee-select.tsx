@@ -6,6 +6,8 @@ import { IconChevronDown, IconX } from "@tabler/icons-react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Label } from "@workspace/ui/components/label"
 import {
   Command,
   CommandEmpty,
@@ -25,7 +27,7 @@ import type {
   AttendeeContact,
   PickableGroup,
 } from "@/lib/rooms/attendee-groups"
-import { mergeAttendees } from "@/lib/rooms/attendee-groups"
+import { ADVISOR_USERNAME, mergeAttendees } from "@/lib/rooms/attendee-groups"
 import type { LabUser } from "@/hooks/rooms/use-lab-users"
 
 function label(u: LabUser): string {
@@ -74,6 +76,11 @@ export function AttendeeSelect({
     (u): u is LabUser & { email: string } => !!u.email
   )
 
+  const advisor = mailable.find((u) => u.username === ADVISOR_USERNAME)
+  const advisorSelected = advisor
+    ? selectedEmails.has(advisor.email.toLowerCase())
+    : false
+
   return (
     <div className="flex flex-col gap-1.5">
       {groups.length === 0 && groupsNote && (
@@ -101,6 +108,24 @@ export function AttendeeSelect({
               <span className="ml-1 opacity-60">{g.members.length}</span>
             </Button>
           ))}
+        </div>
+      )}
+
+      {advisor && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include-advisor"
+            checked={advisorSelected}
+            onCheckedChange={() =>
+              toggle({ name: label(advisor), email: advisor.email })
+            }
+          />
+          <Label
+            htmlFor="include-advisor"
+            className="text-xs font-normal text-muted-foreground"
+          >
+            包含 {label(advisor)}（群組名單不含老師）
+          </Label>
         </div>
       )}
 

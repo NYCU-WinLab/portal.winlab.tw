@@ -113,9 +113,16 @@ async function collectSubGroups(
       )
     : group.subGroups!
 
-  for (const child of children) {
-    await collectSubGroups(env, token, child, depth + 1, out)
-  }
+  // Siblings are independent, so descend into them together rather than
+  // one round trip at a time.
+  const nested = await Promise.all(
+    children.map(async (child) => {
+      const found: RawGroup[] = []
+      await collectSubGroups(env, token, child, depth + 1, found)
+      return found
+    })
+  )
+  out.push(...nested.flat())
 }
 
 export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
@@ -131,10 +138,17 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
       token
     )
 
-    const subGroups: RawGroup[] = []
-    for (const root of roots) {
-      await collectSubGroups(env, token, root, 0, subGroups)
-    }
+    // Walk the roots concurrently. Serially this was one /children round
+    // trip per top-level group before anything else could start — 15 of
+    // them here, which is most of the wait before the picker can render.
+    const perRoot = await Promise.all(
+      roots.map(async (root) => {
+        const found: RawGroup[] = []
+        await collectSubGroups(env, token, root, 0, found)
+        return found
+      })
+    )
+    const subGroups = perRoot.flat()
     if (subGroups.length === 0) {
       return { status: "ok", groups: [], rootGroupCount: roots.length }
     }
