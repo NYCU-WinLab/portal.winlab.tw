@@ -80,7 +80,14 @@ async function resolveRecipients(
 }
 
 export type AttendeeGroupsResponse =
-  | { status: "ok"; groups: PortalAttendeeGroup[] }
+  | {
+      status: "ok"
+      groups: PortalAttendeeGroup[]
+      /** Diagnostics, so an empty result can say which step came up empty. */
+      rootGroupCount: number
+      subGroupCount: number
+      unmatchedSample: string[]
+    }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
   | { status: "error"; detail: string }
@@ -97,16 +104,31 @@ export type AttendeeGroupsResponse =
 export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
   const result = await fetchAttendeeGroups()
   if (result.status !== "ok") return result
-  if (result.groups.length === 0) return { status: "ok", groups: [] }
+  if (result.groups.length === 0) {
+    return {
+      status: "ok",
+      groups: [],
+      rootGroupCount: result.rootGroupCount,
+      subGroupCount: 0,
+      unmatchedSample: [],
+    }
+  }
 
   const supabase = await createClient()
   const { data: users } = await supabase
     .from("user_profiles")
     .select("id, email")
 
+  const mapped = mapGroupsToPortalUsers(result.groups, users ?? [])
   return {
     status: "ok",
-    groups: usableGroups(mapGroupsToPortalUsers(result.groups, users ?? [])),
+    groups: usableGroups(mapped),
+    rootGroupCount: result.rootGroupCount,
+    subGroupCount: result.groups.length,
+    unmatchedSample: [...new Set(mapped.flatMap((g) => g.unmatched))].slice(
+      0,
+      5
+    ),
   }
 }
 

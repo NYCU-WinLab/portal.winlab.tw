@@ -34,7 +34,12 @@ export interface AttendeeGroup {
 }
 
 export type AttendeeGroupsResult =
-  | { status: "ok"; groups: AttendeeGroup[] }
+  | {
+      status: "ok"
+      groups: AttendeeGroup[]
+      /** Top-level groups seen, to tell "realm is empty" from "no children". */
+      rootGroupCount: number
+    }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
   | { status: "error"; detail: string }
@@ -90,13 +95,15 @@ async function collectSubGroups(
 ): Promise<void> {
   if (depth > 0) out.push(group)
 
-  let children = group.subGroups
-  if (children === undefined) {
-    children = await getJson<RawGroup[]>(
+  // No `.catch(() => [])` here on purpose: swallowing a failed /children
+  // call reports "this realm has no subgroups", which is a different
+  // problem with a different fix. Let it propagate to the status result.
+  const children =
+    group.subGroups ??
+    (await getJson<RawGroup[]>(
       `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
       token
-    ).catch(() => [])
-  }
+    ))
 
   for (const child of children) {
     await collectSubGroups(env, token, child, depth + 1, out)
@@ -120,7 +127,9 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
     for (const root of roots) {
       await collectSubGroups(env, token, root, 0, subGroups)
     }
-    if (subGroups.length === 0) return { status: "ok", groups: [] }
+    if (subGroups.length === 0) {
+      return { status: "ok", groups: [], rootGroupCount: roots.length }
+    }
 
     const groups = await Promise.all(
       subGroups.map(async (group) => ({
@@ -130,7 +139,7 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
         members: await fetchGroupMembers(env, token, group.id),
       }))
     )
-    return { status: "ok", groups }
+    return { status: "ok", groups, rootGroupCount: roots.length }
   } catch (err) {
     const detail =
       err instanceof KeycloakAdminError

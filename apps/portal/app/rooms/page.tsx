@@ -100,10 +100,19 @@ function groupsNote(
   if (!data) return "讀取群組失敗:沒有回應"
 
   switch (data.status) {
-    case "ok":
-      return data.groups.length > 0
-        ? null
-        : "Keycloak 沒有回傳任何子群組(或群組內成員都沒有對應的 Portal 帳號)"
+    case "ok": {
+      if (data.groups.length > 0) return null
+      if (data.rootGroupCount === 0) {
+        return "Keycloak 這個 realm 底下沒有任何群組"
+      }
+      if (data.subGroupCount === 0) {
+        return `Keycloak 有 ${data.rootGroupCount} 個頂層群組,但它們都沒有子群組`
+      }
+      const who = data.unmatchedSample.join("、")
+      return `找到 ${data.subGroupCount} 個子群組,但成員都沒有對應的 Portal 帳號${
+        who ? `(例如:${who})` : ""
+      }`
+    }
     case "unconfigured":
       return "群組功能未啟用:伺服器沒有設定 KEYCLOAK_* 環境變數"
     case "forbidden":
