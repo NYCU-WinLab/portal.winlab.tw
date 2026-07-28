@@ -17,6 +17,8 @@ import {
   type KeycloakAdminEnv,
 } from "@/lib/keycloak/admin"
 
+import { needsChildrenFetch } from "./group-tree"
+
 export interface KeycloakGroupMember {
   /** Keycloak's own user id — not the portal user_profiles id. */
   id: string
@@ -95,15 +97,21 @@ async function collectSubGroups(
 ): Promise<void> {
   if (depth > 0) out.push(group)
 
+  // Keycloak 23+ sends `subGroups: []` — an *empty array*, not an omitted
+  // field — alongside a `subGroupCount`. So `subGroups ?? fetch(...)` never
+  // fell through and /children was never actually called, which is why a
+  // realm with populated subgroups still reported having none. Treat only a
+  // non-empty inline array as authoritative.
+  //
   // No `.catch(() => [])` here on purpose: swallowing a failed /children
   // call reports "this realm has no subgroups", which is a different
   // problem with a different fix. Let it propagate to the status result.
-  const children =
-    group.subGroups ??
-    (await getJson<RawGroup[]>(
-      `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
-      token
-    ))
+  const children = needsChildrenFetch(group)
+    ? await getJson<RawGroup[]>(
+        `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
+        token
+      )
+    : group.subGroups!
 
   for (const child of children) {
     await collectSubGroups(env, token, child, depth + 1, out)
