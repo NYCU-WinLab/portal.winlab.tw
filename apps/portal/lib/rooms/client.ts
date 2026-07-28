@@ -2,10 +2,11 @@
 // (https://www.cs.nycu.edu.tw/csauto/meetingroom/). This is NOT an official
 // API — no docs, no version guarantee — reverse-engineered from that site's
 // shipped Angular JS (public/js/reservation.js, public/js/manage_user.js).
-// Room listing and per-room/date reservation queries are unauthenticated (the
+// Room listing and per-date reservation queries are unauthenticated (the
 // site itself serves them to anonymous "訪客" visitors), so this file only
-// covers read access. Booking/cancel would need a stored service-account
-// login and is deliberately out of scope for now.
+// covers that read access. The authenticated write path (login, book,
+// cancel) lives in ./booking-client.ts, kept separate since it needs a
+// stored credential and this file deliberately doesn't.
 
 const BASE = "https://www.cs.nycu.edu.tw/csauto/meetingroom"
 

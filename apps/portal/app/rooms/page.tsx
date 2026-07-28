@@ -3,6 +3,8 @@
 import { useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+import { toast } from "sonner"
+
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -14,6 +16,11 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
+import {
+  useCancelBooking,
+  useConfirmBooking,
+  usePortalBookingsForDate,
+} from "@/hooks/rooms/use-room-booking"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
@@ -22,6 +29,10 @@ import {
   type SlotTier,
 } from "@/lib/rooms/availability"
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
 
 const RANGE_DAYS = 14
 const LABEL_WIDTH = "w-24"
@@ -122,17 +133,45 @@ function DayRow({
 }
 
 function BookingSuggestion({
+  date,
   daySlots,
   slotIndex,
+  onBooked,
 }: {
+  date: string
   daySlots: AvailabilitySlot[]
   slotIndex: number
+  onBooked: () => void
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
   const suggestion = durationMinutes
     ? suggestRoom(daySlots, slotIndex, durationSlots)
     : null
+  const confirmBooking = useConfirmBooking()
+
+  function handleConfirm() {
+    if (!suggestion || !durationMinutes) return
+    const endSlot = daySlots[slotIndex + durationSlots - 1]
+    const startSlot = daySlots[slotIndex]
+    if (!endSlot || !startSlot) return
+
+    confirmBooking.mutate(
+      {
+        date,
+        room: suggestion.room,
+        startTime: startSlot.start,
+        endTime: endSlot.end,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`已預約 ${suggestion.room}`)
+          onBooked()
+        },
+        onError: (err) => toast.error(errorMessage(err, "預約失敗")),
+      }
+    )
+  }
 
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
@@ -153,14 +192,26 @@ function BookingSuggestion({
         ))}
       </div>
       {durationMinutes && (
-        <p className="text-sm">
-          {suggestion
-            ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
-            : "這個時長內沒有教室從頭到尾都空著,試試縮短時間或換個起始時段。"}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm">
+            {suggestion
+              ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
+              : "這個時長內沒有教室從頭到尾都空著,試試縮短時間或換個起始時段。"}
+          </p>
+          {suggestion && (
+            <Button
+              size="sm"
+              className="h-7"
+              disabled={confirmBooking.isPending}
+              onClick={handleConfirm}
+            >
+              {confirmBooking.isPending ? "預約中…" : "確認預約"}
+            </Button>
+          )}
+        </div>
       )}
       <p className="text-xs text-muted-foreground">
-        自動預約功能還在開發中,目前請依建議教室,自行到
+        預約會以本實驗室共用帳號送出,對方系統看到的借用人是「cctseng」,不是你個人帳號。也可以自行到
         <a
           href="https://www.cs.nycu.edu.tw/csauto/meetingroom/"
           target="_blank"
@@ -172,6 +223,52 @@ function BookingSuggestion({
         操作。
       </p>
     </div>
+  )
+}
+
+function LabBookingCancel({
+  date,
+  room,
+  start,
+  end,
+}: {
+  date: string
+  room: string
+  start: string
+  end: string
+}) {
+  const { data: portalBookings, isLoading } = usePortalBookingsForDate(date)
+  const cancelBooking = useCancelBooking()
+
+  if (isLoading) return null
+
+  const match = portalBookings?.find(
+    (b) => b.room === room && b.startTime <= start && b.endTime >= end
+  )
+
+  if (!match) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {room}:這筆借用不是透過 Portal 建立,無法在此自動取消。
+      </p>
+    )
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-7 self-start"
+      disabled={cancelBooking.isPending}
+      onClick={() =>
+        cancelBooking.mutate(match.id, {
+          onSuccess: () => toast.success(`已取消 ${room} 的預約`),
+          onError: (err) => toast.error(errorMessage(err, "取消失敗")),
+        })
+      }
+    >
+      {cancelBooking.isPending ? "取消中…" : `取消 ${room} 的 Portal 預約`}
+    </Button>
   )
 }
 
@@ -350,11 +447,24 @@ export default function RoomsPage() {
                     本實驗室已借用
                   </span>
                   <p className="text-sm">{selectedSlot.labRooms.join("、")}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {selectedSlot.labRooms.map((room) => (
+                      <LabBookingCancel
+                        key={room}
+                        date={selected.date}
+                        room={room}
+                        start={selectedSlot.start}
+                        end={selectedSlot.end}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
               <BookingSuggestion
+                date={selected.date}
                 daySlots={selected.daySlots}
                 slotIndex={selected.slotIndex}
+                onBooked={() => setSelected(null)}
               />
             </div>
           )}

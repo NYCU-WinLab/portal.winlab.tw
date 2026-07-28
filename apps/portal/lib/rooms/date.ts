@@ -26,6 +26,11 @@ export function addDays(dateStr: string, n: number): string {
   }).format(shifted)
 }
 
+/** `dateStr` (YYYY-MM-DD) + `timeStr` ("HH:mm") as an ISO 8601 instant. */
+export function taipeiIso(dateStr: string, timeStr: string): string {
+  return new Date(`${dateStr}T${timeStr}:00+08:00`).toISOString()
+}
+
 /** `dateStr` (YYYY-MM-DD) as "MM/DD（週X）" in Asia/Taipei. */
 export function formatDayLabel(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00+08:00`)

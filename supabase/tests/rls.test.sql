@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(8);
+select plan(11);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -95,6 +95,44 @@ select is(
   (select name from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
   'Renamed',
   'user B cannot update user A''s profile (ownership-scoped update policy)'
+);
+
+-- ── rooms_bookings: Portal's own booking-automation audit trail ────────────
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+
+-- 9. a user can insert a rooms_bookings row for themselves
+select lives_ok(
+  $$ insert into public.rooms_bookings (external_reservation_id, room, date, start_time, end_time, requested_by)
+     values ('test-ext-1', '600A', '2026-08-01', '10:00', '10:30', '11111111-1111-1111-1111-111111111111') $$,
+  'a user can insert a rooms_bookings row for themselves'
+);
+
+-- 10. a user cannot insert a rooms_bookings row claiming to be someone else
+select throws_ok(
+  $$ insert into public.rooms_bookings (external_reservation_id, room, date, start_time, end_time, requested_by)
+     values ('test-ext-2', '600A', '2026-08-01', '11:00', '11:30', '22222222-2222-2222-2222-222222222222') $$,
+  '42501',
+  NULL,
+  'a user cannot insert a rooms_bookings row on someone else''s behalf'
+);
+
+-- 11. user B cannot cancel (update) a booking made by user A
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
+  true
+);
+update public.rooms_bookings set status = 'cancelled' where external_reservation_id = 'test-ext-1';
+reset role;
+select is(
+  (select status from public.rooms_bookings where external_reservation_id = 'test-ext-1'),
+  'booked',
+  'user B cannot cancel user A''s rooms_bookings row'
 );
 
 select * from finish();

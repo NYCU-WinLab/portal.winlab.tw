@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -1575,6 +1555,63 @@ export type Database = {
           },
         ]
       }
+      rooms_bookings: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          date: string
+          end_time: string
+          external_reservation_id: string
+          id: string
+          requested_by: string
+          room: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          date: string
+          end_time: string
+          external_reservation_id: string
+          id?: string
+          requested_by: string
+          room: string
+          start_time: string
+          status?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          date?: string
+          end_time?: string
+          external_reservation_id?: string
+          id?: string
+          requested_by?: string
+          room?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_bookings_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_bookings_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teacher_paper_tags: {
         Row: {
           created_at: string
@@ -1593,17 +1630,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "teacher_paper_tags_teacher_paper_id_fkey"
-            columns: ["teacher_paper_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_papers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "teacher_paper_tags_tag_id_fkey"
             columns: ["tag_id"]
             isOneToOne: false
             referencedRelation: "meeting_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_paper_tags_teacher_paper_id_fkey"
+            columns: ["teacher_paper_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_papers"
             referencedColumns: ["id"]
           },
         ]
@@ -1921,10 +1958,10 @@ export type Database = {
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
       meetings_generate_semester: {
         Args: {
-          p_year: number
+          p_holidays?: Json
           p_start_date: string
           p_weeks: number
-          p_holidays?: Json
+          p_year: number
         }
         Returns: Json
       }
@@ -2126,9 +2163,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       egress_status: ["pending", "approved", "rejected", "transferred"],

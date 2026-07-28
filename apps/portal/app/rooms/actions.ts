@@ -5,12 +5,17 @@
 // portal.winlab.tw), and doing the fetch here keeps the reverse-engineered
 // API details (see lib/rooms/client.ts) off the client bundle.
 
+import { revalidatePath } from "next/cache"
+
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/user"
 import {
   computeDayAvailability,
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
+import { bookRoom, cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
-import { addDays } from "@/lib/rooms/date"
+import { addDays, taipeiIso } from "@/lib/rooms/date"
 
 const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
 
@@ -38,4 +43,135 @@ export async function getRoomAvailabilityRange(
       DAY_WINDOW
     ),
   }))
+}
+
+function requireServiceAccount(): string {
+  const user = process.env.MEETINGROOM_SERVICE_USER
+  if (!user) {
+    throw new Error("自動預約尚未設定服務帳號(MEETINGROOM_SERVICE_USER)")
+  }
+  return user
+}
+
+export interface PortalBooking {
+  id: string
+  room: string
+  date: string
+  startTime: string
+  endTime: string
+  requestedBy: string
+}
+
+/** Bookings Portal itself made (any lab member's), for matching against the grid. */
+export async function getPortalBookingsForDate(
+  date: string
+): Promise<PortalBooking[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("rooms_bookings")
+    .select("id, room, date, start_time, end_time, requested_by")
+    .eq("date", date)
+    .eq("status", "booked")
+
+  if (error) {
+    throw new Error(`讀取 Portal 預約紀錄失敗:${error.message}`)
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    room: row.room,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    requestedBy: row.requested_by,
+  }))
+}
+
+export interface ConfirmBookingInput {
+  date: string
+  room: string
+  startTime: string
+  endTime: string
+}
+
+export async function confirmBooking(
+  input: ConfirmBookingInput
+): Promise<void> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("請先登入")
+
+  const subscriber = requireServiceAccount()
+  const start = taipeiIso(input.date, input.startTime)
+  const end = taipeiIso(input.date, input.endTime)
+
+  const externalId = await bookRoom({
+    room: input.room,
+    start,
+    end,
+    subscriber,
+  })
+
+  const supabase = await createClient()
+  const { error } = await supabase.from("rooms_bookings").insert({
+    external_reservation_id: externalId,
+    room: input.room,
+    date: input.date,
+    start_time: input.startTime,
+    end_time: input.endTime,
+    requested_by: user.id,
+  })
+
+  if (error) {
+    throw new Error(
+      `已在外部系統訂到教室(訂位編號 ${externalId}),但寫入 Portal 稽核紀錄失敗:${error.message}——請通知管理員手動補登,避免之後被誤判成可取消`
+    )
+  }
+
+  revalidatePath("/rooms")
+}
+
+export async function cancelBooking(bookingId: string): Promise<void> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("請先登入")
+
+  const subscriber = requireServiceAccount()
+  const supabase = await createClient()
+
+  const { data: booking, error } = await supabase
+    .from("rooms_bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .eq("status", "booked")
+    .single()
+
+  if (error || !booking) {
+    throw new Error("找不到這筆預約,或已經被取消")
+  }
+  if (booking.requested_by !== user.id) {
+    throw new Error("只能取消自己建立的預約")
+  }
+
+  await cancelRoomBooking(booking.external_reservation_id, {
+    room: booking.room,
+    start: taipeiIso(booking.date, booking.start_time),
+    end: taipeiIso(booking.date, booking.end_time),
+    subscriber,
+  })
+
+  const { error: updateError } = await supabase
+    .from("rooms_bookings")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: user.id,
+    })
+    .eq("id", bookingId)
+
+  if (updateError) {
+    throw new Error(
+      `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`
+    )
+  }
+
+  revalidatePath("/rooms")
 }
