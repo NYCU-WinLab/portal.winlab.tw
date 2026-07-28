@@ -35,7 +35,9 @@ import {
 } from "@/lib/rooms/availability"
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
 import {
+  ADVISOR_USERNAME,
   groupMeetingTitle,
+  mergeAttendees,
   type AttendeeContact,
   type PickableGroup,
 } from "@/lib/rooms/attendee-groups"
@@ -198,6 +200,9 @@ function BookingSuggestion({
   // pick. Anything typed by hand is the user's, and silently overwriting it
   // would be worse than not helping at all.
   const [autoTitle, setAutoTitle] = useState<string | null>(null)
+  // On by default: the advisor attends essentially every meeting, and
+  // Keycloak's project groups never list him.
+  const [includeAdvisor, setIncludeAdvisor] = useState(true)
   const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const durationSlots = durationMinutes ? durationMinutes / SLOT_MINUTES : 0
   const suggestion = durationMinutes
@@ -207,6 +212,16 @@ function BookingSuggestion({
   const { data: labUsers } = useLabUsers()
   const attendeeGroupsQuery = useAttendeeGroups()
   const attendeeGroups = attendeeGroupsQuery.data
+
+  const advisor = labUsers?.find(
+    (u) => u.username === ADVISOR_USERNAME && u.email
+  )
+  const finalAttendees =
+    includeAdvisor && advisor?.email
+      ? mergeAttendees(attendees, [
+          { name: advisor.name ?? advisor.email, email: advisor.email },
+        ])
+      : attendees
 
   function handleConfirm() {
     if (!suggestion || !durationMinutes) return
@@ -221,7 +236,7 @@ function BookingSuggestion({
         startTime: startSlot.start,
         endTime: endSlot.end,
         title,
-        attendees,
+        attendees: finalAttendees,
       },
       {
         onSuccess: (result) => {
@@ -292,6 +307,8 @@ function BookingSuggestion({
                   groupsNote={groupsNote(attendeeGroupsQuery)}
                   value={attendees}
                   onChange={setAttendees}
+                  advisorIncluded={includeAdvisor}
+                  onAdvisorIncludedChange={setIncludeAdvisor}
                   onGroupPicked={(group: PickableGroup) => {
                     if (title !== "" && title !== autoTitle) return
                     const next = groupMeetingTitle(group)

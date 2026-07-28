@@ -45,6 +45,8 @@ export function AttendeeSelect({
   value,
   onChange,
   onGroupPicked,
+  advisorIncluded,
+  onAdvisorIncludedChange,
 }: {
   users: LabUser[]
   groups?: PickableGroup[]
@@ -58,6 +60,14 @@ export function AttendeeSelect({
   onChange: (next: AttendeeContact[]) => void
   /** Fired when a whole group is added, so the title can be pre-filled. */
   onGroupPicked?: (group: PickableGroup) => void
+  /**
+   * The advisor is its own control rather than an entry in `value`: he's on
+   * by default and Keycloak's project groups never list him, so treating him
+   * as an ordinary pick would mean seeding the list from an async query and
+   * guessing whether a later removal was deliberate.
+   */
+  advisorIncluded: boolean
+  onAdvisorIncludedChange: (next: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   // Reset after every pick so the next name can be typed straight away —
@@ -84,9 +94,6 @@ export function AttendeeSelect({
   )
 
   const advisor = mailable.find((u) => u.username === ADVISOR_USERNAME)
-  const advisorSelected = advisor
-    ? selectedEmails.has(advisor.email.toLowerCase())
-    : false
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -125,10 +132,8 @@ export function AttendeeSelect({
         <div className="flex items-center gap-2">
           <Checkbox
             id="include-advisor"
-            checked={advisorSelected}
-            onCheckedChange={() =>
-              toggle({ name: label(advisor), email: advisor.email })
-            }
+            checked={advisorIncluded}
+            onCheckedChange={(next) => onAdvisorIncludedChange(next === true)}
           />
           <Label
             htmlFor="include-advisor"
