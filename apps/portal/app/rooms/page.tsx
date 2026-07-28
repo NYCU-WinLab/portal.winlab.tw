@@ -83,6 +83,36 @@ function axisTickPercent(
   return index === -1 ? null : (index / slots.length) * 100
 }
 
+// Every branch returns something. Bringing this feature up cost two round
+// trips precisely because several distinct failures all rendered as an empty
+// space, so "no groups and no reason why" is not an outcome worth keeping.
+function groupsNote(
+  query: ReturnType<typeof useAttendeeGroups>
+): string | null {
+  if (query.isLoading) return null
+  if (query.isError) {
+    const detail =
+      query.error instanceof Error ? query.error.message : "unknown"
+    return `讀取群組失敗:${detail}`
+  }
+
+  const data = query.data
+  if (!data) return "讀取群組失敗:沒有回應"
+
+  switch (data.status) {
+    case "ok":
+      return data.groups.length > 0
+        ? null
+        : "Keycloak 沒有回傳任何子群組(或群組內成員都沒有對應的 Portal 帳號)"
+    case "unconfigured":
+      return "群組功能未啟用:伺服器沒有設定 KEYCLOAK_* 環境變數"
+    case "forbidden":
+      return `無法讀取 Keycloak 群組:權限不足,admin client 需要 view-users(${data.detail})`
+    case "error":
+      return `無法讀取 Keycloak 群組:${data.detail}`
+  }
+}
+
 interface Selected {
   date: string
   slotIndex: number
@@ -157,7 +187,8 @@ function BookingSuggestion({
     : null
   const confirmBooking = useConfirmBooking()
   const { data: labUsers } = useLabUsers()
-  const { data: attendeeGroups } = useAttendeeGroups()
+  const attendeeGroupsQuery = useAttendeeGroups()
+  const attendeeGroups = attendeeGroupsQuery.data
 
   function handleConfirm() {
     if (!suggestion || !durationMinutes) return
@@ -237,11 +268,7 @@ function BookingSuggestion({
                   groups={
                     attendeeGroups?.status === "ok" ? attendeeGroups.groups : []
                   }
-                  groupsProblem={
-                    attendeeGroups && attendeeGroups.status !== "ok"
-                      ? attendeeGroups
-                      : undefined
-                  }
+                  groupsNote={groupsNote(attendeeGroupsQuery)}
                   value={attendees}
                   onChange={setAttendees}
                 />

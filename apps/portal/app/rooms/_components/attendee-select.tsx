@@ -28,34 +28,21 @@ function label(u: LabUser): string {
   return u.name ?? u.accountId ?? u.id
 }
 
-/** Why the group shortcuts couldn't be offered, when they couldn't. */
-export type GroupsProblem =
-  | { status: "unconfigured" }
-  | { status: "forbidden"; detail: string }
-  | { status: "error"; detail: string }
-
-function problemMessage(problem: GroupsProblem): string | null {
-  switch (problem.status) {
-    // Keycloak isn't wired up at all — nothing to say to a member about it.
-    case "unconfigured":
-      return null
-    case "forbidden":
-      return "無法讀取 Keycloak 群組:admin client 權限不足(需要 view-users)"
-    case "error":
-      return `無法讀取 Keycloak 群組:${problem.detail}`
-  }
-}
-
 export function AttendeeSelect({
   users,
   groups = [],
-  groupsProblem,
+  groupsNote,
   value,
   onChange,
 }: {
   users: LabUser[]
   groups?: PortalAttendeeGroup[]
-  groupsProblem?: GroupsProblem
+  /**
+   * Why there are no group buttons, when there are none. Always set unless
+   * the groups actually loaded: "no buttons and no explanation" is the one
+   * outcome that can't be debugged from a screenshot.
+   */
+  groupsNote?: string | null
   value: string[]
   onChange: (next: string[]) => void
 }) {
@@ -78,10 +65,8 @@ export function AttendeeSelect({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {groupsProblem && problemMessage(groupsProblem) && (
-        <p className="text-xs text-muted-foreground">
-          {problemMessage(groupsProblem)}
-        </p>
+      {groups.length === 0 && groupsNote && (
+        <p className="text-xs text-muted-foreground">{groupsNote}</p>
       )}
 
       {groups.length > 0 && (
