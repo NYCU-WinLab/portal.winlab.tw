@@ -9,7 +9,6 @@ import type { FieldCategory } from "@/lib/approve/types"
 import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import { drainOutboxBatch } from "@/lib/approve/email-drain"
-import { validateUploadPayload } from "@/lib/approve/upload"
 import { computeOrphanedSigners } from "@/lib/approve/signers"
 
 // Fire the outbox drain after the response is sent to the browser. Using
@@ -32,11 +31,8 @@ async function requireUser() {
   return user
 }
 
-export async function uploadPdf(formData: FormData): Promise<void> {
+export async function finalizePdfUpload(documentId: string): Promise<void> {
   const user = await requireUser()
-  const parsed = validateUploadPayload(formData)
-  if ("error" in parsed) throw new Error(parsed.error)
-  const { documentId, file } = parsed
 
   const supabase = await createClient()
   const { data: doc, error: docErr } = await supabase
@@ -50,10 +46,18 @@ export async function uploadPdf(formData: FormData): Promise<void> {
   if (doc.status !== "draft") throw new Error("only drafts can re-upload")
 
   const path = documentStoragePath(documentId)
-  const { error: upErr } = await supabase.storage
-    .from(APPROVE_BUCKET)
-    .upload(path, file, { upsert: true, contentType: "application/pdf" })
-  if (upErr) throw new Error(upErr.message)
+  let uploaded = false
+  for (let attempt = 0; attempt < 9 && !uploaded; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 200))
+    const { data: files, error: storageErr } = await supabase.storage
+      .from(APPROVE_BUCKET)
+      .list(documentId, { limit: 1, search: "original.pdf" })
+    if (storageErr) throw new Error(storageErr.message)
+    uploaded = files?.some((file) => file.name === "original.pdf") ?? false
+  }
+  if (!uploaded) {
+    throw new Error("uploaded PDF not found")
+  }
 
   const { error: updErr } = await supabase
     .from("approve_documents")
