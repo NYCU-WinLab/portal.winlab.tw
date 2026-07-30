@@ -203,7 +203,11 @@ RLS is the data-layer line of defense. Don't wrap a Supabase call in an API rout
 
 Real examples of each, all under `apps/portal/app/api/`:
 
-- **Cron** (declared in root `vercel.json`'s `crons` array) — `cron/approve-emails`, `cron/receipts-emails`.
+- **Cron** (declared in `apps/portal/vercel.json`'s `crons` array) — `cron/approve-emails`,
+  `cron/receipts-emails`, `cron/rooms-recurring`. It must live in `apps/portal/`, not the repo
+  root: Vercel reads `vercel.json` from the project's configured Root Directory, which is
+  `apps/portal` here (and `apps/gallery` for gallery). A repo-root `vercel.json` is read by
+  neither project and silently does nothing.
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
 
