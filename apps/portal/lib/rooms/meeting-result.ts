@@ -148,10 +148,21 @@ async function notifyMeetingFailure(
     if (!request.booking_id) return false
     const { data: booking } = await admin
       .from("rooms_bookings")
-      .select("room, date, start_time, end_time, title, requested_by")
+      .select("room, date, start_time, end_time, title, requested_by, status")
       .eq("id", request.booking_id)
       .maybeSingle()
     if (!booking) return false
+
+    // Nothing to act on once the booking is gone: there's no meeting to open
+    // by hand and no room to keep. Mailing anyway is the noise this whole
+    // batching change was meant to remove.
+    if (booking.status !== "booked") {
+      await admin
+        .from("rooms_meeting_requests")
+        .update({ notified_at: new Date().toISOString() })
+        .eq("id", request.id)
+      return false
+    }
 
     const owner = await contactFor(admin, booking.requested_by)
     if (!owner.email) return false

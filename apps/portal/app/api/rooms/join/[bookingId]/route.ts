@@ -52,7 +52,7 @@ export async function GET(
   const admin = createAdminClient()
   const { data: booking } = await admin
     .from("rooms_bookings")
-    .select("id, title, status")
+    .select("id, title, status, online")
     .eq("id", bookingId)
     .maybeSingle()
 
@@ -62,6 +62,17 @@ export async function GET(
 
   if (booking.status !== "booked") {
     return page("這場會議已經取消", "預約已被取消,線上會議也已經關閉。", 410)
+  }
+
+  // Checked before the request lookup: a booking that never asked for a Teams
+  // meeting has no request row, which would otherwise read as "still being
+  // created" — a wait that never ends.
+  if (!booking.online) {
+    return page(
+      "這場預約沒有線上會議",
+      "這筆預約只借了教室,沒有要開 Teams 會議。",
+      404
+    )
   }
 
   const { data: request } = await admin
