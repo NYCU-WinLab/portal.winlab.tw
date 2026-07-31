@@ -25,6 +25,8 @@ export interface CalendarEvent {
   /** Bumped on each update so clients accept the newer version. */
   sequence: number
   method: "REQUEST" | "CANCEL"
+  /** Teams join link, once the pipeline has created the meeting. */
+  joinUrl?: string | null
 }
 
 /** `2026-08-01T02:00:00.000Z` -> `20260801T020000Z` */
@@ -90,6 +92,17 @@ export function buildCalendarInvite(event: CalendarEvent): string {
         `ATTENDEE;CN=${escapeText(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${a.email}`
     ),
     `STATUS:${event.method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
+    // The join link goes in three places because clients disagree about
+    // where they look: DESCRIPTION is what everyone renders, URL is the
+    // standard field, and the X- property is what Outlook turns into its
+    // "Join" button.
+    ...(event.joinUrl
+      ? [
+          `DESCRIPTION:${escapeText(`線上會議：${event.joinUrl}`)}`,
+          `URL:${event.joinUrl}`,
+          `X-MICROSOFT-SKYPETEAMSMEETINGURL:${event.joinUrl}`,
+        ]
+      : []),
     "END:VEVENT",
     "END:VCALENDAR",
   ]

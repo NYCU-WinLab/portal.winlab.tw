@@ -21,7 +21,7 @@ import {
 } from "@/lib/rooms/availability"
 import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
-import { placeBooking } from "@/lib/rooms/book"
+import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso, todayInTaipei } from "@/lib/rooms/date"
@@ -236,6 +236,10 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     organizer: { name: user.name, email: user.email ?? "" },
     attendees: (booking.attendees ?? []) as unknown as AttendeeContact[],
     cancelled: true,
+    // Must exceed whatever the last REQUEST used. A booking that picked up a
+    // meeting link has already sent sequence 1, so a hardcoded 1 here would
+    // be ignored and the event would stay in everyone's calendar.
+    sequence: await nextInviteSequence(supabase, booking.id),
   })
 
   return sent.ok ? {} : { inviteError: sent.error }

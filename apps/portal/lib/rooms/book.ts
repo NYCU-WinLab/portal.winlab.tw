@@ -34,6 +34,34 @@ export interface PlaceBookingOutcome {
   inviteError?: string
 }
 
+/**
+ * Reserves the next RFC 5545 SEQUENCE for a booking's calendar invite.
+ *
+ * Read-then-write rather than an atomic increment: the three messages a
+ * booking can send are inherently serial (invited on booking, updated when
+ * the meeting link arrives, cancelled by a person), so there is nothing to
+ * race with. Returns 1 if the row has vanished — a repeated 0 is the one
+ * value that would make a client ignore the message.
+ */
+export async function nextInviteSequence(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  bookingId: string
+): Promise<number> {
+  const { data } = await supabase
+    .from("rooms_bookings")
+    .select("invite_sequence")
+    .eq("id", bookingId)
+    .maybeSingle()
+
+  const next = (data?.invite_sequence ?? 0) + 1
+  await supabase
+    .from("rooms_bookings")
+    .update({ invite_sequence: next })
+    .eq("id", bookingId)
+  return next
+}
+
 export async function placeBooking(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
@@ -85,6 +113,9 @@ export async function placeBooking(
     end,
     organizer: { name: input.organizer.name, email: input.organizer.email },
     attendees: input.attendees,
+    // First message for this UID. Later sends (meeting link, cancellation)
+    // read the stored counter and bump it.
+    sequence: 0,
   })
 
   return {

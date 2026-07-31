@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(11);
+select plan(15);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -133,6 +133,33 @@ select is(
   (select status from public.rooms_bookings where external_reservation_id = 'test-ext-1'),
   'booked',
   'user B cannot cancel user A''s rooms_bookings row'
+);
+
+-- ── rooms_meeting_requests: the pipeline's callback credential ─────────────
+-- These four pin the grant, not the policy. The first cut of this table had
+-- RLS with a read-only policy but inherited Supabase's default table grants,
+-- which handed `authenticated` full write and exposed callback_token_hash —
+-- the same shape as #343/#346. A policy test alone would have passed.
+reset role;
+
+select ok(
+  not has_table_privilege('authenticated', 'public.rooms_meeting_requests', 'INSERT'),
+  'authenticated has no INSERT grant on rooms_meeting_requests'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.rooms_meeting_requests', 'UPDATE'),
+  'authenticated has no UPDATE grant on rooms_meeting_requests'
+);
+select ok(
+  not has_table_privilege('anon', 'public.rooms_meeting_requests', 'SELECT'),
+  'anon cannot read rooms_meeting_requests at all'
+);
+-- The token hash is the one column no browser has any use for.
+select ok(
+  not has_column_privilege(
+    'authenticated', 'public.rooms_meeting_requests', 'callback_token_hash', 'SELECT'
+  ),
+  'authenticated cannot read rooms_meeting_requests.callback_token_hash'
 );
 
 select * from finish();

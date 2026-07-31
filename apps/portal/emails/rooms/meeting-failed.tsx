@@ -12,16 +12,15 @@ import {
   Text,
 } from "@react-email/components"
 
-export type BookingInviteProps = {
+export type MeetingFailedProps = {
   title: string
-  room: string
-  /** Already formatted for display, e.g. "08/01（週六）10:00–11:00". */
+  /** Already formatted, e.g. "08/03（週一）09:00–10:00". */
   when: string
-  organizerName: string
-  attendeeNames: string[]
-  cancelled?: boolean
-  /** Teams join link, present once the meeting pipeline has finished. */
-  joinUrl?: string | null
+  room: string
+  reason: string
+  pipelineUrl?: string | null
+  /** Whether re-booking has any chance of going differently. */
+  retryable?: boolean
 }
 
 // Portal runs in Geist Mono (see app/layout.tsx + globals.css). Match that
@@ -29,17 +28,14 @@ export type BookingInviteProps = {
 const FONT_STACK =
   '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
 
-export function BookingInvite({
+export function MeetingFailed({
   title,
-  room,
   when,
-  organizerName,
-  attendeeNames,
-  cancelled = false,
-  joinUrl = null,
-}: BookingInviteProps) {
-  const heading = cancelled ? "會議已取消" : "會議邀請"
-
+  room,
+  reason,
+  pipelineUrl = null,
+  retryable = false,
+}: MeetingFailedProps) {
   return (
     <Html lang="zh-Hant">
       <Head>
@@ -54,38 +50,36 @@ export function BookingInvite({
           fontStyle="normal"
         />
       </Head>
-      <Preview>{`${heading}：${title}（${when}）`}</Preview>
+      <Preview>{`會議連結建立失敗：${title}（${when}）`}</Preview>
       <Body style={body}>
         <Container style={container}>
           <Text style={brand}>WinLab Rooms</Text>
           <Hr style={hr} />
-          <Heading style={h1}>{heading}</Heading>
+          <Heading style={h1}>會議連結建立失敗</Heading>
           <Text style={p}>
-            <strong style={strong}>{organizerName}</strong>
-            {cancelled ? " 取消了這場會議：" : " 邀請你參加："}
+            <strong style={strong}>教室已經訂到了,邀請也寄出去了</strong>
+            ,只有線上會議連結沒有建立成功。與會者收到的邀請裡不會有 Teams
+            連結,需要你自己開一場並補給大家。
           </Text>
           <Section style={card}>
             <Text style={cardTitle}>{title}</Text>
             <Text style={cardMeta}>{when}</Text>
             <Text style={cardMeta}>資工系 {room}</Text>
-            {attendeeNames.length > 0 && (
-              <Text style={cardMeta}>與會：{attendeeNames.join("、")}</Text>
-            )}
-            {!cancelled && joinUrl && (
+            <Text style={cardMeta}>原因:{reason}</Text>
+            {pipelineUrl && (
               <Text style={cardMeta}>
-                線上會議：
-                <Link href={joinUrl} style={link}>
-                  加入 Teams 會議
+                <Link href={pipelineUrl} style={link}>
+                  查看 pipeline 紀錄
                 </Link>
               </Text>
             )}
           </Section>
-          {!cancelled && (
-            <Text style={muted}>
-              這封信附帶行事曆邀請，在 Gmail
-              直接按「是」就會加入你的日曆。回覆會寄給 {organizerName}。
-            </Text>
-          )}
+          <Text style={muted}>
+            {retryable
+              ? "這是暫時性的錯誤,同樣的時段再試一次有機會成功。"
+              : "重試不會有不同結果,這個錯誤需要人處理。"}
+          </Text>
+          <Text style={muted}>教室預約本身不受影響,不需要重訂。</Text>
           <Text style={footer}>portal.winlab.tw/rooms</Text>
         </Container>
       </Body>
@@ -93,7 +87,7 @@ export function BookingInvite({
   )
 }
 
-export default BookingInvite
+export default MeetingFailed
 
 // Token map (see packages/ui/src/styles/globals.css — shadcn neutral scale).
 // Email clients can't touch CSS variables so we resolve to hex here.
@@ -105,8 +99,6 @@ const C = {
   border: "#e5e5e5",
 } as const
 
-const link = { color: C.fg, textDecoration: "underline" }
-
 const body = {
   backgroundColor: C.bg,
   color: C.fg,
@@ -114,11 +106,7 @@ const body = {
   margin: 0,
   padding: 0,
 }
-const container = {
-  maxWidth: "560px",
-  margin: "0 auto",
-  padding: "48px 24px",
-}
+const container = { maxWidth: "560px", margin: "0 auto", padding: "48px 24px" }
 const brand = {
   fontSize: "12px",
   fontWeight: 500,
@@ -147,6 +135,7 @@ const p = {
   margin: "0 0 12px 0",
 }
 const strong = { fontWeight: 600, color: C.fg }
+const link = { color: C.fg, textDecoration: "underline" }
 const card = {
   border: `1px solid ${C.border}`,
   borderRadius: "10px",
