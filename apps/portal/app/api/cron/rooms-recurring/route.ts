@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { runRecurringBookings } from "@/lib/rooms/recurring-run"
-import { sweepStuckMeetingRequests } from "@/lib/rooms/meeting-result"
+import { sweepMeetingRequests } from "@/lib/rooms/meeting-result"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Books the next occurrence of every standing meeting, one week out. Runs
@@ -20,11 +20,12 @@ export async function GET(request: Request) {
 
   try {
     const result = await runRecurringBookings()
-    // Backstop for meeting requests whose pipeline never called back. Daily
-    // is coarse for a 30-minute timeout, but a pipeline that dies silently
-    // has to surface eventually — the interactive path shows its own state
-    // long before this runs.
-    const meetings = await sweepStuckMeetingRequests(createAdminClient())
+    // The single place meeting failures get mailed: resolve anything the
+    // pipeline never reported on, then send one notice per failed request.
+    // Batching it here rather than notifying from the callback is what stops
+    // one meeting generating two messages. A booking made within the last
+    // half hour is still legitimately waiting and is left for tomorrow.
+    const meetings = await sweepMeetingRequests(createAdminClient())
     return NextResponse.json({ ...result, meetings })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

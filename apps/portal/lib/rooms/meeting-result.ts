@@ -103,14 +103,10 @@ export async function applyMeetingOutcome(
     })
     .eq("id", request.id)
 
-  await notifyMeetingFailure(
-    admin,
-    request,
-    describeFailure(outcome.errorCode, outcome.errorMessage),
-    outcome.pipeline.url,
-    isRetryable(outcome.errorCode),
-    outcome.action
-  )
+  // Deliberately no mail here. Every failure notice goes out from the daily
+  // sweep instead, so one meeting produces at most one message: a callback
+  // that fails and a request that then times out would otherwise both write
+  // to the same person about the same meeting.
   return {}
 }
 
@@ -202,6 +198,11 @@ async function resendInviteWithLink(
  *
  * Without this, a failed pipeline and a slow one look identical: the room is
  * booked, the invite went out, and the Teams link just never appears.
+ *
+ * Marks the request notified only after the send succeeds, so a mail outage
+ * means the next daily run tries again rather than swallowing the news.
+ *
+ * @returns whether a message actually went out.
  */
 async function notifyMeetingFailure(
   admin: Admin,
@@ -210,18 +211,18 @@ async function notifyMeetingFailure(
   pipelineUrl: string | null,
   retryable: boolean,
   action: MeetingAction
-): Promise<void> {
+): Promise<boolean> {
   try {
-    if (!request.booking_id) return
+    if (!request.booking_id) return false
     const { data: booking } = await admin
       .from("rooms_bookings")
       .select("room, date, start_time, end_time, title, requested_by")
       .eq("id", request.booking_id)
       .maybeSingle()
-    if (!booking) return
+    if (!booking) return false
 
     const owner = await contactFor(admin, booking.requested_by)
-    if (!owner.email) return
+    if (!owner.email) return false
 
     const title = booking.title ?? `${booking.room} 借用`
     const html = await render(
@@ -235,7 +236,7 @@ async function notifyMeetingFailure(
         action,
       })
     )
-    await getResend().emails.send({
+    const { error } = await getResend().emails.send({
       from: MAIL_FROM_ROOMS,
       to: owner.email,
       subject:
@@ -244,32 +245,48 @@ async function notifyMeetingFailure(
           : `會議連結建立失敗:${title}`,
       html,
     })
+    if (error) return false
+
     await admin
       .from("rooms_meeting_requests")
       .update({ notified_at: new Date().toISOString() })
       .eq("id", request.id)
+    return true
   } catch (err) {
     // Already the failure path; the request row still records what happened.
     console.error("[rooms] meeting failure notice failed", err)
+    return false
   }
 }
 
-/** How long a request may sit pending before it's treated as lost. */
+/**
+ * How long a request may sit pending before it's treated as lost.
+ *
+ * Doubles as the grace period the daily run needs: a booking made minutes
+ * before the cron fires is still legitimately waiting for its pipeline, and
+ * this cutoff is what stops it being declared dead on the spot. It just waits
+ * for tomorrow's run instead.
+ */
 export const STUCK_AFTER_MINUTES = 30
 
 export interface SweepResult {
-  checked: number
   timedOut: number
+  notified: number
 }
 
 /**
- * Resolves requests the pipeline never reported back on.
+ * The one place failure mail goes out.
  *
- * A crashed runner sends no callback at all, so without this a request stays
- * pending forever and the person who booked never learns the meeting link
- * isn't coming.
+ * Two jobs, in order. First resolve anything the pipeline never reported back
+ * on — a crashed runner sends no callback at all, so without this a request
+ * stays pending forever. Then mail every failure that hasn't been mailed yet,
+ * whichever way it failed.
+ *
+ * Notifying from here rather than from the callback is what keeps it to one
+ * message per meeting: a request that fails its callback and later times out
+ * is still one meeting, and its owner should hear about it once.
  */
-export async function sweepStuckMeetingRequests(
+export async function sweepMeetingRequests(
   admin: Admin,
   now = new Date()
 ): Promise<SweepResult> {
@@ -277,14 +294,14 @@ export async function sweepStuckMeetingRequests(
     now.getTime() - STUCK_AFTER_MINUTES * 60_000
   ).toISOString()
 
-  const { data, error } = await admin
+  const { data: stale, error } = await admin
     .from("rooms_meeting_requests")
     .select("id, request_id, booking_id, status, kind")
     .eq("status", "pending")
     .lt("created_at", cutoff)
   if (error) throw new Error(`讀取待處理會議請求失敗:${error.message}`)
 
-  const stuck = (data ?? []) as MeetingRequestRow[]
+  const stuck = (stale ?? []) as MeetingRequestRow[]
   for (const request of stuck) {
     await applyMeetingOutcome(admin, request, {
       kind: "failed",
@@ -299,5 +316,33 @@ export async function sweepStuckMeetingRequests(
     })
   }
 
-  return { checked: stuck.length, timedOut: stuck.length }
+  const { data: unnotified } = await admin
+    .from("rooms_meeting_requests")
+    .select(
+      "id, request_id, booking_id, status, kind, error_code, error_message, pipeline_url"
+    )
+    .eq("status", "failed")
+    .is("notified_at", null)
+
+  let notified = 0
+  for (const row of unnotified ?? []) {
+    const code = row.error_code ?? "UNKNOWN"
+    const sent = await notifyMeetingFailure(
+      admin,
+      {
+        id: row.id,
+        request_id: row.request_id,
+        booking_id: row.booking_id,
+        status: row.status,
+        kind: row.kind,
+      },
+      describeFailure(code, row.error_message ?? ""),
+      row.pipeline_url,
+      isRetryable(code),
+      row.kind === "cancel" ? "cancel" : "create"
+    )
+    if (sent) notified++
+  }
+
+  return { timedOut: stuck.length, notified }
 }

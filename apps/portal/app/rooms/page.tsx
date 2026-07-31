@@ -427,11 +427,14 @@ function LabBookingCancel({
   room,
   start,
   end,
+  onCancelled,
 }: {
   date: string
   room: string
   start: string
   end: string
+  /** Closes the dialog — the slot it was opened for no longer exists. */
+  onCancelled: () => void
 }) {
   const { data: portalBookings, isLoading } = usePortalBookingsForDate(date)
   const cancelBooking = useCancelBooking()
@@ -468,12 +471,16 @@ function LabBookingCancel({
         disabled={cancelBooking.isPending}
         onClick={() =>
           cancelBooking.mutate(match.id, {
-            onSuccess: (result) =>
-              result.inviteError
-                ? toast.warning(
-                    `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`
-                  )
-                : toast.success(`已取消 ${room} 的預約`),
+            onSuccess: (result) => {
+              if (result.inviteError) {
+                toast.warning(
+                  `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`
+                )
+              } else {
+                toast.success(`已取消 ${room} 的預約`)
+              }
+              onCancelled()
+            },
             onError: (err) => toast.error(errorMessage(err, "取消失敗")),
           })
         }
@@ -691,6 +698,7 @@ export default function RoomsPage() {
                         room={room}
                         start={selectedSlot.start}
                         end={selectedSlot.end}
+                        onCancelled={() => setSelected(null)}
                       />
                     ))}
                   </div>
