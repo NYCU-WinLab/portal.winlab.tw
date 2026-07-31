@@ -1641,6 +1641,7 @@ export type Database = {
         Row: {
           booking_id: string | null
           callback_token_hash: string
+          cancel_id: string | null
           completed_at: string | null
           created_at: string
           error_code: string | null
@@ -1649,6 +1650,7 @@ export type Database = {
           id: string
           join_url: string | null
           kind: string
+          message_id: string | null
           notified_at: string | null
           options_applied: boolean | null
           pipeline_id: string | null
@@ -1662,6 +1664,7 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           callback_token_hash: string
+          cancel_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
@@ -1670,6 +1673,7 @@ export type Database = {
           id?: string
           join_url?: string | null
           kind?: string
+          message_id?: string | null
           notified_at?: string | null
           options_applied?: boolean | null
           pipeline_id?: string | null
@@ -1683,6 +1687,7 @@ export type Database = {
         Update: {
           booking_id?: string | null
           callback_token_hash?: string
+          cancel_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
@@ -1691,6 +1696,7 @@ export type Database = {
           id?: string
           join_url?: string | null
           kind?: string
+          message_id?: string | null
           notified_at?: string | null
           options_applied?: boolean | null
           pipeline_id?: string | null

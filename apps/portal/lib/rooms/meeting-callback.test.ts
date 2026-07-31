@@ -31,8 +31,8 @@ describe("readCallback", () => {
     if (!read.ok) return
 
     expect(read.requestId).toBe("room-booking-8f3a1c")
-    expect(read.outcome.kind).toBe("success")
-    if (read.outcome.kind !== "success") return
+    expect(read.outcome.kind).toBe("created")
+    if (read.outcome.kind !== "created") return
     expect(read.outcome.joinUrl).toBe(JOIN_URL)
     expect(read.outcome.eventId).toBe("evt-1")
     expect(read.outcome.threadId).toBe("19:xxx@thread.tacv2")
@@ -54,8 +54,8 @@ describe("readCallback", () => {
     )
     expect(read.ok).toBe(true)
     if (!read.ok) return
-    expect(read.outcome.kind).toBe("success")
-    if (read.outcome.kind !== "success") return
+    expect(read.outcome.kind).toBe("created")
+    if (read.outcome.kind !== "created") return
     expect(read.outcome.joinUrl).toBe(JOIN_URL)
     expect(read.outcome.optionsApplied).toBe(false)
   })
@@ -69,7 +69,7 @@ describe("readCallback", () => {
     )
     expect(read.ok).toBe(true)
     if (!read.ok) return
-    if (read.outcome.kind !== "success") throw new Error("expected success")
+    if (read.outcome.kind !== "created") throw new Error("expected created")
     expect(read.outcome.optionsApplied).toBe(false)
   })
 
@@ -136,9 +136,92 @@ describe("readCallback", () => {
   })
 })
 
+describe("readCallback — cancellations", () => {
+  // The one that would have broken everything: a successful cancellation
+  // reports no meeting and no join_url. Read with the creation rule, every
+  // working cancellation would be recorded as a failure and mailed about.
+  test("a cancellation with no meeting is a success", () => {
+    const read = readCallback({
+      request_id: "room-booking-8f3a1c",
+      action: "cancel",
+      status: "success",
+      stage: "done",
+      meeting: null,
+      api: { cancel_status: 204 },
+      error: null,
+      pipeline: PIPELINE,
+    })
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.action).toBe("cancel")
+    expect(read.outcome.kind).toBe("cancelled")
+  })
+
+  test("a failed cancellation carries its code and action", () => {
+    const read = readCallback({
+      request_id: "room-booking-8f3a1c",
+      action: "cancel",
+      status: "failed",
+      stage: "cancel",
+      meeting: null,
+      error: { code: "CANCEL_FAILED", message: "404 from Teams" },
+      pipeline: PIPELINE,
+    })
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    if (read.outcome.kind !== "failed") throw new Error("expected failure")
+    expect(read.outcome.errorCode).toBe("CANCEL_FAILED")
+    expect(read.outcome.action).toBe("cancel")
+  })
+
+  // status success with an error code set is contradictory; treat it as the
+  // failure it names rather than reporting a cancellation that may not have
+  // happened.
+  test("a cancellation reporting success alongside an error is a failure", () => {
+    const read = readCallback({
+      request_id: "room-booking-8f3a1c",
+      action: "cancel",
+      status: "success",
+      error: { code: "CANCEL_FAILED", message: "already cancelled" },
+    })
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.outcome.kind).toBe("failed")
+  })
+
+  test("a missing action means create, matching the trigger's default", () => {
+    const read = readCallback(success())
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.action).toBe("create")
+  })
+
+  test("a creation reports the ids the cancel pipeline will need", () => {
+    const read = readCallback(
+      success({
+        meeting: {
+          join_url: JOIN_URL,
+          cancel_id: "040000008200e00074c5b7101a82e008",
+          message_id: "1785492325352",
+          event_id: "AAMkAGxxxx",
+        },
+      })
+    )
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    if (read.outcome.kind !== "created") throw new Error("expected created")
+    expect(read.outcome.cancelId).toBe("040000008200e00074c5b7101a82e008")
+    expect(read.outcome.messageId).toBe("1785492325352")
+    // Kept separately: the spec is explicit that the AAMkAG… id is NOT what
+    // goes into EVENT_ID when cancelling.
+    expect(read.outcome.eventId).toBe("AAMkAGxxxx")
+  })
+})
+
 describe("isRetryable", () => {
-  test("only the transient API failure retries", () => {
+  test("only the transient API failures retry", () => {
     expect(isRetryable("CREATE_FAILED")).toBe(true)
+    expect(isRetryable("CANCEL_FAILED")).toBe(true)
     for (const code of [
       "INVALID_REQUEST",
       "LOGIN_FAILED",
@@ -146,6 +229,7 @@ describe("isRetryable", () => {
       "INVALID_PAYLOAD",
       "OPTIONS_FAILED",
       "UNEXPECTED_RESPONSE",
+      "NO_CALLBACK",
       "UNKNOWN",
     ]) {
       expect(isRetryable(code)).toBe(false)

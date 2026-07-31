@@ -18,6 +18,7 @@ import { sendBookingInvite } from "./invite-mail"
 import {
   describeFailure,
   isRetryable,
+  type MeetingAction,
   type MeetingOutcome,
 } from "./meeting-callback"
 
@@ -29,6 +30,7 @@ export interface MeetingRequestRow {
   request_id: string
   booking_id: string | null
   status: string
+  kind: string
 }
 
 export interface ApplyResult {
@@ -43,7 +45,7 @@ export async function applyMeetingOutcome(
 ): Promise<ApplyResult> {
   const completedAt = new Date().toISOString()
 
-  if (outcome.kind === "success") {
+  if (outcome.kind === "created") {
     await admin
       .from("rooms_meeting_requests")
       .update({
@@ -53,6 +55,10 @@ export async function applyMeetingOutcome(
         web_link: outcome.webLink,
         event_id: outcome.eventId,
         thread_id: outcome.threadId,
+        // The pair the cancel pipeline needs handed back. Without them a
+        // cancelled booking can only ever leave an orphan meeting behind.
+        cancel_id: outcome.cancelId,
+        message_id: outcome.messageId,
         options_applied: outcome.optionsApplied,
         pipeline_id: outcome.pipeline.id,
         pipeline_url: outcome.pipeline.url,
@@ -63,6 +69,25 @@ export async function applyMeetingOutcome(
       .eq("id", request.id)
 
     return await resendInviteWithLink(admin, request, outcome.joinUrl)
+  }
+
+  // A cancellation reports nothing but its status, and there's nobody to
+  // tell: whoever cancelled is already looking at the result, and the
+  // attendees got the CANCEL invite when the booking was cancelled.
+  if (outcome.kind === "cancelled") {
+    await admin
+      .from("rooms_meeting_requests")
+      .update({
+        status: "success",
+        stage: outcome.stage,
+        pipeline_id: outcome.pipeline.id,
+        pipeline_url: outcome.pipeline.url,
+        error_code: null,
+        error_message: null,
+        completed_at: completedAt,
+      })
+      .eq("id", request.id)
+    return {}
   }
 
   await admin
@@ -83,7 +108,8 @@ export async function applyMeetingOutcome(
     request,
     describeFailure(outcome.errorCode, outcome.errorMessage),
     outcome.pipeline.url,
-    isRetryable(outcome.errorCode)
+    isRetryable(outcome.errorCode),
+    outcome.action
   )
   return {}
 }
@@ -182,7 +208,8 @@ async function notifyMeetingFailure(
   request: MeetingRequestRow,
   reason: string,
   pipelineUrl: string | null,
-  retryable: boolean
+  retryable: boolean,
+  action: MeetingAction
 ): Promise<void> {
   try {
     if (!request.booking_id) return
@@ -205,12 +232,16 @@ async function notifyMeetingFailure(
         reason,
         pipelineUrl,
         retryable,
+        action,
       })
     )
     await getResend().emails.send({
       from: MAIL_FROM_ROOMS,
       to: owner.email,
-      subject: `會議連結建立失敗:${title}`,
+      subject:
+        action === "cancel"
+          ? `Teams 會議沒有取消成功:${title}`
+          : `會議連結建立失敗:${title}`,
       html,
     })
     await admin
@@ -248,7 +279,7 @@ export async function sweepStuckMeetingRequests(
 
   const { data, error } = await admin
     .from("rooms_meeting_requests")
-    .select("id, request_id, booking_id, status")
+    .select("id, request_id, booking_id, status, kind")
     .eq("status", "pending")
     .lt("created_at", cutoff)
   if (error) throw new Error(`讀取待處理會議請求失敗:${error.message}`)
@@ -257,6 +288,10 @@ export async function sweepStuckMeetingRequests(
   for (const request of stuck) {
     await applyMeetingOutcome(admin, request, {
       kind: "failed",
+      // A lost cancellation and a lost creation need different words: one
+      // leaves no meeting link, the other leaves a live meeting that will
+      // still start and still record.
+      action: request.kind === "cancel" ? "cancel" : "create",
       errorCode: "NO_CALLBACK",
       errorMessage: `pipeline 超過 ${STUCK_AFTER_MINUTES} 分鐘沒有回報結果`,
       stage: null,

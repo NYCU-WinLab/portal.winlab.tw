@@ -23,6 +23,11 @@ import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
+import {
+  meetingPipelineConfigured,
+  triggerMeetingCancel,
+} from "@/lib/rooms/meeting-pipeline"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso, todayInTaipei } from "@/lib/rooms/date"
@@ -228,6 +233,48 @@ export async function confirmBooking(
   return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
 }
 
+/**
+ * Asks the pipeline to take down the Teams meeting for a cancelled booking.
+ *
+ * Never throws: the room is already released and the attendees already have
+ * their cancellation by the time this runs, so failing here must not read as
+ * "the cancellation didn't work". A meeting that can't be taken down is
+ * reported to its creator by the callback instead — it's the one case where
+ * something is genuinely left behind, since it will still start and still
+ * record.
+ */
+async function cancelTeamsMeeting(
+  bookingId: string,
+  date: string,
+  startTime: string
+): Promise<void> {
+  if (!meetingPipelineConfigured()) return
+  try {
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from("rooms_meeting_requests")
+      .select("cancel_id, message_id")
+      .eq("booking_id", bookingId)
+      .eq("kind", "create")
+      .eq("status", "success")
+      .maybeSingle()
+
+    // No successful creation means there's no meeting to take down — the
+    // request failed, or never happened.
+    if (!data?.cancel_id || !data.message_id) return
+
+    await triggerMeetingCancel(admin, {
+      bookingId,
+      cancelId: data.cancel_id,
+      messageId: data.message_id,
+      start: taipeiIso(date, startTime),
+      reason: "此會議已取消(教室預約已取消)",
+    })
+  } catch (err) {
+    console.error("[rooms] teams meeting cancel trigger failed", err)
+  }
+}
+
 export async function cancelBooking(bookingId: string): Promise<BookingResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
@@ -273,6 +320,8 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
       `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`
     )
   }
+
+  await cancelTeamsMeeting(booking.id, booking.date, booking.start_time)
 
   revalidatePath("/rooms")
 

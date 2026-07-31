@@ -1,11 +1,17 @@
 // Reads the pipeline's callback payload into something the route can act on.
 //
-// The one rule worth stating up front: success is decided by whether a
-// join_url came back, NOT by the `status` field. The pipeline reports
-// OPTIONS_FAILED when the meeting was created but auto-recording/language
-// couldn't be applied — the meeting exists and its URL is valid, and the
-// integration notes are explicit that retrying it would create a duplicate.
-// Branching on the URL handles that case whichever way `status` is set.
+// Two rules decide success, and the order between them matters.
+//
+// 1. `action` first. A cancellation that worked reports no meeting and no
+//    join_url — reading it with the create rule would call every successful
+//    cancellation a failure and mail the creator about it.
+// 2. For a creation, success is whether a join_url came back, NOT the
+//    `status` field. The pipeline reports OPTIONS_FAILED when the meeting
+//    was created but auto-recording/language couldn't be applied — the
+//    meeting exists and its URL is valid, and the integration notes are
+//    explicit that retrying it would create a duplicate.
+
+export type MeetingAction = "create" | "cancel"
 
 export interface MeetingPipelineRef {
   id: string | null
@@ -14,18 +20,28 @@ export interface MeetingPipelineRef {
 
 export type MeetingOutcome =
   | {
-      kind: "success"
+      kind: "created"
       joinUrl: string
       webLink: string | null
       eventId: string | null
       threadId: string | null
+      /** The 04000000… GlobalObjectId the cancel pipeline wants as EVENT_ID. */
+      cancelId: string | null
+      /** The channel post id the cancel pipeline wants as MESSAGE_ID. */
+      messageId: string | null
       /** False when the meeting exists but its options didn't apply. */
       optionsApplied: boolean
       stage: string | null
       pipeline: MeetingPipelineRef
     }
   | {
+      kind: "cancelled"
+      stage: string | null
+      pipeline: MeetingPipelineRef
+    }
+  | {
       kind: "failed"
+      action: MeetingAction
       errorCode: string
       errorMessage: string
       stage: string | null
@@ -33,7 +49,12 @@ export type MeetingOutcome =
     }
 
 export type CallbackRead =
-  | { ok: true; requestId: string; outcome: MeetingOutcome }
+  | {
+      ok: true
+      requestId: string
+      action: MeetingAction
+      outcome: MeetingOutcome
+    }
   | { ok: false; error: string }
 
 function str(value: unknown): string | null {
@@ -66,6 +87,9 @@ export function readCallback(
     return { ok: false, error: "X-Request-Id 與 body 的 request_id 不一致" }
   }
 
+  // Absent means create — the trigger treats ACTION as optional too.
+  const action: MeetingAction = root.action === "cancel" ? "cancel" : "create"
+
   const pipelineRaw = record(root.pipeline)
   const pipeline: MeetingPipelineRef = {
     id: pipelineRaw ? str(pipelineRaw.id) : null,
@@ -74,6 +98,37 @@ export function readCallback(
   const stage = str(root.stage)
   const errorRaw = record(root.error)
   const errorCode = errorRaw ? str(errorRaw.code) : null
+  const errorMessage = errorRaw ? str(errorRaw.message) : null
+
+  const failed = (code: string, message: string): CallbackRead => ({
+    ok: true,
+    requestId,
+    action,
+    outcome: {
+      kind: "failed",
+      action,
+      errorCode: code,
+      errorMessage: message,
+      stage,
+      pipeline,
+    },
+  })
+
+  if (action === "cancel") {
+    // Nothing comes back but the status, so that's what decides it.
+    if (root.status === "success" && !errorCode) {
+      return {
+        ok: true,
+        requestId,
+        action,
+        outcome: { kind: "cancelled", stage, pipeline },
+      }
+    }
+    return failed(
+      errorCode ?? "UNKNOWN",
+      errorMessage ?? "pipeline 沒有說明取消失敗的原因"
+    )
+  }
 
   const meeting = record(root.meeting)
   const joinUrl = meeting ? str(meeting.join_url) : null
@@ -82,12 +137,15 @@ export function readCallback(
     return {
       ok: true,
       requestId,
+      action,
       outcome: {
-        kind: "success",
+        kind: "created",
         joinUrl,
         webLink: str(meeting?.web_link),
         eventId: str(meeting?.event_id),
         threadId: str(meeting?.thread_id),
+        cancelId: str(meeting?.cancel_id),
+        messageId: str(meeting?.message_id),
         // Trust an explicit false, and treat OPTIONS_FAILED as false even if
         // the flag is missing — those are the same condition reported twice.
         optionsApplied:
@@ -98,21 +156,12 @@ export function readCallback(
     }
   }
 
-  return {
-    ok: true,
-    requestId,
-    outcome: {
-      kind: "failed",
-      // A payload with no URL and no error code is itself a broken response;
-      // saying so beats recording an empty reason.
-      errorCode: errorCode ?? "UNEXPECTED_RESPONSE",
-      errorMessage:
-        (errorRaw ? str(errorRaw.message) : null) ??
-        "pipeline 沒有回傳會議連結,也沒有說明原因",
-      stage,
-      pipeline,
-    },
-  }
+  // A payload with no URL and no error code is itself a broken response;
+  // saying so beats recording an empty reason.
+  return failed(
+    errorCode ?? "UNEXPECTED_RESPONSE",
+    errorMessage ?? "pipeline 沒有回傳會議連結,也沒有說明原因"
+  )
 }
 
 /** Stable codes from the pipeline, in words the person who booked can act on. */
@@ -123,7 +172,10 @@ const REASONS: Record<string, string> = {
   INVALID_PAYLOAD: "Teams 拒絕了這個會議內容",
   CREATE_FAILED: "Teams 建立會議的 API 失敗",
   OPTIONS_FAILED: "會議已建立,但自動錄影/語言選項沒有套用",
+  CANCEL_FAILED: "Teams 取消會議的 API 失敗,可能識別碼錯誤或會議已經取消",
   UNEXPECTED_RESPONSE: "Teams 的回應缺少必要欄位",
+  NO_CALLBACK: "pipeline 沒有在時限內回報結果",
+  TRIGGER_FAILED: "Portal 連不上 GitLab,pipeline 沒有啟動",
   UNKNOWN: "未預期的錯誤",
 }
 
@@ -135,10 +187,10 @@ export function describeFailure(code: string, message: string): string {
 /**
  * Whether it's worth trying the same request again.
  *
- * Deliberately conservative: only CREATE_FAILED is a transient API failure.
- * Everything else needs either a code change or a human, and quietly retrying
- * would just burn pipeline runs while looking like progress.
+ * Deliberately conservative: only the two transient API failures. Everything
+ * else needs either a code change or a human, and quietly retrying would just
+ * burn pipeline runs while looking like progress.
  */
 export function isRetryable(code: string): boolean {
-  return code === "CREATE_FAILED"
+  return code === "CREATE_FAILED" || code === "CANCEL_FAILED"
 }

@@ -21,6 +21,8 @@ export type MeetingFailedProps = {
   pipelineUrl?: string | null
   /** Whether re-booking has any chance of going differently. */
   retryable?: boolean
+  /** Which half of the flow failed — they need different instructions. */
+  action?: "create" | "cancel"
 }
 
 // Portal runs in Geist Mono (see app/layout.tsx + globals.css). Match that
@@ -35,7 +37,10 @@ export function MeetingFailed({
   reason,
   pipelineUrl = null,
   retryable = false,
+  action = "create",
 }: MeetingFailedProps) {
+  const cancelling = action === "cancel"
+  const heading = cancelling ? "Teams 會議沒有取消成功" : "會議連結建立失敗"
   return (
     <Html lang="zh-Hant">
       <Head>
@@ -50,17 +55,25 @@ export function MeetingFailed({
           fontStyle="normal"
         />
       </Head>
-      <Preview>{`會議連結建立失敗：${title}（${when}）`}</Preview>
+      <Preview>{`${heading}：${title}（${when}）`}</Preview>
       <Body style={body}>
         <Container style={container}>
           <Text style={brand}>WinLab Rooms</Text>
           <Hr style={hr} />
-          <Heading style={h1}>會議連結建立失敗</Heading>
-          <Text style={p}>
-            <strong style={strong}>教室已經訂到了,邀請也寄出去了</strong>
-            ,只有線上會議連結沒有建立成功。與會者收到的邀請裡不會有 Teams
-            連結,需要你自己開一場並補給大家。
-          </Text>
+          <Heading style={h1}>{heading}</Heading>
+          {cancelling ? (
+            <Text style={p}>
+              教室已經退掉了,與會者也收到取消通知,但
+              <strong style={strong}>那場 Teams 會議還在頻道裡</strong>
+              。它到時間仍然會開始並自動錄影,需要你手動到 Teams 把它刪掉。
+            </Text>
+          ) : (
+            <Text style={p}>
+              <strong style={strong}>教室已經訂到了,邀請也寄出去了</strong>
+              ,只有線上會議連結沒有建立成功。與會者收到的邀請裡不會有 Teams
+              連結,需要你自己開一場並補給大家。
+            </Text>
+          )}
           <Section style={card}>
             <Text style={cardTitle}>{title}</Text>
             <Text style={cardMeta}>{when}</Text>
@@ -79,7 +92,11 @@ export function MeetingFailed({
               ? "這是暫時性的錯誤,同樣的時段再試一次有機會成功。"
               : "重試不會有不同結果,這個錯誤需要人處理。"}
           </Text>
-          <Text style={muted}>教室預約本身不受影響,不需要重訂。</Text>
+          <Text style={muted}>
+            {cancelling
+              ? "教室已經退掉了,不需要再處理預約本身。"
+              : "教室預約本身不受影響,不需要重訂。"}
+          </Text>
           <Text style={footer}>portal.winlab.tw/rooms</Text>
         </Container>
       </Body>

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("rooms_meeting_requests")
-    .select("id, request_id, booking_id, status, callback_token_hash")
+    .select("id, request_id, booking_id, status, kind, callback_token_hash")
     .eq("request_id", read.requestId)
     .maybeSingle()
 
@@ -61,6 +61,17 @@ export async function POST(request: Request) {
     request_id: data.request_id,
     booking_id: data.booking_id,
     status: data.status,
+    kind: data.kind,
+  }
+
+  // The pipeline echoes the ACTION it ran. If that disagrees with what this
+  // request was created for, something is crossed — applying it would write
+  // a creation's result onto a cancellation or vice versa.
+  if (read.action !== row.kind) {
+    return NextResponse.json(
+      { error: `action ${read.action} 與這筆請求的 ${row.kind} 不符` },
+      { status: 400 }
+    )
   }
 
   // Idempotency. A 2xx here is what stops the pipeline retrying, so a repeat

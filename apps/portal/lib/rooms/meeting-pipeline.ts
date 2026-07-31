@@ -25,6 +25,20 @@ export interface MeetingRequestInput {
   end: string
 }
 
+export interface MeetingCancelInput {
+  bookingId: string
+  /**
+   * The meeting's cancel_id — the 04000000… GlobalObjectId, NOT the
+   * AAMkAG… Outlook event id. The spec calls this out explicitly because
+   * the two are easy to confuse and the wrong one fails as CANCEL_FAILED.
+   */
+  cancelId: string
+  messageId: string
+  /** The original meeting's start, with an offset. */
+  start: string
+  reason?: string
+}
+
 export interface MeetingTriggerOutcome {
   requestId: string
   pipelineId: string | null
@@ -50,6 +64,43 @@ export async function triggerMeetingPipeline(
   admin: Admin,
   input: MeetingRequestInput
 ): Promise<MeetingTriggerOutcome> {
+  return run(admin, "create", input.bookingId, (form) => {
+    form.set("variables[ACTION]", "create")
+    form.set("variables[SUBJECT]", input.title)
+    form.set("variables[START_TIME]", input.start)
+    form.set("variables[END_TIME]", input.end)
+  })
+}
+
+/**
+ * Asks the pipeline to cancel a meeting it created.
+ *
+ * Same endpoint and same trigger token as creation — only ACTION differs.
+ * Without this a cancelled booking leaves a meeting sitting in the channel
+ * that still starts, still records, and still invites people to something
+ * that isn't happening.
+ */
+export async function triggerMeetingCancel(
+  admin: Admin,
+  input: MeetingCancelInput
+): Promise<MeetingTriggerOutcome> {
+  return run(admin, "cancel", input.bookingId, (form) => {
+    form.set("variables[ACTION]", "cancel")
+    form.set("variables[EVENT_ID]", input.cancelId)
+    form.set("variables[MESSAGE_ID]", input.messageId)
+    form.set("variables[START_TIME]", input.start)
+    if (input.reason) {
+      form.set("variables[CANCELLATION_MESSAGE]", input.reason)
+    }
+  })
+}
+
+async function run(
+  admin: Admin,
+  kind: "create" | "cancel",
+  bookingId: string,
+  fill: (form: FormData) => void
+): Promise<MeetingTriggerOutcome> {
   const token = process.env.GITLAB_MEETING_TRIGGER_TOKEN
   if (!token) throw new Error("GITLAB_MEETING_TRIGGER_TOKEN 未設定")
 
@@ -61,7 +112,8 @@ export async function triggerMeetingPipeline(
     .from("rooms_meeting_requests")
     .insert({
       request_id: requestId,
-      booking_id: input.bookingId,
+      booking_id: bookingId,
+      kind,
       callback_token_hash: hashCallbackToken(callbackToken),
     })
   if (insertError) {
@@ -73,9 +125,7 @@ export async function triggerMeetingPipeline(
   form.set("ref", TRIGGER_REF)
   form.set("variables[REQUEST_ID]", requestId)
   form.set("variables[CALLBACK_TOKEN]", callbackToken)
-  form.set("variables[SUBJECT]", input.title)
-  form.set("variables[START_TIME]", input.start)
-  form.set("variables[END_TIME]", input.end)
+  fill(form)
 
   try {
     const response = await fetch(url, { method: "POST", body: form })
