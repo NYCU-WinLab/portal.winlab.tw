@@ -47,6 +47,30 @@ export function meetingJoinUrl(bookingId: string): string {
 }
 
 /**
+ * Who the invite actually goes to.
+ *
+ * The organiser is included even though they're the ORGANIZER rather than an
+ * ATTENDEE in the .ics. Being named as organiser doesn't put the event in
+ * your own calendar — the message has to reach you. Someone who booked a
+ * meeting they aren't personally attending got nothing at all, and had no
+ * copy of the meeting anywhere.
+ */
+export function recipients(input: BookingInviteInput): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const email of [
+    input.organizer.email,
+    ...input.attendees.map((a) => a.email),
+  ]) {
+    const key = email.trim().toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(email)
+  }
+  return out
+}
+
+/**
  * Mails the attendees a calendar invite (or cancellation) for a booking.
  *
  * Deliberately not throwing on send failure: the room is already booked in
@@ -57,7 +81,10 @@ export function meetingJoinUrl(bookingId: string): string {
 export async function sendBookingInvite(
   input: BookingInviteInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (input.attendees.length === 0) return { ok: true }
+  // A booking with no attendees still sends: the organiser gets their own
+  // meeting. Only a booking with nobody to reach at all is a no-op.
+  const to = recipients(input)
+  if (to.length === 0) return { ok: true }
 
   const when = `${formatDayLabel(input.date)} ${input.startTime}–${input.endTime}`
   const cancelled = input.cancelled ?? false
@@ -92,7 +119,7 @@ export async function sendBookingInvite(
 
     const { error } = await getResend().emails.send({
       from: MAIL_FROM_ROOMS,
-      to: input.attendees.map((a) => a.email),
+      to,
       // RSVPs go back to whoever made the booking — a real mailbox, unlike
       // the notifications sender.
       replyTo: input.organizer.email,

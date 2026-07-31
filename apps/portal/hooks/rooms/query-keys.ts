@@ -6,6 +6,9 @@ export const queryKeys = {
   portalBookings: {
     byDate: (date: string) => ["rooms", "portal-bookings", date] as const,
   },
+  onlineBookings: {
+    all: ["rooms", "online-bookings"] as const,
+  },
   labUsers: {
     all: ["rooms", "lab-users"] as const,
   },

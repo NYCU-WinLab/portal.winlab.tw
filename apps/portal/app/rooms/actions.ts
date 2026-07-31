@@ -184,6 +184,74 @@ export async function getPortalBookingsForDate(
   }))
 }
 
+export interface OnlineBooking {
+  id: string
+  date: string
+  startTime: string
+  endTime: string
+  title: string | null
+  attendees: AttendeeContact[]
+  requestedBy: string
+  meeting: BookingMeeting | null
+}
+
+/**
+ * Online-only meetings from today onwards.
+ *
+ * These reserve no room, so they can't appear on the availability grid — a
+ * block drawn there would claim a room is taken when none is. Without a list
+ * of their own they were invisible: no way to see one existed, and no way to
+ * cancel it.
+ */
+export async function getOnlineBookings(): Promise<OnlineBooking[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("rooms_bookings")
+    .select(
+      "id, date, start_time, end_time, title, attendees, requested_by, status"
+    )
+    .is("room", null)
+    .eq("status", "booked")
+    .gte("date", todayInTaipei())
+    .order("date")
+    .order("start_time")
+
+  if (error) throw new Error(`讀取線上會議失敗:${error.message}`)
+
+  const bookings = data ?? []
+  if (bookings.length === 0) return []
+
+  const { data: requests } = await supabase
+    .from("rooms_meeting_requests")
+    .select("booking_id, status, join_url, error_code")
+    .eq("kind", "create")
+    .in(
+      "booking_id",
+      bookings.map((b) => b.id)
+    )
+
+  const byBooking = new Map<string, BookingMeeting>()
+  for (const r of requests ?? []) {
+    if (!r.booking_id) continue
+    byBooking.set(r.booking_id, {
+      status: r.status as BookingMeeting["status"],
+      joinUrl: r.join_url,
+      errorCode: r.error_code,
+    })
+  }
+
+  return bookings.map((row) => ({
+    id: row.id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    title: row.title,
+    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
+    requestedBy: row.requested_by,
+    meeting: byBooking.get(row.id) ?? null,
+  }))
+}
+
 export interface ConfirmBookingInput {
   date: string
   /** Null books no room at all — an online-only meeting. */
