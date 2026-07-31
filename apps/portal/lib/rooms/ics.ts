@@ -93,15 +93,15 @@ export function buildCalendarInvite(event: CalendarEvent): string {
         `ATTENDEE;CN=${escapeText(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${a.email}`
     ),
     `STATUS:${event.method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
-    // The join link goes in three places because clients disagree about
-    // where they look: DESCRIPTION is what everyone renders, URL is the
-    // standard field, and the X- property is what Outlook turns into its
-    // "Join" button.
+    // DESCRIPTION is what every client renders; URL is the standard field.
+    //
+    // Deliberately NOT X-MICROSOFT-SKYPETEAMSMEETINGURL: this is Portal's
+    // redirect, not a teams.microsoft.com URL, and Outlook builds its "Join"
+    // button out of that property expecting the real thing.
     ...(event.joinUrl
       ? [
           `DESCRIPTION:${escapeText(`線上會議：${event.joinUrl}`)}`,
           `URL:${event.joinUrl}`,
-          `X-MICROSOFT-SKYPETEAMSMEETINGURL:${event.joinUrl}`,
         ]
       : []),
     "END:VEVENT",

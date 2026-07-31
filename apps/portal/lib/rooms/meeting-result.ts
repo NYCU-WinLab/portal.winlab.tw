@@ -11,10 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { MeetingFailed } from "@/emails/rooms/meeting-failed"
 import { getResend, MAIL_FROM_ROOMS } from "@/lib/email/resend"
 
-import type { AttendeeContact } from "./attendee-groups"
-import { nextInviteSequence } from "./book"
-import { formatDayLabel, taipeiIso } from "./date"
-import { sendBookingInvite } from "./invite-mail"
+import { formatDayLabel } from "./date"
 import {
   describeFailure,
   isRetryable,
@@ -68,7 +65,10 @@ export async function applyMeetingOutcome(
       })
       .eq("id", request.id)
 
-    return await resendInviteWithLink(admin, request, outcome.joinUrl)
+    // No mail. The invite already went out with a link that resolves here,
+    // so recording the URL is the whole job — re-sending would give everyone
+    // a second message about a meeting already in their calendar.
+    return {}
   }
 
   // A cancellation reports nothing but its status, and there's nobody to
@@ -110,34 +110,6 @@ export async function applyMeetingOutcome(
   return {}
 }
 
-type BookingRow = {
-  id: string
-  room: string
-  date: string
-  start_time: string
-  end_time: string
-  title: string | null
-  attendees: unknown
-  requested_by: string
-}
-
-async function loadBooking(
-  admin: Admin,
-  bookingId: string
-): Promise<BookingRow | null> {
-  const { data } = await admin
-    .from("rooms_bookings")
-    .select(
-      "id, room, date, start_time, end_time, title, attendees, requested_by, status"
-    )
-    .eq("id", bookingId)
-    .maybeSingle()
-  // A booking cancelled while the pipeline was still running shouldn't get a
-  // fresh invite mailed out after the cancellation.
-  if (!data || data.status !== "booked") return null
-  return data as BookingRow
-}
-
 async function contactFor(
   admin: Admin,
   userId: string
@@ -151,46 +123,6 @@ async function contactFor(
     name: data?.name ?? data?.email ?? "WinLab",
     email: data?.email ?? "",
   }
-}
-
-/**
- * Re-sends the calendar invite carrying the join link.
- *
- * Same UID as the original with a higher SEQUENCE, so Gmail and Outlook
- * update the event already in the recipient's calendar rather than adding a
- * second one. This is why the pipeline's own ical_uid is recorded but not
- * used — adopting it would orphan the invite that already went out.
- */
-async function resendInviteWithLink(
-  admin: Admin,
-  request: MeetingRequestRow,
-  joinUrl: string
-): Promise<ApplyResult> {
-  if (!request.booking_id) return {}
-
-  const booking = await loadBooking(admin, request.booking_id)
-  if (!booking) return {}
-
-  const attendees = (booking.attendees ?? []) as AttendeeContact[]
-  if (attendees.length === 0) return {}
-
-  const organizer = await contactFor(admin, booking.requested_by)
-  const sent = await sendBookingInvite({
-    bookingId: booking.id,
-    title: booking.title ?? `${booking.room} 借用`,
-    room: booking.room,
-    date: booking.date,
-    startTime: booking.start_time,
-    endTime: booking.end_time,
-    start: taipeiIso(booking.date, booking.start_time),
-    end: taipeiIso(booking.date, booking.end_time),
-    organizer,
-    attendees,
-    joinUrl,
-    sequence: await nextInviteSequence(booking.id),
-  })
-
-  return sent.ok ? {} : { inviteError: sent.error }
 }
 
 /**

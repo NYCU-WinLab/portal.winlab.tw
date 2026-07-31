@@ -14,7 +14,7 @@ import type { Json } from "@/lib/supabase/database.types"
 import type { AttendeeContact } from "./attendee-groups"
 import { bookRoom } from "./booking-client"
 import { taipeiIso } from "./date"
-import { sendBookingInvite } from "./invite-mail"
+import { meetingJoinUrl, sendBookingInvite } from "./invite-mail"
 import {
   meetingPipelineConfigured,
   triggerMeetingPipeline,
@@ -119,8 +119,28 @@ export async function placeBooking(
     )
   }
 
-  // The room is booked either way — a mail failure is reported back, not
-  // thrown, so it can't read as "the booking didn't happen".
+  // Trigger before mailing, so the request row exists by the time anyone can
+  // follow the link in the invite. Nothing waits for the pipeline — it answers
+  // minutes later on its own callback — and a trigger that fails must not undo
+  // a room that's already reserved. The request row records the failure and
+  // the daily sweep tells the creator.
+  let meetingRequestId: string | undefined
+  if (input.online && meetingPipelineConfigured()) {
+    const triggered = await triggerMeetingPipeline(createAdminClient(), {
+      bookingId: inserted.id,
+      title: input.title,
+      start,
+      end,
+    })
+    meetingRequestId = triggered.requestId
+  }
+
+  // One message, sent once. The join link is Portal's own redirect rather
+  // than the Teams URL, which doesn't exist yet — that's what removes the
+  // second "here's the link now" mail everyone used to get.
+  //
+  // The room is booked either way, so a mail failure is reported back rather
+  // than thrown: it must not read as "the booking didn't happen".
   const sent = await sendBookingInvite({
     bookingId: inserted.id,
     title: input.title,
@@ -132,25 +152,11 @@ export async function placeBooking(
     end,
     organizer: { name: input.organizer.name, email: input.organizer.email },
     attendees: input.attendees,
-    // First message for this UID. Later sends (meeting link, cancellation)
-    // read the stored counter and bump it.
+    joinUrl: input.online ? meetingJoinUrl(inserted.id) : null,
+    // First message for this UID. The cancellation reads the stored counter
+    // and bumps it.
     sequence: 0,
   })
-
-  // Kick the pipeline off last. It answers minutes later on its own callback,
-  // so nothing here waits for it — and a trigger that fails must not undo a
-  // room that's already reserved and an invite that's already gone out. The
-  // request row records the failure and the creator gets told.
-  let meetingRequestId: string | undefined
-  if (input.online && meetingPipelineConfigured()) {
-    const triggered = await triggerMeetingPipeline(createAdminClient(), {
-      bookingId: inserted.id,
-      title: input.title,
-      start,
-      end,
-    })
-    meetingRequestId = triggered.requestId
-  }
 
   return {
     bookingId: inserted.id,

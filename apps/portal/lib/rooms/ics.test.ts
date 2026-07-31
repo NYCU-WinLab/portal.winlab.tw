@@ -71,3 +71,54 @@ describe("buildCalendarInvite", () => {
     expect(unfolded).toBe(`SUMMARY:${title}`)
   })
 })
+
+describe("join link", () => {
+  const base = {
+    uid: "rooms-abc@portal.winlab.tw",
+    title: "週會",
+    room: "600A",
+    start: "2026-08-01T02:00:00.000Z",
+    end: "2026-08-01T03:00:00.000Z",
+    organizer: { name: "Loki", email: "loki@winlab.tw" },
+    attendees: [{ name: "N0Ball", email: "n0ball@winlab.tw" }],
+    sequence: 0,
+    method: "REQUEST" as const,
+  }
+
+  test("carries the join link in DESCRIPTION and URL", () => {
+    const ics = buildCalendarInvite({
+      ...base,
+      joinUrl: "https://portal.winlab.tw/api/rooms/join/abc",
+    })
+    expect(ics).toContain("URL:https://portal.winlab.tw/api/rooms/join/abc")
+    expect(ics).toContain("DESCRIPTION:")
+  })
+
+  // Outlook builds its "Join" button from this property and expects a real
+  // teams.microsoft.com URL. Ours is a redirect, so it must not claim to be
+  // a Teams meeting URL.
+  test("does not claim the redirect is a Teams meeting URL", () => {
+    const ics = buildCalendarInvite({
+      ...base,
+      joinUrl: "https://portal.winlab.tw/api/rooms/join/abc",
+    })
+    expect(ics).not.toContain("X-MICROSOFT-SKYPETEAMSMEETINGURL")
+  })
+
+  test("omits both fields when there's no link", () => {
+    const ics = buildCalendarInvite({ ...base, joinUrl: null })
+    expect(ics).not.toContain("URL:")
+    expect(ics).not.toContain("DESCRIPTION:")
+  })
+
+  test("a cancellation carries no join link", () => {
+    const ics = buildCalendarInvite({
+      ...base,
+      sequence: 1,
+      method: "CANCEL",
+      joinUrl: null,
+    })
+    expect(ics).toContain("METHOD:CANCEL")
+    expect(ics).not.toContain("URL:")
+  })
+})

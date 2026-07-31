@@ -76,7 +76,7 @@ export function BookingInvite({
               <Text style={cardMeta}>
                 線上會議：
                 <Link href={joinUrl} style={link}>
-                  加入 Teams 會議
+                  加入會議
                 </Link>
               </Text>
             )}

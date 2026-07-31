@@ -1,7 +1,7 @@
 import { render } from "@react-email/render"
 
 import { BookingInvite } from "@/emails/rooms/booking-invite"
-import { getResend, MAIL_FROM_ROOMS } from "@/lib/email/resend"
+import { getResend, MAIL_FROM_ROOMS, siteUrl } from "@/lib/email/resend"
 
 import { buildCalendarInvite } from "./ics"
 import { formatDayLabel } from "./date"
@@ -25,7 +25,12 @@ export interface BookingInviteInput {
   organizer: InviteRecipient
   attendees: InviteRecipient[]
   cancelled?: boolean
-  /** Teams join link, once it exists. */
+  /**
+   * Where "join the meeting" points. This is Portal's own redirect, not the
+   * Teams link — the invite goes out before the pipeline has produced one,
+   * and a stable URL that resolves later is what lets this be the only
+   * message anyone gets about the meeting.
+   */
   joinUrl?: string | null
   /**
    * RFC 5545 SEQUENCE. Read from the booking rather than derived, because a
@@ -36,12 +41,9 @@ export interface BookingInviteInput {
   sequence: number
 }
 
-// A re-send carrying the meeting link says so, so it doesn't read as a
-// duplicate invite for something already in the recipient's calendar.
-function subjectPrefix(cancelled: boolean, input: BookingInviteInput): string {
-  if (cancelled) return "會議已取消"
-  if (input.joinUrl && input.sequence > 0) return "會議連結已加入"
-  return "會議邀請"
+/** The stable link that resolves to the Teams meeting once there is one. */
+export function meetingJoinUrl(bookingId: string): string {
+  return `${siteUrl()}/api/rooms/join/${bookingId}`
 }
 
 /**
@@ -94,7 +96,7 @@ export async function sendBookingInvite(
       // RSVPs go back to whoever made the booking — a real mailbox, unlike
       // the notifications sender.
       replyTo: input.organizer.email,
-      subject: `${subjectPrefix(cancelled, input)}：${input.title}（${when}）`,
+      subject: `${cancelled ? "會議已取消" : "會議邀請"}：${input.title}（${when}）`,
       html,
       attachments: [
         {
