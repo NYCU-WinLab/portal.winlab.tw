@@ -14,6 +14,12 @@ import type { AttendeeGroup } from "./keycloak-groups"
 export interface AttendeeContact {
   name: string
   email: string
+  /**
+   * Keycloak username, when known. Only used to build the Teams topic
+   * prefix for a meeting booked without picking a group — `name` is Chinese
+   * and would make a poor recording filename.
+   */
+  username?: string
 }
 
 export interface PickableGroup {
@@ -47,6 +53,7 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
         members.push({
           name: member.name ?? member.email,
           email: member.email,
+          ...(member.username ? { username: member.username } : {}),
         })
       }
 

@@ -24,6 +24,12 @@ export interface KeycloakGroupMember {
   id: string
   email: string | null
   name: string | null
+  /**
+   * The login name, e.g. `n0ball`. Carried through because it's the ASCII
+   * identifier the Teams topic prefix is built from when a meeting is booked
+   * without picking a whole group — `name` is Chinese.
+   */
+  username: string | null
 }
 
 export interface AttendeeGroup {
@@ -212,5 +218,6 @@ async function fetchGroupMembers(
     id: m.id,
     email: m.email ?? null,
     name: displayName(m),
+    username: m.username ?? null,
   }))
 }

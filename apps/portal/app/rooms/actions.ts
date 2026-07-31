@@ -22,6 +22,7 @@ import {
 import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
+import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { cancelRoomBooking } from "@/lib/rooms/booking-client"
 import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
 import { addDays, taipeiIso, todayInTaipei } from "@/lib/rooms/date"
@@ -102,6 +103,12 @@ export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
   }
 }
 
+export interface BookingMeeting {
+  status: "pending" | "success" | "failed"
+  joinUrl: string | null
+  errorCode: string | null
+}
+
 export interface PortalBooking {
   id: string
   room: string
@@ -111,6 +118,8 @@ export interface PortalBooking {
   requestedBy: string
   title: string | null
   attendees: AttendeeContact[]
+  /** Null when no Teams meeting was ever requested for this booking. */
+  meeting: BookingMeeting | null
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
@@ -133,7 +142,31 @@ export async function getPortalBookingsForDate(
     throw new Error(`讀取 Portal 預約紀錄失敗:${error.message}`)
   }
 
-  return (data ?? []).map((row) => ({
+  const bookings = data ?? []
+
+  // Second query rather than a join: the meeting request is optional and its
+  // absence is meaningful ("no Teams meeting was asked for"), which an inner
+  // join would turn into a missing booking.
+  const { data: requests } = await supabase
+    .from("rooms_meeting_requests")
+    .select("booking_id, status, join_url, error_code")
+    .eq("kind", "create")
+    .in(
+      "booking_id",
+      bookings.map((b) => b.id)
+    )
+
+  const byBooking = new Map<string, BookingMeeting>()
+  for (const r of requests ?? []) {
+    if (!r.booking_id) continue
+    byBooking.set(r.booking_id, {
+      status: r.status as BookingMeeting["status"],
+      joinUrl: r.join_url,
+      errorCode: r.error_code,
+    })
+  }
+
+  return bookings.map((row) => ({
     id: row.id,
     room: row.room!,
     date: row.date,
@@ -142,16 +175,21 @@ export async function getPortalBookingsForDate(
     requestedBy: row.requested_by,
     title: row.title,
     attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
+    meeting: byBooking.get(row.id) ?? null,
   }))
 }
 
 export interface ConfirmBookingInput {
   date: string
-  room: string
+  /** Null books no room at all — an online-only meeting. */
+  room: string | null
   startTime: string
   endTime: string
-  title: string
+  /** The editable half of the topic; the prefix is derived here. */
+  titleSuffix: string
   attendees: AttendeeContact[]
+  /** Keycloak group name, when the attendees came from a group button. */
+  groupName?: string | null
 }
 
 export type BookingResult = { inviteError?: string }
@@ -162,8 +200,14 @@ export async function confirmBooking(
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
-  const title = input.title.trim()
-  if (!title) throw new Error("請填寫會議標題")
+  // Derived server-side from the group and the attendee list, never taken
+  // from the client: the prefix decides which project a Teams recording
+  // files itself under, so it must not be something a caller can name.
+  const prefix = topicPrefix({
+    groupName: input.groupName,
+    firstAttendeeUsername: input.attendees.find((a) => a.username)?.username,
+  })
+  const title = composeTopic(prefix, input.titleSuffix)
 
   const supabase = await createClient()
   const outcome = await placeBooking(supabase, requireServiceAccount(), {
@@ -174,6 +218,10 @@ export async function confirmBooking(
     title,
     attendees: input.attendees,
     organizer: { id: user.id, name: user.name, email: user.email ?? "" },
+    // Every meeting Portal books gets a Teams meeting — the point of the
+    // whole thing is that there's a recording to look back at afterwards.
+    online: true,
+    meetingPrefix: prefix,
   })
 
   revalidatePath("/rooms")
@@ -290,13 +338,16 @@ export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
 }
 
 export interface CreateRecurringInput {
-  title: string
+  /** The editable half of the topic; the prefix is derived here. */
+  titleSuffix: string
   weekday: number
   startTime: string
   durationMinutes: number
   intervalWeeks: number
   attendees: AttendeeContact[]
   includeAdvisor: boolean
+  /** Keycloak group name, when the attendees came from a group button. */
+  groupName?: string | null
 }
 
 export async function createRecurringMeeting(
@@ -305,8 +356,15 @@ export async function createRecurringMeeting(
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
-  const title = input.title.trim()
-  if (!title) throw new Error("請填寫會議標題")
+  // Frozen at creation, not recomputed per occurrence: if the prefix were
+  // rebuilt each week from whoever is in the group by then, someone joining
+  // or leaving would silently start filing the series' recordings under a
+  // different name halfway through a term.
+  const prefix = topicPrefix({
+    groupName: input.groupName,
+    firstAttendeeUsername: input.attendees.find((a) => a.username)?.username,
+  })
+  const title = composeTopic(prefix, input.titleSuffix)
 
   // The anchor fixes which week a fortnightly series lands on. Using the
   // next matching weekday (rather than today) means "every other Monday"
@@ -325,6 +383,8 @@ export async function createRecurringMeeting(
     attendees: input.attendees as unknown as Json,
     include_advisor: input.includeAdvisor,
     created_by: user.id,
+    meeting_prefix: prefix,
+    group_name: input.groupName ?? null,
   })
   if (error) throw new Error(`建立固定會議失敗:${error.message}`)
 

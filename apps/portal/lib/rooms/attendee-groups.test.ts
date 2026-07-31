@@ -10,7 +10,7 @@ import type { AttendeeGroup } from "./keycloak-groups"
 
 function group(
   name: string,
-  members: { email: string | null; name?: string }[],
+  members: { email: string | null; name?: string; username?: string }[],
   description: string | null = null
 ): AttendeeGroup {
   return {
@@ -22,6 +22,7 @@ function group(
       id: `kc-${name}-${i}`,
       email: m.email,
       name: m.name ?? null,
+      username: m.username ?? null,
     })),
   }
 }

@@ -19,8 +19,9 @@
 // and hyphen that delimit the prefix. Spaces are fine and deliberately kept.
 const UNSAFE = /[\\/:*?"<>|[\]]/g
 
-/** What the suffix box starts out saying. */
-export const DEFAULT_TOPIC_SUFFIX = "討論"
+// What the suffix box starts out saying. English so the whole topic — and
+// therefore the recording's filename — stays ASCII by default.
+export const DEFAULT_TOPIC_SUFFIX = "meeting"
 
 export interface TopicSource {
   /** Keycloak group name when the attendees came from a group button. */

@@ -6,6 +6,7 @@ import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import {
@@ -31,8 +31,11 @@ import {
   usePortalBookingsForDate,
 } from "@/hooks/rooms/use-room-booking"
 
+import type { BookingMeeting } from "./actions"
 import { AttendeeSelect } from "./_components/attendee-select"
 import { RecurringTab } from "./_components/recurring-tab"
+import { TopicField } from "./_components/topic-field"
+import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
@@ -43,7 +46,6 @@ import {
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
 import {
   ADVISOR_USERNAME,
-  groupMeetingTitle,
   mergeAttendees,
   type AttendeeContact,
   type PickableGroup,
@@ -202,11 +204,12 @@ function BookingSuggestion({
   onBooked: () => void
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
-  const [title, setTitle] = useState("")
-  // Only titles this component filled in may be replaced by a later group
-  // pick. Anything typed by hand is the user's, and silently overwriting it
-  // would be worse than not helping at all.
-  const [autoTitle, setAutoTitle] = useState<string | null>(null)
+  const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
+  // Which Keycloak group the attendees came from, if a group button was used.
+  // Drives the topic prefix, which the user can see but not edit.
+  const [groupName, setGroupName] = useState<string | null>(null)
+  // Online-only: still a date and a time, just no room reserved.
+  const [onlineOnly, setOnlineOnly] = useState(false)
   // On by default: the advisor attends essentially every meeting, and
   // Keycloak's project groups never list him.
   const [includeAdvisor, setIncludeAdvisor] = useState(true)
@@ -230,29 +233,40 @@ function BookingSuggestion({
         ])
       : attendees
 
+  // Mirrors what the server will derive. Shown so nobody is surprised by the
+  // prefix on their recording; the server recomputes it rather than trusting
+  // anything sent from here.
+  const prefix = topicPrefix({
+    groupName,
+    firstAttendeeUsername: finalAttendees.find((a) => a.username)?.username,
+  })
+
   function handleConfirm() {
-    if (!suggestion || !durationMinutes) return
+    if (!durationMinutes) return
+    if (!onlineOnly && !suggestion) return
     const endSlot = daySlots[slotIndex + durationSlots - 1]
     const startSlot = daySlots[slotIndex]
     if (!endSlot || !startSlot) return
 
+    const room = onlineOnly ? null : (suggestion?.room ?? null)
+    const what = room ? `已預約 ${room}` : "已建立線上會議"
+
     confirmBooking.mutate(
       {
         date,
-        room: suggestion.room,
+        room,
         startTime: startSlot.start,
         endTime: endSlot.end,
-        title,
+        titleSuffix,
         attendees: finalAttendees,
+        groupName,
       },
       {
         onSuccess: (result) => {
           if (result.inviteError) {
-            toast.warning(
-              `已預約 ${suggestion.room},但邀請信寄送失敗:${result.inviteError}`
-            )
+            toast.warning(`${what},但邀請信寄送失敗:${result.inviteError}`)
           } else {
-            toast.success(`已預約 ${suggestion.room}`)
+            toast.success(`${what},Teams 會議連結建立中`)
           }
           onBooked()
         },
@@ -281,28 +295,36 @@ function BookingSuggestion({
       </div>
       {durationMinutes && (
         <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="online-only"
+              checked={onlineOnly}
+              onCheckedChange={(next) => setOnlineOnly(next === true)}
+            />
+            <Label
+              htmlFor="online-only"
+              className="text-xs font-normal text-muted-foreground"
+            >
+              純線上（不借教室）
+            </Label>
+          </div>
+
           <p className="text-sm">
-            {suggestion
-              ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
-              : "這個時長內沒有教室從頭到尾都空著,試試縮短時間或換個起始時段。"}
+            {onlineOnly
+              ? "不借教室,只開一場 Teams 會議。"
+              : suggestion
+                ? `建議教室:${suggestion.room}（${suggestion.tier === "free" ? "免費" : "付費"}）`
+                : "這個時長內沒有教室從頭到尾都空著,試試縮短時間、換個起始時段,或改成純線上。"}
           </p>
 
-          {suggestion && (
+          {(onlineOnly || suggestion) && (
             <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="booking-title" className="text-xs">
-                  會議標題
-                </Label>
-                <Input
-                  id="booking-title"
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value)
-                    setAutoTitle(null)
-                  }}
-                  placeholder="例:Weekly sync"
-                />
-              </div>
+              <TopicField
+                id="booking-title"
+                prefix={prefix}
+                suffix={titleSuffix}
+                onSuffixChange={setTitleSuffix}
+              />
 
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">與會人員</Label>
@@ -316,22 +338,29 @@ function BookingSuggestion({
                   onChange={setAttendees}
                   advisorIncluded={includeAdvisor}
                   onAdvisorIncludedChange={setIncludeAdvisor}
-                  onGroupPicked={(group: PickableGroup) => {
-                    if (title !== "" && title !== autoTitle) return
-                    const next = groupMeetingTitle(group)
-                    setTitle(next)
-                    setAutoTitle(next)
-                  }}
+                  onGroupPicked={(group: PickableGroup) =>
+                    setGroupName(group.name)
+                  }
                 />
               </div>
+
+              <p className="rounded-md border bg-muted/50 p-2 text-xs text-muted-foreground">
+                這場會議會開在 WinLab 的 Teams 頻道,並且
+                <strong>自動錄影、產生逐字稿與 AI 摘要</strong>
+                。頻道成員都看得到這場會議,事後也能回看錄影。
+              </p>
 
               <Button
                 size="sm"
                 className="h-7 self-end"
-                disabled={confirmBooking.isPending || !title.trim()}
+                disabled={confirmBooking.isPending}
                 onClick={handleConfirm}
               >
-                {confirmBooking.isPending ? "預約中…" : "確認預約"}
+                {confirmBooking.isPending
+                  ? "預約中…"
+                  : onlineOnly
+                    ? "建立線上會議"
+                    : "確認預約"}
               </Button>
             </>
           )}
@@ -350,6 +379,46 @@ function BookingSuggestion({
         操作。
       </p>
     </div>
+  )
+}
+
+/**
+ * Where the Teams meeting got to.
+ *
+ * All three states say something. "Still being created" and "it failed" look
+ * identical if only the success case is rendered, and that ambiguity is what
+ * makes a broken pipeline invisible for days.
+ */
+function MeetingStatus({ meeting }: { meeting: BookingMeeting | null }) {
+  if (!meeting) return null
+
+  if (meeting.status === "success" && meeting.joinUrl) {
+    return (
+      <a
+        href={meeting.joinUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs underline underline-offset-2"
+      >
+        加入 Teams 會議
+      </a>
+    )
+  }
+
+  if (meeting.status === "pending") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Teams 會議連結建立中…（通常一兩分鐘,重新整理就會出現）
+      </p>
+    )
+  }
+
+  return (
+    <p className="text-xs text-destructive">
+      Teams 會議建立失敗
+      {meeting.errorCode ? `（${meeting.errorCode}）` : ""}
+      ,教室預約不受影響。建立者已收到通知信。
+    </p>
   )
 }
 
@@ -391,6 +460,7 @@ function LabBookingCancel({
           與會:{attendeeNames.join("、")}
         </p>
       )}
+      <MeetingStatus meeting={match.meeting} />
       <Button
         size="sm"
         variant="outline"

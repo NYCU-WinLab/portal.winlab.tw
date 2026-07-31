@@ -8,7 +8,6 @@ import { toast } from "sonner"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
   Select,
@@ -27,10 +26,11 @@ import {
   useSetRecurringActive,
 } from "@/hooks/rooms/use-recurring"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
-import { groupMeetingTitle } from "@/lib/rooms/attendee-groups"
+import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
+import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 
@@ -55,8 +55,8 @@ export function RecurringTab() {
   const setActive = useSetRecurringActive()
   const remove = useDeleteRecurring()
 
-  const [title, setTitle] = useState("")
-  const [autoTitle, setAutoTitle] = useState<string | null>(null)
+  const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
+  const [groupName, setGroupName] = useState<string | null>(null)
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -64,22 +64,30 @@ export function RecurringTab() {
   const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const [includeAdvisor, setIncludeAdvisor] = useState(true)
 
+  // Mirrors what the server derives; the server recomputes rather than
+  // trusting this.
+  const prefix = topicPrefix({
+    groupName,
+    firstAttendeeUsername: attendees.find((a) => a.username)?.username,
+  })
+
   function handleCreate() {
     create.mutate(
       {
-        title,
+        titleSuffix,
         weekday,
         startTime,
         durationMinutes,
         intervalWeeks,
         attendees,
         includeAdvisor,
+        groupName,
       },
       {
         onSuccess: () => {
           toast.success("已建立固定會議")
-          setTitle("")
-          setAutoTitle(null)
+          setTitleSuffix(DEFAULT_TOPIC_SUFFIX)
+          setGroupName(null)
           setAttendees([])
         },
         onError: (err) => toast.error(errorMessage(err, "建立失敗")),
@@ -98,20 +106,12 @@ export function RecurringTab() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="recurring-title" className="text-xs">
-            會議標題
-          </Label>
-          <Input
-            id="recurring-title"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              setAutoTitle(null)
-            }}
-            placeholder="例:Weekly sync"
-          />
-        </div>
+        <TopicField
+          id="recurring-title"
+          prefix={prefix}
+          suffix={titleSuffix}
+          onSuffixChange={setTitleSuffix}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">星期</Label>
@@ -200,19 +200,20 @@ export function RecurringTab() {
             onChange={setAttendees}
             advisorIncluded={includeAdvisor}
             onAdvisorIncludedChange={setIncludeAdvisor}
-            onGroupPicked={(group) => {
-              if (title !== "" && title !== autoTitle) return
-              const next = groupMeetingTitle(group)
-              setTitle(next)
-              setAutoTitle(next)
-            }}
+            onGroupPicked={(group) => setGroupName(group.name)}
           />
         </div>
+
+        <p className="rounded-md border bg-muted/50 p-2 text-xs text-muted-foreground">
+          每一場都會開在 WinLab 的 Teams 頻道,並且
+          <strong>自動錄影、產生逐字稿與 AI 摘要</strong>
+          。標題前綴在建立時固定下來,之後群組成員異動也不會改變,錄影檔才會一直歸在同一個專案底下。
+        </p>
 
         <Button
           size="sm"
           className="h-7 self-end"
-          disabled={create.isPending || !title.trim()}
+          disabled={create.isPending}
           onClick={handleCreate}
         >
           {create.isPending ? "建立中…" : "建立"}

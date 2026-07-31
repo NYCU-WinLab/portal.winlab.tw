@@ -180,7 +180,13 @@ export function AttendeeSelect({
                     value={[u.name, u.username, u.email]
                       .filter(Boolean)
                       .join(" ")}
-                    onSelect={() => toggle({ name: label(u), email: u.email })}
+                    onSelect={() =>
+                      toggle({
+                        name: label(u),
+                        email: u.email,
+                        ...(u.username ? { username: u.username } : {}),
+                      })
+                    }
                   >
                     <span
                       className={

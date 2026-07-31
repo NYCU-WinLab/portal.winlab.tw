@@ -45,6 +45,8 @@ type ScheduleRow = {
   attendees: unknown
   include_advisor: boolean
   created_by: string
+  meeting_prefix: string | null
+  online: boolean
 }
 
 export async function runRecurringBookings(
@@ -64,7 +66,7 @@ export async function runRecurringBookings(
   const { data: schedules, error } = await admin
     .from("rooms_recurring_meetings")
     .select(
-      "id, title, weekday, start_time, duration_minutes, interval_weeks, anchor_date, attendees, include_advisor, created_by"
+      "id, title, weekday, start_time, duration_minutes, interval_weeks, anchor_date, attendees, include_advisor, created_by, meeting_prefix, online"
     )
     .eq("active", true)
   if (error) throw new Error(`讀取固定會議失敗:${error.message}`)
@@ -147,10 +149,15 @@ export async function runRecurringBookings(
         room: suggestion.room,
         startTime: schedule.start_time,
         endTime,
+        // Already composed as `[prefix]-suffix` when the series was created.
+        // Teams appends its own timestamp to the recording filename, so every
+        // occurrence sharing one topic doesn't collide.
         title: schedule.title,
         attendees,
         organizer,
         recurringId: schedule.id,
+        online: schedule.online,
+        meetingPrefix: schedule.meeting_prefix,
       })
       result.booked++
     } catch (err) {
