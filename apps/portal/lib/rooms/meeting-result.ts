@@ -165,7 +165,7 @@ async function resendInviteWithLink(
     organizer,
     attendees,
     joinUrl,
-    sequence: await nextInviteSequence(admin, booking.id),
+    sequence: await nextInviteSequence(booking.id),
   })
 
   return sent.ok ? {} : { inviteError: sent.error }

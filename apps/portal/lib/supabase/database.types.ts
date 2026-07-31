@@ -1563,12 +1563,14 @@ export type Database = {
           created_at: string
           date: string
           end_time: string
-          external_reservation_id: string
+          external_reservation_id: string | null
           id: string
           invite_sequence: number
+          meeting_prefix: string | null
+          online: boolean
           recurring_id: string | null
           requested_by: string
-          room: string
+          room: string | null
           start_time: string
           status: string
           title: string | null
@@ -1580,12 +1582,14 @@ export type Database = {
           created_at?: string
           date: string
           end_time: string
-          external_reservation_id: string
+          external_reservation_id?: string | null
           id?: string
           invite_sequence?: number
+          meeting_prefix?: string | null
+          online?: boolean
           recurring_id?: string | null
           requested_by: string
-          room: string
+          room?: string | null
           start_time: string
           status?: string
           title?: string | null
@@ -1597,12 +1601,14 @@ export type Database = {
           created_at?: string
           date?: string
           end_time?: string
-          external_reservation_id?: string
+          external_reservation_id?: string | null
           id?: string
           invite_sequence?: number
+          meeting_prefix?: string | null
+          online?: boolean
           recurring_id?: string | null
           requested_by?: string
-          room?: string
+          room?: string | null
           start_time?: string
           status?: string
           title?: string | null
@@ -1642,6 +1648,7 @@ export type Database = {
           event_id: string | null
           id: string
           join_url: string | null
+          kind: string
           notified_at: string | null
           options_applied: boolean | null
           pipeline_id: string | null
@@ -1662,6 +1669,7 @@ export type Database = {
           event_id?: string | null
           id?: string
           join_url?: string | null
+          kind?: string
           notified_at?: string | null
           options_applied?: boolean | null
           pipeline_id?: string | null
@@ -1682,6 +1690,7 @@ export type Database = {
           event_id?: string | null
           id?: string
           join_url?: string | null
+          kind?: string
           notified_at?: string | null
           options_applied?: boolean | null
           pipeline_id?: string | null
@@ -1710,9 +1719,12 @@ export type Database = {
           created_at: string
           created_by: string
           duration_minutes: number
+          group_name: string | null
           id: string
           include_advisor: boolean
           interval_weeks: number
+          meeting_prefix: string | null
+          online: boolean
           start_time: string
           title: string
           weekday: number
@@ -1724,9 +1736,12 @@ export type Database = {
           created_at?: string
           created_by: string
           duration_minutes: number
+          group_name?: string | null
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          meeting_prefix?: string | null
+          online?: boolean
           start_time: string
           title: string
           weekday: number
@@ -1738,9 +1753,12 @@ export type Database = {
           created_at?: string
           created_by?: string
           duration_minutes?: number
+          group_name?: string | null
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          meeting_prefix?: string | null
+          online?: boolean
           start_time?: string
           title?: string
           weekday?: number

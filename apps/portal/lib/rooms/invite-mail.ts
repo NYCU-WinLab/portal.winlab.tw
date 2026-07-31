@@ -14,7 +14,8 @@ export interface InviteRecipient {
 export interface BookingInviteInput {
   bookingId: string
   title: string
-  room: string
+  /** Null for an online-only meeting. */
+  room: string | null
   date: string
   startTime: string
   endTime: string

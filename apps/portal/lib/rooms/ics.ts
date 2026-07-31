@@ -15,7 +15,8 @@ export interface CalendarEvent {
   /** Stable per booking — a CANCEL must reuse the REQUEST's uid. */
   uid: string
   title: string
-  room: string
+  /** Null for an online-only meeting; LOCATION says so instead. */
+  room: string | null
   /** ISO 8601 instant. */
   start: string
   /** ISO 8601 instant. */
@@ -85,7 +86,7 @@ export function buildCalendarInvite(event: CalendarEvent): string {
     `DTSTART:${toIcsUtc(event.start)}`,
     `DTEND:${toIcsUtc(event.end)}`,
     `SUMMARY:${escapeText(event.title)}`,
-    `LOCATION:${escapeText(`資工系 ${event.room}`)}`,
+    `LOCATION:${escapeText(event.room ? `資工系 ${event.room}` : "線上會議")}`,
     `ORGANIZER;CN=${escapeText(event.organizer.name)}:mailto:${event.organizer.email}`,
     ...event.attendees.map(
       (a) =>

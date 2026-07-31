@@ -14,7 +14,8 @@ import {
 
 export type BookingInviteProps = {
   title: string
-  room: string
+  /** Null for an online-only meeting. */
+  room: string | null
   /** Already formatted for display, e.g. "08/01（週六）10:00–11:00". */
   when: string
   organizerName: string
@@ -67,7 +68,7 @@ export function BookingInvite({
           <Section style={card}>
             <Text style={cardTitle}>{title}</Text>
             <Text style={cardMeta}>{when}</Text>
-            <Text style={cardMeta}>資工系 {room}</Text>
+            <Text style={cardMeta}>{room ? `資工系 ${room}` : "線上會議"}</Text>
             {attendeeNames.length > 0 && (
               <Text style={cardMeta}>與會：{attendeeNames.join("、")}</Text>
             )}

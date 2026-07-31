@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(15);
+select plan(19);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -160,6 +160,34 @@ select ok(
     'authenticated', 'public.rooms_meeting_requests', 'callback_token_hash', 'SELECT'
   ),
   'authenticated cannot read rooms_meeting_requests.callback_token_hash'
+);
+
+-- ── rooms_bookings: cancellation is the only update a person may make ─────
+-- The RLS policy restricts updates to the owner's own rows; these pin which
+-- COLUMNS that update may touch. Without the column grant, a booking's owner
+-- could rewrite meeting_prefix over the REST API and file another group's
+-- Teams recording under their own name — the policy alone allows it.
+select ok(
+  has_column_privilege('authenticated', 'public.rooms_bookings', 'status', 'UPDATE'),
+  'a booking owner can flip status (cancellation)'
+);
+select ok(
+  not has_column_privilege('authenticated', 'public.rooms_bookings', 'meeting_prefix', 'UPDATE'),
+  'a booking owner cannot rewrite meeting_prefix'
+);
+select ok(
+  not has_column_privilege('authenticated', 'public.rooms_bookings', 'invite_sequence', 'UPDATE'),
+  'a booking owner cannot rewrite invite_sequence'
+);
+
+-- An online-only booking has no room and no external reservation; a booking
+-- with one but not the other would be a reservation nobody can cancel.
+select throws_ok(
+  $$ insert into public.rooms_bookings (room, external_reservation_id, date, start_time, end_time, requested_by)
+     values ('600A', null, '2026-08-01', '14:00', '15:00', '11111111-1111-1111-1111-111111111111') $$,
+  '23514',
+  NULL,
+  'a booking cannot have a room without an external reservation id'
 );
 
 select * from finish();
