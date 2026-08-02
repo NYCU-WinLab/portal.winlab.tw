@@ -112,6 +112,25 @@ export async function registerGalleryImage(
     sequence_index: input.sequenceIndex ?? null,
   }
 
+  // Idempotent retry: if this sequence slot already exists for the uploader,
+  // treat the earlier insert as success and drop the duplicate storage object.
+  if (input.sequenceId != null && input.sequenceIndex != null) {
+    const { data: existingSlot } = await supabase
+      .from("gallery_images")
+      .select("id")
+      .eq("sequence_id", input.sequenceId)
+      .eq("sequence_index", input.sequenceIndex)
+      .eq("created_by", userId)
+      .maybeSingle()
+
+    if (existingSlot?.id) {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      revalidatePath("/")
+      revalidatePath("/upload")
+      return { ok: true, id: existingSlot.id }
+    }
+  }
+
   const { data: inserted, error: insertError } = await supabase
     .from("gallery_images")
     .insert(insertPayload)
@@ -119,6 +138,26 @@ export async function registerGalleryImage(
     .single()
 
   if (insertError || !inserted) {
+    // Unique slot race: another request won — resolve to that row.
+    if (
+      input.sequenceId != null &&
+      input.sequenceIndex != null &&
+      /duplicate|unique|23505/i.test(insertError?.message ?? "")
+    ) {
+      const { data: raced } = await supabase
+        .from("gallery_images")
+        .select("id")
+        .eq("sequence_id", input.sequenceId)
+        .eq("sequence_index", input.sequenceIndex)
+        .eq("created_by", userId)
+        .maybeSingle()
+      if (raced?.id) {
+        await supabase.storage.from("gallery").remove(expectedPaths)
+        revalidatePath("/")
+        revalidatePath("/upload")
+        return { ok: true, id: raced.id }
+      }
+    }
     await supabase.storage.from("gallery").remove(expectedPaths)
     return {
       ok: false,

@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
+import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
 export function GalleryInfiniteWall({
   initialImages,
@@ -49,6 +51,25 @@ export function GalleryInfiniteWall({
     }),
     [filters]
   )
+
+  useEffect(() => {
+    const urls: string[] = []
+    for (const image of images) {
+      const thumbPath =
+        image.media_type === "video" && image.poster_path
+          ? image.poster_path
+          : image.image_path
+      urls.push(getGalleryThumbUrl(thumbPath), getGalleryImageUrl(thumbPath))
+      for (const item of image.sequence_items) {
+        const itemPath =
+          item.media_type === "video" && item.poster_path
+            ? item.poster_path
+            : item.image_path
+        urls.push(getGalleryThumbUrl(itemPath), getGalleryImageUrl(itemPath))
+      }
+    }
+    cacheGalleryMediaUrls(urls)
+  }, [images])
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return
