@@ -794,18 +794,18 @@ export function GalleryCard({
                     mobileDetailsOpen && "gallery-lightbox-aside--expanded"
                   )}
                 >
-                  <button
-                    type="button"
-                    className="gallery-lightbox-aside-toggle md:hidden"
-                    aria-expanded={mobileDetailsOpen}
-                    onClick={() => setMobileDetailsOpen((open) => !open)}
-                  >
+                  <div className="gallery-lightbox-aside-toggle md:hidden">
                     <span
                       aria-hidden
-                      className="mx-auto h-1 w-10 shrink-0 rounded-full bg-border/80"
+                      className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border/80"
                     />
-                    <span className="flex w-full items-center justify-between gap-3 pt-2">
-                      <span className="min-w-0 text-left">
+                    <div className="flex w-full items-center gap-2 px-4 pt-2 pb-3">
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 bg-transparent text-left"
+                        aria-expanded={mobileDetailsOpen}
+                        onClick={() => setMobileDetailsOpen((open) => !open)}
+                      >
                         <span
                           className={cn(
                             gallerySerif(),
@@ -824,25 +824,36 @@ export function GalleryCard({
                             ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
                             : "Comments & reactions"}
                         </span>
-                      </span>
+                      </button>
                       {isAdmin ? (
                         <PinWallButton
                           imageId={image.id}
                           pinnedAt={pinnedAt}
                           onPinnedChange={handlePinSuccess}
                           scrollToWallTop
-                          stopPropagation
                           className="shrink-0"
                         />
                       ) : null}
-                      <IconChevronUp
-                        className={cn(
-                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                          mobileDetailsOpen && "rotate-180"
-                        )}
-                      />
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        aria-label={
+                          mobileDetailsOpen
+                            ? "Collapse comments"
+                            : "Expand comments"
+                        }
+                        aria-expanded={mobileDetailsOpen}
+                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground"
+                        onClick={() => setMobileDetailsOpen((open) => !open)}
+                      >
+                        <IconChevronUp
+                          className={cn(
+                            "h-4 w-4 transition-transform",
+                            mobileDetailsOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </div>
                   <div className="gallery-lightbox-aside-header space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex flex-wrap items-center gap-2">

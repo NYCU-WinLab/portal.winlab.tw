@@ -92,10 +92,6 @@
   display: flex;
   width: 100%;
   flex-direction: column;
-  padding: 0.5rem 1rem 0.75rem;
-  border: 0;
-  background: transparent;
-  text-align: left;
 }
 
 .gallery-lightbox-aside-header {
