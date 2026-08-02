@@ -10,6 +10,13 @@ export function galleryPhotoPageFromRank(
   return Math.max(1, Math.ceil(rank / pageSize))
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function isGalleryPhotoId(value: string): boolean {
+  return UUID_RE.test(value)
+}
+
 type ImageRow = {
   id: string
   created_at: string
@@ -61,6 +68,8 @@ export async function resolveGalleryPhotoDeepLink(
   supabase: SupabaseClient,
   photoId: string
 ): Promise<GalleryPhotoDeepLink | null> {
+  if (!isGalleryPhotoId(photoId)) return null
+
   const { data: row, error } = await supabase
     .from("gallery_images")
     .select("id, created_at, sequence_id, sequence_index")

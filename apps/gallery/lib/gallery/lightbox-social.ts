@@ -40,16 +40,13 @@ export async function loadLightboxSocial(
   if (profileIds.length > 0) {
     const { data: profiles } = await supabase
       .from("user_profiles")
-      .select("id, name, email")
+      // anon is column-granted to id/name only (email is authenticated+).
+      .select("id, name")
       .in("id", profileIds)
 
     for (const profile of profiles ?? []) {
-      const fallback =
-        typeof profile.email === "string" ? profile.email.split("@")[0] : null
       const name =
-        (typeof profile.name === "string" && profile.name.trim()) ||
-        fallback ||
-        "Unknown"
+        (typeof profile.name === "string" && profile.name.trim()) || "Unknown"
       nameById.set(profile.id, name)
     }
   }

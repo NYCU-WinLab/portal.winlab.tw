@@ -14,7 +14,7 @@ export const GALLERY_PAGE_SIZE = 36
 type ProfileRow = {
   id: string
   name: string | null
-  email: string | null
+  email?: string | null
 }
 
 type CoverRow = {
@@ -43,9 +43,13 @@ function buildNameById(rows: ProfileRow[]): Map<string, string> {
 }
 
 function buildMembers(rows: ProfileRow[]): GalleryMember[] {
-  return rows.filter(
-    (row) => typeof row.name === "string" && row.name.trim().length > 0
-  )
+  return rows
+    .filter((row) => typeof row.name === "string" && row.name.trim().length > 0)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email ?? null,
+    }))
 }
 
 function buildCommentCountByImage(
@@ -80,7 +84,7 @@ async function loadGalleryHomeRange(
     userId
       ? supabase
           .from("user_profiles")
-          .select("id, name, email")
+          .select("id, name")
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     (() => {
@@ -201,7 +205,8 @@ async function loadGalleryHomeRange(
       if (profileIds.length > 0) {
         const { data: profileRows, error: profileError } = await supabase
           .from("user_profiles")
-          .select("id, name, email")
+          // anon is column-granted to id/name only (email is authenticated+).
+          .select("id, name")
           .in("id", profileIds)
 
         if (profileError) {
