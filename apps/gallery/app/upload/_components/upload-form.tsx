@@ -308,6 +308,28 @@ export function UploadForm() {
         toast.success(`Uploaded ${successCount} work${suffix}.`)
       }
 
+      if (sequenceId && failures.length > 0) {
+        toast.message(
+          "Sequence has missing shots — open Manage to see gaps, then Retry failed.",
+          {
+            action: {
+              label: "Manage",
+              onClick: () => router.push("/upload"),
+            },
+          }
+        )
+      } else if (sequenceId && !wallPhotoId) {
+        toast.message(
+          "Sequence is missing a cover shot — set cover in Manage so it appears on the wall.",
+          {
+            action: {
+              label: "Manage",
+              onClick: () => router.push("/upload"),
+            },
+          }
+        )
+      }
+
       if (failures.length === 0) {
         form?.reset()
         setName("")

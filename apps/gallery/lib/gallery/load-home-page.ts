@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { findSequenceGaps } from "@/lib/gallery/manage-uploads"
 import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
@@ -252,6 +253,7 @@ async function loadGalleryHomeRange(
       typeof image.sequence_index === "number" ? image.sequence_index : null,
     sequence_count: 1,
     sequence_items: [],
+    sequence_missing_indexes: [],
     comments: [],
     comment_count: commentCountByImage.get(image.id) ?? 0,
     uploader_name: image.created_by
@@ -274,7 +276,12 @@ async function loadGalleryHomeRange(
       media_type: item.media_type === "video" ? "video" : "image",
       poster_path: item.poster_path ?? null,
       created_at: item.created_at,
+      sequence_index:
+        typeof item.sequence_index === "number" ? item.sequence_index : null,
     }))
+    image.sequence_missing_indexes = findSequenceGaps(
+      items.map((item) => item.sequence_index)
+    ).gaps
   }
 
   return {
