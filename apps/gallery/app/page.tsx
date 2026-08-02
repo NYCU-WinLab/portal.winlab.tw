@@ -68,7 +68,7 @@ export default async function GalleryHomePage({
   const user = await getCurrentUser()
 
   let openPhotoId = photoId
-  let openCommentId = commentId
+  const openCommentId = commentId
   let throughPage = requestedPage
 
   if (photoId) {
@@ -109,6 +109,13 @@ export default async function GalleryHomePage({
           }
         >
           <GalleryInfiniteWall
+            key={[
+              filters.uploaderId ?? "",
+              filters.media,
+              filters.uploadedAfter ?? "",
+              filters.query ?? "",
+              String(currentPage),
+            ].join("|")}
             initialImages={images}
             initialPage={currentPage}
             initialHasMore={hasMore}

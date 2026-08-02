@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
@@ -36,13 +37,8 @@ export function GalleryInfiniteWall({
   const [page, setPage] = useState(initialPage)
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    setImages(initialImages)
-    setPage(initialPage)
-    setHasMore(initialHasMore)
-  }, [initialImages, initialPage, initialHasMore])
 
   const filtersInput = useMemo(
     () => ({
@@ -57,9 +53,14 @@ export function GalleryInfiniteWall({
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return
     setLoadingMore(true)
+    setLoadError(null)
     try {
       const result = await fetchGalleryWallPage(page + 1, filtersInput)
-      if (!result.ok) return
+      if (!result.ok) {
+        setLoadError(result.error)
+        toast.error(result.error)
+        return
+      }
       setImages((prev) => {
         const seen = new Set(prev.map((image) => image.id))
         const next = [...prev]
@@ -72,6 +73,11 @@ export function GalleryInfiniteWall({
       })
       setPage(result.page)
       setHasMore(result.hasMore)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load more photos."
+      setLoadError(message)
+      toast.error(message)
     } finally {
       setLoadingMore(false)
     }
@@ -79,7 +85,7 @@ export function GalleryInfiniteWall({
 
   useEffect(() => {
     const node = sentinelRef.current
-    if (!node || !hasMore) return
+    if (!node || !hasMore || loadError) return
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -89,7 +95,7 @@ export function GalleryInfiniteWall({
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [hasMore, loadMore])
+  }, [hasMore, loadError, loadMore])
 
   return (
     <>
@@ -106,11 +112,27 @@ export function GalleryInfiniteWall({
         loadingMore={loadingMore}
         onLoadMore={loadMore}
       />
-      {hasMore ? <div ref={sentinelRef} className="h-10" aria-hidden /> : null}
+      {hasMore && !loadError ? (
+        <div ref={sentinelRef} className="h-10" aria-hidden />
+      ) : null}
       {loadingMore ? (
         <p className="py-8 text-center text-xs text-muted-foreground">
           Loading more…
         </p>
+      ) : null}
+      {loadError ? (
+        <div className="flex flex-col items-center gap-3 py-8">
+          <p className="text-center text-xs text-muted-foreground">
+            Couldn&apos;t load more photos.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            className="text-xs underline underline-offset-4"
+          >
+            Retry
+          </button>
+        </div>
       ) : null}
     </>
   )

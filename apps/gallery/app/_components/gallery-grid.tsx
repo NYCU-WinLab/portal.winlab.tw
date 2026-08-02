@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
@@ -56,15 +56,44 @@ export function GalleryGrid({
     const index = images.findIndex((image) => image.id === openPhotoId)
     return index >= 0 ? index : null
   })
+  const pendingAdvanceNextRef = useRef(false)
 
   useEffect(() => {
     if (!openPhotoId) return
     const index = images.findIndex((image) => image.id === openPhotoId)
-    if (index >= 0) {
+    if (index < 0) return
+    // Defer sync from the URL deep-link prop to avoid sync setState-in-effect.
+    const timer = window.setTimeout(() => {
       setFocusIndex(index)
       setOpenIndex(index)
-    }
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [images, openPhotoId])
+
+  useEffect(() => {
+    if (!pendingAdvanceNextRef.current || openIndex === null) return
+    const nextIndex = openIndex + 1
+    if (nextIndex >= images.length) {
+      if (!hasMore && !loadingMore) pendingAdvanceNextRef.current = false
+      return
+    }
+    const nextImage = images[nextIndex]
+    if (!nextImage) return
+    pendingAdvanceNextRef.current = false
+    // Defer so this isn't a sync setState-in-effect cascade.
+    const timer = window.setTimeout(() => {
+      setOpenIndex(nextIndex)
+      setFocusIndex(nextIndex)
+      router.replace(
+        buildGalleryPhotoHref({
+          photoId: nextImage.id,
+          commentId: null,
+        }),
+        { scroll: false }
+      )
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [hasMore, images, loadingMore, openIndex, router])
 
   const navigateWall = (direction: "prev" | "next") => {
     if (openIndex === null) return
@@ -72,6 +101,7 @@ export function GalleryGrid({
     if (nextIndex < 0) return
     if (nextIndex >= images.length) {
       if (direction === "next" && hasMore && onLoadMore && !loadingMore) {
+        pendingAdvanceNextRef.current = true
         void onLoadMore()
       }
       return

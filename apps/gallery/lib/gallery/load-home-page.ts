@@ -58,32 +58,24 @@ function buildCommentCountByImage(
   return counts
 }
 
-export async function loadGalleryHomePage(
+async function loadGalleryHomeRange(
   supabase: SupabaseClient,
   {
-    page,
+    from,
+    to,
     userId,
-    filters = {
-      uploaderId: null,
-      media: "all",
-      uploadedAfter: null,
-      query: null,
-    },
+    filters,
   }: {
-    page: number
+    from: number
+    to: number
     userId: string | null
-    filters?: GalleryHomeFilters
+    filters: GalleryHomeFilters
   }
 ): Promise<{
   images: GalleryImage[]
   members: GalleryMember[]
-  totalPages: number
-  currentPage: number
+  totalCount: number
 }> {
-  const currentPage = Number.isFinite(page) && page > 0 ? page : 1
-  const from = (currentPage - 1) * GALLERY_PAGE_SIZE
-  const to = from + GALLERY_PAGE_SIZE - 1
-
   const [profilesResult, imagesResult] = await Promise.all([
     userId
       ? supabase
@@ -122,6 +114,7 @@ export async function loadGalleryHomePage(
 
   if (imagesResult.error) {
     console.error("[gallery] failed to load images", imagesResult.error)
+    throw new Error(imagesResult.error.message || "Failed to load gallery.")
   }
   if (profilesResult.error) {
     console.error(
@@ -279,11 +272,47 @@ export async function loadGalleryHomePage(
     }))
   }
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil((imagesResult.count ?? 0) / GALLERY_PAGE_SIZE)
-  )
+  return {
+    images,
+    members,
+    totalCount: imagesResult.count ?? 0,
+  }
+}
 
+const DEFAULT_FILTERS: GalleryHomeFilters = {
+  uploaderId: null,
+  media: "all",
+  uploadedAfter: null,
+  query: null,
+}
+
+export async function loadGalleryHomePage(
+  supabase: SupabaseClient,
+  {
+    page,
+    userId,
+    filters = DEFAULT_FILTERS,
+  }: {
+    page: number
+    userId: string | null
+    filters?: GalleryHomeFilters
+  }
+): Promise<{
+  images: GalleryImage[]
+  members: GalleryMember[]
+  totalPages: number
+  currentPage: number
+}> {
+  const currentPage = Number.isFinite(page) && page > 0 ? page : 1
+  const from = (currentPage - 1) * GALLERY_PAGE_SIZE
+  const to = from + GALLERY_PAGE_SIZE - 1
+  const { images, members, totalCount } = await loadGalleryHomeRange(supabase, {
+    from,
+    to,
+    userId,
+    filters,
+  })
+  const totalPages = Math.max(1, Math.ceil(totalCount / GALLERY_PAGE_SIZE))
   return { images, members, totalPages, currentPage }
 }
 
@@ -292,12 +321,7 @@ export async function loadGalleryHomePages(
   {
     throughPage,
     userId,
-    filters = {
-      uploaderId: null,
-      media: "all",
-      uploadedAfter: null,
-      query: null,
-    },
+    filters = DEFAULT_FILTERS,
   }: {
     throughPage: number
     userId: string | null
@@ -311,44 +335,20 @@ export async function loadGalleryHomePages(
   hasMore: boolean
 }> {
   const targetPage = Math.max(1, throughPage)
-  const first = await loadGalleryHomePage(supabase, {
-    page: 1,
+  // One range query for pages 1..N — avoids N parallel page round-trips on deep links.
+  const { images, members, totalCount } = await loadGalleryHomeRange(supabase, {
+    from: 0,
+    to: targetPage * GALLERY_PAGE_SIZE - 1,
     userId,
     filters,
   })
-
-  if (targetPage === 1) {
-    return {
-      ...first,
-      hasMore: first.currentPage < first.totalPages,
-    }
-  }
-
-  const extraPages = await Promise.all(
-    Array.from({ length: targetPage - 1 }, (_, index) =>
-      loadGalleryHomePage(supabase, {
-        page: index + 2,
-        userId,
-        filters,
-      })
-    )
-  )
-
-  const seen = new Set<string>()
-  const images: GalleryImage[] = []
-  for (const batch of [first, ...extraPages]) {
-    for (const image of batch.images) {
-      if (seen.has(image.id)) continue
-      seen.add(image.id)
-      images.push(image)
-    }
-  }
+  const totalPages = Math.max(1, Math.ceil(totalCount / GALLERY_PAGE_SIZE))
 
   return {
     images,
-    members: first.members,
-    totalPages: first.totalPages,
+    members,
+    totalPages,
     currentPage: targetPage,
-    hasMore: targetPage < first.totalPages,
+    hasMore: targetPage < totalPages,
   }
 }

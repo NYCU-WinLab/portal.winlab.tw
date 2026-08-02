@@ -90,6 +90,15 @@ function buildArtworkName(
   return index === 0 ? trimmedBaseName : `${trimmedBaseName}${index}`
 }
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true
+  if (!(error instanceof Error)) return false
+  return (
+    error.name === "AbortError" ||
+    /aborted|cancelled|canceled/i.test(error.message)
+  )
+}
+
 function describeUploadFailure(error: unknown): {
   detail: string
   stage: UploadFailure["stage"]
@@ -113,7 +122,8 @@ function describeUploadFailure(error: unknown): {
   if (
     lower.includes("compress") ||
     lower.includes("poster") ||
-    lower.includes("video")
+    lower.includes("video") ||
+    lower.includes("aborted")
   ) {
     return { detail: message, stage: "video-processing" }
   }
@@ -132,6 +142,7 @@ function formatFailurePreview(failure: UploadFailure): string {
 export function UploadForm() {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -158,6 +169,17 @@ export function UploadForm() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [status.kind])
 
+  function beginAbortableRun() {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    return controller
+  }
+
+  function cancelUpload() {
+    abortRef.current?.abort()
+  }
+
   async function runUpload(files: File[], baseName: string) {
     const form = formRef.current
     const trimmed = baseName.trim()
@@ -169,16 +191,25 @@ export function UploadForm() {
       return
     }
 
+    const controller = beginAbortableRun()
     let successCount = 0
     const failures: UploadFailure[] = []
     const sequenceId = files.length > 1 ? crypto.randomUUID() : null
     let wallPhotoId: string | null = null
-    const batch = files.length > 1 ? { total: files.length, current: 0 } : undefined
+    const batch =
+      files.length > 1 ? { total: files.length, current: 0 } : undefined
+    let cancelled = false
 
     for (let i = 0; i < files.length; i++) {
+      if (controller.signal.aborted) {
+        cancelled = true
+        break
+      }
+
       const file = files[i]!
       const batchCurrent = i + 1
-      const labelPrefix = files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
+      const labelPrefix =
+        files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
 
       if (batch) {
         setStatus({
@@ -216,6 +247,7 @@ export function UploadForm() {
             labelPrefix,
             sequenceId,
             sequenceIndex: sequenceId ? i : null,
+            signal: controller.signal,
           })
         } else {
           registeredId = await uploadVideo({
@@ -227,6 +259,7 @@ export function UploadForm() {
             labelPrefix,
             sequenceId,
             sequenceIndex: sequenceId ? i : null,
+            signal: controller.signal,
           })
         }
 
@@ -235,6 +268,10 @@ export function UploadForm() {
         }
         successCount += 1
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          cancelled = true
+          break
+        }
         failures.push({
           file,
           ...describeUploadFailure(error),
@@ -244,8 +281,18 @@ export function UploadForm() {
       }
     }
 
+    if (abortRef.current === controller) abortRef.current = null
     setStatus({ kind: "idle" })
     setFailedUploads(failures)
+
+    if (cancelled) {
+      toast.message(
+        successCount > 0
+          ? `Upload cancelled. ${successCount} finished before cancel.`
+          : "Upload cancelled."
+      )
+      return
+    }
 
     if (successCount > 0) {
       const suffix = successCount > 1 ? "s" : ""
@@ -270,7 +317,8 @@ export function UploadForm() {
 
     if (failures.length > 0) {
       const preview = failures.slice(0, 3).map(formatFailurePreview).join("; ")
-      const hidden = failures.length > 3 ? ` (+${failures.length - 3} more)` : ""
+      const hidden =
+        failures.length > 3 ? ` (+${failures.length - 3} more)` : ""
       toast.error(`Failed ${failures.length}: ${preview}${hidden}`)
     }
   }
@@ -287,12 +335,20 @@ export function UploadForm() {
       return
     }
 
+    const controller = beginAbortableRun()
     let successCount = 0
     let wallPhotoId: string | null = null
     const nextFailures: UploadFailure[] = []
     const total = failures.length
+    let cancelled = false
 
     for (let i = 0; i < failures.length; i++) {
+      if (controller.signal.aborted) {
+        cancelled = true
+        nextFailures.push(...failures.slice(i))
+        break
+      }
+
       const failure = failures[i]!
       const file = failure.file
       const batchCurrent = i + 1
@@ -341,6 +397,7 @@ export function UploadForm() {
             labelPrefix,
             sequenceId: failure.sequenceId,
             sequenceIndex: failure.sequenceIndex,
+            signal: controller.signal,
           })
         } else {
           registeredId = await uploadVideo({
@@ -352,6 +409,7 @@ export function UploadForm() {
             labelPrefix,
             sequenceId: failure.sequenceId,
             sequenceIndex: failure.sequenceIndex,
+            signal: controller.signal,
           })
         }
 
@@ -364,6 +422,11 @@ export function UploadForm() {
 
         successCount += 1
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          cancelled = true
+          nextFailures.push(failure, ...failures.slice(i + 1))
+          break
+        }
         nextFailures.push({
           file,
           ...describeUploadFailure(error),
@@ -373,10 +436,17 @@ export function UploadForm() {
       }
     }
 
+    if (abortRef.current === controller) abortRef.current = null
     setStatus({ kind: "idle" })
     setFailedUploads(nextFailures)
 
-    if (successCount > 0) {
+    if (cancelled) {
+      toast.message(
+        successCount > 0
+          ? `Retry cancelled. ${successCount} finished before cancel.`
+          : "Retry cancelled."
+      )
+    } else if (successCount > 0) {
       const suffix = successCount > 1 ? "s" : ""
       if (wallPhotoId) {
         const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
@@ -391,27 +461,28 @@ export function UploadForm() {
       }
     }
 
-    if (nextFailures.length === 0) {
+    if (!cancelled && nextFailures.length === 0) {
       formRef.current?.reset()
       setName("")
       setSelectedFiles([])
       return
     }
 
+    if (cancelled) return
+
     const preview = nextFailures
       .slice(0, 3)
       .map(formatFailurePreview)
       .join("; ")
     const hidden =
-      nextFailures.length > 3
-        ? ` (+${nextFailures.length - 3} more)`
-        : ""
+      nextFailures.length > 3 ? ` (+${nextFailures.length - 3} more)` : ""
     toast.error(`Still failed ${nextFailures.length}: ${preview}${hidden}`)
   }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const fileInput = formRef.current?.querySelector<HTMLInputElement>("#gallery-file")
+    const fileInput =
+      formRef.current?.querySelector<HTMLInputElement>("#gallery-file")
     const files = Array.from(fileInput?.files ?? [])
 
     if (files.length === 0) {
@@ -493,10 +564,20 @@ export function UploadForm() {
         </p>
         {selectedFiles.length > 1 && trimmedName ? (
           <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
-            <p className={cn(gallerySans(), "text-xs font-medium text-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-xs font-medium text-foreground"
+              )}
+            >
               Sequence naming preview
             </p>
-            <p className={cn(gallerySans(), "mt-1 text-xs text-muted-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "mt-1 text-xs text-muted-foreground"
+              )}
+            >
               {sequencePreview.join(", ")}
               {selectedFiles.length > sequencePreview.length
                 ? ` (+${selectedFiles.length - sequencePreview.length} more)`
@@ -506,12 +587,24 @@ export function UploadForm() {
         ) : null}
         {failedUploads.length > 0 ? (
           <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-3">
-            <p className={cn(gallerySans(), "text-sm font-medium text-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-sm font-medium text-foreground"
+              )}
+            >
               Failed uploads
             </p>
-            <ul className={cn(gallerySans(), "mt-2 space-y-1 text-xs text-muted-foreground")}>
-              {failedUploads.slice(0, 4).map((failure) => (
-                <li key={`${failure.file.name}:${failure.stage}`}>
+            <ul
+              className={cn(
+                gallerySans(),
+                "mt-2 space-y-1 text-xs text-muted-foreground"
+              )}
+            >
+              {failedUploads.slice(0, 4).map((failure, index) => (
+                <li
+                  key={`${failure.file.name}:${failure.stage}:${failure.sequenceIndex ?? index}`}
+                >
                   {formatFailurePreview(failure)}
                 </li>
               ))}
@@ -563,15 +656,26 @@ export function UploadForm() {
               style={{ width: `${Math.round(status.ratio * 100)}%` }}
             />
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={cancelUpload}
+            className={cn(gallerySans(), "self-start")}
+          >
+            Cancel upload
+          </Button>
         </div>
       ) : null}
       <Button
         type="submit"
         size="lg"
-        disabled={pending}
+        disabled={pending || status.kind === "working"}
         className={cn(gallerySans(), "h-12 rounded-full")}
       >
-        {pending ? "Uploading…" : "Upload selected"}
+        {pending || status.kind === "working"
+          ? "Uploading…"
+          : "Upload selected"}
       </Button>
     </form>
   )
@@ -586,6 +690,7 @@ type UploadCtx = {
   labelPrefix: string
   sequenceId: string | null
   sequenceIndex: number | null
+  signal?: AbortSignal
 }
 
 async function uploadImage(
@@ -601,13 +706,16 @@ async function uploadImage(
     labelPrefix,
     sequenceId,
     sequenceIndex,
+    signal,
   } = ctx
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error("Upload aborted.")
+  }
   const ext = guessExtension(resolved.mime, file.name)
   if (ext === "bin") {
-    throw new UploadFailureError(
-      "type",
-      "unsupported extension for this file"
-    )
+    throw new UploadFailureError("type", "unsupported extension for this file")
   }
 
   setStatus({
@@ -625,6 +733,12 @@ async function uploadImage(
     })
   if (uploadError) {
     throw new UploadFailureError("storage-upload", uploadError.message)
+  }
+  if (signal?.aborted) {
+    await supabase.storage.from("gallery").remove([objectPath])
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error("Upload aborted.")
   }
 
   setStatus({
@@ -665,9 +779,11 @@ async function uploadVideo(ctx: UploadCtx): Promise<string> {
     labelPrefix,
     sequenceId,
     sequenceIndex,
+    signal,
   } = ctx
 
   const compressed = await compressVideo(file, {
+    signal,
     onProgress: (ratio, phase) => {
       setStatus({
         kind: "working",
@@ -681,6 +797,11 @@ async function uploadVideo(ctx: UploadCtx): Promise<string> {
       "video-processing",
       "video compression did not return playable assets"
     )
+  }
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error("Upload aborted.")
   }
 
   const videoId = crypto.randomUUID()
@@ -702,6 +823,12 @@ async function uploadVideo(ctx: UploadCtx): Promise<string> {
   if (videoErr) {
     throw new UploadFailureError("storage-upload", videoErr.message)
   }
+  if (signal?.aborted) {
+    await supabase.storage.from("gallery").remove([videoPath])
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error("Upload aborted.")
+  }
 
   setStatus({
     kind: "working",
@@ -717,6 +844,12 @@ async function uploadVideo(ctx: UploadCtx): Promise<string> {
   if (posterErr) {
     await supabase.storage.from("gallery").remove([videoPath])
     throw new UploadFailureError("storage-upload", posterErr.message)
+  }
+  if (signal?.aborted) {
+    await supabase.storage.from("gallery").remove([videoPath, posterPath])
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error("Upload aborted.")
   }
 
   setStatus({

@@ -353,6 +353,17 @@ export function GalleryCard({
         },
         onChange
       )
+      // comment_likes has no image_id column — refresh this lightbox on any
+      // like change (debounced). Cheap while one dialog is open.
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "gallery_comment_likes",
+        },
+        onChange
+      )
       .subscribe()
 
     return () => {
@@ -456,6 +467,18 @@ export function GalleryCard({
       commentId: highlightCommentId,
     })
     const url = `${window.location.origin}${href}`
+    const title = activeItem?.name ?? image.name
+
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title, url })
+        return
+      }
+    } catch (error) {
+      // User dismissed the share sheet — don't fall through as a hard error.
+      if (error instanceof DOMException && error.name === "AbortError") return
+    }
+
     try {
       await navigator.clipboard.writeText(url)
       toast.success("Link copied.")
@@ -618,7 +641,7 @@ export function GalleryCard({
                   <button
                     type="button"
                     onClick={() => void copyShareLink()}
-                    aria-label="Copy share link"
+                    aria-label="Share"
                     className={cn(
                       "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
                       isSignedIn
