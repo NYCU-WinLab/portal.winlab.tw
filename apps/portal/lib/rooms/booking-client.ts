@@ -80,7 +80,9 @@ export async function bookRoom(details: ReservationDetails): Promise<string> {
   })
 
   if (!res.ok) {
-    throw new Error(`meetingroom reservation/add failed: ${res.status}`)
+    throw new Error(
+      `meetingroom reservation/add failed: ${res.status}${await reason(res)}`
+    )
   }
 
   const data = (await res.json()) as { id?: string }
@@ -117,6 +119,27 @@ export async function cancelRoomBooking(
   })
 
   if (!res.ok) {
-    throw new Error(`meetingroom reservation/delete failed: ${res.status}`)
+    throw new Error(
+      `meetingroom reservation/delete failed: ${res.status}${await reason(res)}`
+    )
+  }
+}
+
+/**
+ * The rejection message the dept system actually sent.
+ *
+ * Their own AngularJS client renders this body straight into a toast — it's
+ * the only place the real reason exists. Recording just the status code threw
+ * that away, which is how a 406 on a demonstrably free room became
+ * undiagnosable.
+ */
+async function reason(res: Response): Promise<string> {
+  try {
+    const body = (await res.text()).trim()
+    if (!body) return ""
+    // Their errors are short strings; a full HTML error page is noise.
+    return ` — ${body.slice(0, 300)}`
+  } catch {
+    return ""
   }
 }

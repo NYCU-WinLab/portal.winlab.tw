@@ -264,6 +264,13 @@ function BookingSuggestion({
       },
       {
         onSuccess: (result) => {
+          // The server returns failures rather than throwing them, so this
+          // branch has to check — a thrown error would be redacted to
+          // something meaningless in production.
+          if (result.error) {
+            toast.error(result.error)
+            return
+          }
           if (result.inviteError) {
             toast.warning(`${what},但邀請信寄送失敗:${result.inviteError}`)
           } else {
@@ -433,6 +440,10 @@ function LabBookingCancel({
         onClick={() =>
           cancelBooking.mutate(match.id, {
             onSuccess: (result) => {
+              if (result.error) {
+                toast.error(result.error)
+                return
+              }
               if (result.inviteError) {
                 toast.warning(
                   `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`

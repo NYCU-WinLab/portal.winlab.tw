@@ -265,13 +265,28 @@ export interface ConfirmBookingInput {
   groupName?: string | null
 }
 
-export type BookingResult = { inviteError?: string }
+export type BookingResult = {
+  inviteError?: string
+  /**
+   * Why the booking didn't happen, when it didn't.
+   *
+   * Returned rather than thrown because Next.js redacts errors thrown from a
+   * Server Action in production — every failure reached the user as "An error
+   * occurred in the Server Components render", including ones with a perfectly
+   * good explanation like the dept system's own rejection message.
+   */
+  error?: string
+}
+
+function failureText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 export async function confirmBooking(
   input: ConfirmBookingInput
 ): Promise<BookingResult> {
   const user = await getCurrentUser()
-  if (!user) throw new Error("請先登入")
+  if (!user) return { error: "請先登入" }
 
   // Derived server-side from the group and the attendee list, never taken
   // from the client: the prefix decides which project a Teams recording
@@ -283,22 +298,29 @@ export async function confirmBooking(
   const title = composeTopic(prefix, input.titleSuffix)
 
   const supabase = await createClient()
-  const outcome = await placeBooking(supabase, requireServiceAccount(), {
-    date: input.date,
-    room: input.room,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    title,
-    attendees: input.attendees,
-    organizer: { id: user.id, name: user.name, email: user.email ?? "" },
-    // Every meeting Portal books gets a Teams meeting — the point of the
-    // whole thing is that there's a recording to look back at afterwards.
-    online: true,
-    meetingPrefix: prefix,
-  })
+  try {
+    const outcome = await placeBooking(supabase, requireServiceAccount(), {
+      date: input.date,
+      room: input.room,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      title,
+      attendees: input.attendees,
+      organizer: { id: user.id, name: user.name, email: user.email ?? "" },
+      // Every meeting Portal books gets a Teams meeting — the point of the
+      // whole thing is that there's a recording to look back at afterwards.
+      online: true,
+      meetingPrefix: prefix,
+    })
 
-  revalidatePath("/rooms")
-  return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
+    revalidatePath("/rooms")
+    return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
+  } catch (err) {
+    // Logged as well as returned: the log is what the standup reads, the
+    // return value is what the person staring at the dialog reads.
+    console.error("[rooms] booking failed", err)
+    return { error: failureText(err) }
+  }
 }
 
 /**
@@ -345,7 +367,7 @@ async function cancelTeamsMeeting(
 
 export async function cancelBooking(bookingId: string): Promise<BookingResult> {
   const user = await getCurrentUser()
-  if (!user) throw new Error("請先登入")
+  if (!user) return { error: "請先登入" }
 
   const subscriber = requireServiceAccount()
   const supabase = await createClient()
@@ -358,20 +380,25 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     .single()
 
   if (error || !booking) {
-    throw new Error("找不到這筆預約,或已經被取消")
+    return { error: "找不到這筆預約,或已經被取消" }
   }
   if (booking.requested_by !== user.id) {
-    throw new Error("只能取消自己建立的預約")
+    return { error: "只能取消自己建立的預約" }
   }
 
   // An online-only meeting reserved nothing, so there's nothing to release.
   if (booking.external_reservation_id && booking.room) {
-    await cancelRoomBooking(booking.external_reservation_id, {
-      room: booking.room,
-      start: taipeiIso(booking.date, booking.start_time),
-      end: taipeiIso(booking.date, booking.end_time),
-      subscriber,
-    })
+    try {
+      await cancelRoomBooking(booking.external_reservation_id, {
+        room: booking.room,
+        start: taipeiIso(booking.date, booking.start_time),
+        end: taipeiIso(booking.date, booking.end_time),
+        subscriber,
+      })
+    } catch (err) {
+      console.error("[rooms] cancel failed", err)
+      return { error: failureText(err) }
+    }
   }
 
   const { error: updateError } = await supabase
@@ -384,9 +411,9 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     .eq("id", bookingId)
 
   if (updateError) {
-    throw new Error(
-      `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`
-    )
+    return {
+      error: `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`,
+    }
   }
 
   await cancelTeamsMeeting(booking.id, booking.date, booking.start_time)

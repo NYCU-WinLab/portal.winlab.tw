@@ -66,12 +66,17 @@ export function OnlineMeetings() {
             disabled={cancelBooking.isPending}
             onClick={() =>
               cancelBooking.mutate(m.id, {
-                onSuccess: (result) =>
-                  result.inviteError
-                    ? toast.warning(
-                        `已取消,但取消通知信寄送失敗:${result.inviteError}`
-                      )
-                    : toast.success("已取消這場線上會議"),
+                onSuccess: (result) => {
+                  if (result.error) {
+                    toast.error(result.error)
+                  } else if (result.inviteError) {
+                    toast.warning(
+                      `已取消,但取消通知信寄送失敗:${result.inviteError}`
+                    )
+                  } else {
+                    toast.success("已取消這場線上會議")
+                  }
+                },
                 onError: (err) => toast.error(errorMessage(err, "取消失敗")),
               })
             }
