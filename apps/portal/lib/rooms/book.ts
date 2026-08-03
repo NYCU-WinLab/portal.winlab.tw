@@ -13,6 +13,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import type { AttendeeContact } from "./attendee-groups"
 import { bookRoom } from "./booking-client"
+import { fetchBusySlots } from "./client"
+import { describeConflict, findConflict } from "./conflict"
 import { taipeiIso } from "./date"
 import { meetingJoinUrl, sendBookingInvite } from "./invite-mail"
 import {
@@ -89,9 +91,26 @@ export async function placeBooking(
 
   // An online-only meeting reserves nothing, so there is no external system
   // to call and no reservation id to record.
-  const externalId = input.room
-    ? await bookRoom({ room: input.room, start, end, subscriber })
-    : null
+  let externalId: string | null = null
+  if (input.room) {
+    // Re-checked here rather than trusted from the grid the user clicked:
+    // that grid is cached and can be well out of date, and booking on a stale
+    // picture turns into a bare HTTP status from the dept system with no clue
+    // which half-hour is the problem.
+    const busy = await fetchBusySlots(input.room, input.date)
+    const clash = findConflict(busy, input.room, start, end)
+    if (clash) {
+      throw new Error(
+        describeConflict(
+          input.room,
+          { startTime: input.startTime, endTime: input.endTime },
+          clash
+        )
+      )
+    }
+
+    externalId = await bookRoom({ room: input.room, start, end, subscriber })
+  }
 
   const { data: inserted, error } = await supabase
     .from("rooms_bookings")
