@@ -22,6 +22,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
@@ -145,6 +150,40 @@ interface Selected {
   daySlots: AvailabilitySlot[]
 }
 
+/**
+ * What's in one 30-minute cell: when it is, and which rooms are behind the
+ * colour.
+ *
+ * Rooms are listed by tier rather than lumped together — "600A、345" reads as
+ * two equivalent options when one is free and the other is chargeable, which
+ * is the one distinction the whole colour scheme exists to make.
+ */
+function SlotTooltip({ date, slot }: { date: string; slot: AvailabilitySlot }) {
+  const tier = slotTier(slot)
+  const lines: { label: string; rooms: string[] }[] = [
+    { label: "免費", rooms: slot.freeRooms },
+    { label: "付費", rooms: slot.paidRooms },
+    { label: "本實驗室已借", rooms: slot.labRooms },
+  ].filter((l) => l.rooms.length > 0)
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="font-medium">
+        {formatDayLabel(date)} {slot.start}–{slot.end}
+      </div>
+      {tier === "none" ? (
+        <div className="text-muted-foreground">已滿,沒有可借的教室</div>
+      ) : (
+        lines.map(({ label, rooms }) => (
+          <div key={label} className="text-muted-foreground">
+            {label}:{rooms.join("、")}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 function DayRow({
   date,
   slots,
@@ -165,29 +204,21 @@ function DayRow({
         {formatDayLabel(date)}
       </span>
       <div className="flex flex-1 overflow-hidden rounded-md border">
-        {slots.map((slot, slotIndex) => {
-          const tier = slotTier(slot)
-          const detail =
-            tier === "none"
-              ? "已滿"
-              : tier === "free"
-                ? slot.freeRooms.join("、")
-                : tier === "lab"
-                  ? `本實驗室：${slot.labRooms.join("、")}`
-                  : slot.paidRooms.join("、")
-          return (
-            <button
-              key={slot.start}
+        {slots.map((slot, slotIndex) => (
+          <Tooltip key={slot.start}>
+            <TooltipTrigger
               type="button"
-              title={`${slot.start}–${slot.end}：${detail}`}
               onClick={() => onSelectSlot({ date, slotIndex, daySlots: slots })}
               className={cn(
                 "h-6 flex-1 cursor-pointer border-r transition-colors last:border-r-0",
-                TIER_STYLE[tier]
+                TIER_STYLE[slotTier(slot)]
               )}
             />
-          )
-        })}
+            <TooltipContent>
+              <SlotTooltip date={date} slot={slot} />
+            </TooltipContent>
+          </Tooltip>
+        ))}
       </div>
     </div>
   )
