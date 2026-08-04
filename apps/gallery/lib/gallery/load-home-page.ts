@@ -282,9 +282,6 @@ async function loadGalleryHomeRange(
       sequence_index:
         typeof item.sequence_index === "number" ? item.sequence_index : null,
     }))
-    image.sequence_missing_indexes = findSequenceGaps(
-      items.map((item) => item.sequence_index)
-    ).gaps
   }
 
   return {
