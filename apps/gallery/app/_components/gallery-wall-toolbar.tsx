@@ -33,8 +33,8 @@ export function GalleryWallToolbar({
           disabled={lightboxOpen}
           onClick={onRestoreOrder}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
-            "hover:border-foreground/15 hover:bg-muted/50 hover:text-foreground",
+            "inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
+            "hover:border-foreground/20 hover:bg-muted/50 hover:text-foreground",
             "disabled:pointer-events-none disabled:opacity-40",
             "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
           )}
@@ -48,9 +48,9 @@ export function GalleryWallToolbar({
         disabled={!canShuffle}
         onClick={onShuffle}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
-          "hover:border-foreground/15 hover:bg-muted/50 hover:text-foreground",
-          shuffled && "border-foreground/20 bg-foreground/[0.05]",
+          "inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
+          "hover:border-foreground/20 hover:bg-muted/50 hover:text-foreground",
+          shuffled && "border-foreground/25 bg-foreground/[0.06]",
           "disabled:pointer-events-none disabled:opacity-40",
           "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
         )}

@@ -15,26 +15,26 @@ export function gallerySerif() {
 export function galleryPageBackdropClass() {
   return cn(
     "gallery-page-backdrop pointer-events-none fixed inset-0 -z-10",
-    // Cool zinc wash + soft corner vignette — darkroom paper wall (light only)
-    "bg-[radial-gradient(ellipse_85%_55%_at_50%_-8%,rgba(82,82,91,0.1),transparent_58%),radial-gradient(ellipse_70%_45%_at_100%_100%,rgba(24,24,27,0.045),transparent_50%),radial-gradient(ellipse_55%_40%_at_0%_100%,rgba(63,63,70,0.04),transparent_48%)]"
+    // Committed cool slate paper wall — reads as photo-lab, not flat white
+    "bg-[radial-gradient(ellipse_95%_60%_at_50%_-12%,rgba(63,63,70,0.16),transparent_55%),radial-gradient(ellipse_70%_50%_at_100%_100%,rgba(39,39,42,0.09),transparent_52%),radial-gradient(ellipse_60%_45%_at_0%_95%,rgba(82,82,91,0.08),transparent_48%),linear-gradient(180deg,oklch(0.93_0.01_250)_0%,oklch(0.96_0.008_250)_38%,oklch(0.945_0.01_248)_100%)]"
   )
 }
 
 export function galleryNavLinkClass(active = false) {
   return cn(
     gallerySans(),
-    "inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-[11px] tracking-wide uppercase",
+    "inline-flex min-h-9 items-center rounded-md border px-3 py-1.5 text-[11px] tracking-wide uppercase",
     "shadow-sm backdrop-blur-md transition-colors",
     active
-      ? "border-zinc-700/25 bg-zinc-900/[0.06] text-foreground"
-      : "border-border/60 bg-background/85 text-muted-foreground hover:border-foreground/15 hover:bg-muted/50 hover:text-foreground"
+      ? "border-zinc-800/30 bg-zinc-900/[0.08] text-foreground"
+      : "border-border/70 bg-background/80 text-muted-foreground hover:border-foreground/20 hover:bg-muted/55 hover:text-foreground"
   )
 }
 
 export function galleryShellBrandClass(active = false) {
   return cn(
     gallerySerif(),
-    "text-base text-foreground/90 transition-colors hover:text-foreground sm:text-lg",
+    "text-lg text-foreground/95 transition-colors hover:text-foreground sm:text-xl",
     active && "text-foreground"
   )
 }
@@ -52,7 +52,7 @@ export function galleryShellNavLinkClass(active = false) {
 export function galleryShellIconButtonClass() {
   return cn(
     gallerySans(),
-    "inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/85 transition-colors",
+    "inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground/85 transition-colors",
     "hover:bg-muted/60 hover:text-foreground",
     "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
   )
@@ -61,22 +61,25 @@ export function galleryShellIconButtonClass() {
 export function galleryPillClass() {
   return cn(
     gallerySans(),
-    "inline-flex min-h-9 items-center rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-foreground/15 hover:bg-muted/50 hover:text-foreground md:text-xs"
+    "inline-flex min-h-9 items-center rounded-md border border-border/70 bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-foreground/20 hover:bg-muted/50 hover:text-foreground md:text-xs"
   )
 }
 
 export function galleryPolaroidClass() {
   return cn(
-    "gallery-polaroid w-full overflow-hidden bg-[#fafafa]",
-    "rounded-[3px] border border-zinc-900/[0.08]",
-    "shadow-[0_1px_2px_rgba(24,24,27,0.06),0_14px_36px_-16px_rgba(24,24,27,0.3)]",
+    "gallery-polaroid w-full overflow-visible bg-[#f7f7f5]",
+    "rounded-[2px] border-[3px] border-[#f7f7f5]",
+    "shadow-[0_2px_4px_rgba(24,24,27,0.08),0_18px_42px_-14px_rgba(24,24,27,0.38),0_0_0_1px_rgba(24,24,27,0.06)]",
     "transition-[box-shadow,transform] duration-500 ease-out",
-    "group-hover/polaroid:shadow-[0_3px_8px_rgba(24,24,27,0.08),0_22px_48px_-14px_rgba(24,24,27,0.34)]"
+    "group-hover/polaroid:shadow-[0_4px_10px_rgba(24,24,27,0.1),0_28px_56px_-12px_rgba(24,24,27,0.42),0_0_0_1px_rgba(24,24,27,0.08)]"
   )
 }
 
 export function gallerySectionTitleClass() {
-  return cn(gallerySerif(), "text-3xl text-foreground/90 sm:text-4xl")
+  return cn(
+    gallerySerif(),
+    "text-4xl leading-none tracking-tight text-foreground sm:text-5xl"
+  )
 }
 
 export function gallerySectionLeadClass() {
@@ -88,7 +91,7 @@ export function gallerySectionLeadClass() {
 
 export function galleryPanelClass() {
   return cn(
-    "gallery-panel rounded-2xl border border-zinc-900/10 bg-card/70 p-5 shadow-sm backdrop-blur-sm sm:p-6"
+    "gallery-panel rounded-xl border border-zinc-900/12 bg-card/80 p-5 shadow-[0_1px_2px_rgba(24,24,27,0.06),0_16px_40px_-24px_rgba(24,24,27,0.28)] backdrop-blur-sm sm:p-7"
   )
 }
 
@@ -97,10 +100,10 @@ export function GalleryBrandMark({ className }: { className?: string }) {
     <Image
       src="/icons/mark.png"
       alt=""
-      width={28}
-      height={28}
+      width={32}
+      height={32}
       className={cn(
-        "gallery-brand-mark size-6 shrink-0 object-contain sm:size-7",
+        "gallery-brand-mark size-7 shrink-0 object-contain sm:size-8",
         className
       )}
       draggable={false}
@@ -118,9 +121,9 @@ export function GalleryFooter() {
       <Image
         src="/icons/mark.png"
         alt=""
-        width={28}
-        height={28}
-        className="size-7 opacity-70"
+        width={32}
+        height={32}
+        className="size-8 opacity-75"
         draggable={false}
         unoptimized
       />
@@ -130,7 +133,7 @@ export function GalleryFooter() {
           "w-full text-center text-[11px] text-muted-foreground"
         )}
       >
-        <span className={cn(gallerySerif(), "text-foreground/80")}>
+        <span className={cn(gallerySerif(), "text-base text-foreground/85")}>
           Gallery
         </span>
         <span aria-hidden className="mx-1.5">
@@ -140,7 +143,7 @@ export function GalleryFooter() {
         <span aria-hidden className="mx-1.5">
           ·
         </span>
-        <span>darkroom paper wall</span>
+        <span>paper wall</span>
       </p>
     </div>
   )
@@ -164,25 +167,25 @@ export function GalleryEmptyState({
     >
       <div
         aria-hidden
-        className="gallery-empty-polaroid mb-6 flex h-[4.75rem] w-14 rotate-[-5deg] items-center justify-center rounded-[3px] border border-zinc-900/[0.1] bg-[#fafafa] shadow-[0_8px_24px_-12px_rgba(24,24,27,0.35)]"
+        className="gallery-empty-polaroid mb-6 flex h-[5.5rem] w-16 rotate-[-7deg] items-center justify-center rounded-[2px] border-[3px] border-[#f7f7f5] bg-[#f7f7f5] shadow-[0_12px_28px_-10px_rgba(24,24,27,0.4)]"
       >
         <Image
           src="/icons/mark.png"
           alt=""
-          width={36}
-          height={36}
-          className="size-9 object-contain opacity-90"
+          width={40}
+          height={40}
+          className="size-10 object-contain opacity-90"
           draggable={false}
           unoptimized
         />
       </div>
       <p className={gallerySectionTitleClass()}>{title}</p>
       {description ? (
-        <p className={cn(gallerySectionLeadClass(), "mt-2 max-w-xs")}>
+        <p className={cn(gallerySectionLeadClass(), "mt-3 max-w-xs")}>
           {description}
         </p>
       ) : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {action ? <div className="mt-6">{action}</div> : null}
     </div>
   )
 }

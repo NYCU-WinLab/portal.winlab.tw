@@ -26,6 +26,15 @@ describe("getPolaroidTape", () => {
   test("is deterministic and only returns known values", () => {
     const id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
     expect(getPolaroidTape(id)).toBe(getPolaroidTape(id))
-    expect(["tl", "tr", "none"]).toContain(getPolaroidTape(id))
+    expect(["tl", "tr", "clip", "none"]).toContain(getPolaroidTape(id))
+  })
+
+  test("assigns accents to a majority of a sample of ids", () => {
+    const ids = Array.from(
+      { length: 40 },
+      (_, i) => `aaaaaaaa-aaaa-aaaa-aaaa-${i.toString(16).padStart(12, "0")}`
+    )
+    const accented = ids.filter((id) => getPolaroidTape(id) !== "none").length
+    expect(accented).toBeGreaterThan(20)
   })
 })

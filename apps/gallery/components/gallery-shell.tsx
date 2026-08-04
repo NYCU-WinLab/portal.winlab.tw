@@ -62,8 +62,8 @@ export function GalleryShell({
       />
       <GalleryPaperParallax />
       <header className="gallery-shell-header pointer-events-none">
-        <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-1.5 pb-1 sm:px-6 sm:pb-1.5">
-          <div className="gallery-shell-nav-row relative grid min-h-[1.75rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
+        <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-2.5 pb-2 sm:px-6 sm:pb-2.5">
+          <div className="gallery-shell-nav-row relative grid min-h-[2rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
             <Link
               href="/"
               className={cn(

@@ -185,7 +185,7 @@ export function GalleryHomeFiltersBar({
       aria-label="Filter gallery"
       className={cn(
         gallerySans(),
-        "gallery-home-filters mb-6 flex flex-col items-center gap-2.5 sm:mb-8 sm:gap-3"
+        "gallery-home-filters mb-7 flex flex-col items-center gap-2 opacity-90 sm:mb-9 sm:gap-2.5"
       )}
     >
       <form
@@ -204,7 +204,7 @@ export function GalleryHomeFiltersBar({
             placeholder="Search titles…"
             className={cn(
               gallerySans(),
-              "min-h-10 w-full rounded-full border border-border/60 bg-background/85 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/20"
+              "min-h-9 w-full rounded-md border border-border/70 bg-background/75 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/25"
             )}
           />
           {searchDraft ? (
@@ -454,7 +454,7 @@ export function GalleryHomeFiltersBar({
         <p
           className={cn(
             gallerySans(),
-            "hidden rounded-full border border-border/60 bg-background/85 px-3 py-1 text-[11px] text-muted-foreground shadow-sm sm:inline-flex"
+            "hidden rounded-md border border-border/60 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground shadow-sm sm:inline-flex"
           )}
         >
           {summaryParts.join(" · ")}

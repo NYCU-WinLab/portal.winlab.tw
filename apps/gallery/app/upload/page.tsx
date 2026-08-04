@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { SeasonalThemePanel } from "@/app/upload/_components/seasonal-theme-panel"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import { UploadManageList } from "@/app/upload/_components/upload-manage-list"
+import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import {
   galleryPanelClass,
   gallerySectionLeadClass,
@@ -45,13 +46,10 @@ export default async function UploadPage() {
   return (
     <GalleryThemedShell active="manage" signedIn containerClassName="max-w-3xl">
       <div className="flex flex-col gap-10 sm:gap-12">
-        <header className="space-y-2">
-          <h1 className={gallerySectionTitleClass()}>Manage</h1>
-          <p className={gallerySectionLeadClass()}>
-            Hang polaroids on the lab wall — sequences, covers, and the
-            occasional axolotl cameo.
-          </p>
-        </header>
+        <GalleryPageHero
+          title="Manage"
+          lead="Hang polaroids on the lab wall — sequences, covers, and the occasional axolotl cameo."
+        />
 
         {user.isAdmin ? (
           <SeasonalThemePanel

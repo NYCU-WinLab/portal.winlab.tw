@@ -214,14 +214,14 @@ export function GalleryGrid({
   return (
     <div
       key={wallEpoch}
-      className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-3 lg:gap-x-7 lg:gap-y-11"
+      className="grid grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:grid-cols-3 lg:gap-x-9 lg:gap-y-14"
       aria-label="Gallery wall"
     >
       {images.map((image, index) => (
         <div
           key={image.id}
           className="gallery-wall-card w-full max-w-full"
-          style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+          style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}
         >
           <GalleryCardBoundary>
             <GalleryCard

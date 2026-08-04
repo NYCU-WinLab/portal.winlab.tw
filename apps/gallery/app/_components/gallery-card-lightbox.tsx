@@ -332,13 +332,21 @@ export function GalleryLightboxSocialAside({
           </button>
         </div>
       </div>
-      <div className="gallery-lightbox-aside-header space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
-        <div className="min-w-0 space-y-0.5">
+      <div className="gallery-lightbox-aside-header space-y-4 border-b border-border/45 px-5 py-5 sm:px-6">
+        <p
+          className={cn(
+            gallerySans(),
+            "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
+          )}
+        >
+          On the wall
+        </p>
+        <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2
               className={cn(
                 gallerySerif(),
-                "text-lg leading-snug text-foreground sm:text-xl"
+                "text-2xl leading-none tracking-tight text-foreground sm:text-[1.75rem]"
               )}
             >
               {activeItem?.name ?? image.name}

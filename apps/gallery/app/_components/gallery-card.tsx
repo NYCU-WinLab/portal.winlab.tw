@@ -353,18 +353,19 @@ export function GalleryCard({
                 tape === "tl" &&
                   "gallery-polaroid-tape gallery-polaroid-tape--tl",
                 tape === "tr" &&
-                  "gallery-polaroid-tape gallery-polaroid-tape--tr"
+                  "gallery-polaroid-tape gallery-polaroid-tape--tr",
+                tape === "clip" && "gallery-polaroid-clip"
               )}
             >
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="block w-full rounded-[2px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {thumbFailed ? (
                     <div
                       className={cn(
-                        "flex w-full items-center justify-center bg-muted/80 px-4 text-center text-xs text-muted-foreground",
+                        "mx-2.5 mt-2.5 flex items-center justify-center bg-muted/80 px-4 text-center text-xs text-muted-foreground",
                         frame.aspectClass
                       )}
                     >
@@ -373,7 +374,7 @@ export function GalleryCard({
                   ) : (
                     <div
                       className={cn(
-                        "relative overflow-hidden bg-neutral-100",
+                        "relative mx-2.5 mt-2.5 overflow-hidden bg-neutral-200/80 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
                         frame.aspectClass
                       )}
                     >
@@ -391,7 +392,7 @@ export function GalleryCard({
                         <div
                           className={cn(
                             gallerySans(),
-                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
+                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
                           )}
                         >
                           <IconPin className="size-3" aria-hidden />
@@ -402,7 +403,7 @@ export function GalleryCard({
                         <div
                           className={cn(
                             gallerySans(),
-                            "absolute top-2.5 right-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                            "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
                           )}
                         >
                           {sequenceGapLabel
@@ -412,11 +413,11 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
+                  <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
                     <p
                       className={cn(
                         gallerySerif(),
-                        "truncate text-center text-sm leading-snug text-foreground/85"
+                        "truncate text-center text-[0.95rem] leading-snug text-foreground/90 sm:text-base"
                       )}
                     >
                       {image.name}
