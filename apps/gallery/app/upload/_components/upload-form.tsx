@@ -1,153 +1,38 @@
 "use client"
 
 import type { FormEvent } from "react"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useMemo, useRef, useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
+import { toast } from "sonner"
 
-import { registerGalleryImage } from "@/app/upload/actions"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
-import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
-import {
-  guessExtension,
-  resolveMediaMimeType,
-  type ResolvedMime,
-} from "@/lib/gallery/mime"
-import { createClient } from "@/lib/supabase/client"
+import { useGalleryUpload } from "@/hooks/gallery/use-gallery-upload"
+import { formatFailurePreview } from "@/lib/gallery/upload-errors"
+import { buildArtworkName } from "@/lib/gallery/upload-naming"
 import {
   VIDEO_MAX_DURATION_SECONDS,
   VIDEO_MAX_INPUT_BYTES,
-  compressVideo,
-  type CompressPhase,
-} from "@/lib/gallery/video-compress"
+} from "@/lib/gallery/upload-pipeline"
 
-type Status =
-  | { kind: "idle" }
-  | {
-      kind: "working"
-      label: string
-      ratio: number
-      batch?: { current: number; total: number }
-    }
-
-type UploadFailure = {
-  file: File
-  detail: string
-  stage:
-    | "type"
-    | "video-processing"
-    | "storage-upload"
-    | "storage-verify"
-    | "db-insert"
-    | "unknown"
-  sequenceId: string | null
-  sequenceIndex: number | null
-}
-
-const PHASE_LABEL: Record<CompressPhase, string> = {
-  init: "Loading encoder",
-  probe: "Reading video",
-  compress: "Compressing to 720p",
-  poster: "Capturing cover frame",
-}
-
-class UploadFailureError extends Error {
-  constructor(
-    readonly stage: UploadFailure["stage"],
-    message: string
-  ) {
-    super(message)
-    this.name = "UploadFailureError"
-  }
-}
-
-function inferArtworkName(fileName: string): string {
-  const base = fileName.replace(/\.[^.]+$/, "").trim()
-  return base || "Untitled"
-}
-
-function buildArtworkName(
-  files: File[],
-  trimmedBaseName: string,
-  index: number
-): string {
-  const file = files[index]
-  if (!file) return trimmedBaseName || "Untitled"
-
-  if (files.length === 1) {
-    return trimmedBaseName || inferArtworkName(file.name)
-  }
-
-  if (!trimmedBaseName) {
-    return inferArtworkName(file.name)
-  }
-
-  return index === 0 ? trimmedBaseName : `${trimmedBaseName}${index}`
-}
-
-function isAbortError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === "AbortError") return true
-  if (!(error instanceof Error)) return false
-  return (
-    error.name === "AbortError" ||
-    /aborted|cancelled|canceled/i.test(error.message)
-  )
-}
-
-function describeUploadFailure(error: unknown): {
-  detail: string
-  stage: UploadFailure["stage"]
-} {
-  if (error instanceof UploadFailureError) {
-    return { detail: error.message, stage: error.stage }
-  }
-
-  const message = error instanceof Error ? error.message : String(error)
-  const lower = message.toLowerCase()
-
-  if (lower.includes("unsupported")) {
-    return { detail: message, stage: "type" }
-  }
-  if (lower.includes("verify upload") || lower.includes("file not found")) {
-    return { detail: message, stage: "storage-verify" }
-  }
-  if (lower.includes("database insert failed")) {
-    return { detail: message, stage: "db-insert" }
-  }
-  if (
-    lower.includes("compress") ||
-    lower.includes("poster") ||
-    lower.includes("video") ||
-    lower.includes("aborted")
-  ) {
-    return { detail: message, stage: "video-processing" }
-  }
-  if (lower.includes("upload")) {
-    return { detail: message, stage: "storage-upload" }
-  }
-
-  return { detail: message, stage: "unknown" }
-}
-
-function formatFailurePreview(failure: UploadFailure): string {
-  return `${failure.file.name} [${failure.stage}] ${failure.detail}`
-}
-
-/** Client uploads bytes to Supabase Storage; server action only registers the row (no 413 on Vercel). */
+/** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
 export function UploadForm() {
-  const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  const [pending, startTransition] = useTransition()
   const [name, setName] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [failedUploads, setFailedUploads] = useState<UploadFailure[]>([])
-  const [status, setStatus] = useState<Status>({ kind: "idle" })
+  const {
+    pending,
+    status,
+    failedUploads,
+    setFailedUploads,
+    cancelUpload,
+    runUpload,
+    retryFailedUploads,
+  } = useGalleryUpload()
+
   const fileNames = selectedFiles.map((file) => file.name)
   const trimmedName = name.trim()
   const sequencePreview = useMemo(() => {
@@ -157,348 +42,11 @@ export function UploadForm() {
       .map((_, index) => buildArtworkName(selectedFiles, trimmedName, index))
   }, [selectedFiles, trimmedName])
 
-  useEffect(() => {
-    if (status.kind !== "working") return
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ""
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [status.kind])
-
-  function beginAbortableRun() {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    return controller
-  }
-
-  function cancelUpload() {
-    abortRef.current?.abort()
-  }
-
-  async function runUpload(files: File[], baseName: string) {
-    const form = formRef.current
-    const trimmed = baseName.trim()
-    const supabase = createClient()
-    const { data: claimsData } = await supabase.auth.getClaims()
-    const userId = claimsData?.claims?.sub
-    if (!userId) {
-      toast.error("Not signed in.")
-      return
-    }
-
-    const controller = beginAbortableRun()
-    let successCount = 0
-    const failures: UploadFailure[] = []
-    const sequenceId = files.length > 1 ? crypto.randomUUID() : null
-    let wallPhotoId: string | null = null
-    const batch =
-      files.length > 1 ? { total: files.length, current: 0 } : undefined
-    let cancelled = false
-
-    for (let i = 0; i < files.length; i++) {
-      if (controller.signal.aborted) {
-        cancelled = true
-        break
-      }
-
-      const file = files[i]!
-      const batchCurrent = i + 1
-      const labelPrefix =
-        files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
-
-      if (batch) {
-        setStatus({
-          kind: "working",
-          label: `Uploading ${batchCurrent} of ${files.length}`,
-          ratio: (i + 0.05) / files.length,
-          batch: { current: batchCurrent, total: files.length },
-        })
-      }
-
-      const resolved = resolveMediaMimeType(file)
-      if (!resolved) {
-        failures.push({
-          file,
-          stage: "type",
-          detail: `unsupported type: ${file.type || "unknown"}`,
-          sequenceId,
-          sequenceIndex: sequenceId ? i : null,
-        })
-        continue
-      }
-
-      const artworkName = buildArtworkName(files, trimmed, i)
-
-      try {
-        let registeredId: string
-        if (resolved.kind === "image") {
-          registeredId = await uploadImage({
-            supabase,
-            userId,
-            file,
-            resolved,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId,
-            sequenceIndex: sequenceId ? i : null,
-            signal: controller.signal,
-          })
-        } else {
-          registeredId = await uploadVideo({
-            supabase,
-            userId,
-            file,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId,
-            sequenceIndex: sequenceId ? i : null,
-            signal: controller.signal,
-          })
-        }
-
-        if (!wallPhotoId && (sequenceId ? i === 0 : true)) {
-          wallPhotoId = registeredId
-        }
-        successCount += 1
-      } catch (error) {
-        if (isAbortError(error) || controller.signal.aborted) {
-          cancelled = true
-          break
-        }
-        failures.push({
-          file,
-          ...describeUploadFailure(error),
-          sequenceId,
-          sequenceIndex: sequenceId ? i : null,
-        })
-      }
-    }
-
-    if (abortRef.current === controller) abortRef.current = null
-    setStatus({ kind: "idle" })
-    setFailedUploads(failures)
-
-    if (cancelled) {
-      toast.message(
-        successCount > 0
-          ? `Upload cancelled. ${successCount} finished before cancel.`
-          : "Upload cancelled."
-      )
-      return
-    }
-
-    if (successCount > 0) {
-      const suffix = successCount > 1 ? "s" : ""
-      if (wallPhotoId) {
-        const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-        toast.success(`Uploaded ${successCount} work${suffix}.`, {
-          action: {
-            label: "View on wall",
-            onClick: () => router.push(href),
-          },
-        })
-      } else {
-        toast.success(`Uploaded ${successCount} work${suffix}.`)
-      }
-
-      if (sequenceId && failures.length > 0) {
-        toast.message(
-          "Sequence has missing shots — open Manage to see gaps, then Retry failed.",
-          {
-            action: {
-              label: "Manage",
-              onClick: () => router.push("/upload"),
-            },
-          }
-        )
-      } else if (sequenceId && !wallPhotoId) {
-        toast.message(
-          "Sequence is missing a cover shot — set cover in Manage so it appears on the wall.",
-          {
-            action: {
-              label: "Manage",
-              onClick: () => router.push("/upload"),
-            },
-          }
-        )
-      }
-
-      if (failures.length === 0) {
-        form?.reset()
-        setName("")
-        setSelectedFiles([])
-      }
-    }
-
-    if (failures.length > 0) {
-      const preview = failures.slice(0, 3).map(formatFailurePreview).join("; ")
-      const hidden =
-        failures.length > 3 ? ` (+${failures.length - 3} more)` : ""
-      toast.error(`Failed ${failures.length}: ${preview}${hidden}`)
-    }
-  }
-
-  async function retryFailedUploads(failures: UploadFailure[]) {
-    if (failures.length === 0) return
-
-    const trimmed = name.trim()
-    const supabase = createClient()
-    const { data: claimsData } = await supabase.auth.getClaims()
-    const userId = claimsData?.claims?.sub
-    if (!userId) {
-      toast.error("Not signed in.")
-      return
-    }
-
-    const controller = beginAbortableRun()
-    let successCount = 0
-    let wallPhotoId: string | null = null
-    const nextFailures: UploadFailure[] = []
-    const total = failures.length
-    let cancelled = false
-
-    for (let i = 0; i < failures.length; i++) {
-      if (controller.signal.aborted) {
-        cancelled = true
-        nextFailures.push(...failures.slice(i))
-        break
-      }
-
-      const failure = failures[i]!
-      const file = failure.file
-      const batchCurrent = i + 1
-      const labelPrefix = total > 1 ? `(${batchCurrent}/${total}) ` : ""
-
-      setStatus({
-        kind: "working",
-        label: `Retrying ${batchCurrent} of ${total}`,
-        ratio: (i + 0.05) / total,
-        batch: { current: batchCurrent, total },
-      })
-
-      const resolved = resolveMediaMimeType(file)
-      if (!resolved) {
-        nextFailures.push({
-          file,
-          stage: "type",
-          detail: `unsupported type: ${file.type || "unknown"}`,
-          sequenceId: failure.sequenceId,
-          sequenceIndex: failure.sequenceIndex,
-        })
-        continue
-      }
-
-      const artworkName =
-        failure.sequenceId && failure.sequenceIndex != null
-          ? trimmed
-            ? failure.sequenceIndex === 0
-              ? trimmed
-              : `${trimmed}${failure.sequenceIndex}`
-            : inferArtworkName(file.name)
-          : trimmed
-            ? trimmed
-            : inferArtworkName(file.name)
-
-      try {
-        let registeredId: string
-        if (resolved.kind === "image") {
-          registeredId = await uploadImage({
-            supabase,
-            userId,
-            file,
-            resolved,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId: failure.sequenceId,
-            sequenceIndex: failure.sequenceIndex,
-            signal: controller.signal,
-          })
-        } else {
-          registeredId = await uploadVideo({
-            supabase,
-            userId,
-            file,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId: failure.sequenceId,
-            sequenceIndex: failure.sequenceIndex,
-            signal: controller.signal,
-          })
-        }
-
-        if (
-          !wallPhotoId &&
-          (failure.sequenceId ? failure.sequenceIndex === 0 : true)
-        ) {
-          wallPhotoId = registeredId
-        }
-
-        successCount += 1
-      } catch (error) {
-        if (isAbortError(error) || controller.signal.aborted) {
-          cancelled = true
-          nextFailures.push(failure, ...failures.slice(i + 1))
-          break
-        }
-        nextFailures.push({
-          file,
-          ...describeUploadFailure(error),
-          sequenceId: failure.sequenceId,
-          sequenceIndex: failure.sequenceIndex,
-        })
-      }
-    }
-
-    if (abortRef.current === controller) abortRef.current = null
-    setStatus({ kind: "idle" })
-    setFailedUploads(nextFailures)
-
-    if (cancelled) {
-      toast.message(
-        successCount > 0
-          ? `Retry cancelled. ${successCount} finished before cancel.`
-          : "Retry cancelled."
-      )
-    } else if (successCount > 0) {
-      const suffix = successCount > 1 ? "s" : ""
-      if (wallPhotoId) {
-        const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-        toast.success(`Uploaded ${successCount} work${suffix}.`, {
-          action: {
-            label: "View on wall",
-            onClick: () => router.push(href),
-          },
-        })
-      } else {
-        toast.success(`Uploaded ${successCount} work${suffix}.`)
-      }
-    }
-
-    if (!cancelled && nextFailures.length === 0) {
-      formRef.current?.reset()
-      setName("")
-      setSelectedFiles([])
-      return
-    }
-
-    if (cancelled) return
-
-    const preview = nextFailures
-      .slice(0, 3)
-      .map(formatFailurePreview)
-      .join("; ")
-    const hidden =
-      nextFailures.length > 3 ? ` (+${nextFailures.length - 3} more)` : ""
-    toast.error(`Still failed ${nextFailures.length}: ${preview}${hidden}`)
+  function resetForm() {
+    formRef.current?.reset()
+    setName("")
+    setSelectedFiles([])
+    setFailedUploads([])
   }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -516,9 +64,7 @@ export function UploadForm() {
       return
     }
 
-    startTransition(async () => {
-      await runUpload(files, name)
-    })
+    runUpload(files, name, { onAllSucceeded: resetForm })
   }
 
   return (
@@ -579,7 +125,8 @@ export function UploadForm() {
         >
           Videos: max {VIDEO_MAX_DURATION_SECONDS}s and{" "}
           {VIDEO_MAX_INPUT_BYTES / 1024 / 1024} MB, auto-compressed to 720p mp4
-          in your browser.
+          in your browser. Gallery storage cap is 30 MB per file after
+          compression. HEIC/HEIF from iPhone are accepted.
         </p>
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
           Multi-select uploads are grouped as one sequence on the wall.
@@ -637,8 +184,8 @@ export function UploadForm() {
                 size="sm"
                 disabled={pending}
                 onClick={() =>
-                  startTransition(async () => {
-                    await retryFailedUploads(failedUploads)
+                  retryFailedUploads(failedUploads, name, {
+                    onAllSucceeded: resetForm,
                   })
                 }
               >
@@ -701,204 +248,4 @@ export function UploadForm() {
       </Button>
     </form>
   )
-}
-
-type UploadCtx = {
-  supabase: ReturnType<typeof createClient>
-  userId: string
-  file: File
-  artworkName: string
-  setStatus: (s: Status) => void
-  labelPrefix: string
-  sequenceId: string | null
-  sequenceIndex: number | null
-  signal?: AbortSignal
-}
-
-async function uploadImage(
-  ctx: UploadCtx & { resolved: ResolvedMime }
-): Promise<string> {
-  const {
-    supabase,
-    userId,
-    file,
-    resolved,
-    artworkName,
-    setStatus,
-    labelPrefix,
-    sequenceId,
-    sequenceIndex,
-    signal,
-  } = ctx
-  if (signal?.aborted) {
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new Error("Upload aborted.")
-  }
-  const ext = guessExtension(resolved.mime, file.name)
-  if (ext === "bin") {
-    throw new UploadFailureError("type", "unsupported extension for this file")
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading ${file.name}`,
-    ratio: 0.4,
-  })
-
-  const objectPath = `${userId}/${crypto.randomUUID()}.${ext}`
-  const { error: uploadError } = await supabase.storage
-    .from("gallery")
-    .upload(objectPath, file, {
-      contentType: resolved.mime,
-      upsert: false,
-    })
-  if (uploadError) {
-    throw new UploadFailureError("storage-upload", uploadError.message)
-  }
-  if (signal?.aborted) {
-    await supabase.storage.from("gallery").remove([objectPath])
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new Error("Upload aborted.")
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Registering ${file.name}`,
-    ratio: 0.85,
-  })
-
-  const result = await registerGalleryImage({
-    name: artworkName,
-    imagePath: objectPath,
-    mediaType: "image",
-    sequenceId,
-    sequenceIndex,
-  })
-  if (!result.ok) {
-    await supabase.storage.from("gallery").remove([objectPath])
-    throw new UploadFailureError(
-      result.error.includes("Database insert failed")
-        ? "db-insert"
-        : result.error.includes("verify upload") ||
-            result.error.includes("File not found")
-          ? "storage-verify"
-          : "unknown",
-      result.error
-    )
-  }
-  return result.id
-}
-
-async function uploadVideo(ctx: UploadCtx): Promise<string> {
-  const {
-    supabase,
-    userId,
-    file,
-    artworkName,
-    setStatus,
-    labelPrefix,
-    sequenceId,
-    sequenceIndex,
-    signal,
-  } = ctx
-
-  const compressed = await compressVideo(file, {
-    signal,
-    onProgress: (ratio, phase) => {
-      setStatus({
-        kind: "working",
-        label: `${labelPrefix}${PHASE_LABEL[phase]}`,
-        ratio,
-      })
-    },
-  })
-  if (!compressed.video || !compressed.poster) {
-    throw new UploadFailureError(
-      "video-processing",
-      "video compression did not return playable assets"
-    )
-  }
-  if (signal?.aborted) {
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new Error("Upload aborted.")
-  }
-
-  const videoId = crypto.randomUUID()
-  const posterId = crypto.randomUUID()
-  const videoPath = `${userId}/${videoId}.${compressed.videoExt}`
-  const posterPath = `${userId}/${posterId}.${compressed.posterExt}`
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading video`,
-    ratio: 0.3,
-  })
-  const { error: videoErr } = await supabase.storage
-    .from("gallery")
-    .upload(videoPath, compressed.video, {
-      contentType: compressed.videoMime,
-      upsert: false,
-    })
-  if (videoErr) {
-    throw new UploadFailureError("storage-upload", videoErr.message)
-  }
-  if (signal?.aborted) {
-    await supabase.storage.from("gallery").remove([videoPath])
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new Error("Upload aborted.")
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading cover`,
-    ratio: 0.7,
-  })
-  const { error: posterErr } = await supabase.storage
-    .from("gallery")
-    .upload(posterPath, compressed.poster, {
-      contentType: compressed.posterMime,
-      upsert: false,
-    })
-  if (posterErr) {
-    await supabase.storage.from("gallery").remove([videoPath])
-    throw new UploadFailureError("storage-upload", posterErr.message)
-  }
-  if (signal?.aborted) {
-    await supabase.storage.from("gallery").remove([videoPath, posterPath])
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new Error("Upload aborted.")
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Registering`,
-    ratio: 0.9,
-  })
-  const result = await registerGalleryImage({
-    name: artworkName,
-    imagePath: videoPath,
-    mediaType: "video",
-    posterPath,
-    durationSeconds: compressed.durationSeconds,
-    sequenceId,
-    sequenceIndex,
-  })
-  if (!result.ok) {
-    await supabase.storage.from("gallery").remove([videoPath, posterPath])
-    throw new UploadFailureError(
-      result.error.includes("Database insert failed")
-        ? "db-insert"
-        : result.error.includes("verify upload") ||
-            result.error.includes("File not found")
-          ? "storage-verify"
-          : "unknown",
-      result.error
-    )
-  }
-  return result.id
 }
