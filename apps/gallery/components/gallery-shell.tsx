@@ -77,7 +77,7 @@ export function GalleryShell({
                 <span
                   className={cn(
                     gallerySans(),
-                    "gallery-seasonal-badge hidden shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tracking-wide uppercase not-italic sm:inline-flex sm:px-2 sm:text-[10px]",
+                    "gallery-seasonal-badge shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tracking-wide uppercase not-italic sm:px-2 sm:text-[10px]",
                     seasonalThemeId === "dragon-boat" &&
                       "border-emerald-700/25 bg-emerald-600/10 text-emerald-800",
                     seasonalThemeId === "world-cup" &&
@@ -89,7 +89,7 @@ export function GalleryShell({
                 </span>
               ) : null}
             </Link>
-            <div className="gallery-header-seasonal-row relative z-0 flex min-w-0 items-end justify-center justify-self-stretch overflow-hidden">
+            <div className="gallery-header-seasonal-row relative z-0 hidden min-w-0 items-end justify-center justify-self-stretch overflow-hidden sm:flex">
               <GalleryHeaderSeasonal themeId={seasonalThemeId} />
             </div>
             <div className="relative z-10 justify-self-end">

@@ -256,6 +256,34 @@ html::-webkit-scrollbar {
   box-shadow: 0 1px 2px rgba(24, 24, 27, 0.12);
 }
 
+.gallery-polaroid {
+  position: relative;
+}
+
+.gallery-polaroid-tape::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -0.35rem;
+  width: 2.4rem;
+  height: 0.72rem;
+  background: color-mix(in oklch, oklch(0.78 0.04 85) 88%, white);
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.18);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.gallery-polaroid-tape--tl::before {
+  left: 0.65rem;
+  transform: rotate(-12deg);
+}
+
+.gallery-polaroid-tape--tr::before {
+  right: 0.65rem;
+  left: auto;
+  transform: rotate(11deg);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .group\/polaroid:hover .gallery-polaroid {
     transform: translateY(-3px);
@@ -294,10 +322,16 @@ html[data-gallery-theme="dragon-boat"] .gallery-shell-nav-row {
 html[data-gallery-theme="dragon-boat"] .gallery-header-seasonal-row {
   position: relative;
   z-index: 0;
-  display: block;
+  display: none;
   overflow: hidden;
   height: 1.35rem;
   pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  html[data-gallery-theme="dragon-boat"] .gallery-header-seasonal-row {
+    display: block;
+  }
 }
 
 html[data-gallery-theme="dragon-boat"] .gallery-seasonal-badge {
@@ -673,10 +707,16 @@ html[data-gallery-theme="world-cup"] .gallery-shell-nav-row {
 html[data-gallery-theme="world-cup"] .gallery-header-seasonal-row {
   position: relative;
   z-index: 0;
-  display: block;
+  display: none;
   overflow: hidden;
   height: 1.35rem;
   pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  html[data-gallery-theme="world-cup"] .gallery-header-seasonal-row {
+    display: block;
+  }
 }
 
 html[data-gallery-theme="world-cup"] .gallery-seasonal-badge {

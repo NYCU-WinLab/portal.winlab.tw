@@ -14,6 +14,7 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
 /** Lightbox shortcuts. */
 export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["←", "→"], action: "Prev / next (sequence, then wall)" },
+  { keys: ["I"], action: "Toggle comments panel (mobile)" },
   { keys: ["Esc"], action: "Close" },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]

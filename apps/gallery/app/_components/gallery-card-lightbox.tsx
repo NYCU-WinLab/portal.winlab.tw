@@ -125,7 +125,7 @@ export function GalleryLightboxMediaPane({
       {!mediaLoaded && !lightboxFailed ? (
         <div
           aria-hidden
-          className="gallery-lightbox-image animate-pulse bg-muted/80"
+          className="gallery-lightbox-image min-h-[40dvh] w-[min(92vw,28rem)] animate-pulse rounded-sm bg-zinc-700/40 sm:min-h-[50dvh]"
         />
       ) : null}
       {lightboxFailed ? (
@@ -167,7 +167,7 @@ export function GalleryLightboxMediaPane({
         <button
           type="button"
           onClick={goLightboxPrev}
-          className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+          className="absolute top-1/2 left-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:left-3 sm:h-10 sm:w-10"
           aria-label="Previous"
         >
           <IconChevronLeft className="h-5 w-5" />
@@ -177,7 +177,7 @@ export function GalleryLightboxMediaPane({
         <button
           type="button"
           onClick={goLightboxNext}
-          className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+          className="absolute top-1/2 right-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:right-3 sm:h-10 sm:w-10"
           aria-label="Next"
         >
           <IconChevronRight className="h-5 w-5" />

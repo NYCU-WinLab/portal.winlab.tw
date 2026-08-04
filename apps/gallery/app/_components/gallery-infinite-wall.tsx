@@ -10,7 +10,29 @@ import { fetchGalleryWallPage } from "@/app/actions/wall"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
-import { shuffleGalleryWallOrder } from "@/lib/gallery/wall-shuffle"
+import {
+  mergeGalleryWallPage,
+  restoreGalleryWallOrder,
+  shuffleGalleryWallOrder,
+} from "@/lib/gallery/wall-shuffle"
+
+type PrefetchedPage = {
+  page: number
+  images: GalleryImage[]
+  hasMore: boolean
+}
+
+function warmThumbUrls(images: GalleryImage[]) {
+  const urls: string[] = []
+  for (const image of images.slice(0, 48)) {
+    const thumbPath =
+      image.media_type === "video" && image.poster_path
+        ? image.poster_path
+        : image.image_path
+    urls.push(getGalleryThumbUrl(thumbPath))
+  }
+  cacheGalleryMediaUrls(urls)
+}
 
 export function GalleryInfiniteWall({
   initialImages,
@@ -43,8 +65,17 @@ export function GalleryInfiniteWall({
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [wallEpoch, setWallEpoch] = useState(0)
+  const [shuffled, setShuffled] = useState(false)
+  const loadOrderIdsRef = useRef(initialImages.map((image) => image.id))
+  const shuffledRef = useRef(false)
+  const prefetchingRef = useRef(false)
+  const prefetchedRef = useRef<PrefetchedPage | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const lightboxOpen = Boolean(openPhotoId)
+
+  useEffect(() => {
+    shuffledRef.current = shuffled
+  }, [shuffled])
 
   const filtersInput = useMemo(
     () => ({
@@ -57,41 +88,53 @@ export function GalleryInfiniteWall({
   )
 
   useEffect(() => {
-    // Wall warm: thumbs only (lightbox warms full-res on open).
-    const urls: string[] = []
-    for (const image of images.slice(0, 48)) {
-      const thumbPath =
-        image.media_type === "video" && image.poster_path
-          ? image.poster_path
-          : image.image_path
-      urls.push(getGalleryThumbUrl(thumbPath))
-    }
-    cacheGalleryMediaUrls(urls)
+    warmThumbUrls(images)
   }, [images])
+
+  const applyPage = useCallback(
+    (incoming: GalleryImage[], nextPage: number, nextHasMore: boolean) => {
+      const isShuffled = shuffledRef.current
+      setImages((prev) => {
+        const { images: merged, addedIds } = mergeGalleryWallPage(
+          prev,
+          incoming,
+          isShuffled
+        )
+        if (addedIds.length > 0) {
+          loadOrderIdsRef.current = [...loadOrderIdsRef.current, ...addedIds]
+        }
+        return merged
+      })
+      setPage(nextPage)
+      setHasMore(nextHasMore)
+      if (isShuffled) {
+        setWallEpoch((epoch) => epoch + 1)
+      }
+    },
+    []
+  )
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return
     setLoadingMore(true)
     setLoadError(null)
     try {
+      const cached =
+        prefetchedRef.current?.page === page + 1 ? prefetchedRef.current : null
+      prefetchedRef.current = null
+
+      if (cached) {
+        applyPage(cached.images, cached.page, cached.hasMore)
+        return
+      }
+
       const result = await fetchGalleryWallPage(page + 1, filtersInput)
       if (!result.ok) {
         setLoadError(result.error)
         toast.error(result.error)
         return
       }
-      setImages((prev) => {
-        const seen = new Set(prev.map((image) => image.id))
-        const next = [...prev]
-        for (const image of result.images) {
-          if (seen.has(image.id)) continue
-          seen.add(image.id)
-          next.push(image)
-        }
-        return next
-      })
-      setPage(result.page)
-      setHasMore(result.hasMore)
+      applyPage(result.images, result.page, result.hasMore)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load more photos."
@@ -100,7 +143,37 @@ export function GalleryInfiniteWall({
     } finally {
       setLoadingMore(false)
     }
-  }, [filtersInput, hasMore, loadingMore, page])
+  }, [applyPage, filtersInput, hasMore, loadingMore, page])
+
+  useEffect(() => {
+    if (!hasMore || loadingMore || loadError || prefetchingRef.current) return
+    if (prefetchedRef.current?.page === page + 1) return
+
+    let cancelled = false
+    prefetchingRef.current = true
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await fetchGalleryWallPage(page + 1, filtersInput)
+          if (cancelled || !result.ok) return
+          prefetchedRef.current = {
+            page: result.page,
+            images: result.images,
+            hasMore: result.hasMore,
+          }
+          warmThumbUrls(result.images)
+        } finally {
+          prefetchingRef.current = false
+        }
+      })()
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      prefetchingRef.current = false
+    }
+  }, [filtersInput, hasMore, loadError, loadingMore, page])
 
   useEffect(() => {
     const node = sentinelRef.current
@@ -110,7 +183,7 @@ export function GalleryInfiniteWall({
       ([entry]) => {
         if (entry?.isIntersecting) void loadMore()
       },
-      { rootMargin: "560px" }
+      { rootMargin: "720px" }
     )
     observer.observe(node)
     return () => observer.disconnect()
@@ -119,16 +192,26 @@ export function GalleryInfiniteWall({
   const onShuffle = useCallback(() => {
     if (images.length < 2) return
     setImages((prev) => shuffleGalleryWallOrder(prev))
+    setShuffled(true)
     setWallEpoch((epoch) => epoch + 1)
     toast.success("Wall reshuffled.")
   }, [images.length])
+
+  const onRestoreOrder = useCallback(() => {
+    setImages((prev) => restoreGalleryWallOrder(prev, loadOrderIdsRef.current))
+    setShuffled(false)
+    setWallEpoch((epoch) => epoch + 1)
+    toast.success("Wall order restored.")
+  }, [])
 
   return (
     <>
       {images.length > 0 ? (
         <GalleryWallToolbar
           canShuffle={images.length > 1 && !lightboxOpen}
+          shuffled={shuffled}
           onShuffle={onShuffle}
+          onRestoreOrder={onRestoreOrder}
           lightboxOpen={lightboxOpen}
         />
       ) : null}

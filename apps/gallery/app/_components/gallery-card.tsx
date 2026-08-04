@@ -40,7 +40,7 @@ import {
 import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
-import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
+import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
   nextSequenceIndex,
@@ -96,6 +96,7 @@ export function GalleryCard({
   const searchParams = useSearchParams()
   const rotation = getRotation(image.id)
   const frame = getPolaroidFrame(image.id)
+  const tape = getPolaroidTape(image.id)
   const sequenceMedia: GallerySequenceItem[] =
     image.sequence_items.length > 0
       ? image.sequence_items
@@ -262,12 +263,32 @@ export function GalleryCard({
       if (event.key === "ArrowRight") {
         event.preventDefault()
         goLightboxNext()
+        return
+      }
+      if (event.key === "i" || event.key === "I") {
+        event.preventDefault()
+        setMobileDetailsOpen((open) => !open)
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [goLightboxNext, goLightboxPrev, isDialogOpen])
+
+  // Prefetch adjacent sequence full-res for snappier story browsing.
+  useEffect(() => {
+    if (!isDialogOpen) return
+    const neighbors = [activeIndex - 1, activeIndex + 1]
+      .map((idx) => sequenceMedia[idx])
+      .filter(Boolean)
+    const urls = neighbors.flatMap((item) => [
+      mediaUrlFromItem(item!),
+      thumbUrlFromItem(item!),
+    ])
+    cacheGalleryMediaUrls(urls)
+    // sequenceMedia identity changes each render; key off length + active shot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment
+  }, [activeIndex, isDialogOpen, image.id, sequenceMedia.length])
 
   const handlePinSuccess = (nextPinnedAt: string | null) => {
     setPinnedAt(nextPinnedAt)
@@ -326,7 +347,15 @@ export function GalleryCard({
           }
         >
           <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-            <div className={galleryPolaroidClass()}>
+            <div
+              className={cn(
+                galleryPolaroidClass(),
+                tape === "tl" &&
+                  "gallery-polaroid-tape gallery-polaroid-tape--tl",
+                tape === "tr" &&
+                  "gallery-polaroid-tape gallery-polaroid-tape--tr"
+              )}
+            >
               <DialogTrigger asChild>
                 <button
                   type="button"
