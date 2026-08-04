@@ -47,13 +47,14 @@
   },
   "overrides": {
     "tslib": "^2.8.1",
-    "fast-uri": "^3.1.4",
+    "fast-uri": "^3.1.5",
+    "ip-address": "^10.4.0",
     "sharp": "^0.35.3",
     "ws": "^8.21.0",
     "esbuild": "^0.28.1",
     "hono": "^4.12.25",
     "js-yaml": "^4.3.0",
-    "brace-expansion": "^5.0.8",
+    "brace-expansion": "^5.0.9",
     "postcss": "^8.5.23"
   }
 }
