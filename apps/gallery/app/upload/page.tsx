@@ -45,8 +45,12 @@ export default async function UploadPage() {
   return (
     <GalleryThemedShell active="manage" signedIn containerClassName="max-w-3xl">
       <div className="flex flex-col gap-10 sm:gap-12">
-        <header>
+        <header className="space-y-2">
           <h1 className={gallerySectionTitleClass()}>Manage</h1>
+          <p className={gallerySectionLeadClass()}>
+            Hang polaroids on the lab wall — sequences, covers, and the
+            occasional axolotl cameo.
+          </p>
         </header>
 
         {user.isAdmin ? (
@@ -68,7 +72,7 @@ export default async function UploadPage() {
           </h2>
           {myImages.length === 0 ? (
             <p className={gallerySectionLeadClass()}>
-              You haven&apos;t uploaded anything yet.
+              Nothing here yet — drop a photo above to claim a spot on the wall.
             </p>
           ) : (
             <UploadManageList images={myImages} isAdmin={user.isAdmin} />

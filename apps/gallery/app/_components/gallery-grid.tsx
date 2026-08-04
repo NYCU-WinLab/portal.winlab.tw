@@ -1,10 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
-import { GalleryEmptyState } from "@/components/gallery-chrome"
+import {
+  GalleryEmptyState,
+  galleryNavLinkClass,
+} from "@/components/gallery-chrome"
 import {
   buildGalleryHomeHref,
   describeGalleryFilterSummary,
@@ -28,6 +32,7 @@ export function GalleryGrid({
   loadingMore = false,
   onLoadMore,
   filters,
+  wallEpoch = 0,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -41,6 +46,8 @@ export function GalleryGrid({
   loadingMore?: boolean
   onLoadMore?: () => void | Promise<void>
   filters?: GalleryHomeFilters
+  /** Bumps when the wall is reshuffled so settle animation replays. */
+  wallEpoch?: number
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -60,7 +67,6 @@ export function GalleryGrid({
     if (!openPhotoId) return
     const index = images.findIndex((image) => image.id === openPhotoId)
     if (index < 0) return
-    // Defer sync from the URL deep-link prop to avoid sync setState-in-effect.
     const timer = window.setTimeout(() => {
       setFocusIndex(index)
       setOpenIndex(index)
@@ -78,7 +84,6 @@ export function GalleryGrid({
     const nextImage = images[nextIndex]
     if (!nextImage) return
     pendingAdvanceNextRef.current = false
-    // Defer so this isn't a sync setState-in-effect cascade.
     const timer = window.setTimeout(() => {
       setOpenIndex(nextIndex)
       setFocusIndex(nextIndex)
@@ -174,7 +179,7 @@ export function GalleryGrid({
           action={
             <button
               type="button"
-              className="text-xs underline underline-offset-4"
+              className={galleryNavLinkClass()}
               onClick={() => router.replace(buildGalleryHomeHref({}))}
             >
               Clear filters
@@ -186,18 +191,37 @@ export function GalleryGrid({
     return (
       <GalleryEmptyState
         title="Nothing on the wall yet"
-        description="Be the first to hang something — sign in and head to Manage."
+        description="Hang the first polaroid — the lab wall is waiting."
+        action={
+          isSignedIn ? (
+            <Link href="/upload" className={galleryNavLinkClass(true)}>
+              Upload a photo
+            </Link>
+          ) : (
+            <Link
+              href="/auth/login?next=/upload"
+              className={galleryNavLinkClass(true)}
+            >
+              Sign in to upload
+            </Link>
+          )
+        }
       />
     )
   }
 
   return (
     <div
-      className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12"
+      key={wallEpoch}
+      className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-3 lg:gap-x-7 lg:gap-y-11"
       aria-label="Gallery wall"
     >
       {images.map((image, index) => (
-        <div key={image.id} className="w-full max-w-full">
+        <div
+          key={image.id}
+          className="gallery-wall-card w-full max-w-full"
+          style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+        >
           <GalleryCard
             image={image}
             isSignedIn={isSignedIn}

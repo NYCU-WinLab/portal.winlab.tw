@@ -305,12 +305,7 @@ function UploadSequenceGroup({
       </p>
       {gapLabel ? (
         <div className="flex flex-wrap items-center gap-2">
-          <p
-            className={cn(
-              gallerySans(),
-              "text-xs text-amber-700 dark:text-amber-300"
-            )}
-          >
+          <p className={cn(gallerySans(), "text-xs text-amber-800")}>
             Incomplete · {gapLabel}
           </p>
           <button

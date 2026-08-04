@@ -19,7 +19,10 @@ import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
 import { PinWallButton } from "@/app/_components/pin-wall-button"
 import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
-import { posterUrlFromItem } from "@/app/_components/gallery-card-media"
+import {
+  posterUrlFromItem,
+  thumbUrlFromItem,
+} from "@/app/_components/gallery-card-media"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import type { GalleryReaction, ReactionCounts } from "@/lib/gallery/reactions"
@@ -181,18 +184,30 @@ export function GalleryLightboxMediaPane({
         </button>
       ) : null}
       {isSequence ? (
-        <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
+        <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-end justify-center gap-1.5 overflow-x-auto px-4 pb-0.5">
           {sequenceMedia.map((item, idx) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setActiveIndex(idx)}
-              className={cn(
-                "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
-                idx === activeIndex && "bg-white"
-              )}
               aria-label={`View shot ${idx + 1}`}
-            />
+              aria-current={idx === activeIndex ? "true" : undefined}
+              className={cn(
+                "relative h-11 w-9 shrink-0 overflow-hidden rounded-[2px] border-2 bg-zinc-900/30 shadow-md transition-[transform,opacity]",
+                idx === activeIndex
+                  ? "scale-105 border-white"
+                  : "border-white/35 opacity-75 hover:opacity-100"
+              )}
+            >
+              {/* Tiny strip thumbs — next/image is overkill in lightbox chrome */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumbUrlFromItem(item)}
+                alt=""
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            </button>
           ))}
         </div>
       ) : null}
@@ -300,9 +315,7 @@ export function GalleryLightboxSocialAside({
           <button
             type="button"
             aria-label={
-              mobileDetailsOpen
-                ? "Collapse comments"
-                : "Expand comments"
+              mobileDetailsOpen ? "Collapse comments" : "Expand comments"
             }
             aria-expanded={mobileDetailsOpen}
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground"
@@ -332,7 +345,7 @@ export function GalleryLightboxSocialAside({
               <span
                 className={cn(
                   gallerySans(),
-                  "inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                  "inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800"
                 )}
               >
                 <IconPin className="size-3" aria-hidden />

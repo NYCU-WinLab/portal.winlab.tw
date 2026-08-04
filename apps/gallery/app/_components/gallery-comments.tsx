@@ -338,7 +338,7 @@ export function GalleryComments({
                       {comment.commenter_name}
                     </span>
                     {comment.pinned_at ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                         <IconPin className="size-3" aria-hidden />
                         Pinned
                       </span>
@@ -434,8 +434,7 @@ export function GalleryComments({
                           disabled={isPending}
                           className={cn(
                             galleryPillClass(),
-                            comment.pinned_at &&
-                              "text-amber-700 dark:text-amber-300"
+                            comment.pinned_at && "text-amber-800"
                           )}
                         >
                           {comment.pinned_at ? "Unpin" : "Pin"}

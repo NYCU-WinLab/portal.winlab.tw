@@ -2,7 +2,7 @@
  * Precaches the app shell; runtime-caches Supabase gallery media after first view.
  * No offline write queue.
  */
-const VERSION = "gallery-sw-v2"
+const VERSION = "gallery-sw-v3"
 const SHELL_CACHE = `${VERSION}-shell`
 const MEDIA_CACHE = `${VERSION}-media`
 
@@ -11,6 +11,7 @@ const SHELL_URLS = [
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/apple-touch-icon.png",
+  "/icons/mark.png",
 ]
 
 self.addEventListener("install", (event) => {
@@ -119,9 +120,11 @@ async function networkFirstNavigation(request) {
 
 async function cacheMediaUrls(urls) {
   const cache = await caches.open(MEDIA_CACHE)
+  const unique = [...new Set(urls.filter((url) => typeof url === "string"))]
+  // Cap warm batch so we don't thrash storage on long walls.
+  const batch = unique.filter(isGalleryMedia).slice(0, 64)
   await Promise.all(
-    urls.map(async (url) => {
-      if (typeof url !== "string" || !isGalleryMedia(url)) return
+    batch.map(async (url) => {
       try {
         const existing = await cache.match(url)
         if (existing) return

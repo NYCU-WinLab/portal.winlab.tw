@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryWallToolbar } from "@/app/_components/gallery-wall-toolbar"
 import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import { shuffleGalleryWallOrder } from "@/lib/gallery/wall-shuffle"
 
 export function GalleryInfiniteWall({
   initialImages,
@@ -40,7 +42,9 @@ export function GalleryInfiniteWall({
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [wallEpoch, setWallEpoch] = useState(0)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const lightboxOpen = Boolean(openPhotoId)
 
   const filtersInput = useMemo(
     () => ({
@@ -106,14 +110,28 @@ export function GalleryInfiniteWall({
       ([entry]) => {
         if (entry?.isIntersecting) void loadMore()
       },
-      { rootMargin: "480px" }
+      { rootMargin: "560px" }
     )
     observer.observe(node)
     return () => observer.disconnect()
   }, [hasMore, loadError, loadMore])
 
+  const onShuffle = useCallback(() => {
+    if (images.length < 2) return
+    setImages((prev) => shuffleGalleryWallOrder(prev))
+    setWallEpoch((epoch) => epoch + 1)
+    toast.success("Wall reshuffled.")
+  }, [images.length])
+
   return (
     <>
+      {images.length > 0 ? (
+        <GalleryWallToolbar
+          canShuffle={images.length > 1 && !lightboxOpen}
+          onShuffle={onShuffle}
+          lightboxOpen={lightboxOpen}
+        />
+      ) : null}
       <GalleryGrid
         images={images}
         isSignedIn={isSignedIn}
@@ -127,6 +145,7 @@ export function GalleryInfiniteWall({
         loadingMore={loadingMore}
         onLoadMore={loadMore}
         filters={filters}
+        wallEpoch={wallEpoch}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />

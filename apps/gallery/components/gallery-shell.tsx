@@ -1,5 +1,4 @@
 import type { ReactNode } from "react"
-import Image from "next/image"
 import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
@@ -10,6 +9,7 @@ import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
 import {
+  GalleryBrandMark,
   GalleryFooter,
   galleryShellBrandClass,
   galleryPageBackdropClass,
@@ -66,24 +66,16 @@ export function GalleryShell({
               href="/"
               className={cn(
                 galleryShellBrandClass(active === "home"),
-                "relative z-10 inline-flex min-w-0 items-center gap-1.5 sm:gap-2"
+                "relative z-10 inline-flex min-w-0 items-center gap-2 sm:gap-2.5"
               )}
             >
-              <Image
-                src="/icons/mark.png"
-                alt=""
-                width={22}
-                height={22}
-                className="gallery-brand-mark size-[1.125rem] shrink-0 select-none sm:size-[1.25rem]"
-                draggable={false}
-                unoptimized
-              />
-              Gallery
+              <GalleryBrandMark />
+              <span className="truncate">Gallery</span>
               {theme ? (
                 <span
                   className={cn(
                     gallerySans(),
-                    "gallery-seasonal-badge shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tracking-wide uppercase not-italic sm:px-2 sm:text-[10px]",
+                    "gallery-seasonal-badge hidden shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tracking-wide uppercase not-italic sm:inline-flex sm:px-2 sm:text-[10px]",
                     seasonalThemeId === "dragon-boat" &&
                       "border-emerald-700/25 bg-emerald-600/10 text-emerald-800",
                     seasonalThemeId === "world-cup" &&

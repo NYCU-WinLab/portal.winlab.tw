@@ -151,12 +151,12 @@ export function GalleryHomeFiltersBar({
       aria-label="Filter gallery"
       className={cn(
         gallerySans(),
-        "gallery-home-filters mb-9 flex flex-col items-center gap-3 sm:mb-10"
+        "gallery-home-filters mb-6 flex flex-col items-center gap-2.5 sm:mb-8 sm:gap-3"
       )}
     >
       <form
         onSubmit={onSearchSubmit}
-        className="flex w-full max-w-md items-center gap-2 px-2"
+        className="flex w-full max-w-md items-center gap-2 px-1 sm:px-2"
       >
         <div className="relative min-w-0 flex-1">
           <IconSearch
@@ -170,14 +170,14 @@ export function GalleryHomeFiltersBar({
             placeholder="Search titles…"
             className={cn(
               gallerySans(),
-              "w-full rounded-full border border-border/60 bg-background/80 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/20"
+              "min-h-10 w-full rounded-full border border-border/60 bg-background/85 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/20"
             )}
           />
           {searchDraft ? (
             <button
               type="button"
               aria-label="Clear search"
-              className="absolute top-1/2 right-2.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+              className="absolute top-1/2 right-2.5 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSearchDraft("")
                 apply({ ...filters, query: null })
@@ -196,7 +196,7 @@ export function GalleryHomeFiltersBar({
         </button>
       </form>
 
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {MEDIA_OPTIONS.map((option) => (
           <FilterPill
             key={option.value}
@@ -215,21 +215,62 @@ export function GalleryHomeFiltersBar({
 
         <FilterDivider />
 
-        {DATE_OPTIONS.map((option) => (
-          <FilterPill
-            key={option.value}
-            active={datePreset === option.value}
-            disabled={isPending}
-            onClick={() =>
-              apply({
-                ...filters,
-                uploadedAfter: dateAfterFromPreset(option.value),
-              })
-            }
+        <div className="hidden flex-wrap items-center justify-center gap-1.5 sm:flex sm:gap-2">
+          {DATE_OPTIONS.map((option) => (
+            <FilterPill
+              key={option.value}
+              active={datePreset === option.value}
+              disabled={isPending}
+              onClick={() =>
+                apply({
+                  ...filters,
+                  uploadedAfter: dateAfterFromPreset(option.value),
+                })
+              }
+            >
+              {option.label}
+            </FilterPill>
+          ))}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={isPending}
+              className={cn(
+                galleryNavLinkClass(datePreset !== "all"),
+                "inline-flex items-center gap-1 sm:hidden",
+                isPending && "opacity-50"
+              )}
+            >
+              <span>
+                {DATE_OPTIONS.find((o) => o.value === datePreset)?.label ??
+                  "When"}
+              </span>
+              <IconChevronDown className="size-3 shrink-0 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="center"
+            className={cn(gallerySans(), "w-40")}
           >
-            {option.label}
-          </FilterPill>
-        ))}
+            {DATE_OPTIONS.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                className="cursor-pointer text-xs"
+                onClick={() =>
+                  apply({
+                    ...filters,
+                    uploadedAfter: dateAfterFromPreset(option.value),
+                  })
+                }
+              >
+                {option.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <FilterDivider />
 
@@ -244,7 +285,7 @@ export function GalleryHomeFiltersBar({
                 isPending && "opacity-50"
               )}
             >
-              <span className="max-w-[8rem] truncate sm:max-w-[10rem]">
+              <span className="max-w-[7rem] truncate sm:max-w-[10rem]">
                 {uploaderLabel}
               </span>
               <IconChevronDown className="size-3 shrink-0 opacity-60" />
@@ -316,7 +357,7 @@ export function GalleryHomeFiltersBar({
         <p
           className={cn(
             gallerySans(),
-            "rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[11px] text-muted-foreground shadow-sm"
+            "rounded-full border border-border/60 bg-background/85 px-3 py-1 text-[11px] text-muted-foreground shadow-sm"
           )}
         >
           {summaryParts.join(" · ")}

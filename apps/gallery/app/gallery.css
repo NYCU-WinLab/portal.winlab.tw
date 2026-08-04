@@ -1,3 +1,70 @@
+/* ── Darkroom paper wall (default, light-only) ───────────────────────────── */
+
+html:not([data-gallery-theme]),
+html:not([data-gallery-theme]) body,
+body:not([data-gallery-theme]) {
+  --background: oklch(0.97 0.004 260);
+  --foreground: oklch(0.24 0.01 260);
+  --card: oklch(0.985 0.003 260);
+  --card-foreground: oklch(0.24 0.01 260);
+  --muted: oklch(0.94 0.006 260);
+  --muted-foreground: oklch(0.48 0.015 260);
+  --accent: oklch(0.93 0.008 260);
+  --accent-foreground: oklch(0.28 0.012 260);
+  --border: oklch(0.88 0.008 260);
+  --input: oklch(0.88 0.008 260);
+  --primary: oklch(0.35 0.02 260);
+  --primary-foreground: oklch(0.98 0.002 260);
+  --ring: oklch(0.55 0.02 260);
+}
+
+.gallery-page-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+@keyframes gallery-polaroid-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gallery-cheatsheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gallery-wall-card {
+  animation: gallery-polaroid-settle 0.55s ease-out both;
+}
+
+.gallery-cheatsheet-enter {
+  animation: gallery-cheatsheet-enter 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-wall-card,
+  .gallery-cheatsheet-enter {
+    animation: none;
+  }
+}
+
 [data-slot="dialog-overlay"],
 [data-slot="dialog-content"] {
   z-index: 100;
@@ -54,7 +121,7 @@
   min-height: 100dvh;
   width: 100%;
   overflow: hidden;
-  background: oklch(0.12 0 0);
+  background: oklch(0.18 0.01 260);
 }
 
 .gallery-lightbox-media {
@@ -82,10 +149,10 @@
   min-height: 0;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  border-top: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
-  background: color-mix(in oklch, var(--background) 95%, transparent);
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(12px);
+  border-top: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  box-shadow: 0 -12px 40px rgba(24, 24, 27, 0.12);
+  backdrop-filter: blur(14px);
 }
 
 .gallery-lightbox-aside-toggle {
@@ -189,7 +256,11 @@ html::-webkit-scrollbar {
 
 @media (prefers-reduced-motion: no-preference) {
   .group\/polaroid:hover .gallery-polaroid {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+  }
+
+  .gallery-empty-polaroid {
+    animation: gallery-polaroid-settle 0.6s ease-out both;
   }
 }
 
