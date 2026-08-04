@@ -52,15 +52,15 @@ export function buildGalleryPhotoMetadata(
 
 export const DEFAULT_GALLERY_METADATA: Metadata = {
   title: "Gallery — WinLab",
-  description: "Art from NYCU WinLab.",
+  description: "Lab polaroids on a darkroom paper wall — NYCU WinLab.",
   openGraph: {
     title: "Gallery — WinLab",
-    description: "Art from NYCU WinLab.",
+    description: "Lab polaroids on a darkroom paper wall — NYCU WinLab.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Gallery — WinLab",
-    description: "Art from NYCU WinLab.",
+    description: "Lab polaroids on a darkroom paper wall — NYCU WinLab.",
   },
 }
