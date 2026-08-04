@@ -41,7 +41,7 @@ import {
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
-import { getGalleryImageUrl } from "@/lib/gallery/url"
+import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 type SelectableItem = {
   id: string
@@ -100,7 +100,7 @@ function UploadListItem({
         />
       ) : null}
       <UploadListThumb
-        src={getGalleryImageUrl(thumbPath)}
+        src={getGalleryThumbUrl(thumbPath, 160)}
         alt={image.name}
         isVideo={isVideo}
       />
@@ -301,7 +301,7 @@ function UploadSequenceGroup({
       <p
         className={cn(gallerySans(), "text-xs text-muted-foreground uppercase")}
       >
-        Sequence · {items.length} shots · drag handle to reorder
+        Sequence story · {items.length} shots · drag handle to reorder
       </p>
       {gapLabel ? (
         <div className="flex flex-wrap items-center gap-2">

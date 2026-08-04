@@ -22,7 +22,7 @@ export function UploadListThumb({
   }
 
   return (
-    <div className="relative h-20 w-20 shrink-0 overflow-hidden">
+    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[2px] border border-zinc-900/10 bg-muted/30 shadow-sm">
       <img
         src={src}
         alt={alt}

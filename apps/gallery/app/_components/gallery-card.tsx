@@ -353,7 +353,7 @@ export function GalleryCard({
                         alt={activeItem?.name ?? image.name}
                         fill
                         priority={priorityLcp}
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 28vw"
                         className="object-cover"
                         onError={() => setThumbFailed(true)}
                       />

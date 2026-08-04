@@ -298,9 +298,11 @@ export function GalleryLightboxSocialAside({
                 "mt-0.5 block text-[11px] text-muted-foreground"
               )}
             >
-              {wallCommentCount > 0
-                ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
-                : "Comments & reactions"}
+              {mobileDetailsOpen
+                ? "Swipe down or tap to hide"
+                : wallCommentCount > 0
+                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"} · tap or swipe up`
+                  : "Comments & reactions · tap or swipe up"}
             </span>
           </button>
           {isAdmin ? (

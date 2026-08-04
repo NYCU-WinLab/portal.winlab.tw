@@ -74,12 +74,12 @@ export function UploadForm() {
           htmlFor="gallery-name"
           className={cn(gallerySerif(), "text-base")}
         >
-          Name (base name for single upload / sequence cover)
+          Title
         </Label>
         <Input
           id="gallery-name"
           name="name"
-          placeholder="Untitled, 2026"
+          placeholder="Untitled lab moment"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={pending}
@@ -88,13 +88,17 @@ export function UploadForm() {
             "h-11 rounded-xl border-border/60 bg-background"
           )}
         />
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          Base name for a single shot, or the cover title when you multi-select
+          a sequence.
+        </p>
       </div>
       <div className="flex flex-col gap-2">
         <Label
           htmlFor="gallery-file"
           className={cn(gallerySerif(), "text-base")}
         >
-          Images & videos
+          Photos & clips
         </Label>
         <Input
           id="gallery-file"

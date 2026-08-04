@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
+import { GalleryCardBoundary } from "@/app/_components/gallery-card-boundary"
 import {
   GalleryEmptyState,
   galleryNavLinkClass,
@@ -222,40 +223,45 @@ export function GalleryGrid({
           className="gallery-wall-card w-full max-w-full"
           style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
         >
-          <GalleryCard
-            image={image}
-            isSignedIn={isSignedIn}
-            viewerId={viewerId}
-            viewerName={viewerName}
-            members={members}
-            isAdmin={isAdmin}
-            priorityLcp={index === 0}
-            initialOpen={false}
-            highlightCommentId={openPhotoId === image.id ? openCommentId : null}
-            open={openIndex === index}
-            onOpenChange={(open) => {
-              if (open) {
-                setOpenIndex(index)
-                router.replace(
-                  buildGalleryPhotoHref({
-                    photoId: image.id,
-                    commentId: openPhotoId === image.id ? openCommentId : null,
-                  }),
-                  { scroll: false }
-                )
-              } else {
-                closeLightbox()
+          <GalleryCardBoundary>
+            <GalleryCard
+              image={image}
+              isSignedIn={isSignedIn}
+              viewerId={viewerId}
+              viewerName={viewerName}
+              members={members}
+              isAdmin={isAdmin}
+              priorityLcp={index === 0}
+              initialOpen={false}
+              highlightCommentId={
+                openPhotoId === image.id ? openCommentId : null
               }
-            }}
-            gridFocused={
-              keyboardNavActive && focusIndex === index && openIndex === null
-            }
-            hasWallPrev={openIndex === index && index > 0}
-            hasWallNext={
-              openIndex === index && (index < images.length - 1 || hasMore)
-            }
-            onWallNavigate={openIndex === index ? navigateWall : undefined}
-          />
+              open={openIndex === index}
+              onOpenChange={(open) => {
+                if (open) {
+                  setOpenIndex(index)
+                  router.replace(
+                    buildGalleryPhotoHref({
+                      photoId: image.id,
+                      commentId:
+                        openPhotoId === image.id ? openCommentId : null,
+                    }),
+                    { scroll: false }
+                  )
+                } else {
+                  closeLightbox()
+                }
+              }}
+              gridFocused={
+                keyboardNavActive && focusIndex === index && openIndex === null
+              }
+              hasWallPrev={openIndex === index && index > 0}
+              hasWallNext={
+                openIndex === index && (index < images.length - 1 || hasMore)
+              }
+              onWallNavigate={openIndex === index ? navigateWall : undefined}
+            />
+          </GalleryCardBoundary>
         </div>
       ))}
     </div>

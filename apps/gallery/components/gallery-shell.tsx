@@ -8,6 +8,7 @@ import { GalleryHeaderPitchline } from "@/components/gallery-header-pitchline"
 import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
+import { GalleryPaperParallax } from "@/app/_components/gallery-paper-parallax"
 import {
   GalleryBrandMark,
   GalleryFooter,
@@ -59,6 +60,7 @@ export function GalleryShell({
         className="gallery-seasonal-decor pointer-events-none fixed inset-0 z-0"
         aria-hidden
       />
+      <GalleryPaperParallax />
       <header className="gallery-shell-header pointer-events-none">
         <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-1.5 pb-1 sm:px-6 sm:pb-1.5">
           <div className="gallery-shell-nav-row relative grid min-h-[1.75rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
