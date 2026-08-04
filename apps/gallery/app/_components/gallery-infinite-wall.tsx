@@ -151,10 +151,20 @@ export function GalleryInfiniteWall({
         <div ref={sentinelRef} className="h-10" aria-hidden />
       ) : null}
       {loadingMore ? (
-        <p className="py-8 text-center text-xs text-muted-foreground">
-          Loading more…
-        </p>
+        <div
+          className="mx-auto grid max-w-3xl grid-cols-3 gap-3 py-10 opacity-70"
+          aria-hidden
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[4/5] animate-pulse rounded-[3px] border border-zinc-900/8 bg-zinc-200/70"
+              style={{ animationDelay: `${i * 80}ms` }}
+            />
+          ))}
+        </div>
       ) : null}
+      {loadingMore ? <p className="sr-only">Loading more photos</p> : null}
       {loadError ? (
         <div className="flex flex-col items-center gap-3 py-8">
           <p className="text-center text-xs text-muted-foreground">

@@ -114,18 +114,35 @@ export function GalleryFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <p
-      className={cn(
-        gallerySans(),
-        "gallery-footer w-full text-center text-[11px] text-muted-foreground"
-      )}
-    >
-      <span className={cn(gallerySerif(), "text-foreground/80")}>Gallery</span>
-      <span aria-hidden className="mx-1.5">
-        ·
-      </span>
-      <span>© {year} NYCU WinLab</span>
-    </p>
+    <div className="gallery-footer flex flex-col items-center gap-3">
+      <Image
+        src="/icons/mark.png"
+        alt=""
+        width={28}
+        height={28}
+        className="size-7 opacity-70"
+        draggable={false}
+        unoptimized
+      />
+      <p
+        className={cn(
+          gallerySans(),
+          "w-full text-center text-[11px] text-muted-foreground"
+        )}
+      >
+        <span className={cn(gallerySerif(), "text-foreground/80")}>
+          Gallery
+        </span>
+        <span aria-hidden className="mx-1.5">
+          ·
+        </span>
+        <span>© {year} NYCU WinLab</span>
+        <span aria-hidden className="mx-1.5">
+          ·
+        </span>
+        <span>darkroom paper wall</span>
+      </p>
+    </div>
   )
 }
 

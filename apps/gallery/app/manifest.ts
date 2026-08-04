@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Gallery — WinLab",
     short_name: "Gallery",
-    description: "Art from NYCU WinLab.",
+    description: "Lab polaroids on a darkroom paper wall — NYCU WinLab.",
     start_url: "/",
     scope: "/",
     display: "standalone",

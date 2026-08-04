@@ -33,7 +33,7 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: "Gallery — WinLab",
-  description: "Art from NYCU WinLab.",
+  description: "Lab polaroids on a darkroom paper wall — NYCU WinLab.",
   applicationName: "Gallery",
   icons: {
     icon: [

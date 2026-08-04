@@ -29,7 +29,7 @@ export function buildGalleryPhotoMetadata(
   const imageUrl = getGalleryThumbUrl(thumbPath, 1200)
   const pageUrl = `${origin}/?photo=${encodeURIComponent(photoId)}`
   const title = `${row.name} — Gallery`
-  const description = "Art from NYCU WinLab."
+  const description = "Lab polaroids on a darkroom paper wall — NYCU WinLab."
 
   return {
     title,
