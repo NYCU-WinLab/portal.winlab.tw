@@ -113,9 +113,11 @@ export function GalleryFooter() {
 export function GalleryEmptyState({
   title,
   description,
+  action,
 }: {
   title: string
   description?: string
+  action?: ReactNode
 }) {
   return (
     <div
@@ -136,6 +138,7 @@ export function GalleryEmptyState({
           {description}
         </p>
       ) : null}
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )
 }

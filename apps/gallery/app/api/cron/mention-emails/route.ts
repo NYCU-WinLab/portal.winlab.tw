@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 
 import { drainGalleryMentionEmails } from "@/lib/gallery/mention-email-drain"
 
-// Periodic drain for gallery @mention emails. Keep /api/mentions/* for
-// manual / Apps Script drains; this cron is the built-in path.
+// Daily drain for gallery @mention emails (Hobby Vercel = one cron/day).
+// Keep /api/mentions/* for manual / Apps Script drains if you need faster delivery.
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

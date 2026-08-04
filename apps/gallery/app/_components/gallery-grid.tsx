@@ -5,19 +5,15 @@ import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
 import { GalleryEmptyState } from "@/components/gallery-chrome"
+import {
+  buildGalleryHomeHref,
+  describeGalleryFilterSummary,
+  hasActiveGalleryFilters,
+  type GalleryHomeFilters,
+} from "@/lib/gallery/home-filters"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    target.isContentEditable
-  )
-}
 
 export function GalleryGrid({
   images,
@@ -31,6 +27,7 @@ export function GalleryGrid({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
+  filters,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -43,6 +40,7 @@ export function GalleryGrid({
   hasMore?: boolean
   loadingMore?: boolean
   onLoadMore?: () => void | Promise<void>
+  filters?: GalleryHomeFilters
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -162,6 +160,29 @@ export function GalleryGrid({
   }, [focusIndex, hasMore, images.length, loadingMore, onLoadMore, openIndex])
 
   if (images.length === 0) {
+    const filtersActive = filters ? hasActiveGalleryFilters(filters) : false
+    if (filtersActive && filters) {
+      const summary = describeGalleryFilterSummary(filters, members).join(" · ")
+      return (
+        <GalleryEmptyState
+          title="No matches"
+          description={
+            summary
+              ? `Nothing matches ${summary}.`
+              : "Nothing matches these filters."
+          }
+          action={
+            <button
+              type="button"
+              className="text-xs underline underline-offset-4"
+              onClick={() => router.replace(buildGalleryHomeHref({}))}
+            >
+              Clear filters
+            </button>
+          }
+        />
+      )
+    }
     return (
       <GalleryEmptyState
         title="Nothing on the wall yet"

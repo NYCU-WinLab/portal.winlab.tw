@@ -126,6 +126,7 @@ export function GalleryInfiniteWall({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={loadMore}
+        filters={filters}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />

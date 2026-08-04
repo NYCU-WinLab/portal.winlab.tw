@@ -532,6 +532,27 @@ export function UploadManageList({
         >
           {selectionMode ? "Cancel selection" : "Select"}
         </button>
+        {selectionMode ? (
+          <button
+            type="button"
+            onClick={() => {
+              const allSelected =
+                selectableItems.length > 0 &&
+                selectableItems.every((item) => selectedIds.has(item.id))
+              if (allSelected) {
+                setSelectedIds(new Set())
+                return
+              }
+              setSelectedIds(new Set(selectableItems.map((item) => item.id)))
+            }}
+            className={galleryPillClass()}
+          >
+            {selectableItems.length > 0 &&
+            selectableItems.every((item) => selectedIds.has(item.id))
+              ? "Clear"
+              : "Select all"}
+          </button>
+        ) : null}
         {selectionMode && selectedItems.length > 0 ? (
           <button
             type="button"

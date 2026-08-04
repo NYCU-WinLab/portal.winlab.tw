@@ -53,6 +53,7 @@ import {
 } from "@/components/gallery-chrome"
 import { setGalleryReaction } from "@/app/actions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
 import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
@@ -475,6 +476,8 @@ export function GalleryCard({
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key === "ArrowLeft") {
         event.preventDefault()
         goLightboxPrev()
@@ -731,13 +734,19 @@ export function GalleryCard({
                       }
                       controls
                       autoPlay
+                      muted
                       playsInline
                       preload="metadata"
                       className={cn(
                         "gallery-lightbox-image",
                         !mediaLoaded && "opacity-0"
                       )}
-                      onLoadedData={() => setMediaLoaded(true)}
+                      onLoadedData={(event) => {
+                        setMediaLoaded(true)
+                        // Start muted for autoplay policies, then unmute if allowed.
+                        const video = event.currentTarget
+                        video.muted = false
+                      }}
                       onError={() => setLightboxFailed(true)}
                     />
                   ) : (
@@ -941,6 +950,7 @@ export function GalleryCard({
                       members={members}
                       isAdmin={isAdmin}
                       highlightCommentId={highlightCommentId}
+                      loading={!commentsLoaded}
                     />
                   </div>
                 </aside>

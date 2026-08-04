@@ -1,6 +1,13 @@
 "use client"
 
-import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { IconChevronDown, IconSearch, IconX } from "@tabler/icons-react"
 
@@ -101,6 +108,10 @@ export function GalleryHomeFiltersBar({
   const [isPending, startTransition] = useTransition()
   const [searchDraft, setSearchDraft] = useState(filters.query ?? "")
 
+  useEffect(() => {
+    setSearchDraft(filters.query ?? "")
+  }, [filters.query])
+
   const apply = (next: GalleryHomeFilters) => {
     const photo = searchParams.get("photo")
     const comment = searchParams.get("comment")
@@ -159,9 +170,22 @@ export function GalleryHomeFiltersBar({
             placeholder="Search titles…"
             className={cn(
               gallerySans(),
-              "w-full rounded-full border border-border/60 bg-background/80 py-2 pr-3 pl-9 text-xs text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/20"
+              "w-full rounded-full border border-border/60 bg-background/80 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/20"
             )}
           />
+          {searchDraft ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              className="absolute top-1/2 right-2.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setSearchDraft("")
+                apply({ ...filters, query: null })
+              }}
+            >
+              <IconX className="size-3.5" aria-hidden />
+            </button>
+          ) : null}
         </div>
         <button
           type="submit"
