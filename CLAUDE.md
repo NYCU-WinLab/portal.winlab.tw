@@ -146,6 +146,13 @@ Because the proxy already gates protected pages, individual pages don't need the
 
 ### Auth (Keycloak via Supabase OIDC)
 
+> This section covers **sign-in** only. For the **Keycloak Admin API** — reading
+> or writing user attributes such as `admissionYear`, and diagnosing why one
+> comes back empty — run `bun run kc doctor` and see
+> `docs/keycloak/2026-07-28-keycloak-26.7-admin-api-research.md`. Custom
+> attributes are gated by the realm's user profile, not by roles, and the
+> failure is silent: reads omit them, writes return `204` having saved nothing.
+
 Dashboard checklist (lives entirely in Supabase + Keycloak consoles, never in code):
 
 1. Keycloak realm → create a client, "Client Protocol" = `openid-connect`, "Access Type" = `confidential`.

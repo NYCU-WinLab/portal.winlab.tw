@@ -14,18 +14,24 @@
 import { bootstrap } from "./bootstrap"
 import { defaultConfigPath, loadConfig, type ProfileName } from "./config"
 import { doctor } from "./doctor"
+import { profile } from "./profile"
 import { describeError } from "./report"
+import { users } from "./users"
 
 const USAGE = `
 kc — Keycloak realm tooling for portal.winlab.tw
 
   bun run kc doctor [options]      Diagnose the realm connection end to end
+  bun run kc profile               List the realm's declared user attributes
+  bun run kc users [options]       Summarise how an attribute is populated
   bun run kc bootstrap [options]   Provision the service-account clients
 
 Options
   --profile <cli|app>   Which credential to use (default: cli, read-only)
-  --attr <name>         Attribute to check, or to declare during bootstrap
+  --attr <name>         Attribute to check, summarise, or declare
   --user <email>        Read one user as a live end-to-end check (doctor)
+  --list                Show individual users, not just the distribution (users)
+  --limit <n>           Cap how many users are read (users, default 500)
   --apply               Execute the plan instead of describing it (bootstrap)
   --config <path>       Credential file (default: ${defaultConfigPath()})
 
@@ -40,6 +46,8 @@ type Args = {
   attribute?: string
   user?: string
   apply: boolean
+  list: boolean
+  limit: number
   configPath: string
 }
 
@@ -51,6 +59,8 @@ function parseArgs(argv: string[]): Args | null {
     command,
     profile: "cli",
     apply: false,
+    list: false,
+    limit: 500,
     configPath: defaultConfigPath(),
   }
 
@@ -61,6 +71,18 @@ function parseArgs(argv: string[]): Args | null {
       case "--apply":
         args.apply = true
         break
+      case "--list":
+        args.list = true
+        break
+      case "--limit": {
+        const parsed = Number(next)
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          throw new Error("--limit needs a positive integer")
+        }
+        args.limit = parsed
+        i += 1
+        break
+      }
       case "--profile":
         if (next !== "cli" && next !== "app") {
           throw new Error("--profile must be `cli` or `app`")
@@ -114,6 +136,14 @@ async function main(): Promise<number> {
   switch (args.command) {
     case "doctor":
       return doctor(config, { attribute: args.attribute, user: args.user })
+    case "profile":
+      return profile(config)
+    case "users":
+      return users(config, {
+        attribute: args.attribute,
+        list: args.list,
+        limit: args.limit,
+      })
     case "bootstrap":
       return bootstrap(config, {
         apply: args.apply,

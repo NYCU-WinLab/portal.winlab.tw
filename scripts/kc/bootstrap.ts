@@ -20,6 +20,8 @@ import {
   KeycloakError,
   findProfileAttribute,
   passwordToken,
+  realmManagementRoles,
+  serviceAccountToken,
   unmanagedPolicy,
   type UserProfileConfig,
 } from "./keycloak"
@@ -161,7 +163,9 @@ export async function bootstrap(
   for (const spec of CLIENTS) {
     report.heading(`Client: ${spec.clientId}  (${spec.role})`)
     const secret = await provisionClient(api, spec, rmId, options.apply, report)
-    if (secret) secrets[spec.envPrefix] = secret
+    if (!secret) continue
+    secrets[spec.envPrefix] = secret
+    await verifyClient(config, spec, secret, report)
   }
 
   if (options.attribute) {
@@ -180,6 +184,39 @@ export async function bootstrap(
   }
 
   return report.summary()
+}
+
+// Keycloak accepting a role mapping does not mean an issued token will carry
+// it — the first run of this tool reported three green lines and produced two
+// credentials that 403'd on everything. Nothing here is trustworthy until a
+// real token has been read back, so prove it rather than infer it.
+async function verifyClient(
+  config: Config,
+  spec: ClientSpec,
+  secret: string,
+  report: Report
+) {
+  try {
+    const { accessToken } = await serviceAccountToken(
+      config.url,
+      config.realm,
+      spec.clientId,
+      secret
+    )
+    const roles = realmManagementRoles(accessToken)
+    if (roles.includes(spec.role)) {
+      report.ok(`Verified — its own token carries ${spec.role}`)
+      return
+    }
+    report.fail(
+      `Its own token does NOT carry ${spec.role}`,
+      roles.length === 0
+        ? "No realm-management roles at all. With Full Scope Allowed off, the role has to be in the client's scope mapping as well as on the service account."
+        : `Token carries: ${roles.join(", ")}`
+    )
+  } catch (err) {
+    report.fail("Could not authenticate as the new client", describeError(err))
+  }
 }
 
 async function realmManagementId(
@@ -234,7 +271,9 @@ async function provisionClient(
         ? `would update existing client (settings reconciled, secret left alone)`
         : `would create confidential client with service accounts enabled`
     )
-    report.info(`would grant realm-management → ${spec.role}`)
+    report.info(
+      `would grant realm-management → ${spec.role} (service account role + client scope mapping)`
+    )
     report.info(`would store credentials as ${spec.envPrefix}_ID / _SECRET`)
     return null
   }
@@ -270,12 +309,28 @@ async function provisionClient(
     const role = await api.get<RoleRepresentation>(
       `/clients/${realmManagementUuid}/roles/${encodeURIComponent(spec.role)}`
     )
+    const mapping = [{ id: role.id, name: role.name }]
+
     // Idempotent: Keycloak ignores a mapping that is already present.
     await api.post(
       `/users/${serviceAccount.id}/role-mappings/clients/${realmManagementUuid}`,
-      [{ id: role.id, name: role.name }]
+      mapping
     )
-    report.ok(`Granted realm-management → ${spec.role}`)
+
+    // Both halves are required. The roles in an issued token are the
+    // INTERSECTION of the service account's roles and the client's scope, so
+    // with fullScopeAllowed off the grant above alone yields a token carrying
+    // no realm-management roles at all — every admin call then 403s while the
+    // console shows the role correctly assigned.
+    await api.post(
+      `/clients/${uuid}/scope-mappings/clients/${realmManagementUuid}`,
+      mapping
+    )
+
+    report.ok(
+      `Granted realm-management → ${spec.role}`,
+      "role assigned to the service account and added to the client scope"
+    )
   } catch (err) {
     report.fail("Could not assign the role", describeError(err))
     return null
