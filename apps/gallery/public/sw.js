@@ -2,11 +2,16 @@
  * Precaches the app shell; runtime-caches Supabase gallery media after first view.
  * No offline write queue.
  */
-const VERSION = "gallery-sw-v1"
+const VERSION = "gallery-sw-v2"
 const SHELL_CACHE = `${VERSION}-shell`
 const MEDIA_CACHE = `${VERSION}-media`
 
-const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon", "/apple-icon"]
+const SHELL_URLS = [
+  "/",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/apple-touch-icon.png",
+]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
