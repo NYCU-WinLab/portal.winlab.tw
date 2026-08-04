@@ -16,6 +16,14 @@ describe("resolveWallPhotoId", () => {
     ]
     expect(resolveWallPhotoId(siblings[1]!, siblings)).toBe("cover")
   })
+
+  test("falls back to lowest index when cover is missing", () => {
+    const siblings = [
+      { id: "shot-2", sequence_id: "seq-1", sequence_index: 2 },
+      { id: "shot-1", sequence_id: "seq-1", sequence_index: 1 },
+    ]
+    expect(resolveWallPhotoId(siblings[0]!, siblings)).toBe("shot-1")
+  })
 })
 
 describe("groupManageUploads", () => {

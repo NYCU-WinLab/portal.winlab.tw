@@ -24,10 +24,11 @@ export function isGalleryStorageMediaUrl(url: string): boolean {
 }
 
 export function buildGallerySwCacheMessage(
-  urls: string[]
+  urls: string[],
+  limit = 64
 ): GallerySwCacheUrlsMessage {
   return {
     type: GALLERY_SW_CACHE_URLS_TYPE,
-    urls: Array.from(new Set(urls.filter(Boolean))),
+    urls: Array.from(new Set(urls.filter(Boolean))).slice(0, limit),
   }
 }

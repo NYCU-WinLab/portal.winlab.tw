@@ -196,6 +196,7 @@ export function GalleryCard({
   const sequenceGapLabel = describeSequenceGaps(
     image.sequence_missing_indexes ?? []
   )
+  const showSequenceBadge = isSequence || Boolean(sequenceGapLabel)
   const [internalOpen, setInternalOpen] = useState(initialOpen)
   const isDialogOpen = open !== undefined ? open : internalOpen
   const setIsDialogOpen = (next: boolean) => {
@@ -617,7 +618,7 @@ export function GalleryCard({
                           Pinned
                         </div>
                       ) : null}
-                      {isSequence ? (
+                      {showSequenceBadge ? (
                         <div
                           className={cn(
                             gallerySans(),

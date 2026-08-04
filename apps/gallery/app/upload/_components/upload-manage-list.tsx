@@ -224,13 +224,22 @@ function UploadSequenceGroup({
   }
 
   const setCover = (index: number) => {
-    if (index === 0) return
+    const item = items[index]
+    if (!item) return
+    // listIndex 0 is not always the cover when slot 0 is missing.
+    if (item.sequence_index === 0) return
     const nextIds = swapSequenceOrder(orderedIds, index, 0)
     if (!nextIds) return
     const nextItems = nextIds
-      .map((id) => items.find((item) => item.id === id))
-      .filter((item): item is ManageUploadRow => Boolean(item))
+      .map((id) => items.find((row) => row.id === id))
+      .filter((row): row is ManageUploadRow => Boolean(row))
     persistOrder(nextIds, nextItems)
+  }
+
+  const compactSequence = () => {
+    if (items.length === 0) return
+    const nextIds = items.map((item) => item.id)
+    persistOrder(nextIds, items)
   }
 
   const {
@@ -295,14 +304,24 @@ function UploadSequenceGroup({
         Sequence · {items.length} shots · drag handle to reorder
       </p>
       {gapLabel ? (
-        <p
-          className={cn(
-            gallerySans(),
-            "text-xs text-amber-700 dark:text-amber-300"
-          )}
-        >
-          Incomplete · {gapLabel}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p
+            className={cn(
+              gallerySans(),
+              "text-xs text-amber-700 dark:text-amber-300"
+            )}
+          >
+            Incomplete · {gapLabel}
+          </p>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={compactSequence}
+            className={galleryPillClass()}
+          >
+            Compact slots
+          </button>
+        </div>
       ) : null}
       <ul ref={listRef} className="flex flex-col gap-3">
         {timelineSlots.map((slot) => {

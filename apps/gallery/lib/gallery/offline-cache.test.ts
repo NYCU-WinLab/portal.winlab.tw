@@ -37,4 +37,13 @@ describe("buildGallerySwCacheMessage", () => {
     expect(message.type).toBe(GALLERY_SW_CACHE_URLS_TYPE)
     expect(message.urls).toHaveLength(1)
   })
+
+  test("caps batch size", () => {
+    const urls = Array.from(
+      { length: 10 },
+      (_, i) =>
+        `https://x.supabase.co/storage/v1/object/public/gallery/u/${i}.jpg`
+    )
+    expect(buildGallerySwCacheMessage(urls, 3).urls).toHaveLength(3)
+  })
 })

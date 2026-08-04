@@ -90,12 +90,11 @@ async function loadGalleryHomeRange(
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     (() => {
       let query = supabase
-        .from("gallery_images")
+        .from("gallery_wall_covers")
         .select(
           "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index",
           { count: "exact" }
         )
-        .or("sequence_id.is.null,sequence_index.eq.0")
 
       if (filters.uploaderId) {
         query = query.eq("created_by", filters.uploaderId)
@@ -267,8 +266,12 @@ async function loadGalleryHomeRange(
   for (const image of images) {
     if (!image.sequence_id) continue
     const items = sequenceRowsById.get(image.sequence_id) ?? []
-    if (items.length <= 1) continue
+    if (items.length === 0) continue
     image.sequence_count = items.length
+    image.sequence_missing_indexes = findSequenceGaps(
+      items.map((item) => item.sequence_index)
+    ).gaps
+    if (items.length <= 1) continue
     image.sequence_items = items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -279,9 +282,6 @@ async function loadGalleryHomeRange(
       sequence_index:
         typeof item.sequence_index === "number" ? item.sequence_index : null,
     }))
-    image.sequence_missing_indexes = findSequenceGaps(
-      items.map((item) => item.sequence_index)
-    ).gaps
   }
 
   return {

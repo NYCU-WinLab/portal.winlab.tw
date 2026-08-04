@@ -8,7 +8,7 @@ import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
-import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
+import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 export function GalleryInfiniteWall({
   initialImages,
@@ -53,20 +53,14 @@ export function GalleryInfiniteWall({
   )
 
   useEffect(() => {
+    // Wall warm: thumbs only (lightbox warms full-res on open).
     const urls: string[] = []
-    for (const image of images) {
+    for (const image of images.slice(0, 48)) {
       const thumbPath =
         image.media_type === "video" && image.poster_path
           ? image.poster_path
           : image.image_path
-      urls.push(getGalleryThumbUrl(thumbPath), getGalleryImageUrl(thumbPath))
-      for (const item of image.sequence_items) {
-        const itemPath =
-          item.media_type === "video" && item.poster_path
-            ? item.poster_path
-            : item.image_path
-        urls.push(getGalleryThumbUrl(itemPath), getGalleryImageUrl(itemPath))
-      }
+      urls.push(getGalleryThumbUrl(thumbPath))
     }
     cacheGalleryMediaUrls(urls)
   }, [images])
