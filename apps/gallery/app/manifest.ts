@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 
+/** Static axolotl marks — prefer public/icons for PWA (cacheable, no ImageResponse). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Gallery — WinLab",
@@ -13,33 +14,28 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#fafafa",
     icons: [
       {
-        src: "/icon",
-        sizes: "32x32",
-        type: "image/png",
-      },
-      {
-        src: "/apple-icon",
-        sizes: "180x180",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/pwa-icon?size=192",
+        src: "/icons/icon-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/pwa-icon?size=512",
+        src: "/icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/pwa-icon?size=512",
+        src: "/icons/icon-512-maskable.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+      {
+        src: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+        purpose: "any",
       },
     ],
   }

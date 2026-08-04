@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 
 import { IconDownload, IconShare2, IconX } from "@tabler/icons-react"
 
@@ -84,6 +85,15 @@ export function GalleryInstallPrompt() {
       )}
     >
       <div className="mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-border/80 bg-background/95 p-4 shadow-lg backdrop-blur-sm">
+        <Image
+          src="/icons/icon-192.png"
+          alt=""
+          width={40}
+          height={40}
+          className="mt-0.5 size-10 shrink-0 rounded-md border border-border/50 bg-background shadow-sm"
+          draggable={false}
+          unoptimized
+        />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">Install Gallery</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import Image from "next/image"
 import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
@@ -68,6 +69,15 @@ export function GalleryShell({
                 "relative z-10 inline-flex min-w-0 items-center gap-1.5 sm:gap-2"
               )}
             >
+              <Image
+                src="/icons/mark.png"
+                alt=""
+                width={22}
+                height={22}
+                className="gallery-brand-mark size-[1.125rem] shrink-0 select-none sm:size-[1.25rem]"
+                draggable={false}
+                unoptimized
+              />
               Gallery
               {theme ? (
                 <span

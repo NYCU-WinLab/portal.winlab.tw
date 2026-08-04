@@ -14,8 +14,9 @@ export function gallerySerif() {
 export function galleryPageBackdropClass() {
   return cn(
     "gallery-page-backdrop pointer-events-none fixed inset-0 -z-10",
-    "bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,rgba(120,113,108,0.07),transparent_55%)]",
-    "dark:bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,rgba(255,255,255,0.04),transparent_55%)]"
+    // Cool zinc wash + faint vignette — paper-wall, not cream/terracotta
+    "bg-[radial-gradient(ellipse_85%_55%_at_50%_-8%,rgba(82,82,91,0.09),transparent_58%),radial-gradient(ellipse_70%_45%_at_100%_100%,rgba(24,24,27,0.04),transparent_50%)]",
+    "dark:bg-[radial-gradient(ellipse_85%_55%_at_50%_-8%,rgba(255,255,255,0.05),transparent_58%),radial-gradient(ellipse_70%_45%_at_100%_100%,rgba(255,255,255,0.03),transparent_50%)]"
   )
 }
 
@@ -67,10 +68,10 @@ export function galleryPillClass() {
 export function galleryPolaroidClass() {
   return cn(
     "gallery-polaroid w-full overflow-hidden bg-white",
-    "rounded-[2px] border border-black/[0.07]",
-    "shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_28px_-14px_rgba(0,0,0,0.22)]",
-    "transition-shadow duration-500",
-    "group-hover/polaroid:shadow-[0_2px_4px_rgba(0,0,0,0.05),0_16px_36px_-12px_rgba(0,0,0,0.26)]"
+    "rounded-[3px] border border-black/[0.08]",
+    "shadow-[0_1px_2px_rgba(0,0,0,0.05),0_12px_32px_-16px_rgba(24,24,27,0.28)]",
+    "transition-[box-shadow,transform] duration-500 ease-out",
+    "group-hover/polaroid:shadow-[0_2px_6px_rgba(0,0,0,0.06),0_20px_44px_-14px_rgba(24,24,27,0.32)]"
   )
 }
 
