@@ -1062,6 +1062,35 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_presenter_pool: {
+        Row: {
+          admission_year: number
+          created_at: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          admission_year: number
+          created_at?: string
+          sort_order: number
+          user_id: string
+        }
+        Update: {
+          admission_year?: number
+          created_at?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_presenter_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_question_pool: {
         Row: {
           created_at: string
@@ -1840,6 +1869,27 @@ export type Database = {
       }
     }
     Views: {
+      meeting_presenter_roster: {
+        Row: {
+          admission_year: number | null
+          email: string | null
+          last_presented_date: string | null
+          name: string | null
+          pool_added_at: string | null
+          sort_order: number | null
+          times_presented: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_presenter_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_question_rotation: {
         Row: {
           email: string | null
@@ -1971,9 +2021,25 @@ export type Database = {
         }
         Returns: Json
       }
+      meetings_fill_presenters: {
+        Args: { p_year: number }
+        Returns: Json
+      }
       meetings_insert_week: {
         Args: { p_at_meeting_id: string }
         Returns: string
+      }
+      meetings_pool_move: {
+        Args: { p_delta: number; p_user: string }
+        Returns: undefined
+      }
+      meetings_pool_remove: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_pool_upsert: {
+        Args: { p_admission_year: number; p_user: string }
+        Returns: undefined
       }
       meetings_remove_from_pool: {
         Args: { p_user: string }

@@ -25,12 +25,14 @@ import {
   useInsertMeetingWeek,
   useRemoveMeetingWeek,
 } from "@/hooks/meetings/use-meetings"
+import { useFillPresenters } from "@/hooks/meetings/use-presenter-pool"
 import { useQuestionersByYear } from "@/hooks/meetings/use-questioners"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import { getCurrentMeetingId } from "@/lib/meetings/schedule"
 import type { Meeting } from "@/lib/meetings/types"
 
+import { ConfirmDialog } from "./confirm-dialog"
 import { FileCell } from "./file-cell"
 import { GenerateSemesterDialog } from "./generate-semester-dialog"
 import { MeetingEditDialog } from "./meeting-edit-dialog"
@@ -69,6 +71,7 @@ export function ScheduleTab({ year }: { year: number }) {
   const swapMeetings = useSwapMeetings()
   const insertWeek = useInsertMeetingWeek()
   const removeWeek = useRemoveMeetingWeek()
+  const fillPresenters = useFillPresenters()
 
   const [editTarget, setEditTarget] = useState<Meeting | null>(null)
   const [editMode, setEditMode] = useState(false)
@@ -82,6 +85,15 @@ export function ScheduleTab({ year }: { year: number }) {
   const presentationMeetings = meetings.filter(
     (m) => !m.isHoliday && !m.isSpeaker
   )
+
+  // Mirrors meetings_fill_presenters' own filter so the button's count is what
+  // the RPC will actually do: unassigned presentation weeks from today onward.
+  // A week carrying only a hand-typed name counts as taken, and past weeks are
+  // never filled — that would invent a presentation.
+  const today = new Date().toLocaleDateString("sv-SE")
+  const fillable = presentationMeetings.filter(
+    (m) => !m.presenter && !m.presenterUserId && m.scheduledDate >= today
+  ).length
 
   const currentWeekId = getCurrentMeetingId(meetings)
   const currentRowRef = useRef<HTMLTableRowElement>(null)
@@ -212,6 +224,19 @@ export function ScheduleTab({ year }: { year: number }) {
               >
                 產生整學期
               </Button>
+            )}
+            {showEditMode && (
+              <ConfirmDialog
+                trigger={
+                  <Button size="sm" variant="outline" disabled={fillable === 0}>
+                    依順位填入空白週
+                    {fillable > 0 ? `（${fillable}）` : ""}
+                  </Button>
+                }
+                title="依報告順位填入空白週？"
+                description={`將依「報告順位名單」的順序，把 ${year} 學年度尚未排定報告人的 ${fillable} 個未來週次填滿（資深屆先，同屆依順位循環）。假日、演講週，以及已有報告人的週次都不會被更動。`}
+                onConfirm={() => fillPresenters.mutate(year)}
+              />
             )}
           </div>
           {editMode && (
