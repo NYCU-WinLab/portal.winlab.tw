@@ -235,3 +235,41 @@ export function findProfileAttribute(
 ): UserProfileAttribute | null {
   return config.attributes?.find((a) => a.name === name) ?? null
 }
+
+/**
+ * The regex a managed attribute's value must satisfy, if the realm declares
+ * one. Keycloak enforces these on write and rejects the whole PUT with a 400,
+ * so anything writing attributes should check first rather than discover it
+ * halfway through a batch.
+ */
+export function attributePattern(
+  attribute: UserProfileAttribute
+): { source: string; message?: string } | null {
+  const validation = attribute.validations?.pattern as
+    | { pattern?: string; "error-message"?: string }
+    | undefined
+  if (!validation?.pattern) return null
+  return {
+    source: validation.pattern,
+    message: validation["error-message"],
+  }
+}
+
+/** Human-readable one-liner of an attribute's declared validations. */
+export function describeValidations(attribute: UserProfileAttribute): string {
+  const entries = Object.entries(attribute.validations ?? {})
+  if (entries.length === 0) return "no validation"
+  return entries
+    .map(([name, config]) => {
+      if (name === "pattern") {
+        const pattern = (config as { pattern?: string }).pattern
+        return `pattern ${pattern ?? "?"}`
+      }
+      if (name === "length") {
+        const { min, max } = config as { min?: number; max?: number }
+        return `length ${min ?? "-"}..${max ?? "-"}`
+      }
+      return name
+    })
+    .join(", ")
+}

@@ -10,6 +10,7 @@ import { redactor } from "./config"
 import {
   AdminApi,
   KeycloakError,
+  describeValidations,
   serviceAccountToken,
   unmanagedPolicy,
   type UserProfileConfig,
@@ -82,12 +83,12 @@ export async function profile(config: Config): Promise<number> {
       : adminReads
         ? "admin: read only"
         : "admin: NO ACCESS"
+    // Validations are the thing most likely to reject a write that every
+    // other check said was fine, so they belong in the default output.
     report.line(
       adminReads ? "ok" : "warn",
       `${attribute.name.padEnd(width)}  ${access}`,
-      attribute.displayName && attribute.displayName !== attribute.name
-        ? attribute.displayName
-        : undefined
+      describeValidations(attribute)
     )
   }
 

@@ -117,16 +117,17 @@ export async function users(
     }
   }
 
+  // TSV rather than prose: --list exists to be piped into something that
+  // reconciles against another source, and email is the only field that joins
+  // reliably across systems. An empty first column means the attribute is
+  // unset for that user.
   if (options.list) {
-    report.heading("Users")
+    report.heading(`TSV: ${attribute}\temail\tusername`)
     for (const { user, value } of withValue) {
-      report.info(`${value}  ${user.username ?? user.id}`)
+      report.plain(`${value}\t${user.email ?? ""}\t${user.username ?? user.id}`)
     }
-    if (missing.length > 0) {
-      report.heading(`Missing "${attribute}"`)
-      for (const user of missing) {
-        report.info(user.username ?? user.id)
-      }
+    for (const user of missing) {
+      report.plain(`\t${user.email ?? ""}\t${user.username ?? user.id}`)
     }
   }
 

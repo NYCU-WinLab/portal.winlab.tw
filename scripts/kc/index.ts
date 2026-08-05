@@ -14,6 +14,7 @@
 import { bootstrap } from "./bootstrap"
 import { defaultConfigPath, loadConfig, type ProfileName } from "./config"
 import { doctor } from "./doctor"
+import { importAttributes } from "./import"
 import { profile } from "./profile"
 import { describeError } from "./report"
 import { users } from "./users"
@@ -24,15 +25,17 @@ kc — Keycloak realm tooling for portal.winlab.tw
   bun run kc doctor [options]      Diagnose the realm connection end to end
   bun run kc profile               List the realm's declared user attributes
   bun run kc users [options]       Summarise how an attribute is populated
+  bun run kc import-attributes …   Backfill empty attributes from a TSV plan
   bun run kc bootstrap [options]   Provision the service-account clients
 
 Options
   --profile <cli|app>   Which credential to use (default: cli, read-only)
   --attr <name>         Attribute to check, summarise, or declare
   --user <email>        Read one user as a live end-to-end check (doctor)
-  --list                Show individual users, not just the distribution (users)
+  --list                Emit TSV of value/email/username instead of a summary
   --limit <n>           Cap how many users are read (users, default 500)
-  --apply               Execute the plan instead of describing it (bootstrap)
+  --plan <path>         TSV of attribute/username/value (import-attributes)
+  --apply               Execute instead of describing (bootstrap, import)
   --config <path>       Credential file (default: ${defaultConfigPath()})
 
 Credentials are read from, in increasing precedence:
@@ -48,6 +51,7 @@ type Args = {
   apply: boolean
   list: boolean
   limit: number
+  plan?: string
   configPath: string
 }
 
@@ -100,6 +104,11 @@ function parseArgs(argv: string[]): Args | null {
         args.user = next
         i += 1
         break
+      case "--plan":
+        if (!next) throw new Error("--plan needs a path")
+        args.plan = next
+        i += 1
+        break
       case "--config":
         if (!next) throw new Error("--config needs a path")
         args.configPath = next
@@ -138,6 +147,15 @@ async function main(): Promise<number> {
       return doctor(config, { attribute: args.attribute, user: args.user })
     case "profile":
       return profile(config)
+    case "import-attributes":
+      if (!args.plan) {
+        console.error("import-attributes needs --plan <path>")
+        return 2
+      }
+      return importAttributes(config, {
+        apply: args.apply,
+        planPath: args.plan,
+      })
     case "users":
       return users(config, {
         attribute: args.attribute,
