@@ -513,6 +513,14 @@ export function UploadManageList({
 
   if (images.length === 0) return null
 
+  const allSelected =
+    selectableItems.length > 0 &&
+    selectableItems.every((item) => selectedIds.has(item.id))
+  const selectedPreview = selectedItems
+    .slice(0, 4)
+    .map((item) => item.name)
+    .join(", ")
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -539,9 +547,6 @@ export function UploadManageList({
           <button
             type="button"
             onClick={() => {
-              const allSelected =
-                selectableItems.length > 0 &&
-                selectableItems.every((item) => selectedIds.has(item.id))
               if (allSelected) {
                 setSelectedIds(new Set())
                 return
@@ -550,23 +555,64 @@ export function UploadManageList({
             }}
             className={galleryPillClass()}
           >
-            {selectableItems.length > 0 &&
-            selectableItems.every((item) => selectedIds.has(item.id))
-              ? "Clear"
-              : "Select all"}
-          </button>
-        ) : null}
-        {selectionMode && selectedItems.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setConfirmOpen(true)}
-            disabled={isPending}
-            className={cn(galleryPillClass(), "text-destructive")}
-          >
-            Delete selected ({selectedItems.length})
+            {allSelected
+              ? "Clear all"
+              : `Select all (${selectableItems.length})`}
           </button>
         ) : null}
       </div>
+
+      {selectionMode ? (
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[min(100%,48rem)] flex-wrap items-center justify-between gap-3 px-4",
+            "sm:px-6"
+          )}
+        >
+          <div
+            className={cn(
+              "flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-900/15 bg-card/95 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.45)] backdrop-blur-md"
+            )}
+            role="status"
+            aria-live="polite"
+          >
+            <p className={cn(gallerySans(), "text-sm text-foreground")}>
+              {selectedItems.length === 0
+                ? "Tap works to select"
+                : `${selectedItems.length} of ${selectableItems.length} selected`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (allSelected) {
+                    setSelectedIds(new Set())
+                    return
+                  }
+                  setSelectedIds(
+                    new Set(selectableItems.map((item) => item.id))
+                  )
+                }}
+                className={galleryPillClass()}
+              >
+                {allSelected ? "Clear" : "Select all"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={isPending || selectedItems.length === 0}
+                className={cn(
+                  galleryPillClass(),
+                  "border-destructive/30 text-destructive disabled:opacity-40"
+                )}
+              >
+                Delete selected
+                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {timeline.map((entry) => {
         if (entry.kind === "sequence") {
@@ -603,18 +649,33 @@ export function UploadManageList({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {selectedItems.length} selected work
+              Permanently delete {selectedItems.length} work
               {selectedItems.length === 1 ? "" : "s"}?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the selected works from the gallery and storage.
-              Cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This removes the selected works from the gallery and storage.
+                  Cannot be undone.
+                </p>
+                {selectedPreview ? (
+                  <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-foreground/80">
+                    {selectedPreview}
+                    {selectedItems.length > 4
+                      ? ` (+${selectedItems.length - 4} more)`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmBatchDelete}>
-              Delete
+            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBatchDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

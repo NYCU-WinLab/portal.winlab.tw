@@ -472,16 +472,28 @@ export function GalleryComments({
 
       <div className="relative mt-3 shrink-0 border-t border-border/50 pt-3">
         {replyTarget ? (
-          <button
-            type="button"
-            onClick={() => setReplyTarget(null)}
-            className={cn(
-              gallerySans(),
-              "mb-2 text-[11px] text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Cancel reply
-          </button>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                gallerySans(),
+                "rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[11px] text-foreground"
+              )}
+            >
+              Replying to{" "}
+              {flattened.find((c) => c.id === replyTarget)?.commenter_name ??
+                "comment"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setReplyTarget(null)}
+              className={cn(
+                gallerySans(),
+                "text-[11px] text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Cancel
+            </button>
+          </div>
         ) : null}
         {showMentionPicker ? (
           <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-56 flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-md">
@@ -500,8 +512,8 @@ export function GalleryComments({
                   )}
                 >
                   {mentionBrowseAll
-                    ? `Lab members (${filteredMembers.length})`
-                    : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"}`}
+                    ? `Lab members (${filteredMembers.length}) · ↑↓ Enter`
+                    : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"} · ↑↓ Enter · Esc`}
                 </p>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {filteredMembers.map((m, index) => (
@@ -546,22 +558,56 @@ export function GalleryComments({
                 e.currentTarget.selectionStart ?? e.currentTarget.value.length
               )
             }
-            placeholder={isSignedIn ? "Add a comment… @" : "Sign in to comment"}
+            placeholder={
+              isSignedIn
+                ? replyTarget
+                  ? "Write a reply… @ to mention"
+                  : "Add a comment… @ to mention"
+                : "Sign in to comment"
+            }
             disabled={!isSignedIn || isPending}
-            className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-20 text-sm"
+            className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-28 text-sm"
           />
-          <Button
-            type="button"
-            size="sm"
-            className={cn(
-              gallerySans(),
-              "absolute right-2 bottom-2 h-8 rounded-full px-3 text-xs"
-            )}
-            disabled={!isSignedIn || isPending || !draft.trim()}
-            onClick={submit}
-          >
-            Post
-          </Button>
+          <div className="absolute right-2 bottom-2 flex items-center gap-1">
+            {isSignedIn ? (
+              <button
+                type="button"
+                aria-label="Mention someone"
+                disabled={isPending}
+                onClick={() => {
+                  const el = textareaRef.current
+                  if (!el) return
+                  const cursor = el.selectionStart ?? draft.length
+                  const before = draft.slice(0, cursor)
+                  const after = draft.slice(cursor)
+                  const needsSpace = before.length > 0 && !/\s$/.test(before)
+                  const next = `${before}${needsSpace ? " @" : "@"}${after}`
+                  setDraft(next)
+                  const pos = before.length + (needsSpace ? 2 : 1)
+                  requestAnimationFrame(() => {
+                    el.focus()
+                    el.setSelectionRange(pos, pos)
+                    syncMentionQuery(next, pos)
+                  })
+                }}
+                className={cn(
+                  gallerySans(),
+                  "inline-flex h-8 items-center rounded-full px-2.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                )}
+              >
+                @
+              </button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              className={cn(gallerySans(), "h-8 rounded-full px-3 text-xs")}
+              disabled={!isSignedIn || isPending || !draft.trim()}
+              onClick={submit}
+            >
+              Post
+            </Button>
+          </div>
         </div>
       </div>
 

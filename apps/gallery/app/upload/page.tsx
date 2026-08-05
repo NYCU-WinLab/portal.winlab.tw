@@ -6,6 +6,7 @@ import { UploadManageList } from "@/app/upload/_components/upload-manage-list"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import {
   galleryPanelClass,
+  gallerySans,
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
@@ -48,7 +49,7 @@ export default async function UploadPage() {
       <div className="flex flex-col gap-10 sm:gap-12">
         <GalleryPageHero
           title="Manage"
-          lead="Hang polaroids on the lab wall — sequences, covers, and the occasional axolotl cameo."
+          lead="Develop shots in the darkroom tray, then pin them to the lab paper wall — sequences, covers, and the occasional axolotl cameo."
         />
 
         {user.isAdmin ? (
@@ -58,19 +59,31 @@ export default async function UploadPage() {
           />
         ) : null}
 
-        <section className={galleryPanelClass()}>
-          <UploadForm />
+        <section className={cn(galleryPanelClass(), "overflow-hidden !p-0")}>
+          <div className="p-5 sm:p-7">
+            <UploadForm />
+          </div>
         </section>
 
         <section className="space-y-4">
-          <h2
-            className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
-          >
-            Your uploads ({myImages.length})
-          </h2>
+          <div className="space-y-1">
+            <p
+              className={cn(
+                gallerySans(),
+                "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
+              )}
+            >
+              Your darkroom
+            </p>
+            <h2
+              className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
+            >
+              On the wall ({myImages.length})
+            </h2>
+          </div>
           {myImages.length === 0 ? (
             <p className={gallerySectionLeadClass()}>
-              Nothing here yet — drop a photo above to claim a spot on the wall.
+              Nothing hung yet — drop a photo above to claim a spot on the wall.
             </p>
           ) : (
             <UploadManageList images={myImages} isAdmin={user.isAdmin} />
