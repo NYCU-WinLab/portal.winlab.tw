@@ -1,6 +1,7 @@
 "use client"
 
 import type { Dispatch, SetStateAction } from "react"
+import { useRef } from "react"
 
 import {
   IconChevronLeft,
@@ -25,7 +26,13 @@ import {
 } from "@/app/_components/gallery-card-media"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
-import type { GalleryReaction, ReactionCounts } from "@/lib/gallery/reactions"
+import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
+import {
+  formatReactionSummary,
+  totalReactions,
+  type GalleryReaction,
+  type ReactionCounts,
+} from "@/lib/gallery/reactions"
 import type {
   GalleryComment,
   GalleryImage,
@@ -289,19 +296,44 @@ export function GalleryLightboxSocialAside({
   comments: GalleryComment[]
   setComments: Dispatch<SetStateAction<GalleryComment[]>>
 }) {
+  const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
+  const reactionPeek = formatReactionSummary(counts)
+  const reactionTotal = totalReactions(counts)
+
+  const onSheetTouchStart = (event: React.TouchEvent) => {
+    const touch = event.touches[0]
+    if (!touch) return
+    sheetTouchStart.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const onSheetTouchEnd = (event: React.TouchEvent) => {
+    if (!sheetTouchStart.current) return
+    const touch = event.changedTouches[0]
+    if (!touch) return
+    const deltaX = touch.clientX - sheetTouchStart.current.x
+    const deltaY = touch.clientY - sheetTouchStart.current.y
+    sheetTouchStart.current = null
+
+    const swipe = resolveLightboxSwipe(deltaX, deltaY, 40)
+    if (swipe === "up") setMobileDetailsOpen(true)
+    else if (swipe === "down") setMobileDetailsOpen(false)
+  }
+
   return (
     <aside
       className={cn(
         "gallery-lightbox-aside",
         mobileDetailsOpen && "gallery-lightbox-aside--expanded"
       )}
+      onTouchStart={onSheetTouchStart}
+      onTouchEnd={onSheetTouchEnd}
     >
       <div className="gallery-lightbox-aside-toggle md:hidden">
         <span
           aria-hidden
-          className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border/80"
+          className="gallery-lightbox-sheet-handle mx-auto mt-2.5 h-1 w-11 shrink-0 rounded-full bg-zinc-400/70"
         />
-        <div className="flex w-full items-center gap-2 px-4 pt-2 pb-3">
+        <div className="flex w-full items-center gap-2 px-4 pt-2.5 pb-3.5">
           <button
             type="button"
             className="min-w-0 flex-1 bg-transparent text-left"
@@ -319,14 +351,14 @@ export function GalleryLightboxSocialAside({
             <span
               className={cn(
                 gallerySans(),
-                "mt-0.5 block text-[11px] text-muted-foreground"
+                "mt-0.5 block truncate text-[11px] text-muted-foreground"
               )}
             >
               {mobileDetailsOpen
-                ? "Swipe down or tap to hide"
+                ? "Swipe down to tuck the sheet"
                 : wallCommentCount > 0
-                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"} · tap or swipe up`
-                  : "Comments & reactions · tap or swipe up"}
+                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"} · swipe up`
+                  : "Reactions & comments · swipe up"}
             </span>
           </button>
           {isAdmin ? (
@@ -344,28 +376,40 @@ export function GalleryLightboxSocialAside({
               mobileDetailsOpen ? "Collapse comments" : "Expand comments"
             }
             aria-expanded={mobileDetailsOpen}
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-900/[0.05] text-muted-foreground transition-colors hover:bg-zinc-900/10 hover:text-foreground"
             onClick={() => setMobileDetailsOpen((open) => !open)}
           >
             <IconChevronUp
               className={cn(
-                "h-4 w-4 transition-transform",
+                "h-4 w-4 transition-transform duration-200",
                 mobileDetailsOpen && "rotate-180"
               )}
             />
           </button>
         </div>
+        {!mobileDetailsOpen && reactionTotal > 0 ? (
+          <div
+            className={cn(
+              gallerySans(),
+              "gallery-lightbox-reaction-peek -mt-1 mb-3 flex justify-center px-4"
+            )}
+          >
+            <span className="rounded-full border border-zinc-800/10 bg-white/70 px-2.5 py-0.5 text-[10px] tracking-wide text-zinc-600 shadow-sm">
+              {reactionPeek}
+            </span>
+          </div>
+        ) : null}
       </div>
       <div className="gallery-lightbox-aside-header space-y-4 border-b border-border/45 px-5 py-5 sm:px-6">
         <p
           className={cn(
             gallerySans(),
-            "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
+            "gallery-lightbox-aside-eyebrow text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
           )}
         >
           On the wall
         </p>
-        <div className="min-w-0 space-y-1">
+        <div className="gallery-lightbox-aside-title-block min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2
               className={cn(
@@ -417,7 +461,7 @@ export function GalleryLightboxSocialAside({
           ) : null}
         </div>
         {isAdmin ? (
-          <div className="flex justify-end">
+          <div className="gallery-lightbox-aside-pin flex justify-end">
             <PinWallButton
               imageId={image.id}
               pinnedAt={pinnedAt}

@@ -2,10 +2,13 @@
 
 import { useRef, type RefObject } from "react"
 
+import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
+
 type LightboxGestureHandlers = {
   onPrev: () => void
   onNext: () => void
   onSwipeUp: () => void
+  onSwipeDown?: () => void
 }
 
 export function useLightboxGestures(
@@ -14,6 +17,7 @@ export function useLightboxGestures(
     onPrev,
     onNext,
     onSwipeUp,
+    onSwipeDown,
     enabled,
   }: LightboxGestureHandlers & {
     enabled: boolean
@@ -37,19 +41,11 @@ export function useLightboxGestures(
     const deltaY = touch.clientY - startRef.current.y
     startRef.current = null
 
-    const absX = Math.abs(deltaX)
-    const absY = Math.abs(deltaY)
-    const threshold = 48
-
-    if (absX < threshold && absY < threshold) return
-
-    if (absX > absY) {
-      if (deltaX > threshold) onPrev()
-      else if (deltaX < -threshold) onNext()
-      return
-    }
-
-    if (deltaY < -threshold) onSwipeUp()
+    const swipe = resolveLightboxSwipe(deltaX, deltaY)
+    if (swipe === "prev") onPrev()
+    else if (swipe === "next") onNext()
+    else if (swipe === "up") onSwipeUp()
+    else if (swipe === "down") onSwipeDown?.()
   }
 
   return {

@@ -247,6 +247,7 @@ export function GalleryCard({
     onPrev: goLightboxPrev,
     onNext: goLightboxNext,
     onSwipeUp: () => setMobileDetailsOpen(true),
+    onSwipeDown: () => setMobileDetailsOpen(false),
   })
 
   const copyShareLink = useCallback(async () => {

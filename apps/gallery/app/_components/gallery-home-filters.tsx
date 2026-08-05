@@ -26,7 +26,11 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { galleryNavLinkClass, gallerySans } from "@/components/gallery-chrome"
+import {
+  galleryFilterChipClass,
+  gallerySans,
+  gallerySerif,
+} from "@/components/gallery-chrome"
 import {
   buildGalleryHomeHref,
   describeGalleryFilterSummary,
@@ -75,7 +79,7 @@ function FilterDivider() {
   return (
     <span
       aria-hidden
-      className="mx-0.5 hidden h-3 w-px shrink-0 bg-border/70 sm:mx-1 sm:block"
+      className="mx-0.5 hidden h-4 w-px shrink-0 bg-zinc-900/12 sm:mx-1.5 sm:block"
     />
   )
 }
@@ -96,7 +100,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(galleryNavLinkClass(active), disabled && "opacity-50")}
+      className={cn(galleryFilterChipClass(active), disabled && "opacity-50")}
     >
       {children}
     </button>
@@ -185,97 +189,218 @@ export function GalleryHomeFiltersBar({
       aria-label="Filter gallery"
       className={cn(
         gallerySans(),
-        "gallery-home-filters mb-7 flex flex-col items-center gap-2 opacity-90 sm:mb-9 sm:gap-2.5"
+        "gallery-home-filters mb-8 flex flex-col items-center sm:mb-10"
       )}
     >
-      <form
-        onSubmit={onSearchSubmit}
-        className="flex w-full max-w-md items-center gap-2 px-1 sm:px-2"
-      >
-        <div className="relative min-w-0 flex-1">
-          <IconSearch
-            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={searchDraft}
-            onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Search titles…"
-            className={cn(
-              gallerySans(),
-              "min-h-9 w-full rounded-md border border-border/70 bg-background/75 py-2 pr-9 pl-9 text-xs text-foreground shadow-sm transition-colors outline-none placeholder:text-muted-foreground focus:border-foreground/25"
-            )}
-          />
-          {searchDraft ? (
-            <button
-              type="button"
-              aria-label="Clear search"
-              className="absolute top-1/2 right-2.5 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setSearchDraft("")
-                apply({ ...filters, query: null })
-              }}
+      <div className="gallery-home-filters-sheet">
+        <div className="gallery-home-filters-sheet-rail" aria-hidden />
+        <div className="relative flex flex-col items-center gap-3 px-4 pt-4 pb-4 sm:gap-3.5 sm:px-6 sm:pt-5 sm:pb-5">
+          <div className="flex flex-col items-center gap-1 text-center">
+            <p
+              className={cn(
+                gallerySans(),
+                "text-[10px] tracking-[0.22em] text-zinc-500 uppercase"
+              )}
             >
-              <IconX className="size-3.5" aria-hidden />
-            </button>
-          ) : null}
-        </div>
-        <button
-          type="submit"
-          disabled={isPending}
-          className={cn(galleryNavLinkClass(), isPending && "opacity-50")}
-        >
-          Search
-        </button>
-      </form>
+              Contact sheet
+            </p>
+            <p
+              className={cn(
+                gallerySerif(),
+                "text-xl leading-none tracking-tight text-foreground sm:text-2xl"
+              )}
+            >
+              Find on the wall
+            </p>
+          </div>
 
-      {/* Mobile: one Filters menu (media + when + who) */}
-      <div className="flex w-full max-w-md items-center justify-center gap-2 sm:hidden">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <form
+            onSubmit={onSearchSubmit}
+            className="flex w-full max-w-md items-center gap-2"
+          >
+            <div className="relative min-w-0 flex-1">
+              <IconSearch
+                className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-500"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder="Search titles…"
+                className={cn(
+                  gallerySans(),
+                  "gallery-home-filters-search min-h-10 w-full rounded-[2px] border border-zinc-800/18 bg-white/90 py-2.5 pr-9 pl-9 text-xs text-foreground shadow-[inset_0_1px_2px_rgba(24,24,27,0.04)] transition-[border-color,box-shadow] outline-none placeholder:text-zinc-400 focus:border-zinc-800/35 focus:shadow-[0_0_0_3px_rgba(24,24,27,0.06)]"
+                )}
+              />
+              {searchDraft ? (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  className="absolute top-1/2 right-2.5 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 hover:text-foreground"
+                  onClick={() => {
+                    setSearchDraft("")
+                    apply({ ...filters, query: null })
+                  }}
+                >
+                  <IconX className="size-3.5" aria-hidden />
+                </button>
+              ) : null}
+            </div>
             <button
-              type="button"
+              type="submit"
               disabled={isPending}
               className={cn(
-                galleryNavLinkClass(active),
-                "inline-flex max-w-[14rem] items-center gap-1.5",
+                galleryFilterChipClass(false),
+                "shrink-0 border-zinc-800/25 bg-zinc-900/[0.06] font-medium text-foreground",
                 isPending && "opacity-50"
               )}
             >
-              <IconFilter
-                className="size-3.5 shrink-0 opacity-70"
-                aria-hidden
-              />
-              <span className="truncate">{mobileFilterLabel}</span>
-              <IconChevronDown className="size-3 shrink-0 opacity-60" />
+              Search
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="center"
-            className={cn(gallerySans(), "max-h-[70dvh] w-56 overflow-y-auto")}
-          >
-            <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
-              Media
-            </DropdownMenuLabel>
+          </form>
+
+          {/* Mobile: one Filters menu (media + when + who) */}
+          <div className="flex w-full max-w-md items-center justify-center gap-2 sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  className={cn(
+                    galleryFilterChipClass(active),
+                    "inline-flex max-w-[16rem] items-center gap-1.5",
+                    isPending && "opacity-50"
+                  )}
+                >
+                  <IconFilter
+                    className="size-3.5 shrink-0 opacity-80"
+                    aria-hidden
+                  />
+                  <span className="truncate">{mobileFilterLabel}</span>
+                  <IconChevronDown className="size-3 shrink-0 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="center"
+                className={cn(
+                  gallerySans(),
+                  "max-h-[70dvh] w-56 overflow-y-auto"
+                )}
+              >
+                <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
+                  Media
+                </DropdownMenuLabel>
+                {MEDIA_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    className="cursor-pointer text-xs"
+                    onClick={() => apply({ ...filters, media: option.value })}
+                  >
+                    {option.label}
+                    {filters.media === option.value ? " ·" : ""}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
+                  When
+                </DropdownMenuLabel>
+                {DATE_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    className="cursor-pointer text-xs"
+                    onClick={() =>
+                      apply({
+                        ...filters,
+                        uploadedAfter: dateAfterFromPreset(option.value),
+                      })
+                    }
+                  >
+                    {option.label}
+                    {datePreset === option.value ? " ·" : ""}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
+                  Who
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs"
+                  onClick={() => apply({ ...filters, uploaderId: null })}
+                >
+                  Anyone
+                </DropdownMenuItem>
+                {members.map((member) => (
+                  <DropdownMenuItem
+                    key={member.id}
+                    className="cursor-pointer text-xs"
+                    onClick={() =>
+                      apply({
+                        ...filters,
+                        uploaderId: member.id,
+                      })
+                    }
+                  >
+                    <span className="truncate">
+                      {member.name ?? member.email ?? "Member"}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+                {active ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer text-xs"
+                      onClick={clearAll}
+                    >
+                      Clear filters
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {active ? (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={clearAll}
+                className={cn(
+                  galleryFilterChipClass(false),
+                  "inline-flex items-center gap-1",
+                  isPending && "opacity-50"
+                )}
+                aria-label="Clear filters"
+              >
+                <IconX className="size-3" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+
+          {/* Desktop: expanded pill row */}
+          <div className="hidden flex-wrap items-center justify-center gap-1.5 sm:flex">
             {MEDIA_OPTIONS.map((option) => (
-              <DropdownMenuItem
+              <FilterPill
                 key={option.value}
-                className="cursor-pointer text-xs"
-                onClick={() => apply({ ...filters, media: option.value })}
+                active={filters.media === option.value}
+                disabled={isPending}
+                onClick={() =>
+                  apply({
+                    ...filters,
+                    media: option.value,
+                  })
+                }
               >
                 {option.label}
-                {filters.media === option.value ? " ·" : ""}
-              </DropdownMenuItem>
+              </FilterPill>
             ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
-              When
-            </DropdownMenuLabel>
+
+            <FilterDivider />
+
             {DATE_OPTIONS.map((option) => (
-              <DropdownMenuItem
+              <FilterPill
                 key={option.value}
-                className="cursor-pointer text-xs"
+                active={datePreset === option.value}
+                disabled={isPending}
                 onClick={() =>
                   apply({
                     ...filters,
@@ -284,182 +409,98 @@ export function GalleryHomeFiltersBar({
                 }
               >
                 {option.label}
-                {datePreset === option.value ? " ·" : ""}
-              </DropdownMenuItem>
+              </FilterPill>
             ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
-              Who
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              className="cursor-pointer text-xs"
-              onClick={() => apply({ ...filters, uploaderId: null })}
-            >
-              Anyone
-            </DropdownMenuItem>
-            {members.map((member) => (
-              <DropdownMenuItem
-                key={member.id}
-                className="cursor-pointer text-xs"
-                onClick={() =>
-                  apply({
-                    ...filters,
-                    uploaderId: member.id,
-                  })
-                }
+
+            <FilterDivider />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  className={cn(
+                    galleryFilterChipClass(filters.uploaderId !== null),
+                    "inline-flex items-center gap-1",
+                    isPending && "opacity-50"
+                  )}
+                >
+                  <span className="max-w-[10rem] truncate">
+                    {uploaderLabel}
+                  </span>
+                  <IconChevronDown className="size-3 shrink-0 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="center"
+                className={cn(gallerySans(), "max-h-64 w-48 overflow-y-auto")}
               >
-                <span className="truncate">
-                  {member.name ?? member.email ?? "Member"}
-                </span>
-              </DropdownMenuItem>
-            ))}
-            {active ? (
-              <>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-xs"
-                  onClick={clearAll}
+                  onClick={() =>
+                    apply({
+                      ...filters,
+                      uploaderId: null,
+                    })
+                  }
                 >
-                  Clear filters
+                  Anyone
                 </DropdownMenuItem>
+                {members.map((member) => (
+                  <DropdownMenuItem
+                    key={member.id}
+                    className="cursor-pointer text-xs"
+                    onClick={() =>
+                      apply({
+                        ...filters,
+                        uploaderId: member.id,
+                      })
+                    }
+                  >
+                    <span className="truncate">
+                      {member.name ?? member.email ?? "Member"}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {active ? (
+              <>
+                <FilterDivider />
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={clearAll}
+                  className={cn(
+                    galleryFilterChipClass(false),
+                    "inline-flex items-center gap-1",
+                    isPending && "opacity-50"
+                  )}
+                >
+                  <IconX className="size-3" aria-hidden />
+                  Clear
+                </button>
               </>
             ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {active ? (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={clearAll}
-            className={cn(
-              galleryNavLinkClass(),
-              "inline-flex items-center gap-1",
-              isPending && "opacity-50"
-            )}
-            aria-label="Clear filters"
-          >
-            <IconX className="size-3" aria-hidden />
-          </button>
-        ) : null}
-      </div>
+          </div>
 
-      {/* Desktop: expanded pill row */}
-      <div className="hidden flex-wrap items-center justify-center gap-2 sm:flex">
-        {MEDIA_OPTIONS.map((option) => (
-          <FilterPill
-            key={option.value}
-            active={filters.media === option.value}
-            disabled={isPending}
-            onClick={() =>
-              apply({
-                ...filters,
-                media: option.value,
-              })
-            }
-          >
-            {option.label}
-          </FilterPill>
-        ))}
-
-        <FilterDivider />
-
-        {DATE_OPTIONS.map((option) => (
-          <FilterPill
-            key={option.value}
-            active={datePreset === option.value}
-            disabled={isPending}
-            onClick={() =>
-              apply({
-                ...filters,
-                uploadedAfter: dateAfterFromPreset(option.value),
-              })
-            }
-          >
-            {option.label}
-          </FilterPill>
-        ))}
-
-        <FilterDivider />
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              disabled={isPending}
+          {summaryParts.length > 0 ? (
+            <p
               className={cn(
-                galleryNavLinkClass(filters.uploaderId !== null),
-                "inline-flex items-center gap-1",
-                isPending && "opacity-50"
+                gallerySans(),
+                "inline-flex max-w-md items-center rounded-[2px] border border-zinc-800/10 bg-zinc-900/[0.04] px-3 py-1 text-[11px] text-zinc-600"
               )}
             >
-              <span className="max-w-[10rem] truncate">{uploaderLabel}</span>
-              <IconChevronDown className="size-3 shrink-0 opacity-60" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="center"
-            className={cn(gallerySans(), "max-h-64 w-48 overflow-y-auto")}
-          >
-            <DropdownMenuItem
-              className="cursor-pointer text-xs"
-              onClick={() =>
-                apply({
-                  ...filters,
-                  uploaderId: null,
-                })
-              }
-            >
-              Anyone
-            </DropdownMenuItem>
-            {members.map((member) => (
-              <DropdownMenuItem
-                key={member.id}
-                className="cursor-pointer text-xs"
-                onClick={() =>
-                  apply({
-                    ...filters,
-                    uploaderId: member.id,
-                  })
-                }
-              >
-                <span className="truncate">
-                  {member.name ?? member.email ?? "Member"}
-                </span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {active ? (
-          <>
-            <FilterDivider />
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={clearAll}
-              className={cn(
-                galleryNavLinkClass(),
-                "inline-flex items-center gap-1",
-                isPending && "opacity-50"
-              )}
-            >
-              <IconX className="size-3" aria-hidden />
-              Clear
-            </button>
-          </>
-        ) : null}
-      </div>
-
-      {summaryParts.length > 0 ? (
-        <p
-          className={cn(
-            gallerySans(),
-            "hidden rounded-md border border-border/60 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground shadow-sm sm:inline-flex"
+              Showing {summaryParts.join(" · ")}
+            </p>
+          ) : (
+            <p className={cn(gallerySans(), "text-[11px] text-zinc-500/90")}>
+              Media · when · who
+            </p>
           )}
-        >
-          {summaryParts.join(" · ")}
-        </p>
-      ) : null}
+        </div>
+      </div>
     </nav>
   )
 }
