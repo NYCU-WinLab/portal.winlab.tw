@@ -15,6 +15,7 @@ import {
   restoreGalleryWallOrder,
   shuffleGalleryWallOrder,
 } from "@/lib/gallery/wall-shuffle"
+import { cn } from "@workspace/ui/lib/utils"
 
 type PrefetchedPage = {
   page: number
@@ -166,7 +167,7 @@ export function GalleryInfiniteWall({
           prefetchingRef.current = false
         }
       })()
-    }, 350)
+    }, 180)
 
     return () => {
       cancelled = true
@@ -235,19 +236,31 @@ export function GalleryInfiniteWall({
       ) : null}
       {loadingMore ? (
         <div
-          className="mx-auto grid max-w-3xl grid-cols-3 gap-3 py-10 opacity-70"
+          className="mx-auto grid max-w-3xl grid-cols-3 gap-4 py-10 sm:gap-6"
           aria-hidden
         >
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="aspect-[4/5] animate-pulse rounded-[3px] border border-zinc-900/8 bg-zinc-200/70"
-              style={{ animationDelay: `${i * 80}ms` }}
+              className="gallery-wall-load-skeleton aspect-[4/5] animate-pulse rounded-[2px]"
+              style={{
+                animationDelay: `${i * 90}ms`,
+                transform: `rotate(${i === 1 ? 1.5 : i === 2 ? -1.2 : -0.6}deg)`,
+              }}
             />
           ))}
         </div>
       ) : null}
       {loadingMore ? <p className="sr-only">Loading more photos</p> : null}
+      {!hasMore && !loadingMore && !loadError && images.length > 0 ? (
+        <p
+          className={cn(
+            "mx-auto max-w-sm py-10 text-center text-[11px] tracking-[0.16em] text-muted-foreground uppercase"
+          )}
+        >
+          End of the wall
+        </p>
+      ) : null}
       {loadError ? (
         <div className="flex flex-col items-center gap-3 py-8">
           <p className="text-center text-xs text-muted-foreground">

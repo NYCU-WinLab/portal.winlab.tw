@@ -159,6 +159,8 @@ export function GalleryLightboxMediaPane({
           src={mediaUrl}
           alt={activeItem?.name ?? image.name}
           className={cn("gallery-lightbox-image", !mediaLoaded && "opacity-0")}
+          decoding="async"
+          fetchPriority="high"
           onLoad={() => setMediaLoaded(true)}
           onError={() => setLightboxFailed(true)}
         />
@@ -184,32 +186,54 @@ export function GalleryLightboxMediaPane({
         </button>
       ) : null}
       {isSequence ? (
-        <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-end justify-center gap-1.5 overflow-x-auto px-4 pb-0.5">
-          {sequenceMedia.map((item, idx) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveIndex(idx)}
-              aria-label={`View shot ${idx + 1}`}
-              aria-current={idx === activeIndex ? "true" : undefined}
-              className={cn(
-                "relative h-11 w-9 shrink-0 overflow-hidden rounded-[2px] border-2 bg-zinc-900/30 shadow-md transition-[transform,opacity]",
-                idx === activeIndex
-                  ? "scale-105 border-white"
-                  : "border-white/35 opacity-75 hover:opacity-100"
-              )}
-            >
-              {/* Tiny strip thumbs — next/image is overkill in lightbox chrome */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumbUrlFromItem(item)}
-                alt=""
-                className="h-full w-full object-cover"
-                draggable={false}
-              />
-            </button>
-          ))}
+        <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl flex-col items-center gap-1.5 px-4 pb-0.5">
+          <p
+            className={cn(
+              gallerySans(),
+              "rounded-full bg-black/45 px-2.5 py-0.5 text-[10px] tracking-wide text-white/90 uppercase backdrop-blur-sm"
+            )}
+          >
+            Story · shot {activeIndex + 1} of {sequenceMedia.length}
+          </p>
+          <div className="flex w-full items-end justify-center gap-1.5 overflow-x-auto">
+            {sequenceMedia.map((item, idx) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveIndex(idx)}
+                aria-label={`View shot ${idx + 1}`}
+                aria-current={idx === activeIndex ? "true" : undefined}
+                className={cn(
+                  "relative h-11 w-9 shrink-0 overflow-hidden rounded-[2px] border-2 bg-zinc-900/30 shadow-md transition-[transform,opacity]",
+                  idx === activeIndex
+                    ? "scale-105 border-white"
+                    : "border-white/35 opacity-75 hover:opacity-100"
+                )}
+              >
+                {/* Tiny strip thumbs — next/image is overkill in lightbox chrome */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={thumbUrlFromItem(item)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
+              </button>
+            ))}
+          </div>
         </div>
+      ) : null}
+      {!isSequence ? (
+        <p
+          className={cn(
+            gallerySans(),
+            "gallery-lightbox-hint pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-full bg-black/40 px-2.5 py-1 text-[10px] tracking-wide text-white/80 uppercase backdrop-blur-sm sm:block"
+          )}
+        >
+          ← → navigate · S share · ? keys
+        </p>
       ) : null}
     </div>
   )

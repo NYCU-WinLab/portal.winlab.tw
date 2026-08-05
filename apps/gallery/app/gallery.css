@@ -412,6 +412,77 @@ html::-webkit-scrollbar {
   transform: translateX(-50%);
 }
 
+/* ── Upload film dropzone ─────────────────────────────────────────────────── */
+
+.gallery-upload-dropzone {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(24, 24, 27, 0.02) 0%,
+      transparent 40%,
+      rgba(24, 24, 27, 0.03) 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 18px,
+      rgba(24, 24, 27, 0.035) 18px,
+      rgba(24, 24, 27, 0.035) 19px
+    );
+}
+
+.gallery-film-sprocket {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.85rem;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 8px,
+      oklch(0.94 0.006 250) 8px,
+      oklch(0.94 0.006 250) 16px
+    ),
+    oklch(0.28 0.014 255);
+  box-shadow: inset 0 0 0 1px rgba(24, 24, 27, 0.35);
+  pointer-events: none;
+}
+
+.gallery-film-sprocket--left {
+  left: 0;
+}
+
+.gallery-film-sprocket--right {
+  right: 0;
+}
+
+.gallery-wall-load-skeleton {
+  border: 3px solid #f7f7f5;
+  background: linear-gradient(180deg, #ececeb 0%, #e4e4e2 100%), #f7f7f5;
+  box-shadow:
+    0 2px 4px rgba(24, 24, 27, 0.06),
+    0 14px 28px -14px rgba(24, 24, 27, 0.32);
+}
+
+.gallery-lightbox-hint {
+  animation: gallery-cheatsheet-enter 0.25s ease-out both;
+}
+
+@keyframes gallery-comment-highlight-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(180, 120, 40, 0);
+  }
+  40% {
+    box-shadow: 0 0 0 3px rgba(180, 120, 40, 0.28);
+  }
+}
+
+.gallery-comment-highlight {
+  animation: gallery-comment-highlight-pulse 1.2s ease-out 2;
+}
+
 /* ── Dragon Boat Festival (端午) ─────────────────────────────────────────── */
 
 html[data-gallery-theme="dragon-boat"],
@@ -470,7 +541,8 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-pop {
   cursor: pointer;
   transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg));
   opacity: 0;
-  filter: drop-shadow(0 6px 14px rgba(30, 120, 75, 0.22));
+  /* Soften so seasonal never crowds out the paper-wall photos */
+  filter: drop-shadow(0 6px 14px rgba(30, 120, 75, 0.16));
   animation: gallery-zongzi-pop-in 0.55s ease-out forwards;
   animation-delay: var(--seed-delay, 0s);
   transition:
@@ -521,7 +593,7 @@ html[data-gallery-theme="dragon-boat"] .gallery-zongzi-burst-particle {
       translateY(0.5rem) scale(0.75);
   }
   to {
-    opacity: 1;
+    opacity: 0.72;
     transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
       translateY(0) scale(1);
   }
@@ -855,7 +927,7 @@ html[data-gallery-theme="world-cup"] .gallery-football-pop {
   cursor: pointer;
   transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg));
   opacity: 0;
-  filter: drop-shadow(0 5px 12px rgba(20, 90, 40, 0.28));
+  filter: drop-shadow(0 5px 12px rgba(20, 90, 40, 0.18));
   animation: gallery-football-pop-in 0.55s ease-out forwards;
   animation-delay: var(--seed-delay, 0s);
   transition:
@@ -907,7 +979,7 @@ html[data-gallery-theme="world-cup"] .gallery-football-burst-particle {
       translateY(0.5rem) scale(0.75);
   }
   to {
-    opacity: 1;
+    opacity: 0.7;
     transform: translate(-50%, -50%) rotate(var(--seed-rotate, 0deg))
       translateY(0) scale(1);
   }
