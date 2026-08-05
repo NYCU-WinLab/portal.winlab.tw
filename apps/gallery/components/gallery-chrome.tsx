@@ -31,6 +31,18 @@ export function galleryNavLinkClass(active = false) {
   )
 }
 
+/** High-visibility filter chips — ink-on-paper, sits under the hero. */
+export function galleryFilterChipClass(active = false) {
+  return cn(
+    gallerySans(),
+    "inline-flex min-h-9 items-center rounded-[2px] border px-3 py-1.5 text-[11px] tracking-[0.14em] uppercase",
+    "shadow-[0_1px_2px_rgba(24,24,27,0.05)] transition-[background-color,border-color,color,box-shadow]",
+    active
+      ? "border-zinc-800/55 bg-zinc-900 text-[#f7f7f5] shadow-[0_2px_8px_-2px_rgba(24,24,27,0.35)]"
+      : "border-zinc-800/14 bg-[#f7f7f5]/90 text-zinc-600 hover:border-zinc-800/28 hover:bg-white hover:text-foreground"
+  )
+}
+
 export function galleryShellBrandClass(active = false) {
   return cn(
     gallerySerif(),
