@@ -20,11 +20,20 @@ import {
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
-const THEME_OPTIONS: Array<{ value: ThemeChoice; label: string }> = [
-  { value: "off", label: "Off" },
+const THEME_OPTIONS: Array<{
+  value: ThemeChoice
+  label: string
+  hint?: string
+}> = [
+  {
+    value: "off",
+    label: "Paper wall",
+    hint: "Default darkroom renewal",
+  },
   ...GALLERY_SEASONAL_THEME_IDS.map((id) => ({
-    value: id,
+    value: id as ThemeChoice,
     label: GALLERY_SEASONAL_THEMES[id].label,
+    hint: "Limited-time overlay",
   })),
 ]
 
@@ -52,7 +61,7 @@ export function SeasonalThemePanel({
       if (themeId) {
         toast.success(`${GALLERY_SEASONAL_THEMES[themeId].label} theme is on.`)
       } else {
-        toast.success("Seasonal theme off.")
+        toast.success("Back to paper wall.")
       }
     })
   }
@@ -64,7 +73,8 @@ export function SeasonalThemePanel({
           Site theme
         </h2>
         <p className={gallerySectionLeadClass()}>
-          Pick a limited-time look for everyone visiting the gallery wall.
+          Paper wall is the committed look. Seasonal themes add a light overlay
+          — they never replace the darkroom renewal.
         </p>
       </div>
 
@@ -78,6 +88,7 @@ export function SeasonalThemePanel({
       >
         {THEME_OPTIONS.map((option) => {
           const checked = selected === option.value
+          const isDefault = option.value === "off"
 
           return (
             <button
@@ -90,11 +101,18 @@ export function SeasonalThemePanel({
               className={cn(
                 "min-w-[8.5rem] flex-1 rounded-xl border px-4 py-3 text-left transition-colors",
                 checked
-                  ? "border-foreground/25 bg-foreground/[0.07] text-foreground"
+                  ? isDefault
+                    ? "border-zinc-800/35 bg-zinc-900/[0.09] text-foreground ring-1 ring-zinc-900/10"
+                    : "border-foreground/25 bg-foreground/[0.07] text-foreground"
                   : "border-border/60 bg-muted/20 text-muted-foreground hover:border-foreground/15 hover:bg-muted/40 hover:text-foreground"
               )}
             >
-              <span className="text-sm font-medium">{option.label}</span>
+              <span className="block text-sm font-medium">{option.label}</span>
+              {option.hint ? (
+                <span className="mt-0.5 block text-[11px] opacity-75">
+                  {option.hint}
+                </span>
+              ) : null}
             </button>
           )
         })}
