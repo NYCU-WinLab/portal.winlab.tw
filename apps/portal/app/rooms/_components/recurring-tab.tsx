@@ -31,6 +31,7 @@ import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
+import { DeliverablesField } from "./deliverables-field"
 import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
@@ -59,6 +60,7 @@ export function RecurringTab() {
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [agenda, setAgenda] = useState("")
+  const [deliverables, setDeliverables] = useState<string[]>([])
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -78,6 +80,7 @@ export function RecurringTab() {
       {
         titleSuffix,
         agenda,
+        deliverables,
         weekday,
         startTime,
         durationMinutes,
@@ -92,6 +95,7 @@ export function RecurringTab() {
           setTitleSuffix(DEFAULT_TOPIC_SUFFIX)
           setGroupName(null)
           setAgenda("")
+          setDeliverables([])
           setAttendees([])
         },
         onError: (err) => toast.error(errorMessage(err, "建立失敗")),
@@ -129,6 +133,12 @@ export function RecurringTab() {
             rows={3}
           />
         </div>
+
+        <DeliverablesField
+          id="recurring-deliverables"
+          value={deliverables}
+          onChange={setDeliverables}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">星期</Label>

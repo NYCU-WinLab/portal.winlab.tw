@@ -1584,6 +1584,7 @@ export type Database = {
           cancelled_by: string | null
           created_at: string
           date: string
+          deliverables: string[]
           end_time: string
           external_reservation_id: string | null
           group_name: string | null
@@ -1606,6 +1607,7 @@ export type Database = {
           cancelled_by?: string | null
           created_at?: string
           date: string
+          deliverables?: string[]
           end_time: string
           external_reservation_id?: string | null
           group_name?: string | null
@@ -1628,6 +1630,7 @@ export type Database = {
           cancelled_by?: string | null
           created_at?: string
           date?: string
+          deliverables?: string[]
           end_time?: string
           external_reservation_id?: string | null
           group_name?: string | null
@@ -1755,6 +1758,7 @@ export type Database = {
           attendees: Json
           created_at: string
           created_by: string
+          deliverables: string[]
           duration_minutes: number
           group_name: string | null
           id: string
@@ -1774,6 +1778,7 @@ export type Database = {
           attendees?: Json
           created_at?: string
           created_by: string
+          deliverables?: string[]
           duration_minutes: number
           group_name?: string | null
           id?: string
@@ -1793,6 +1798,7 @@ export type Database = {
           attendees?: Json
           created_at?: string
           created_by?: string
+          deliverables?: string[]
           duration_minutes?: number
           group_name?: string | null
           id?: string

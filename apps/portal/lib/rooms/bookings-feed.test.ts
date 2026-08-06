@@ -23,6 +23,7 @@ function row(overrides: Partial<FeedRow> = {}): FeedRow {
     issue_refs: ["winlab/tasa-satsim#12"],
     group_name: "tasa-satsim",
     agenda: "review the link budget",
+    deliverables: ["Deliverable::Presentation"],
     ...overrides,
   }
 }
@@ -98,6 +99,7 @@ describe("toFeedItem", () => {
       issue_refs: ["winlab/tasa-satsim#12"],
       group_name: "tasa-satsim",
       agenda: "review the link budget",
+      deliverables: ["Deliverable::Presentation"],
     })
   })
 
@@ -129,6 +131,12 @@ describe("toFeedItem", () => {
     const item = toFeedItem(row(), joinUrl)
     expect(item.group_name).toBe("tasa-satsim")
     expect(item.agenda).toBe("review the link budget")
+  })
+
+  test("missing deliverables comes back as an empty array", () => {
+    expect(
+      toFeedItem(row({ deliverables: null }), joinUrl).deliverables
+    ).toEqual([])
   })
 
   test("a booking with no group reports null rather than guessing", () => {

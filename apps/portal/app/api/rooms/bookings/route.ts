@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   const { data, error } = await admin
     .from("rooms_bookings")
     .select(
-      "id, date, start_time, end_time, room, title, status, online, issue_refs, group_name, agenda"
+      "id, date, start_time, end_time, room, title, status, online, issue_refs, group_name, agenda, deliverables"
     )
     // Cancelled rows are included on purpose — see bookings-feed.ts. Their
     // absence would be indistinguishable from "finished" or "endpoint broke".

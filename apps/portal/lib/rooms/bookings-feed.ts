@@ -38,6 +38,7 @@ export interface BookingFeedItem {
    */
   group_name: string | null
   agenda: string | null
+  deliverables: string[]
 }
 
 export interface FeedWindow {
@@ -105,6 +106,7 @@ export interface FeedRow {
   issue_refs: string[] | null
   group_name: string | null
   agenda: string | null
+  deliverables: string[] | null
 }
 
 export function toFeedItem(
@@ -125,5 +127,6 @@ export function toFeedItem(
     issue_refs: row.issue_refs ?? [],
     group_name: row.group_name,
     agenda: row.agenda,
+    deliverables: row.deliverables ?? [],
   }
 }

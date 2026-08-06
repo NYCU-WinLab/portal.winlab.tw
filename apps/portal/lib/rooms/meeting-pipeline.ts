@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { deliverablesParam } from "./deliverables"
 import {
   hashCallbackToken,
   newCallbackToken,
@@ -35,6 +36,8 @@ export interface MeetingRequestInput {
   groupName?: string | null
   /** Free text: what the meeting is for. Becomes the issue's body. */
   agenda?: string | null
+  /** GitLab `Deliverable::*` labels, already validated against the list. */
+  deliverables?: readonly string[]
 }
 
 export interface MeetingCancelInput {
@@ -83,6 +86,8 @@ export async function triggerMeetingPipeline(
     form.set("variables[END_TIME]", input.end)
     if (input.groupName) form.set("variables[GROUP_NAME]", input.groupName)
     if (input.agenda) form.set("variables[AGENDA]", input.agenda)
+    const deliverables = deliverablesParam(input.deliverables ?? [])
+    if (deliverables) form.set("variables[DELIVERABLES]", deliverables)
   })
 }
 
