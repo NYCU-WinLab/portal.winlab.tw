@@ -23,6 +23,18 @@ export interface MeetingRequestInput {
   /** ISO 8601 with an offset — the pipeline rejects bare instants. */
   start: string
   end: string
+  /**
+   * The Keycloak group's leaf name, when the attendees came from a group.
+   *
+   * Deliberately the leaf and not a path: GitLab nests three levels deep
+   * (winlab/network-system-design-and-implementation/tasa-satsim) where
+   * Keycloak is flat (/winlab-projects/tasa-satsim), so a path built here
+   * would look plausible and 404. GitLab resolves the leaf on its side and
+   * fails loudly if it matches zero or more than one group.
+   */
+  groupName?: string | null
+  /** Free text: what the meeting is for. Becomes the issue's body. */
+  agenda?: string | null
 }
 
 export interface MeetingCancelInput {
@@ -69,6 +81,8 @@ export async function triggerMeetingPipeline(
     form.set("variables[SUBJECT]", input.title)
     form.set("variables[START_TIME]", input.start)
     form.set("variables[END_TIME]", input.end)
+    if (input.groupName) form.set("variables[GROUP_NAME]", input.groupName)
+    if (input.agenda) form.set("variables[AGENDA]", input.agenda)
   })
 }
 

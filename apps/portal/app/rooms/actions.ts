@@ -263,6 +263,8 @@ export interface ConfirmBookingInput {
   attendees: AttendeeContact[]
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
 }
 
 export type BookingResult = {
@@ -311,6 +313,8 @@ export async function confirmBooking(
       // whole thing is that there's a recording to look back at afterwards.
       online: true,
       meetingPrefix: prefix,
+      groupName: input.groupName ?? null,
+      agenda: input.agenda?.trim() || null,
     })
 
     revalidatePath("/rooms")
@@ -492,6 +496,8 @@ export interface CreateRecurringInput {
   includeAdvisor: boolean
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
 }
 
 export async function createRecurringMeeting(
@@ -529,6 +535,7 @@ export async function createRecurringMeeting(
     created_by: user.id,
     meeting_prefix: prefix,
     group_name: input.groupName ?? null,
+    agenda: input.agenda?.trim() || null,
   })
   if (error) throw new Error(`建立固定會議失敗:${error.message}`)
 

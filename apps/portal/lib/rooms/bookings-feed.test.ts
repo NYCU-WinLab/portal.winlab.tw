@@ -21,6 +21,8 @@ function row(overrides: Partial<FeedRow> = {}): FeedRow {
     status: "booked",
     online: true,
     issue_refs: ["winlab/tasa-satsim#12"],
+    group_name: "tasa-satsim",
+    agenda: "review the link budget",
     ...overrides,
   }
 }
@@ -94,6 +96,8 @@ describe("toFeedItem", () => {
       status: "confirmed",
       join_url: "https://portal.winlab.tw/api/rooms/join/b1",
       issue_refs: ["winlab/tasa-satsim#12"],
+      group_name: "tasa-satsim",
+      agenda: "review the link budget",
     })
   })
 
@@ -117,6 +121,18 @@ describe("toFeedItem", () => {
 
   test("a booking with no Teams meeting has no join link", () => {
     expect(toFeedItem(row({ online: false }), joinUrl).join_url).toBeNull()
+  })
+
+  // Repeated from the trigger so a lost trigger copy is recoverable on the
+  // next poll — the same reason `status` is here rather than inferred.
+  test("carries the fields the trigger also sent", () => {
+    const item = toFeedItem(row(), joinUrl)
+    expect(item.group_name).toBe("tasa-satsim")
+    expect(item.agenda).toBe("review the link budget")
+  })
+
+  test("a booking with no group reports null rather than guessing", () => {
+    expect(toFeedItem(row({ group_name: null }), joinUrl).group_name).toBeNull()
   })
 
   // Always an array, so the consumer never branches on the field's absence.

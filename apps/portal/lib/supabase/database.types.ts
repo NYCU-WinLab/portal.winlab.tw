@@ -740,6 +740,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_activity_notifications_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_activity_notifications_recipient_user_id_fkey"
             columns: ["recipient_user_id"]
             isOneToOne: false
@@ -864,6 +871,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_comments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_comments_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -897,6 +911,13 @@ export type Database = {
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
             referencedColumns: ["id"]
           },
           {
@@ -1557,6 +1578,7 @@ export type Database = {
       }
       rooms_bookings: {
         Row: {
+          agenda: string | null
           attendees: Json
           cancelled_at: string | null
           cancelled_by: string | null
@@ -1564,8 +1586,10 @@ export type Database = {
           date: string
           end_time: string
           external_reservation_id: string | null
+          group_name: string | null
           id: string
           invite_sequence: number
+          issue_refs: string[]
           meeting_prefix: string | null
           online: boolean
           recurring_id: string | null
@@ -1576,6 +1600,7 @@ export type Database = {
           title: string | null
         }
         Insert: {
+          agenda?: string | null
           attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -1583,8 +1608,10 @@ export type Database = {
           date: string
           end_time: string
           external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
           invite_sequence?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           recurring_id?: string | null
@@ -1595,6 +1622,7 @@ export type Database = {
           title?: string | null
         }
         Update: {
+          agenda?: string | null
           attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -1602,8 +1630,10 @@ export type Database = {
           date?: string
           end_time?: string
           external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
           invite_sequence?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           recurring_id?: string | null
@@ -1720,6 +1750,7 @@ export type Database = {
       rooms_recurring_meetings: {
         Row: {
           active: boolean
+          agenda: string | null
           anchor_date: string
           attendees: Json
           created_at: string
@@ -1729,6 +1760,7 @@ export type Database = {
           id: string
           include_advisor: boolean
           interval_weeks: number
+          issue_refs: string[]
           meeting_prefix: string | null
           online: boolean
           start_time: string
@@ -1737,6 +1769,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          agenda?: string | null
           anchor_date: string
           attendees?: Json
           created_at?: string
@@ -1746,6 +1779,7 @@ export type Database = {
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           start_time: string
@@ -1754,6 +1788,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          agenda?: string | null
           anchor_date?: string
           attendees?: Json
           created_at?: string
@@ -1763,6 +1798,7 @@ export type Database = {
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           start_time?: string
@@ -2004,6 +2040,30 @@ export type Database = {
       }
     }
     Views: {
+      gallery_wall_covers: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          duration_seconds: number | null
+          id: string | null
+          image_path: string | null
+          media_type: string | null
+          name: string | null
+          pinned_at: string | null
+          poster_path: string | null
+          sequence_id: string | null
+          sequence_index: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_question_rotation: {
         Row: {
           email: string | null

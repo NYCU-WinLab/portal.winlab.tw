@@ -32,6 +32,12 @@ export interface BookingFeedItem {
   /** Null when this booking never asked for a Teams meeting. */
   join_url: string | null
   issue_refs: string[]
+  /**
+   * Repeated from the trigger on purpose. If the trigger's copy was lost,
+   * the next poll picks these up from here — same reason `status` exists.
+   */
+  group_name: string | null
+  agenda: string | null
 }
 
 export interface FeedWindow {
@@ -97,6 +103,8 @@ export interface FeedRow {
   status: string
   online: boolean
   issue_refs: string[] | null
+  group_name: string | null
+  agenda: string | null
 }
 
 export function toFeedItem(
@@ -115,5 +123,7 @@ export function toFeedItem(
     status: row.status === "booked" ? "confirmed" : "cancelled",
     join_url: row.online ? joinUrlFor(row.id) : null,
     issue_refs: row.issue_refs ?? [],
+    group_name: row.group_name,
+    agenda: row.agenda,
   }
 }
