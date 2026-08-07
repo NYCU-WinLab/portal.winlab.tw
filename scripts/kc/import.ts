@@ -194,7 +194,13 @@ export async function importAttributes(
       const found = await api.get<UserRepresentation[]>(
         `/users?username=${encodeURIComponent(username)}&exact=true`
       )
-      user = found[0]
+      // Re-fetch by id: the search endpoint's representation has been trimmed
+      // over the 26.x line (organizations already default to brief), and the
+      // merge below sends `attributes` back wholesale. If the list ever omits
+      // them, merging from a search hit would wipe every attribute it didn't
+      // return.
+      if (found[0])
+        user = await api.get<UserRepresentation>(`/users/${found[0].id}`)
     } catch (err) {
       tally.failed += changes.length
       notes.push(`${username}: lookup failed — ${describeError(err)}`)
@@ -209,6 +215,10 @@ export async function importAttributes(
 
     const attributes: Record<string, string[]> = { ...(user.attributes ?? {}) }
     const applied: string[] = []
+    // Only the changes this run actually writes. Verifying against every
+    // planned change would count ones that were already correct, so a realm
+    // that silently discarded the write could still report success.
+    const appliedChanges: PlannedChange[] = []
 
     for (const change of changes) {
       const validator = validators.get(change.attribute)
@@ -238,6 +248,7 @@ export async function importAttributes(
       }
       attributes[change.attribute] = [change.value]
       applied.push(`${change.attribute}=${change.value}`)
+      appliedChanges.push(change)
     }
 
     if (applied.length === 0) continue
@@ -262,7 +273,7 @@ export async function importAttributes(
     // policy Keycloak accepts the write and stores nothing.
     try {
       const after = await api.get<UserRepresentation>(`/users/${user.id}`)
-      const stuck = changes.filter(
+      const stuck = appliedChanges.filter(
         (c) => after.attributes?.[c.attribute]?.[0]?.trim() === c.value
       )
       tally.written += stuck.length

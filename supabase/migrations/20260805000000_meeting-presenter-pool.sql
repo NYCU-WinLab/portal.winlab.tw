@@ -152,6 +152,13 @@ begin
     raise exception '入學學年須為民國年三碼（例如 113）' using errcode = 'P0001';
   end if;
 
+  -- Serialize appends to a cohort. Without this two admins adding to the same
+  -- year both read the same max(sort_order) and the loser gets a raw 23505
+  -- instead of simply landing at n+1.
+  perform pg_advisory_xact_lock(
+    hashtext('meetings_presenter_pool:' || p_admission_year::text)
+  );
+
   select admission_year into v_old_year
   from public.meeting_presenter_pool
   where user_id = p_user;
@@ -204,6 +211,10 @@ begin
     return;
   end if;
 
+  perform pg_advisory_xact_lock(
+    hashtext('meetings_presenter_pool:' || v_year::text)
+  );
+
   delete from public.meeting_presenter_pool where user_id = p_user;
   perform public.meetings_pool_compact(v_year);
 end;
@@ -237,6 +248,13 @@ begin
   if not found then
     raise exception '此成員不在報告順位名單中' using errcode = 'P0001';
   end if;
+
+  -- Two admins reordering the same cohort would otherwise each hold one row
+  -- and wait on the other's — a deadlock, surfaced as a raw 40P01. One lock
+  -- per cohort makes reorders take turns instead.
+  perform pg_advisory_xact_lock(
+    hashtext('meetings_presenter_pool:' || v_row.admission_year::text)
+  );
 
   select * into v_neighbour
   from public.meeting_presenter_pool
@@ -285,12 +303,15 @@ security definer
 set search_path to 'public'
 as $function$
 declare
-  v_roster  uuid[];
-  v_names   text[];
-  v_size    int;
-  v_index   int := 0;
-  v_meeting record;
-  v_filled  int := 0;
+  v_roster   uuid[];
+  v_names    text[];
+  v_size     int;
+  v_index    int := 0;
+  v_meeting  record;
+  v_filled   int := 0;
+  v_updated  int;
+  v_attempts int;
+  v_today    date := (now() at time zone 'Asia/Taipei')::date;
 begin
   if not public.is_meetings_admin() then
     raise exception 'Forbidden: 僅管理員可排定報告人' using errcode = '42501';
@@ -320,20 +341,53 @@ begin
       and not is_speaker
       and presenter_user_id is null
       and presenter is null
-      and scheduled_date >= current_date
+      -- The lab is in Taipei; the database session is not. Comparing against
+      -- current_date (UTC by default on Supabase) would treat a Taipei
+      -- morning as "yesterday" for eight hours and quietly fill a week that
+      -- has already happened.
+      and scheduled_date >= v_today
     order by scheduled_date asc, id asc
   loop
-    update public.meetings
-    set presenter = v_names[(v_index % v_size) + 1],
-        presenter_user_id = v_roster[(v_index % v_size) + 1]
-    where id = v_meeting.id;
+    v_attempts := 0;
 
-    -- Same convention as every other mutation in this app: a presenter change
-    -- invalidates the questioner roster for that week.
-    perform public.meetings_sync_questioners(v_meeting.id);
+    loop
+      begin
+        update public.meetings
+        set presenter = v_names[(v_index % v_size) + 1],
+            presenter_user_id = v_roster[(v_index % v_size) + 1]
+        where id = v_meeting.id
+          -- Re-assert the predicate at write time. The cursor is a snapshot,
+          -- and meetings_claim can land between the two — without this a
+          -- student's claim is silently overwritten and reported as filled.
+          and presenter_user_id is null
+          and presenter is null;
+        get diagnostics v_updated = row_count;
+        exit;
+      exception when unique_violation then
+        -- meetings_presenter_paper_uniq is a partial index and cannot be
+        -- deferred: if this week already carries a reading-list paper the
+        -- candidate has presented before, the insert fails. Without this
+        -- handler the exception would abort the whole fill and leave every
+        -- other week unassigned. Try the next member instead; give up on
+        -- this week once the roster has been exhausted.
+        v_index := v_index + 1;
+        v_attempts := v_attempts + 1;
+        if v_attempts >= v_size then
+          v_updated := 0;
+          exit;
+        end if;
+      end;
+    end loop;
 
-    v_index := v_index + 1;
-    v_filled := v_filled + 1;
+    if v_updated > 0 then
+      -- Same convention as every other mutation in this app: a presenter
+      -- change invalidates the questioner roster for that week.
+      perform public.meetings_sync_questioners(v_meeting.id);
+      v_index := v_index + 1;
+      v_filled := v_filled + 1;
+    end if;
+    -- Deliberately no index advance when nothing was written: the candidate
+    -- did not get a week, so they stay next in line.
   end loop;
 
   return jsonb_build_object('filled', v_filled, 'poolSize', v_size);

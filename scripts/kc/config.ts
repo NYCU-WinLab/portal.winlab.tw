@@ -164,11 +164,17 @@ export async function loadConfig(profile: ProfileName): Promise<Config> {
 // Belt and braces: every command routes its output through this, so a secret
 // echoed back inside a Keycloak error body can't reach a terminal or a
 // transcript. Longest-first so overlapping secrets scrub completely.
+// Reads `secrets` on every call rather than snapshotting it, so a caller can
+// keep pushing newly-minted values in — bootstrap only learns the client
+// secrets partway through, and they must be scrubbed from everything printed
+// after that point.
 export function redactor(secrets: string[]): (text: string) => string {
-  const ordered = [...new Set(secrets)]
-    .filter((s) => s.length >= 8)
-    .sort((a, b) => b.length - a.length)
   return (text: string) => {
+    const ordered = [...new Set(secrets)]
+      // A short "secret" would match ordinary words and redact the very
+      // diagnostics this tool exists to print.
+      .filter((s) => s.length >= 6)
+      .sort((a, b) => b.length - a.length)
     let out = text
     for (const secret of ordered) out = out.split(secret).join("«redacted»")
     return out

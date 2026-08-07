@@ -105,7 +105,11 @@ export async function bootstrap(
   config: Config,
   options: BootstrapOptions
 ): Promise<number> {
-  const report = new Report(redactor(config.secrets))
+  // Grows as client secrets are read back from Keycloak. The redactor closes
+  // over this array, so secrets minted mid-run are scrubbed from every line
+  // printed after them — including a Keycloak error body echoing one back.
+  const secretsSeen = [...config.secrets]
+  const report = new Report(redactor(secretsSeen))
 
   if (!config.url || !config.realm) {
     report.fail(
@@ -162,7 +166,14 @@ export async function bootstrap(
   const secrets: Record<string, string> = {}
   for (const spec of CLIENTS) {
     report.heading(`Client: ${spec.clientId}  (${spec.role})`)
-    const secret = await provisionClient(api, spec, rmId, options.apply, report)
+    const secret = await provisionClient(
+      api,
+      spec,
+      rmId,
+      options.apply,
+      report,
+      (value) => secretsSeen.push(value)
+    )
     if (!secret) continue
     secrets[spec.envPrefix] = secret
     await verifyClient(config, spec, secret, report)
@@ -250,7 +261,8 @@ async function provisionClient(
   spec: ClientSpec,
   realmManagementUuid: string,
   apply: boolean,
-  report: Report
+  report: Report,
+  onSecret: (secret: string) => void
 ): Promise<string | null> {
   const desired = desiredRepresentation(spec)
 
@@ -344,6 +356,7 @@ async function provisionClient(
       report.fail("Client has no secret — is it really confidential?")
       return null
     }
+    onSecret(credential.value)
     report.ok("Read client secret (not shown)")
     return credential.value
   } catch (err) {

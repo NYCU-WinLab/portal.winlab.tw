@@ -25,7 +25,9 @@ export function TagPicker({ value, onChange }: Props) {
   const [color, setColor] = useState<string>(DEFAULT_TAG_COLOR)
 
   function toggle(id: string) {
-    onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id])
+    onChange(
+      value.includes(id) ? value.filter((x) => x !== id) : [...value, id]
+    )
   }
 
   function create() {

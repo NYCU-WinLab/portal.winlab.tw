@@ -112,6 +112,10 @@ export function useFillPresenters() {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       // Assigning a presenter re-syncs that week's questioners server-side.
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      // The roster view derives 已報告次數 and last-presented from `meetings`,
+      // so a fill changes it too — without this the admin keeps reading the
+      // pre-fill counts they are about to reorder by.
+      qc.invalidateQueries({ queryKey: queryKeys.presenterPool.all })
       toast.success(
         filled > 0 ? `已排定 ${filled} 週的報告人` : "沒有可排定的空白週"
       )

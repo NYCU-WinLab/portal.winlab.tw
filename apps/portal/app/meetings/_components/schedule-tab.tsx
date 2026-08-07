@@ -90,7 +90,13 @@ export function ScheduleTab({ year }: { year: number }) {
   // the RPC will actually do: unassigned presentation weeks from today onward.
   // A week carrying only a hand-typed name counts as taken, and past weeks are
   // never filled — that would invent a presentation.
-  const today = new Date().toLocaleDateString("sv-SE")
+  // Pinned to Taipei, matching the RPC's own `(now() at time zone
+  // 'Asia/Taipei')::date`. Using the browser's local date would disagree with
+  // the server for anyone in another timezone, so the button's count and the
+  // number of weeks actually filled would differ — the #336 shape of bug.
+  const today = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Taipei",
+  }).format(new Date())
   const fillable = presentationMeetings.filter(
     (m) => !m.presenter && !m.presenterUserId && m.scheduledDate >= today
   ).length
@@ -228,7 +234,11 @@ export function ScheduleTab({ year }: { year: number }) {
             {showEditMode && (
               <ConfirmDialog
                 trigger={
-                  <Button size="sm" variant="outline" disabled={fillable === 0}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={fillable === 0 || fillPresenters.isPending}
+                  >
                     依順位填入空白週
                     {fillable > 0 ? `（${fillable}）` : ""}
                   </Button>

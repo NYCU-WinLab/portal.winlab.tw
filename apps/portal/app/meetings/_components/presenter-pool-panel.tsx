@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import {
   IconChevronDown,
@@ -52,6 +52,9 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   )
   const [year, setYear] = useState("")
   const [hint, setHint] = useState<string | null>(null)
+  // Which candidate the in-flight lookup belongs to, so a slow answer for an
+  // earlier pick can be discarded rather than landing on the current one.
+  const lookupFor = useRef<string | null>(null)
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
@@ -64,10 +67,28 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
   async function pick(user: { id: string; name: string | null }) {
     const name = user.name ?? user.id
+    lookupFor.current = user.id
     setPicked({ id: user.id, name })
     setYear("")
     setHint("查詢入學學年中…")
-    const suggestion = await suggestAdmissionYear(user.id)
+
+    let suggestion: Awaited<ReturnType<typeof suggestAdmissionYear>>
+    try {
+      suggestion = await suggestAdmissionYear(user.id)
+    } catch {
+      // Without this the hint would sit on "查詢中…" forever and the admin
+      // would have no idea the lookup died.
+      if (lookupFor.current === user.id) {
+        setHint("查詢入學學年失敗，請手動填寫")
+      }
+      return
+    }
+
+    // Two clicks in quick succession resolve out of order. Dropping the stale
+    // answer stops the form showing one member's name beside another's year —
+    // which would silently file them under the wrong cohort.
+    if (lookupFor.current !== user.id) return
+
     if (suggestion.status === "found") {
       setYear(String(suggestion.year))
       setHint(
@@ -75,6 +96,8 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
           ? "已自動帶入 Keycloak 的入學學年"
           : "Keycloak 沒有入學學年，已從學號推算"
       )
+    } else if (suggestion.status === "forbidden") {
+      setHint("沒有查詢權限，請手動填寫")
     } else {
       setHint("Keycloak 查不到入學學年，請手動填寫")
     }
@@ -86,6 +109,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
       { userId: picked.id, admissionYear: parsedYear },
       {
         onSuccess: () => {
+          lookupFor.current = null
           setPicked(null)
           setYear("")
           setHint(null)
@@ -106,6 +130,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
             className="h-6 gap-1 px-2 text-xs text-muted-foreground"
             onClick={() => {
               setAdding((v) => !v)
+              lookupFor.current = null
               setPicked(null)
               setHint(null)
             }}
@@ -161,6 +186,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                   size="sm"
                   className="h-7 text-muted-foreground"
                   onClick={() => {
+                    lookupFor.current = null
                     setPicked(null)
                     setHint(null)
                   }}

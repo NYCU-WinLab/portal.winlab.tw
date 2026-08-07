@@ -55,4 +55,14 @@ describe("redactor", () => {
   test("passes text through when there are no secrets", () => {
     expect(redactor([])("nothing to hide")).toBe("nothing to hide")
   })
+
+  // bootstrap only learns the client secrets partway through its run, so the
+  // redactor has to pick up values pushed after it was built.
+  test("scrubs secrets added after it was created", () => {
+    const secrets: string[] = []
+    const redact = redactor(secrets)
+    expect(redact("value later-secret-value")).toBe("value later-secret-value")
+    secrets.push("later-secret-value")
+    expect(redact("value later-secret-value")).toBe("value «redacted»")
+  })
 })

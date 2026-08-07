@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(36);
+select plan(41);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -122,6 +122,24 @@ select is(
   (select sort_order from public.meeting_presenter_pool where user_id = 'bbbbbbbb-0000-0000-0000-000000000011'),
   2, 'the displaced member takes the vacated position (a swap, not an insert)');
 
+-- Down is its own branch: every other move assertion uses -1, so a sign error
+-- here would pass the whole suite.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_pool_move('bbbbbbbb-0000-0000-0000-000000000012', 1);
+reset role;
+
+select is(
+  (select string_agg(name, ',' order by sort_order)
+   from public.meeting_presenter_roster where admission_year = 113),
+  'A,B', 'moving down swaps with the member below');
+
+-- put B back on top for the assertions that follow
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_pool_move('bbbbbbbb-0000-0000-0000-000000000012', -1);
+reset role;
+
 -- an edge move is a no-op, and never reaches into the neighbouring cohort
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
@@ -196,7 +214,10 @@ insert into public.meetings (year, week_label, scheduled_date, is_holiday, is_sp
   (2040, '第1週', '2040-09-06', false, false, NULL, NULL),                                    -- → A
   (2040, '第2週(月考週)', '2040-09-13', true, false, NULL, NULL),                              -- holiday, skipped
   (2040, '第3週', '2040-09-20', false, false, NULL, NULL),                                    -- → B
-  (2040, '第4週', '2040-09-27', false, true, '外賓講者', NULL),                                -- speaker, skipped
+  -- No presenter name on this one: with a name it would be skipped by the
+  -- "already taken" filter even if the is_speaker clause were deleted, so the
+  -- test would prove nothing about speaker weeks.
+  (2040, '第4週', '2040-09-27', false, true, NULL, NULL),                                     -- speaker, skipped
   (2040, '第5週', '2040-10-04', false, false, NULL, NULL),                                    -- → C
   (2040, '第6週', '2040-10-11', false, false, 'P', 'bbbbbbbb-0000-0000-0000-000000000002'),   -- taken, skipped
   (2040, '第7週', '2040-10-18', false, false, '客座', NULL),                                   -- free-text, skipped
@@ -228,7 +249,10 @@ select is(
   NULL, 'a holiday week is never assigned a presenter');
 select is(
   (select presenter_user_id from public.meetings where scheduled_date = '2040-09-27'),
-  NULL, 'a speaker week keeps its external name and gains no presenter_user_id');
+  NULL, 'a speaker week is never assigned a presenter');
+select is(
+  (select presenter from public.meetings where scheduled_date = '2040-09-27'),
+  NULL, 'a speaker week is skipped for being a speaker week, not for being taken');
 select is(
   (select presenter from public.meetings where scheduled_date = '2040-10-11'),
   'P', 'a week that already has a presenter is left alone');
@@ -258,6 +282,37 @@ reset role;
 
 select is((select (ret->>'filled')::int from fill_empty), 0, 'an empty roster fills nothing');
 select is((select (ret->>'poolSize')::int from fill_empty), 0, 'an empty roster reports poolSize 0 rather than failing');
+
+-- ═══ a week whose paper the only candidate already presented ════════════════
+-- meetings_presenter_paper_uniq is a partial index and cannot be deferred, so
+-- this raises inside the loop. Without the handler the exception would abort
+-- the whole fill; the week must simply be left alone instead. Dates are five
+-- years apart so meetings_paper_cooldown (365 days per paper) stays satisfied.
+insert into public.teacher_papers (id, provided_date, paper_name) values
+  ('dddddddd-0000-0000-0000-000000000001', '2035-01-01', 'A paper A already gave');
+
+insert into public.meetings (year, week_label, scheduled_date, presenter, presenter_user_id, teacher_paper_id) values
+  (2035, '第1週', '2035-01-01', 'A', 'bbbbbbbb-0000-0000-0000-000000000011',
+   'dddddddd-0000-0000-0000-000000000001');
+
+insert into public.meetings (year, week_label, scheduled_date, teacher_paper_id) values
+  (2043, '第1週', '2043-09-07', 'dddddddd-0000-0000-0000-000000000001');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_pool_upsert('bbbbbbbb-0000-0000-0000-000000000011', 113);
+create temp table fill_clash as
+  select public.meetings_fill_presenters(2043) as ret;
+reset role;
+
+select is((select (ret->>'filled')::int from fill_clash), 0,
+  'a week the only candidate cannot take is skipped, not fatal');
+select is(
+  (select presenter_user_id from public.meetings where scheduled_date = '2043-09-07'),
+  NULL, 'that week is left unassigned rather than rolling the whole fill back');
+select is(
+  (select presenter from public.meetings where scheduled_date = '2035-01-01'),
+  'A', 'the earlier presentation of that paper is untouched');
 
 select * from finish();
 rollback;
