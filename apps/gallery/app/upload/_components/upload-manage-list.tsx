@@ -1,12 +1,7 @@
 "use client"
 
-import {
-  useMemo,
-  useState,
-  useTransition,
-  type DragEvent,
-  type ReactNode,
-} from "react"
+import { useMemo, useState, useTransition, type ReactNode } from "react"
+import { IconGripVertical } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import {
@@ -37,13 +32,16 @@ import {
   gallerySans,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
+import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import {
+  describeSequenceGaps,
+  findSequenceGaps,
   groupManageUploads,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
-import { getGalleryImageUrl } from "@/lib/gallery/url"
+import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 type SelectableItem = {
   id: string
@@ -61,7 +59,8 @@ function UploadListItem({
   selectionMode,
   isAdmin = false,
   showWallPin = false,
-  draggableProps,
+  sequenceIndex,
+  reorderHandle,
 }: {
   image: ManageUploadRow
   siblings: ManageUploadRow[]
@@ -71,12 +70,8 @@ function UploadListItem({
   selectionMode: boolean
   isAdmin?: boolean
   showWallPin?: boolean
-  draggableProps?: {
-    draggable: boolean
-    onDragStart: (event: DragEvent<HTMLLIElement>) => void
-    onDragOver: (event: DragEvent<HTMLLIElement>) => void
-    onDrop: (event: DragEvent<HTMLLIElement>) => void
-  }
+  sequenceIndex?: number
+  reorderHandle?: ReactNode
 }) {
   const isVideo = image.media_type === "video"
   const thumbPath =
@@ -85,13 +80,16 @@ function UploadListItem({
 
   return (
     <li
-      {...draggableProps}
+      data-sequence-index={
+        typeof sequenceIndex === "number" ? sequenceIndex : undefined
+      }
       className={cn(
         galleryPanelClass(),
-        "flex items-center gap-4 !p-4 sm:gap-5",
-        draggableProps?.draggable && "cursor-grab active:cursor-grabbing"
+        "flex items-center gap-3 !p-4 sm:gap-5",
+        "data-[sequence-drop-target=true]:ring-2 data-[sequence-drop-target=true]:ring-foreground/40"
       )}
     >
+      {reorderHandle}
       {selectionMode ? (
         <input
           type="checkbox"
@@ -102,7 +100,7 @@ function UploadListItem({
         />
       ) : null}
       <UploadListThumb
-        src={getGalleryImageUrl(thumbPath)}
+        src={getGalleryThumbUrl(thumbPath, 160)}
         alt={image.name}
         isVideo={isVideo}
       />
@@ -121,6 +119,9 @@ function UploadListItem({
           })}
           {isVideo && image.duration_seconds
             ? ` · ${image.duration_seconds}s video`
+            : ""}
+          {typeof image.sequence_index === "number"
+            ? ` · slot ${image.sequence_index + 1}`
             : ""}
         </p>
         {sequenceControls ? (
@@ -150,6 +151,30 @@ function UploadListItem({
   )
 }
 
+function SequenceGapRow({ slotIndex }: { slotIndex: number }) {
+  return (
+    <li
+      className={cn(
+        galleryPanelClass(),
+        "flex items-center gap-4 border-dashed !p-4 opacity-80"
+      )}
+    >
+      <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/30 text-xs text-muted-foreground">
+        ?
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={cn(gallerySans(), "text-sm font-medium text-foreground")}>
+          {slotIndex === 0 ? "Missing cover" : `Missing shot ${slotIndex + 1}`}
+        </p>
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          Upload retry should fill slot {slotIndex + 1}. Reorder after the hole
+          is filled if you want a different cover.
+        </p>
+      </div>
+    </li>
+  )
+}
+
 function UploadSequenceGroup({
   sequenceId,
   items: initialItems,
@@ -169,11 +194,21 @@ function UploadSequenceGroup({
 }) {
   const [items, setItems] = useState(initialItems)
   const [isPending, startTransition] = useTransition()
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
   const orderedIds = useMemo(() => items.map((item) => item.id), [items])
+  const gapInfo = useMemo(
+    () => findSequenceGaps(items.map((item) => item.sequence_index)),
+    [items]
+  )
+  const gapLabel = describeSequenceGaps(gapInfo.gaps)
 
   const persistOrder = (nextIds: string[], nextItems: ManageUploadRow[]) => {
-    setItems(nextItems)
+    // Keep client sequence_index dense so Cover / Set cover stay accurate
+    // before the server round-trip finishes.
+    const densified = nextItems.map((item, index) => ({
+      ...item,
+      sequence_index: index,
+    }))
+    setItems(densified)
     startTransition(async () => {
       const result = await updateGallerySequenceOrder(sequenceId, nextIds)
       if (!result.ok) {
@@ -195,83 +230,182 @@ function UploadSequenceGroup({
   }
 
   const setCover = (index: number) => {
-    if (index === 0) return
+    const item = items[index]
+    if (!item) return
+    // listIndex 0 is not always the cover when slot 0 is missing.
+    if (item.sequence_index === 0) return
     const nextIds = swapSequenceOrder(orderedIds, index, 0)
     if (!nextIds) return
     const nextItems = nextIds
-      .map((id) => items.find((item) => item.id === id))
-      .filter((item): item is ManageUploadRow => Boolean(item))
+      .map((id) => items.find((row) => row.id === id))
+      .filter((row): row is ManageUploadRow => Boolean(row))
     persistOrder(nextIds, nextItems)
   }
 
-  const onDropAt = (targetIndex: number) => {
-    if (dragIndex === null || dragIndex === targetIndex) return
-    move(dragIndex, targetIndex)
-    setDragIndex(null)
+  const compactSequence = () => {
+    if (items.length === 0) return
+    const nextIds = items.map((item) => item.id)
+    // Same order, but densified indexes close gaps on the server.
+    persistOrder(nextIds, items)
+    toast.message("Compacting sequence slots…")
   }
+
+  const {
+    listRef,
+    onHandlePointerDown,
+    onHandlePointerMove,
+    onHandlePointerUp,
+    onHandlePointerCancel,
+  } = useSequencePointerReorder({
+    itemCount: items.length,
+    disabled: isPending || selectionMode,
+    onReorder: move,
+  })
+
+  const timelineSlots = useMemo(() => {
+    if (gapInfo.maxIndex == null) {
+      return items.map((item, listIndex) => ({
+        kind: "item" as const,
+        item,
+        listIndex,
+      }))
+    }
+
+    const bySlot = new Map<
+      number,
+      { item: ManageUploadRow; listIndex: number }
+    >()
+    items.forEach((item, listIndex) => {
+      if (typeof item.sequence_index === "number") {
+        bySlot.set(item.sequence_index, { item, listIndex })
+      }
+    })
+
+    const slots: Array<
+      | { kind: "item"; item: ManageUploadRow; listIndex: number }
+      | { kind: "gap"; slotIndex: number }
+    > = []
+
+    for (let slot = 0; slot <= gapInfo.maxIndex; slot++) {
+      const hit = bySlot.get(slot)
+      if (hit) {
+        slots.push({ kind: "item", item: hit.item, listIndex: hit.listIndex })
+      } else {
+        slots.push({ kind: "gap", slotIndex: slot })
+      }
+    }
+
+    // Rows without a numeric index still appear at the end.
+    items.forEach((item, listIndex) => {
+      if (typeof item.sequence_index === "number") return
+      slots.push({ kind: "item", item, listIndex })
+    })
+
+    return slots
+  }, [gapInfo.maxIndex, items])
 
   return (
     <div className="space-y-3">
       <p
         className={cn(gallerySans(), "text-xs text-muted-foreground uppercase")}
       >
-        Sequence · {items.length} shots · drag to reorder
+        Sequence story · {items.length} shots · drag handle to reorder
       </p>
-      <ul className="flex flex-col gap-3">
-        {items.map((image, index) => (
-          <UploadListItem
-            key={image.id}
-            image={image}
-            siblings={allImages}
-            selected={selectedIds.has(image.id)}
-            onToggleSelected={() => onToggleSelected(image.id)}
-            selectionMode={selectionMode}
-            isAdmin={isAdmin}
-            showWallPin={index === 0}
-            draggableProps={{
-              draggable: !isPending,
-              onDragStart: () => setDragIndex(index),
-              onDragOver: (event) => event.preventDefault(),
-              onDrop: () => onDropAt(index),
-            }}
-            sequenceControls={
-              <>
-                {index === 0 ? (
-                  <span
-                    className={cn(galleryPillClass(), "pointer-events-none")}
-                  >
-                    Cover
-                  </span>
-                ) : (
+      {gapLabel ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={cn(gallerySans(), "text-xs text-amber-800")}>
+            Incomplete · {gapLabel}
+          </p>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={compactSequence}
+            className={galleryPillClass()}
+          >
+            Compact slots
+          </button>
+        </div>
+      ) : null}
+      <ul ref={listRef} className="flex flex-col gap-3">
+        {timelineSlots.map((slot) => {
+          if (slot.kind === "gap") {
+            return (
+              <SequenceGapRow
+                key={`gap-${sequenceId}-${slot.slotIndex}`}
+                slotIndex={slot.slotIndex}
+              />
+            )
+          }
+
+          const { item: image, listIndex: index } = slot
+          return (
+            <UploadListItem
+              key={image.id}
+              image={image}
+              siblings={allImages}
+              selected={selectedIds.has(image.id)}
+              onToggleSelected={() => onToggleSelected(image.id)}
+              selectionMode={selectionMode}
+              isAdmin={isAdmin}
+              showWallPin={image.sequence_index === 0}
+              sequenceIndex={index}
+              reorderHandle={
+                <button
+                  type="button"
+                  aria-label={`Reorder ${image.name}`}
+                  disabled={isPending || selectionMode}
+                  className={cn(
+                    "inline-flex size-11 shrink-0 touch-none items-center justify-center rounded-md",
+                    "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    "disabled:opacity-40"
+                  )}
+                  onPointerDown={(event) => onHandlePointerDown(index, event)}
+                  onPointerMove={onHandlePointerMove}
+                  onPointerUp={onHandlePointerUp}
+                  onPointerCancel={onHandlePointerCancel}
+                >
+                  <IconGripVertical className="size-5" aria-hidden />
+                </button>
+              }
+              sequenceControls={
+                <>
+                  {image.sequence_index === 0 ? (
+                    <span
+                      className={cn(galleryPillClass(), "pointer-events-none")}
+                    >
+                      Cover
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setCover(index)}
+                      className={galleryPillClass()}
+                    >
+                      Set cover
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled={isPending}
-                    onClick={() => setCover(index)}
+                    disabled={isPending || index === 0}
+                    onClick={() => move(index, index - 1)}
                     className={galleryPillClass()}
                   >
-                    Set cover
+                    Up
                   </button>
-                )}
-                <button
-                  type="button"
-                  disabled={isPending || index === 0}
-                  onClick={() => move(index, index - 1)}
-                  className={galleryPillClass()}
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  disabled={isPending || index === items.length - 1}
-                  onClick={() => move(index, index + 1)}
-                  className={galleryPillClass()}
-                >
-                  Down
-                </button>
-              </>
-            }
-          />
-        ))}
+                  <button
+                    type="button"
+                    disabled={isPending || index === items.length - 1}
+                    onClick={() => move(index, index + 1)}
+                    className={galleryPillClass()}
+                  >
+                    Down
+                  </button>
+                </>
+              }
+            />
+          )
+        })}
       </ul>
     </div>
   )
@@ -401,6 +535,27 @@ export function UploadManageList({
         >
           {selectionMode ? "Cancel selection" : "Select"}
         </button>
+        {selectionMode ? (
+          <button
+            type="button"
+            onClick={() => {
+              const allSelected =
+                selectableItems.length > 0 &&
+                selectableItems.every((item) => selectedIds.has(item.id))
+              if (allSelected) {
+                setSelectedIds(new Set())
+                return
+              }
+              setSelectedIds(new Set(selectableItems.map((item) => item.id)))
+            }}
+            className={galleryPillClass()}
+          >
+            {selectableItems.length > 0 &&
+            selectableItems.every((item) => selectedIds.has(item.id))
+              ? "Clear"
+              : "Select all"}
+          </button>
+        ) : null}
         {selectionMode && selectedItems.length > 0 ? (
           <button
             type="button"
@@ -430,10 +585,7 @@ export function UploadManageList({
         }
 
         return (
-          <ul
-            key={entry.row.id}
-            className="flex flex-col gap-3"
-          >
+          <ul key={entry.row.id} className="flex flex-col gap-3">
             <UploadListItem
               image={entry.row}
               siblings={images}

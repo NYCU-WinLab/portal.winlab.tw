@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   cancelBooking,
   confirmBooking,
+  getOnlineBookings,
   getPortalBookingsForDate,
   type ConfirmBookingInput,
 } from "@/app/rooms/actions"
@@ -16,6 +17,15 @@ export function usePortalBookingsForDate(date: string) {
   return useQuery({
     queryKey: queryKeys.portalBookings.byDate(date),
     queryFn: () => getPortalBookingsForDate(date),
+    staleTime: 30_000,
+  })
+}
+
+/** Upcoming meetings that booked no room, which the grid can't show. */
+export function useOnlineBookings() {
+  return useQuery({
+    queryKey: queryKeys.onlineBookings.all,
+    queryFn: () => getOnlineBookings(),
     staleTime: 30_000,
   })
 }

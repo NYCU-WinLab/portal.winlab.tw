@@ -10,6 +10,8 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryInstallPrompt } from "@/app/_components/gallery-install-prompt"
+import { GalleryOfflineBanner } from "@/app/_components/gallery-offline-banner"
+import { GalleryServiceWorker } from "@/app/_components/gallery-service-worker"
 import { KonamiWinlabLogo } from "@/app/_components/konami-winlab-logo"
 import { ThemeProvider } from "@/components/theme-provider"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
@@ -31,8 +33,22 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: "Gallery — WinLab",
-  description: "Art from NYCU WinLab.",
+  description: "Lab polaroids on a cool slate paper wall — NYCU WinLab.",
   applicationName: "Gallery",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -44,10 +60,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-  ],
+  // Gallery is light-only — cool slate paper, never dark chrome.
+  themeColor: "#e4e4e7",
 }
 
 export default async function RootLayout({
@@ -88,6 +102,8 @@ export default async function RootLayout({
       >
         <ThemeProvider>
           {children}
+          <GalleryServiceWorker />
+          <GalleryOfflineBanner />
           <GalleryInstallPrompt />
           <KonamiWinlabLogo />
           <Toaster />

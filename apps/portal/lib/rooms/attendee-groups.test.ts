@@ -1,95 +1,109 @@
 import { describe, expect, test } from "bun:test"
 
-import { mapGroupsToPortalUsers, usableGroups } from "./attendee-groups"
+import {
+  groupLabel,
+  groupMeetingTitle,
+  mergeAttendees,
+  toPickableGroups,
+} from "./attendee-groups"
 import type { AttendeeGroup } from "./keycloak-groups"
-
-const PORTAL_USERS = [
-  { id: "uuid-a", email: "alice@winlab.tw" },
-  { id: "uuid-b", email: "bob@winlab.tw" },
-  { id: "uuid-c", email: null },
-]
 
 function group(
   name: string,
-  members: { email: string | null; name?: string }[]
+  members: { email: string | null; name?: string; username?: string }[],
+  description: string | null = null
 ): AttendeeGroup {
   return {
     id: `g-${name}`,
     name,
+    description,
     path: `/winlab-projects/${name}`,
     members: members.map((m, i) => ({
       id: `kc-${name}-${i}`,
       email: m.email,
       name: m.name ?? null,
+      username: m.username ?? null,
     })),
   }
 }
 
-describe("mapGroupsToPortalUsers", () => {
-  test("matches members to portal users by email", () => {
-    const [mapped] = mapGroupsToPortalUsers(
-      [group("ai", [{ email: "alice@winlab.tw" }, { email: "bob@winlab.tw" }])],
-      PORTAL_USERS
-    )
-    expect(mapped!.userIds).toEqual(["uuid-a", "uuid-b"])
-    expect(mapped!.unmatched).toEqual([])
+describe("toPickableGroups", () => {
+  test("a member is invitable on Keycloak's data alone — no Portal account needed", () => {
+    const [g] = toPickableGroups([
+      group("ai", [{ email: "nobody@winlab.tw", name: "Never Logged In" }]),
+    ])
+    expect(g!.members).toEqual([
+      { name: "Never Logged In", email: "nobody@winlab.tw" },
+    ])
   })
 
-  test("matching is case-insensitive — neither system normalises email", () => {
-    const [mapped] = mapGroupsToPortalUsers(
-      [group("ai", [{ email: "Alice@WinLab.tw" }])],
-      PORTAL_USERS
-    )
-    expect(mapped!.userIds).toEqual(["uuid-a"])
+  test("members with no email are reported, not silently dropped", () => {
+    const [g] = toPickableGroups([
+      group("ai", [
+        { email: "a@winlab.tw", name: "A" },
+        { email: null, name: "No Mail" },
+      ]),
+    ])
+    expect(g!.members).toHaveLength(1)
+    expect(g!.unmailable).toEqual(["No Mail"])
   })
 
-  test("members without a portal account are reported, not silently dropped", () => {
-    const [mapped] = mapGroupsToPortalUsers(
-      [
-        group("ai", [
-          { email: "alice@winlab.tw" },
-          { email: "ghost@winlab.tw", name: "Ghost" },
-        ]),
-      ],
-      PORTAL_USERS
-    )
-    expect(mapped!.userIds).toEqual(["uuid-a"])
-    expect(mapped!.unmatched).toEqual(["Ghost"])
+  test("the same address listed twice only appears once", () => {
+    const [g] = toPickableGroups([
+      group("ai", [
+        { email: "a@winlab.tw", name: "A" },
+        { email: "A@WinLab.tw", name: "A again" },
+      ]),
+    ])
+    expect(g!.members).toHaveLength(1)
   })
 
-  test("a member with no email at all counts as unmatched", () => {
-    const [mapped] = mapGroupsToPortalUsers(
-      [group("ai", [{ email: null, name: "No Mail" }])],
-      PORTAL_USERS
-    )
-    expect(mapped!.userIds).toEqual([])
-    expect(mapped!.unmatched).toEqual(["No Mail"])
+  test("falls back to the address when Keycloak has no display name", () => {
+    const [g] = toPickableGroups([group("ai", [{ email: "a@winlab.tw" }])])
+    expect(g!.members[0]!.name).toBe("a@winlab.tw")
   })
 
-  test("the same portal user listed twice is only added once", () => {
-    const [mapped] = mapGroupsToPortalUsers(
-      [
-        group("ai", [
-          { email: "alice@winlab.tw" },
-          { email: "ALICE@winlab.tw" },
-        ]),
-      ],
-      PORTAL_USERS
-    )
-    expect(mapped!.userIds).toEqual(["uuid-a"])
+  test("groups with nobody invitable are dropped, and the rest sort by path", () => {
+    const groups = toPickableGroups([
+      group("zeta", [{ email: "z@winlab.tw" }]),
+      group("empty", [{ email: null, name: "No Mail" }]),
+      group("alpha", [{ email: "a@winlab.tw" }]),
+    ])
+    expect(groups.map((g) => g.name)).toEqual(["alpha", "zeta"])
   })
 })
 
-describe("usableGroups", () => {
-  test("drops groups where nothing matched and sorts by path", () => {
-    const mapped = mapGroupsToPortalUsers(
-      [
-        group("zeta", [{ email: "bob@winlab.tw" }]),
-        group("empty", [{ email: "ghost@winlab.tw" }]),
-        group("alpha", [{ email: "alice@winlab.tw" }]),
-      ],
-      PORTAL_USERS
+describe("mergeAttendees", () => {
+  test("adds new people and keeps the existing order", () => {
+    expect(
+      mergeAttendees(
+        [{ name: "A", email: "a@winlab.tw" }],
+        [{ name: "B", email: "b@winlab.tw" }]
+      )
+    ).toEqual([
+      { name: "A", email: "a@winlab.tw" },
+      { name: "B", email: "b@winlab.tw" },
+    ])
+  })
+
+  test("adding a group twice doesn't duplicate anyone", () => {
+    const once = mergeAttendees([], [{ name: "A", email: "a@winlab.tw" }])
+    expect(mergeAttendees(once, [{ name: "A", email: "A@WINLAB.TW" }])).toEqual(
+      once
     )
-    expect(usableGroups(mapped).map((g) => g.name)).toEqual(["alpha", "zeta"])
+  })
+})
+
+describe("groupLabel / groupMeetingTitle", () => {
+  test("prefers the description — group names are path slugs, not labels", () => {
+    const g = { name: "o-ran-sc", description: "O-RAN 軟體社群" }
+    expect(groupLabel(g)).toBe("O-RAN 軟體社群")
+    expect(groupMeetingTitle(g)).toBe("O-RAN 軟體社群 會議")
+  })
+
+  test("falls back to the name when a group has no description", () => {
+    const g = { name: "o-ran-sc", description: null }
+    expect(groupLabel(g)).toBe("o-ran-sc")
+    expect(groupMeetingTitle(g)).toBe("o-ran-sc 會議")
   })
 })

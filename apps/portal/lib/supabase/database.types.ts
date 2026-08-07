@@ -740,6 +740,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_activity_notifications_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_activity_notifications_recipient_user_id_fkey"
             columns: ["recipient_user_id"]
             isOneToOne: false
@@ -864,6 +871,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_comments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_comments_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -897,6 +911,13 @@ export type Database = {
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
             referencedColumns: ["id"]
           },
           {
@@ -1586,46 +1607,70 @@ export type Database = {
       }
       rooms_bookings: {
         Row: {
-          attendees: string[]
+          agenda: string | null
+          attendees: Json
           cancelled_at: string | null
           cancelled_by: string | null
           created_at: string
           date: string
+          deliverables: string[]
           end_time: string
-          external_reservation_id: string
+          external_reservation_id: string | null
+          group_name: string | null
           id: string
+          invite_sequence: number
+          issue_refs: string[]
+          meeting_prefix: string | null
+          online: boolean
+          recurring_id: string | null
           requested_by: string
-          room: string
+          room: string | null
           start_time: string
           status: string
           title: string | null
         }
         Insert: {
-          attendees?: string[]
+          agenda?: string | null
+          attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
           date: string
+          deliverables?: string[]
           end_time: string
-          external_reservation_id: string
+          external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
+          invite_sequence?: number
+          issue_refs?: string[]
+          meeting_prefix?: string | null
+          online?: boolean
+          recurring_id?: string | null
           requested_by: string
-          room: string
+          room?: string | null
           start_time: string
           status?: string
           title?: string | null
         }
         Update: {
-          attendees?: string[]
+          agenda?: string | null
+          attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
           date?: string
+          deliverables?: string[]
           end_time?: string
-          external_reservation_id?: string
+          external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
+          invite_sequence?: number
+          issue_refs?: string[]
+          meeting_prefix?: string | null
+          online?: boolean
+          recurring_id?: string | null
           requested_by?: string
-          room?: string
+          room?: string | null
           start_time?: string
           status?: string
           title?: string | null
@@ -1639,8 +1684,166 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rooms_bookings_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_recurring_meetings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rooms_bookings_requested_by_fkey"
             columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms_meeting_requests: {
+        Row: {
+          booking_id: string | null
+          callback_token_hash: string
+          cancel_id: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          event_id: string | null
+          id: string
+          join_url: string | null
+          kind: string
+          message_id: string | null
+          notified_at: string | null
+          options_applied: boolean | null
+          pipeline_id: string | null
+          pipeline_url: string | null
+          request_id: string
+          stage: string | null
+          status: string
+          thread_id: string | null
+          web_link: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          callback_token_hash: string
+          cancel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          join_url?: string | null
+          kind?: string
+          message_id?: string | null
+          notified_at?: string | null
+          options_applied?: boolean | null
+          pipeline_id?: string | null
+          pipeline_url?: string | null
+          request_id: string
+          stage?: string | null
+          status?: string
+          thread_id?: string | null
+          web_link?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          callback_token_hash?: string
+          cancel_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          join_url?: string | null
+          kind?: string
+          message_id?: string | null
+          notified_at?: string | null
+          options_applied?: boolean | null
+          pipeline_id?: string | null
+          pipeline_url?: string | null
+          request_id?: string
+          stage?: string | null
+          status?: string
+          thread_id?: string | null
+          web_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_meeting_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms_recurring_meetings: {
+        Row: {
+          active: boolean
+          agenda: string | null
+          anchor_date: string
+          attendees: Json
+          created_at: string
+          created_by: string
+          deliverables: string[]
+          duration_minutes: number
+          group_name: string | null
+          id: string
+          include_advisor: boolean
+          interval_weeks: number
+          issue_refs: string[]
+          meeting_prefix: string | null
+          online: boolean
+          start_time: string
+          title: string
+          weekday: number
+        }
+        Insert: {
+          active?: boolean
+          agenda?: string | null
+          anchor_date: string
+          attendees?: Json
+          created_at?: string
+          created_by: string
+          deliverables?: string[]
+          duration_minutes: number
+          group_name?: string | null
+          id?: string
+          include_advisor?: boolean
+          interval_weeks?: number
+          issue_refs?: string[]
+          meeting_prefix?: string | null
+          online?: boolean
+          start_time: string
+          title: string
+          weekday: number
+        }
+        Update: {
+          active?: boolean
+          agenda?: string | null
+          anchor_date?: string
+          attendees?: Json
+          created_at?: string
+          created_by?: string
+          deliverables?: string[]
+          duration_minutes?: number
+          group_name?: string | null
+          id?: string
+          include_advisor?: boolean
+          interval_weeks?: number
+          issue_refs?: string[]
+          meeting_prefix?: string | null
+          online?: boolean
+          start_time?: string
+          title?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_recurring_meetings_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
@@ -1807,6 +2010,7 @@ export type Database = {
           name: string | null
           roles: Json | null
           telegram_user_id: string | null
+          username: string | null
         }
         Insert: {
           active_workflow?: Json | null
@@ -1821,6 +2025,7 @@ export type Database = {
           name?: string | null
           roles?: Json | null
           telegram_user_id?: string | null
+          username?: string | null
         }
         Update: {
           active_workflow?: Json | null
@@ -1835,6 +2040,7 @@ export type Database = {
           name?: string | null
           roles?: Json | null
           telegram_user_id?: string | null
+          username?: string | null
         }
         Relationships: []
       }
@@ -1869,6 +2075,30 @@ export type Database = {
       }
     }
     Views: {
+      gallery_wall_covers: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          duration_seconds: number | null
+          id: string | null
+          image_path: string | null
+          media_type: string | null
+          name: string | null
+          pinned_at: string | null
+          poster_path: string | null
+          sequence_id: string | null
+          sequence_index: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_presenter_roster: {
         Row: {
           admission_year: number | null

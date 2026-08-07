@@ -17,24 +17,44 @@ import {
   type KeycloakAdminEnv,
 } from "@/lib/keycloak/admin"
 
+import { needsChildrenFetch } from "./group-tree"
+
 export interface KeycloakGroupMember {
   /** Keycloak's own user id — not the portal user_profiles id. */
   id: string
   email: string | null
   name: string | null
+  /**
+   * The login name, e.g. `n0ball`. Carried through because it's the ASCII
+   * identifier the Teams topic prefix is built from when a meeting is booked
+   * without picking a whole group — `name` is Chinese.
+   */
+  username: string | null
 }
 
 export interface AttendeeGroup {
   id: string
   /** Just this group's own name, e.g. "ai". */
   name: string
+  /**
+   * Human-readable label, when the group carries one. Keycloak only gained
+   * a native `description` on GroupRepresentation recently; before that the
+   * convention was an attribute of the same name. Read both, since which
+   * one this realm uses isn't something to guess at.
+   */
+  description: string | null
   /** Full path including parents, e.g. "/winlab-projects/ai". */
   path: string
   members: KeycloakGroupMember[]
 }
 
 export type AttendeeGroupsResult =
-  | { status: "ok"; groups: AttendeeGroup[] }
+  | {
+      status: "ok"
+      groups: AttendeeGroup[]
+      /** Top-level groups seen, to tell "realm is empty" from "no children". */
+      rootGroupCount: number
+    }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
   | { status: "error"; detail: string }
@@ -43,8 +63,17 @@ type RawGroup = {
   id: string
   name: string
   path: string
+  description?: string
+  attributes?: Record<string, string[]>
   subGroups?: RawGroup[]
   subGroupCount?: number
+}
+
+function groupDescription(group: RawGroup): string | null {
+  const native = group.description?.trim()
+  if (native) return native
+  const attribute = group.attributes?.description?.[0]?.trim()
+  return attribute || null
 }
 
 type RawMember = {
@@ -90,17 +119,32 @@ async function collectSubGroups(
 ): Promise<void> {
   if (depth > 0) out.push(group)
 
-  let children = group.subGroups
-  if (children === undefined) {
-    children = await getJson<RawGroup[]>(
-      `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
-      token
-    ).catch(() => [])
-  }
+  // Keycloak 23+ sends `subGroups: []` — an *empty array*, not an omitted
+  // field — alongside a `subGroupCount`. So `subGroups ?? fetch(...)` never
+  // fell through and /children was never actually called, which is why a
+  // realm with populated subgroups still reported having none. Treat only a
+  // non-empty inline array as authoritative.
+  //
+  // No `.catch(() => [])` here on purpose: swallowing a failed /children
+  // call reports "this realm has no subgroups", which is a different
+  // problem with a different fix. Let it propagate to the status result.
+  const children = needsChildrenFetch(group)
+    ? await getJson<RawGroup[]>(
+        `${adminRealmUrl(env)}/groups/${encodeURIComponent(group.id)}/children?max=500`,
+        token
+      )
+    : group.subGroups!
 
-  for (const child of children) {
-    await collectSubGroups(env, token, child, depth + 1, out)
-  }
+  // Siblings are independent, so descend into them together rather than
+  // one round trip at a time.
+  const nested = await Promise.all(
+    children.map(async (child) => {
+      const found: RawGroup[] = []
+      await collectSubGroups(env, token, child, depth + 1, found)
+      return found
+    })
+  )
+  out.push(...nested.flat())
 }
 
 export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
@@ -116,21 +160,31 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
       token
     )
 
-    const subGroups: RawGroup[] = []
-    for (const root of roots) {
-      await collectSubGroups(env, token, root, 0, subGroups)
+    // Walk the roots concurrently. Serially this was one /children round
+    // trip per top-level group before anything else could start — 15 of
+    // them here, which is most of the wait before the picker can render.
+    const perRoot = await Promise.all(
+      roots.map(async (root) => {
+        const found: RawGroup[] = []
+        await collectSubGroups(env, token, root, 0, found)
+        return found
+      })
+    )
+    const subGroups = perRoot.flat()
+    if (subGroups.length === 0) {
+      return { status: "ok", groups: [], rootGroupCount: roots.length }
     }
-    if (subGroups.length === 0) return { status: "ok", groups: [] }
 
     const groups = await Promise.all(
       subGroups.map(async (group) => ({
         id: group.id,
         name: group.name,
+        description: groupDescription(group),
         path: group.path,
         members: await fetchGroupMembers(env, token, group.id),
       }))
     )
-    return { status: "ok", groups }
+    return { status: "ok", groups, rootGroupCount: roots.length }
   } catch (err) {
     const detail =
       err instanceof KeycloakAdminError
@@ -152,13 +206,18 @@ async function fetchGroupMembers(
   token: string,
   groupId: string
 ): Promise<KeycloakGroupMember[]> {
+  // briefRepresentation=false is what makes Keycloak include `email` on each
+  // member. The brief form carries id/username/name only, and email is the
+  // key everything downstream matches Portal accounts on — without it every
+  // member looks like someone with no Portal account.
   const raw = await getJson<RawMember[]>(
-    `${adminRealmUrl(env)}/groups/${encodeURIComponent(groupId)}/members?max=500`,
+    `${adminRealmUrl(env)}/groups/${encodeURIComponent(groupId)}/members?briefRepresentation=false&max=500`,
     token
   )
   return raw.map((m) => ({
     id: m.id,
     email: m.email ?? null,
     name: displayName(m),
+    username: m.username ?? null,
   }))
 }

@@ -15,7 +15,8 @@ export interface CalendarEvent {
   /** Stable per booking — a CANCEL must reuse the REQUEST's uid. */
   uid: string
   title: string
-  room: string
+  /** Null for an online-only meeting; LOCATION says so instead. */
+  room: string | null
   /** ISO 8601 instant. */
   start: string
   /** ISO 8601 instant. */
@@ -25,6 +26,8 @@ export interface CalendarEvent {
   /** Bumped on each update so clients accept the newer version. */
   sequence: number
   method: "REQUEST" | "CANCEL"
+  /** Teams join link, once the pipeline has created the meeting. */
+  joinUrl?: string | null
 }
 
 /** `2026-08-01T02:00:00.000Z` -> `20260801T020000Z` */
@@ -83,13 +86,24 @@ export function buildCalendarInvite(event: CalendarEvent): string {
     `DTSTART:${toIcsUtc(event.start)}`,
     `DTEND:${toIcsUtc(event.end)}`,
     `SUMMARY:${escapeText(event.title)}`,
-    `LOCATION:${escapeText(`資工系 ${event.room}`)}`,
+    `LOCATION:${escapeText(event.room ? `資工系 ${event.room}` : "線上會議")}`,
     `ORGANIZER;CN=${escapeText(event.organizer.name)}:mailto:${event.organizer.email}`,
     ...event.attendees.map(
       (a) =>
         `ATTENDEE;CN=${escapeText(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${a.email}`
     ),
     `STATUS:${event.method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
+    // DESCRIPTION is what every client renders; URL is the standard field.
+    //
+    // Deliberately NOT X-MICROSOFT-SKYPETEAMSMEETINGURL: this is Portal's
+    // redirect, not a teams.microsoft.com URL, and Outlook builds its "Join"
+    // button out of that property expecting the real thing.
+    ...(event.joinUrl
+      ? [
+          `DESCRIPTION:${escapeText(`線上會議：${event.joinUrl}`)}`,
+          `URL:${event.joinUrl}`,
+        ]
+      : []),
     "END:VEVENT",
     "END:VCALENDAR",
   ]

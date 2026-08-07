@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { findSequenceGaps } from "@/lib/gallery/manage-uploads"
 import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
@@ -14,7 +15,7 @@ export const GALLERY_PAGE_SIZE = 36
 type ProfileRow = {
   id: string
   name: string | null
-  email: string | null
+  email?: string | null
 }
 
 type CoverRow = {
@@ -43,9 +44,13 @@ function buildNameById(rows: ProfileRow[]): Map<string, string> {
 }
 
 function buildMembers(rows: ProfileRow[]): GalleryMember[] {
-  return rows.filter(
-    (row) => typeof row.name === "string" && row.name.trim().length > 0
-  )
+  return rows
+    .filter((row) => typeof row.name === "string" && row.name.trim().length > 0)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email ?? null,
+    }))
 }
 
 function buildCommentCountByImage(
@@ -58,47 +63,38 @@ function buildCommentCountByImage(
   return counts
 }
 
-export async function loadGalleryHomePage(
+async function loadGalleryHomeRange(
   supabase: SupabaseClient,
   {
-    page,
+    from,
+    to,
     userId,
-    filters = {
-      uploaderId: null,
-      media: "all",
-      uploadedAfter: null,
-      query: null,
-    },
+    filters,
   }: {
-    page: number
+    from: number
+    to: number
     userId: string | null
-    filters?: GalleryHomeFilters
+    filters: GalleryHomeFilters
   }
 ): Promise<{
   images: GalleryImage[]
   members: GalleryMember[]
-  totalPages: number
-  currentPage: number
+  totalCount: number
 }> {
-  const currentPage = Number.isFinite(page) && page > 0 ? page : 1
-  const from = (currentPage - 1) * GALLERY_PAGE_SIZE
-  const to = from + GALLERY_PAGE_SIZE - 1
-
   const [profilesResult, imagesResult] = await Promise.all([
     userId
       ? supabase
           .from("user_profiles")
-          .select("id, name, email")
+          .select("id, name")
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     (() => {
       let query = supabase
-        .from("gallery_images")
+        .from("gallery_wall_covers")
         .select(
           "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index",
           { count: "exact" }
         )
-        .or("sequence_id.is.null,sequence_index.eq.0")
 
       if (filters.uploaderId) {
         query = query.eq("created_by", filters.uploaderId)
@@ -122,6 +118,7 @@ export async function loadGalleryHomePage(
 
   if (imagesResult.error) {
     console.error("[gallery] failed to load images", imagesResult.error)
+    throw new Error(imagesResult.error.message || "Failed to load gallery.")
   }
   if (profilesResult.error) {
     console.error(
@@ -208,7 +205,8 @@ export async function loadGalleryHomePage(
       if (profileIds.length > 0) {
         const { data: profileRows, error: profileError } = await supabase
           .from("user_profiles")
-          .select("id, name, email")
+          // anon is column-granted to id/name only (email is authenticated+).
+          .select("id, name")
           .in("id", profileIds)
 
         if (profileError) {
@@ -254,6 +252,7 @@ export async function loadGalleryHomePage(
       typeof image.sequence_index === "number" ? image.sequence_index : null,
     sequence_count: 1,
     sequence_items: [],
+    sequence_missing_indexes: [],
     comments: [],
     comment_count: commentCountByImage.get(image.id) ?? 0,
     uploader_name: image.created_by
@@ -267,8 +266,12 @@ export async function loadGalleryHomePage(
   for (const image of images) {
     if (!image.sequence_id) continue
     const items = sequenceRowsById.get(image.sequence_id) ?? []
-    if (items.length <= 1) continue
+    if (items.length === 0) continue
     image.sequence_count = items.length
+    image.sequence_missing_indexes = findSequenceGaps(
+      items.map((item) => item.sequence_index)
+    ).gaps
+    if (items.length <= 1) continue
     image.sequence_items = items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -276,14 +279,52 @@ export async function loadGalleryHomePage(
       media_type: item.media_type === "video" ? "video" : "image",
       poster_path: item.poster_path ?? null,
       created_at: item.created_at,
+      sequence_index:
+        typeof item.sequence_index === "number" ? item.sequence_index : null,
     }))
   }
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil((imagesResult.count ?? 0) / GALLERY_PAGE_SIZE)
-  )
+  return {
+    images,
+    members,
+    totalCount: imagesResult.count ?? 0,
+  }
+}
 
+const DEFAULT_FILTERS: GalleryHomeFilters = {
+  uploaderId: null,
+  media: "all",
+  uploadedAfter: null,
+  query: null,
+}
+
+export async function loadGalleryHomePage(
+  supabase: SupabaseClient,
+  {
+    page,
+    userId,
+    filters = DEFAULT_FILTERS,
+  }: {
+    page: number
+    userId: string | null
+    filters?: GalleryHomeFilters
+  }
+): Promise<{
+  images: GalleryImage[]
+  members: GalleryMember[]
+  totalPages: number
+  currentPage: number
+}> {
+  const currentPage = Number.isFinite(page) && page > 0 ? page : 1
+  const from = (currentPage - 1) * GALLERY_PAGE_SIZE
+  const to = from + GALLERY_PAGE_SIZE - 1
+  const { images, members, totalCount } = await loadGalleryHomeRange(supabase, {
+    from,
+    to,
+    userId,
+    filters,
+  })
+  const totalPages = Math.max(1, Math.ceil(totalCount / GALLERY_PAGE_SIZE))
   return { images, members, totalPages, currentPage }
 }
 
@@ -292,12 +333,7 @@ export async function loadGalleryHomePages(
   {
     throughPage,
     userId,
-    filters = {
-      uploaderId: null,
-      media: "all",
-      uploadedAfter: null,
-      query: null,
-    },
+    filters = DEFAULT_FILTERS,
   }: {
     throughPage: number
     userId: string | null
@@ -311,44 +347,20 @@ export async function loadGalleryHomePages(
   hasMore: boolean
 }> {
   const targetPage = Math.max(1, throughPage)
-  const first = await loadGalleryHomePage(supabase, {
-    page: 1,
+  // One range query for pages 1..N — avoids N parallel page round-trips on deep links.
+  const { images, members, totalCount } = await loadGalleryHomeRange(supabase, {
+    from: 0,
+    to: targetPage * GALLERY_PAGE_SIZE - 1,
     userId,
     filters,
   })
-
-  if (targetPage === 1) {
-    return {
-      ...first,
-      hasMore: first.currentPage < first.totalPages,
-    }
-  }
-
-  const extraPages = await Promise.all(
-    Array.from({ length: targetPage - 1 }, (_, index) =>
-      loadGalleryHomePage(supabase, {
-        page: index + 2,
-        userId,
-        filters,
-      })
-    )
-  )
-
-  const seen = new Set<string>()
-  const images: GalleryImage[] = []
-  for (const batch of [first, ...extraPages]) {
-    for (const image of batch.images) {
-      if (seen.has(image.id)) continue
-      seen.add(image.id)
-      images.push(image)
-    }
-  }
+  const totalPages = Math.max(1, Math.ceil(totalCount / GALLERY_PAGE_SIZE))
 
   return {
     images,
-    members: first.members,
-    totalPages: first.totalPages,
+    members,
+    totalPages,
     currentPage: targetPage,
-    hasMore: targetPage < first.totalPages,
+    hasMore: targetPage < totalPages,
   }
 }

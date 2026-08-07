@@ -1,24 +1,15 @@
-export type ValidatedUploadPayload =
-  | { documentId: string; file: File }
-  | { error: string }
+export const MAX_PDF_BYTES = 50 * 1024 * 1024
 
-const MAX_PDF_BYTES = 50 * 1024 * 1024
+type PdfFileMetadata = Pick<File, "size" | "type">
 
-/**
- * Pure parse + size cap for the uploadPdf action's FormData. Returns the
- * extracted `{ documentId, file }` on success or `{ error }` for a bad payload
- * / oversized file. The DB ownership + draft-status check stays in the action.
- */
-export function validateUploadPayload(
-  formData: FormData
-): ValidatedUploadPayload {
-  const documentId = formData.get("documentId")
-  const file = formData.get("file")
-  if (typeof documentId !== "string" || !(file instanceof File)) {
-    return { error: "bad payload" }
+export function validatePdfFile(
+  file: PdfFileMetadata
+): { ok: true } | { ok: false; error: string } {
+  if (file.type !== "application/pdf") {
+    return { ok: false, error: "只收 PDF" }
   }
   if (file.size > MAX_PDF_BYTES) {
-    return { error: "PDF too large (>50MB)" }
+    return { ok: false, error: "PDF 超過 50MB" }
   }
-  return { documentId, file }
+  return { ok: true }
 }

@@ -67,7 +67,7 @@ export function PinWallButton({
       disabled={isPending}
       className={cn(
         galleryPillClass(),
-        pinnedAt && "text-amber-700 dark:text-amber-300",
+        pinnedAt && "text-amber-800",
         className
       )}
     >

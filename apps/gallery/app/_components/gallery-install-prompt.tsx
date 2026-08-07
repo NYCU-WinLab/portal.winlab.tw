@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 
 import { IconDownload, IconShare2, IconX } from "@tabler/icons-react"
 
@@ -83,9 +84,20 @@ export function GalleryInstallPrompt() {
         "fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(env(safe-area-inset-bottom),1rem)]"
       )}
     >
-      <div className="mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-border/80 bg-background/95 p-4 shadow-lg backdrop-blur-sm">
+      <div className="mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-zinc-900/10 bg-[#fafafa]/95 p-4 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.35)] backdrop-blur-sm">
+        <Image
+          src="/icons/mark.png"
+          alt=""
+          width={40}
+          height={40}
+          className="mt-0.5 size-10 shrink-0 rounded-md border border-zinc-900/10 bg-white object-contain p-1 shadow-sm"
+          draggable={false}
+          unoptimized
+        />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">Install Gallery</p>
+          <p className="text-sm font-medium text-foreground">
+            Keep Gallery in your pocket
+          </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             {iosHint ? (
               <>

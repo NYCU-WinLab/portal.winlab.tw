@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache"
 
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
+import {
+  allObjectNamesPresent,
+  DEFAULT_VERIFY_PLAN,
+  objectNamesFromPaths,
+  storageSearchOptions,
+} from "@/lib/gallery/storage-verify"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
@@ -67,34 +73,63 @@ export async function registerGalleryImage(
   const expectedPaths = [input.imagePath]
   if (input.posterPath) expectedPaths.push(input.posterPath)
 
-  const expectedNames = new Set(
-    expectedPaths.map((p) => p.slice(userId.length + 1))
-  )
+  const expectedNames = objectNamesFromPaths(expectedPaths, userId)
 
-  // Supabase Storage listing can be slightly delayed on mobile networks.
-  // Retry a bit longer to reduce intermittent "File not found" failures.
+  // Path-scoped search + backoff — bare list(limit:1000) misses objects when
+  // the folder is large or Storage listing lags on mobile networks.
   let uploaded = false
-  for (let attempt = 0; attempt < 9 && !uploaded; attempt++) {
-    if (attempt > 0) {
-      await new Promise((r) => setTimeout(r, 200))
+  let lastListError: string | null = null
+  for (
+    let attempt = 0;
+    attempt < DEFAULT_VERIFY_PLAN.attempts && !uploaded;
+    attempt++
+  ) {
+    const delay = DEFAULT_VERIFY_PLAN.delayBeforeMs(attempt)
+    if (delay > 0) {
+      await new Promise((r) => setTimeout(r, delay))
     }
-    const { data: files, error: listError } = await supabase.storage
-      .from("gallery")
-      .list(userId, { limit: 1000 })
 
-    if (listError) {
-      return {
-        ok: false,
-        error: `Could not verify upload: ${listError.message}`,
+    const listedNames: string[] = []
+    let listFailed = false
+    for (const name of expectedNames) {
+      const { data: files, error: listError } = await supabase.storage
+        .from("gallery")
+        .list(userId, storageSearchOptions(name))
+
+      if (listError) {
+        lastListError = listError.message
+        listFailed = true
+        break
+      }
+      for (const file of files ?? []) {
+        if (file.name) listedNames.push(file.name)
       }
     }
-    const present = new Set((files ?? []).map((f) => f.name))
-    uploaded = [...expectedNames].every((n) => present.has(n))
+    if (listFailed) continue
+
+    uploaded = allObjectNamesPresent(expectedNames, listedNames)
+
+    // Fallback: signed URL succeeds only when the object is readable.
+    if (!uploaded) {
+      let signedOk = true
+      for (const path of expectedPaths) {
+        const { data, error } = await supabase.storage
+          .from("gallery")
+          .createSignedUrl(path, 60)
+        if (error || !data?.signedUrl) {
+          signedOk = false
+          break
+        }
+      }
+      uploaded = signedOk
+    }
   }
   if (!uploaded) {
     return {
       ok: false,
-      error: "File not found in storage. Try uploading again.",
+      error: lastListError
+        ? `Could not verify upload: ${lastListError}`
+        : "File not found in storage. Try uploading again.",
     }
   }
 
@@ -112,6 +147,25 @@ export async function registerGalleryImage(
     sequence_index: input.sequenceIndex ?? null,
   }
 
+  // Idempotent retry: if this sequence slot already exists for the uploader,
+  // treat the earlier insert as success and drop the duplicate storage object.
+  if (input.sequenceId != null && input.sequenceIndex != null) {
+    const { data: existingSlot } = await supabase
+      .from("gallery_images")
+      .select("id")
+      .eq("sequence_id", input.sequenceId)
+      .eq("sequence_index", input.sequenceIndex)
+      .eq("created_by", userId)
+      .maybeSingle()
+
+    if (existingSlot?.id) {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      revalidatePath("/")
+      revalidatePath("/upload")
+      return { ok: true, id: existingSlot.id }
+    }
+  }
+
   const { data: inserted, error: insertError } = await supabase
     .from("gallery_images")
     .insert(insertPayload)
@@ -119,6 +173,26 @@ export async function registerGalleryImage(
     .single()
 
   if (insertError || !inserted) {
+    // Unique slot race: another request won — resolve to that row.
+    if (
+      input.sequenceId != null &&
+      input.sequenceIndex != null &&
+      /duplicate|unique|23505/i.test(insertError?.message ?? "")
+    ) {
+      const { data: raced } = await supabase
+        .from("gallery_images")
+        .select("id")
+        .eq("sequence_id", input.sequenceId)
+        .eq("sequence_index", input.sequenceIndex)
+        .eq("created_by", userId)
+        .maybeSingle()
+      if (raced?.id) {
+        await supabase.storage.from("gallery").remove(expectedPaths)
+        revalidatePath("/")
+        revalidatePath("/upload")
+        return { ok: true, id: raced.id }
+      }
+    }
     await supabase.storage.from("gallery").remove(expectedPaths)
     return {
       ok: false,

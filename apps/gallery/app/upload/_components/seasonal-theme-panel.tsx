@@ -101,12 +101,7 @@ export function SeasonalThemePanel({
       </div>
 
       {!settingsReady ? (
-        <p
-          className={cn(
-            gallerySans(),
-            "mt-3 text-xs text-amber-800 dark:text-amber-200"
-          )}
-        >
+        <p className={cn(gallerySans(), "mt-3 text-xs text-amber-800")}>
           Database settings not ready — apply{" "}
           <code className="text-[10px]">2026-06-12-gallery-settings.sql</code>,
           or set{" "}

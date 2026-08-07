@@ -8,7 +8,9 @@ import { GalleryHeaderPitchline } from "@/components/gallery-header-pitchline"
 import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
+import { GalleryPaperParallax } from "@/app/_components/gallery-paper-parallax"
 import {
+  GalleryBrandMark,
   GalleryFooter,
   galleryShellBrandClass,
   galleryPageBackdropClass,
@@ -58,17 +60,19 @@ export function GalleryShell({
         className="gallery-seasonal-decor pointer-events-none fixed inset-0 z-0"
         aria-hidden
       />
+      <GalleryPaperParallax />
       <header className="gallery-shell-header pointer-events-none">
-        <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-1.5 pb-1 sm:px-6 sm:pb-1.5">
-          <div className="gallery-shell-nav-row relative grid min-h-[1.75rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
+        <div className="gallery-shell-header-inner pointer-events-auto relative mx-auto max-w-6xl px-4 pt-2.5 pb-2 sm:px-6 sm:pb-2.5">
+          <div className="gallery-shell-nav-row relative grid min-h-[2rem] w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-3">
             <Link
               href="/"
               className={cn(
                 galleryShellBrandClass(active === "home"),
-                "relative z-10 inline-flex min-w-0 items-center gap-1.5 sm:gap-2"
+                "relative z-10 inline-flex min-w-0 items-center gap-2 sm:gap-2.5"
               )}
             >
-              Gallery
+              <GalleryBrandMark />
+              <span className="truncate">Gallery</span>
               {theme ? (
                 <span
                   className={cn(
@@ -85,7 +89,7 @@ export function GalleryShell({
                 </span>
               ) : null}
             </Link>
-            <div className="gallery-header-seasonal-row relative z-0 flex min-w-0 items-end justify-center justify-self-stretch overflow-hidden">
+            <div className="gallery-header-seasonal-row relative z-0 hidden min-w-0 items-end justify-center justify-self-stretch overflow-hidden sm:flex">
               <GalleryHeaderSeasonal themeId={seasonalThemeId} />
             </div>
             <div className="relative z-10 justify-self-end">

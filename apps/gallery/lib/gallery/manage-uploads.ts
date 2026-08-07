@@ -68,3 +68,47 @@ export function swapSequenceOrder(
   next.splice(toIndex, 0, moved)
   return next
 }
+
+/** Missing sequence_index values in 0..max(present), inclusive. */
+export function findSequenceGaps(indices: Array<number | null | undefined>): {
+  gaps: number[]
+  maxIndex: number | null
+  missingCover: boolean
+} {
+  const present = new Set<number>()
+  let maxIndex = -1
+  for (const value of indices) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      continue
+    }
+    const index = Math.floor(value)
+    present.add(index)
+    if (index > maxIndex) maxIndex = index
+  }
+
+  if (maxIndex < 0) {
+    return { gaps: [], maxIndex: null, missingCover: false }
+  }
+
+  const gaps: number[] = []
+  for (let i = 0; i <= maxIndex; i++) {
+    if (!present.has(i)) gaps.push(i)
+  }
+
+  return {
+    gaps,
+    maxIndex,
+    missingCover: !present.has(0),
+  }
+}
+
+export function describeSequenceGaps(gaps: number[]): string | null {
+  if (gaps.length === 0) return null
+  if (gaps.length === 1) {
+    return gaps[0] === 0
+      ? "Missing cover (shot 1)"
+      : `Missing shot ${gaps[0]! + 1}`
+  }
+  const labels = gaps.map((gap) => (gap === 0 ? "cover" : `shot ${gap + 1}`))
+  return `Missing ${labels.join(", ")}`
+}

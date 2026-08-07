@@ -4,6 +4,9 @@ export type PolaroidFrame = {
   maxWidthClass: string
 }
 
+/** Washi-tape / clip accent on the polaroid corner. */
+export type PolaroidTape = "tl" | "tr" | "clip" | "none"
+
 const FRAMES: PolaroidFrame[] = [
   { aspectClass: "aspect-[4/5]", maxWidthClass: "max-w-[16rem]" },
   { aspectClass: "aspect-[3/4]", maxWidthClass: "max-w-[15rem]" },
@@ -26,4 +29,13 @@ function frameSeed(id: string): number {
 export function getPolaroidFrame(id: string): PolaroidFrame {
   const idx = frameSeed(id) % FRAMES.length
   return FRAMES[idx]!
+}
+
+export function getPolaroidTape(id: string): PolaroidTape {
+  // ~70% of cards get tape or a clip — the wall should look hung, not sparse.
+  const slot = frameSeed(id) % 10
+  if (slot <= 2) return "tl"
+  if (slot <= 5) return "tr"
+  if (slot <= 6) return "clip"
+  return "none"
 }

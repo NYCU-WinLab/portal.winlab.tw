@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Link,
   Preview,
   Section,
   Text,
@@ -13,12 +14,15 @@ import {
 
 export type BookingInviteProps = {
   title: string
-  room: string
+  /** Null for an online-only meeting. */
+  room: string | null
   /** Already formatted for display, e.g. "08/01（週六）10:00–11:00". */
   when: string
   organizerName: string
   attendeeNames: string[]
   cancelled?: boolean
+  /** Teams join link, present once the meeting pipeline has finished. */
+  joinUrl?: string | null
 }
 
 // Portal runs in Geist Mono (see app/layout.tsx + globals.css). Match that
@@ -33,6 +37,7 @@ export function BookingInvite({
   organizerName,
   attendeeNames,
   cancelled = false,
+  joinUrl = null,
 }: BookingInviteProps) {
   const heading = cancelled ? "會議已取消" : "會議邀請"
 
@@ -63,9 +68,17 @@ export function BookingInvite({
           <Section style={card}>
             <Text style={cardTitle}>{title}</Text>
             <Text style={cardMeta}>{when}</Text>
-            <Text style={cardMeta}>資工系 {room}</Text>
+            <Text style={cardMeta}>{room ? `資工系 ${room}` : "線上會議"}</Text>
             {attendeeNames.length > 0 && (
               <Text style={cardMeta}>與會：{attendeeNames.join("、")}</Text>
+            )}
+            {!cancelled && joinUrl && (
+              <Text style={cardMeta}>
+                線上會議：
+                <Link href={joinUrl} style={link}>
+                  加入會議
+                </Link>
+              </Text>
             )}
           </Section>
           {!cancelled && (
@@ -92,6 +105,8 @@ const C = {
   mutedFg: "#737373",
   border: "#e5e5e5",
 } as const
+
+const link = { color: C.fg, textDecoration: "underline" }
 
 const body = {
   backgroundColor: C.bg,
