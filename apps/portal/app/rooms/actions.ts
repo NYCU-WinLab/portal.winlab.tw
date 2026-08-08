@@ -23,6 +23,7 @@ import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
+import { sanitizeIssueRefs } from "@/lib/rooms/epic-refs"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import {
   meetingPipelineConfigured,
@@ -268,6 +269,11 @@ export interface ConfirmBookingInput {
   agenda?: string | null
   /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
   deliverables?: string[]
+  /**
+   * Epics this meeting belongs to. Any form the picker or a person produces;
+   * canonicalised here. Empty means the pipeline opens a standalone epic.
+   */
+  issueRefs?: string[]
 }
 
 export type BookingResult = {
@@ -321,6 +327,10 @@ export async function confirmBooking(
       // Sanitised here rather than trusted: these become labels on a real
       // GitLab issue, so an arbitrary string from a browser can't be one.
       deliverables: sanitizeDeliverables(input.deliverables ?? []),
+      // Same reasoning as deliverables: this decides which epic a marker
+      // comment lands on, so an unparseable string from a browser is dropped
+      // rather than forwarded.
+      issueRefs: sanitizeIssueRefs(input.issueRefs ?? []),
     })
 
     revalidatePath("/rooms")
@@ -506,6 +516,8 @@ export interface CreateRecurringInput {
   agenda?: string | null
   /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
   deliverables?: string[]
+  /** Epics every occurrence of this series belongs to. */
+  issueRefs?: string[]
 }
 
 export async function createRecurringMeeting(
@@ -545,6 +557,7 @@ export async function createRecurringMeeting(
     group_name: input.groupName ?? null,
     agenda: input.agenda?.trim() || null,
     deliverables: sanitizeDeliverables(input.deliverables ?? []),
+    issue_refs: sanitizeIssueRefs(input.issueRefs ?? []),
   })
   if (error) throw new Error(`建立固定會議失敗:${error.message}`)
 

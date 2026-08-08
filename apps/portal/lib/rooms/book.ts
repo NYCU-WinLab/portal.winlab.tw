@@ -43,6 +43,8 @@ export interface PlaceBookingInput {
   agenda?: string | null
   /** GitLab `Deliverable::*` labels, already validated by the caller. */
   deliverables?: readonly string[]
+  /** Epics this meeting belongs to, canonicalised as `group&iid`. */
+  issueRefs?: readonly string[]
 }
 
 export interface PlaceBookingOutcome {
@@ -135,6 +137,7 @@ export async function placeBooking(
       group_name: input.groupName ?? null,
       agenda: input.agenda ?? null,
       deliverables: input.deliverables ?? [],
+      issue_refs: input.issueRefs ?? [],
     })
     .select("id")
     .single()
@@ -162,6 +165,7 @@ export async function placeBooking(
       groupName: input.groupName,
       agenda: input.agenda,
       deliverables: input.deliverables,
+      issueRefs: input.issueRefs,
     })
     meetingRequestId = triggered.requestId
   }
