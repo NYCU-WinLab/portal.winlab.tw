@@ -37,6 +37,12 @@ export interface PlaceBookingInput {
   online?: boolean
   /** The machine-readable half of the Teams topic, e.g. `tasa`. */
   meetingPrefix?: string | null
+  /** Keycloak group leaf, when the attendees came from a group button. */
+  groupName?: string | null
+  /** Free text: what the meeting is for. */
+  agenda?: string | null
+  /** GitLab `Deliverable::*` labels, already validated by the caller. */
+  deliverables?: readonly string[]
 }
 
 export interface PlaceBookingOutcome {
@@ -126,6 +132,9 @@ export async function placeBooking(
       recurring_id: input.recurringId ?? null,
       online: input.online ?? false,
       meeting_prefix: input.meetingPrefix ?? null,
+      group_name: input.groupName ?? null,
+      agenda: input.agenda ?? null,
+      deliverables: input.deliverables ?? [],
     })
     .select("id")
     .single()
@@ -150,6 +159,9 @@ export async function placeBooking(
       title: input.title,
       start,
       end,
+      groupName: input.groupName,
+      agenda: input.agenda,
+      deliverables: input.deliverables,
     })
     meetingRequestId = triggered.requestId
   }

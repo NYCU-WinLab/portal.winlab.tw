@@ -146,6 +146,13 @@ Because the proxy already gates protected pages, individual pages don't need the
 
 ### Auth (Keycloak via Supabase OIDC)
 
+> This section covers **sign-in** only. For the **Keycloak Admin API** — reading
+> or writing user attributes such as `admissionYear`, and diagnosing why one
+> comes back empty — run `bun run kc doctor` and see
+> `docs/keycloak/2026-07-28-keycloak-26.7-admin-api-research.md`. Custom
+> attributes are gated by the realm's user profile, not by roles, and the
+> failure is silent: reads omit them, writes return `204` having saved nothing.
+
 Dashboard checklist (lives entirely in Supabase + Keycloak consoles, never in code):
 
 1. Keycloak realm → create a client, "Client Protocol" = `openid-connect`, "Access Type" = `confidential`.
@@ -210,6 +217,45 @@ Real examples of each, all under `apps/portal/app/api/`:
   neither project and silently does nothing.
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
+
+### Portal ↔ GitLab boundary
+
+The lab runs a GitLab-side automation (`winlab-helper`) alongside this portal.
+The line between them, agreed with its maintainer and written down on both
+sides:
+
+> **Portal doesn't write to GitLab. GitLab doesn't schedule.**
+
+Portal answers _"who presents next"_ — it has the Keycloak groups, the people,
+the calendar. GitLab answers _"what did that meeting leave behind"_ — agenda,
+action items, recording, transcript.
+
+In practice that means Portal never holds a GitLab write credential. Where the
+two must meet, it's one of:
+
+- **GitLab reads Portal.** `api/rooms/bookings` is the shape to copy: bearer
+  token, explicit `from`/`to` window, and cancelled rows stay in the response
+  carrying a status. A row disappearing is never a signal — absence can't
+  distinguish "cancelled" from "finished" from "the endpoint is down", and a
+  consumer forced to guess will eventually guess wrong.
+- **Portal triggers a GitLab pipeline** and the write happens there, with the
+  credential staying on that side.
+
+It will look convenient, when Portal picks next week's presenter, to also open
+the meeting's issue. Don't. GitLab already opens one when the recording
+appears, and two writers producing a record of the same meeting means two
+issues and nobody responsible for merging them. If that ever needs to change,
+it's a choice between the two paths, not an addition.
+
+Today those two paths can't both fire, and the reason is worth stating because
+it's a property of the data rather than a check anyone wrote: lab seminars use
+a standing room booking, so they never come through `/rooms`, and GitLab's
+recording-triggered path ignores any Teams subject carrying a `[prefix]` —
+which is exactly the set that came from a Portal booking.
+
+**That breaks the day a lab seminar is booked through `/rooms`.** Then both
+paths fire on the same meeting. Anyone making that change has to turn off the
+GitLab side first.
 
 ## Coding style (aligned with https://supabase.com/ui)
 

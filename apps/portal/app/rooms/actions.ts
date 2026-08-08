@@ -22,6 +22,7 @@ import {
 import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
+import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import {
   meetingPipelineConfigured,
@@ -263,6 +264,10 @@ export interface ConfirmBookingInput {
   attendees: AttendeeContact[]
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
+  /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
+  deliverables?: string[]
 }
 
 export type BookingResult = {
@@ -311,6 +316,11 @@ export async function confirmBooking(
       // whole thing is that there's a recording to look back at afterwards.
       online: true,
       meetingPrefix: prefix,
+      groupName: input.groupName ?? null,
+      agenda: input.agenda?.trim() || null,
+      // Sanitised here rather than trusted: these become labels on a real
+      // GitLab issue, so an arbitrary string from a browser can't be one.
+      deliverables: sanitizeDeliverables(input.deliverables ?? []),
     })
 
     revalidatePath("/rooms")
@@ -492,6 +502,10 @@ export interface CreateRecurringInput {
   includeAdvisor: boolean
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
+  /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
+  deliverables?: string[]
 }
 
 export async function createRecurringMeeting(
@@ -529,6 +543,8 @@ export async function createRecurringMeeting(
     created_by: user.id,
     meeting_prefix: prefix,
     group_name: input.groupName ?? null,
+    agenda: input.agenda?.trim() || null,
+    deliverables: sanitizeDeliverables(input.deliverables ?? []),
   })
   if (error) throw new Error(`建立固定會議失敗:${error.message}`)
 

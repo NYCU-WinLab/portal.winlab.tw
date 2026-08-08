@@ -740,6 +740,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_activity_notifications_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_activity_notifications_recipient_user_id_fkey"
             columns: ["recipient_user_id"]
             isOneToOne: false
@@ -864,6 +871,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_comments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_comments_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -897,6 +911,13 @@ export type Database = {
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
             referencedColumns: ["id"]
           },
           {
@@ -1061,6 +1082,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      meeting_presenter_pool: {
+        Row: {
+          admission_year: number
+          created_at: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          admission_year: number
+          created_at?: string
+          sort_order: number
+          user_id: string
+        }
+        Update: {
+          admission_year?: number
+          created_at?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_presenter_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meeting_question_pool: {
         Row: {
@@ -1557,15 +1607,19 @@ export type Database = {
       }
       rooms_bookings: {
         Row: {
+          agenda: string | null
           attendees: Json
           cancelled_at: string | null
           cancelled_by: string | null
           created_at: string
           date: string
+          deliverables: string[]
           end_time: string
           external_reservation_id: string | null
+          group_name: string | null
           id: string
           invite_sequence: number
+          issue_refs: string[]
           meeting_prefix: string | null
           online: boolean
           recurring_id: string | null
@@ -1576,15 +1630,19 @@ export type Database = {
           title: string | null
         }
         Insert: {
+          agenda?: string | null
           attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
           date: string
+          deliverables?: string[]
           end_time: string
           external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
           invite_sequence?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           recurring_id?: string | null
@@ -1595,15 +1653,19 @@ export type Database = {
           title?: string | null
         }
         Update: {
+          agenda?: string | null
           attendees?: Json
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
           date?: string
+          deliverables?: string[]
           end_time?: string
           external_reservation_id?: string | null
+          group_name?: string | null
           id?: string
           invite_sequence?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           recurring_id?: string | null
@@ -1720,15 +1782,18 @@ export type Database = {
       rooms_recurring_meetings: {
         Row: {
           active: boolean
+          agenda: string | null
           anchor_date: string
           attendees: Json
           created_at: string
           created_by: string
+          deliverables: string[]
           duration_minutes: number
           group_name: string | null
           id: string
           include_advisor: boolean
           interval_weeks: number
+          issue_refs: string[]
           meeting_prefix: string | null
           online: boolean
           start_time: string
@@ -1737,15 +1802,18 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          agenda?: string | null
           anchor_date: string
           attendees?: Json
           created_at?: string
           created_by: string
+          deliverables?: string[]
           duration_minutes: number
           group_name?: string | null
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           start_time: string
@@ -1754,15 +1822,18 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          agenda?: string | null
           anchor_date?: string
           attendees?: Json
           created_at?: string
           created_by?: string
+          deliverables?: string[]
           duration_minutes?: number
           group_name?: string | null
           id?: string
           include_advisor?: boolean
           interval_weeks?: number
+          issue_refs?: string[]
           meeting_prefix?: string | null
           online?: boolean
           start_time?: string
@@ -2004,6 +2075,51 @@ export type Database = {
       }
     }
     Views: {
+      gallery_wall_covers: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          duration_seconds: number | null
+          id: string | null
+          image_path: string | null
+          media_type: string | null
+          name: string | null
+          pinned_at: string | null
+          poster_path: string | null
+          sequence_id: string | null
+          sequence_index: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_presenter_roster: {
+        Row: {
+          admission_year: number | null
+          email: string | null
+          last_presented_date: string | null
+          name: string | null
+          pool_added_at: string | null
+          sort_order: number | null
+          times_presented: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_presenter_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_question_rotation: {
         Row: {
           email: string | null
@@ -2135,9 +2251,25 @@ export type Database = {
         }
         Returns: Json
       }
+      meetings_fill_presenters: {
+        Args: { p_year: number }
+        Returns: Json
+      }
       meetings_insert_week: {
         Args: { p_at_meeting_id: string }
         Returns: string
+      }
+      meetings_pool_move: {
+        Args: { p_delta: number; p_user: string }
+        Returns: undefined
+      }
+      meetings_pool_remove: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_pool_upsert: {
+        Args: { p_admission_year: number; p_user: string }
+        Returns: undefined
       }
       meetings_remove_from_pool: {
         Args: { p_user: string }

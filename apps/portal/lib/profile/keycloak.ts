@@ -112,6 +112,44 @@ export async function updateKeycloakProfile(
     )
 }
 
+// Read another user's attributes, by email. Unlike the functions above this
+// is not about the caller editing their own profile — it exists so an admin
+// building the presenter roster can pull someone's 入學學年 from the IdP
+// instead of retyping it. Callers MUST gate on admin themselves; this only
+// knows how to fetch.
+//
+// Never throws, for the same reason getEditableProfile doesn't: a Keycloak
+// blip should degrade to "type it in by hand", not break the page.
+export async function lookupAttributesByEmail(
+  email: string
+): Promise<Record<string, string[]> | null> {
+  const env = adminEnv()
+  if (!env || email.length === 0) return null
+  try {
+    const token = await adminToken(env)
+    const query = new URLSearchParams({ email, exact: "true", max: "2" })
+    const res = await fetch(
+      `${env.url}/admin/realms/${encodeURIComponent(env.realm)}/users?${query}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    )
+    if (!res.ok) {
+      console.error(
+        "[meetings] keycloak lookup failed",
+        new KeycloakAdminError("get", res.status, await errorDetail(res))
+      )
+      return null
+    }
+    const users = (await res.json()) as KeycloakUserRepresentation[]
+    // Two hits means the email is not the unique key we assumed; guessing
+    // which one is right would quietly attach the wrong year to someone.
+    if (users.length !== 1) return null
+    return (users[0]?.attributes as Record<string, string[]>) ?? {}
+  } catch (err) {
+    console.error("[meetings] keycloak lookup failed", err)
+    return null
+  }
+}
+
 export function profileFromRepresentation(
   rep: KeycloakUserRepresentation
 ): Record<EditableProfileField, string> {

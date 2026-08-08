@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { Textarea } from "@workspace/ui/components/textarea"
 
 import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
 import {
@@ -30,6 +31,7 @@ import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
+import { DeliverablesField } from "./deliverables-field"
 import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
@@ -57,6 +59,8 @@ export function RecurringTab() {
 
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
+  const [agenda, setAgenda] = useState("")
+  const [deliverables, setDeliverables] = useState<string[]>([])
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -75,6 +79,8 @@ export function RecurringTab() {
     create.mutate(
       {
         titleSuffix,
+        agenda,
+        deliverables,
         weekday,
         startTime,
         durationMinutes,
@@ -88,6 +94,8 @@ export function RecurringTab() {
           toast.success("已建立固定會議")
           setTitleSuffix(DEFAULT_TOPIC_SUFFIX)
           setGroupName(null)
+          setAgenda("")
+          setDeliverables([])
           setAttendees([])
         },
         onError: (err) => toast.error(errorMessage(err, "建立失敗")),
@@ -111,6 +119,25 @@ export function RecurringTab() {
           prefix={prefix}
           suffix={titleSuffix}
           onSuffixChange={setTitleSuffix}
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="recurring-agenda" className="text-xs">
+            討論事項（可不填）
+          </Label>
+          <Textarea
+            id="recurring-agenda"
+            value={agenda}
+            onChange={(e) => setAgenda(e.target.value)}
+            placeholder="每次會議固定要討論的事項"
+            rows={3}
+          />
+        </div>
+
+        <DeliverablesField
+          id="recurring-deliverables"
+          value={deliverables}
+          onChange={setDeliverables}
         />
 
         <div className="flex flex-col gap-1.5">

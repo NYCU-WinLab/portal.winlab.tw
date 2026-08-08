@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
+import { PresenterPoolPanel } from "./presenter-pool-panel"
 import { QuestionPoolPanel } from "./question-pool-panel"
 
 const INFO = [
@@ -55,6 +56,7 @@ export function InfoTab({ isAdmin }: { isAdmin: boolean }) {
           </Card>
         ))}
       </div>
+      <PresenterPoolPanel isAdmin={isAdmin} />
       <QuestionPoolPanel isAdmin={isAdmin} />
     </div>
   )

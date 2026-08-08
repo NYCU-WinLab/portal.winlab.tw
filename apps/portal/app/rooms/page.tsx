@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { Textarea } from "@workspace/ui/components/textarea"
 import {
   Tabs,
   TabsContent,
@@ -37,6 +38,7 @@ import {
 } from "@/hooks/rooms/use-room-booking"
 
 import { AttendeeSelect } from "./_components/attendee-select"
+import { DeliverablesField } from "./_components/deliverables-field"
 import { MeetingStatus } from "./_components/meeting-status"
 import { OnlineMeetings } from "./_components/online-meetings"
 import { RecurringTab } from "./_components/recurring-tab"
@@ -237,6 +239,10 @@ function BookingSuggestion({
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
+  // Free text handed straight to GitLab, which opens the meeting's issue with
+  // it. Optional — a booking with no agenda is still a booking.
+  const [agenda, setAgenda] = useState("")
+  const [deliverables, setDeliverables] = useState<string[]>([])
   // Which Keycloak group the attendees came from, if a group button was used.
   // Drives the topic prefix, which the user can see but not edit.
   const [groupName, setGroupName] = useState<string | null>(null)
@@ -290,6 +296,8 @@ function BookingSuggestion({
         startTime: startSlot.start,
         endTime: endSlot.end,
         titleSuffix,
+        agenda,
+        deliverables,
         attendees: finalAttendees,
         groupName,
       },
@@ -363,6 +371,28 @@ function BookingSuggestion({
                 prefix={prefix}
                 suffix={titleSuffix}
                 onSuffixChange={setTitleSuffix}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="booking-agenda" className="text-xs">
+                  討論事項（可不填）
+                </Label>
+                <Textarea
+                  id="booking-agenda"
+                  value={agenda}
+                  onChange={(e) => setAgenda(e.target.value)}
+                  placeholder="這場會議要討論什麼"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  會一併帶到 GitLab,成為這場會議 issue 的內容。
+                </p>
+              </div>
+
+              <DeliverablesField
+                id="booking-deliverables"
+                value={deliverables}
+                onChange={setDeliverables}
               />
 
               <div className="flex flex-col gap-1.5">

@@ -47,6 +47,9 @@ type ScheduleRow = {
   created_by: string
   meeting_prefix: string | null
   online: boolean
+  group_name: string | null
+  agenda: string | null
+  deliverables: string[] | null
 }
 
 export async function runRecurringBookings(
@@ -66,7 +69,7 @@ export async function runRecurringBookings(
   const { data: schedules, error } = await admin
     .from("rooms_recurring_meetings")
     .select(
-      "id, title, weekday, start_time, duration_minutes, interval_weeks, anchor_date, attendees, include_advisor, created_by, meeting_prefix, online"
+      "id, title, weekday, start_time, duration_minutes, interval_weeks, anchor_date, attendees, include_advisor, created_by, meeting_prefix, online, group_name, agenda, deliverables"
     )
     .eq("active", true)
   if (error) throw new Error(`讀取固定會議失敗:${error.message}`)
@@ -158,6 +161,9 @@ export async function runRecurringBookings(
         recurringId: schedule.id,
         online: schedule.online,
         meetingPrefix: schedule.meeting_prefix,
+        groupName: schedule.group_name,
+        agenda: schedule.agenda,
+        deliverables: schedule.deliverables ?? [],
       })
       result.booked++
     } catch (err) {
