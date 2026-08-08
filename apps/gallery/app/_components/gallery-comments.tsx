@@ -35,6 +35,7 @@ import {
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
+import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
@@ -345,10 +346,7 @@ export function GalleryComments({
                     ) : null}
                     <span aria-hidden>·</span>
                     <time dateTime={comment.created_at}>
-                      {new Date(comment.created_at).toLocaleString(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
+                      {formatUploadedAt(comment.created_at)}
                     </time>
                     {edited ? (
                       <>

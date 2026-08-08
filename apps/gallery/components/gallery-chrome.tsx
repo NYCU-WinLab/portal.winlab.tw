@@ -126,6 +126,7 @@ export function GalleryBrandMark({ className }: { className?: string }) {
 }
 
 export function GalleryFooter() {
+  // Year can disagree across TZ at New Year; suppress rather than flash.
   const year = new Date().getFullYear()
 
   return (
@@ -151,7 +152,7 @@ export function GalleryFooter() {
         <span aria-hidden className="mx-1.5">
           ·
         </span>
-        <span>© {year} NYCU WinLab</span>
+        <span suppressHydrationWarning>© {year} NYCU WinLab</span>
         <span aria-hidden className="mx-1.5">
           ·
         </span>
