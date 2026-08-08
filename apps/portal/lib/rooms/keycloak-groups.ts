@@ -2,19 +2,19 @@
 // everyone in this subgroup" instead of making people click members one by
 // one. Read-only — nothing here writes back to Keycloak.
 //
-// Needs the admin client to hold `view-users` (a composite that includes
-// `query-groups`) on top of the `manage-users` it already had for /profile.
-// Without it Keycloak answers 403, which is reported back rather than
-// swallowed — a silently empty group list is indistinguishable from "the
-// realm has no groups", and that cost real debugging time once already.
+// Needs the service account to hold `view-users` — a composite that includes
+// `query-groups`, which is what the /groups listing actually checks. Without
+// it Keycloak answers 403, which is reported back rather than swallowed: a
+// silently empty group list is indistinguishable from "the realm has no
+// groups", and that cost real debugging time once already.
 
 import {
-  adminEnv,
+  keycloakEnv,
   adminRealmUrl,
   adminToken,
   errorDetail,
   KeycloakAdminError,
-  type KeycloakAdminEnv,
+  type KeycloakEnv,
 } from "@/lib/keycloak/admin"
 
 import { needsChildrenFetch } from "./group-tree"
@@ -111,7 +111,7 @@ function displayName(member: RawMember): string | null {
  * instead of silently returning nothing on one of them.
  */
 async function collectSubGroups(
-  env: KeycloakAdminEnv,
+  env: KeycloakEnv,
   token: string,
   group: RawGroup,
   depth: number,
@@ -148,7 +148,7 @@ async function collectSubGroups(
 }
 
 export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
-  const env = adminEnv()
+  const env = keycloakEnv()
   if (!env) return { status: "unconfigured" }
 
   try {
@@ -202,7 +202,7 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
 }
 
 async function fetchGroupMembers(
-  env: KeycloakAdminEnv,
+  env: KeycloakEnv,
   token: string,
   groupId: string
 ): Promise<KeycloakGroupMember[]> {

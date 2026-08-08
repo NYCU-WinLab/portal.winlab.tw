@@ -147,11 +147,18 @@ Because the proxy already gates protected pages, individual pages don't need the
 ### Auth (Keycloak via Supabase OIDC)
 
 > This section covers **sign-in** only. For the **Keycloak Admin API** — reading
-> or writing user attributes such as `admissionYear`, and diagnosing why one
-> comes back empty — run `bun run kc doctor` and see
+> user attributes such as `admissionYear`, and diagnosing why one comes back
+> empty — run `bun run kc doctor` and see
 > `docs/keycloak/2026-07-28-keycloak-26.7-admin-api-research.md`. Custom
 > attributes are gated by the realm's user profile, not by roles, and the
 > failure is silent: reads omit them, writes return `204` having saved nothing.
+>
+> **The portal's Keycloak credential is read-only (`view-users`) and stays that
+> way.** Members edit their own account in Keycloak's Account Console, linked
+> from `/profile`. The portal once held `manage-users` so it could host that
+> form, which also gave it the power to change any member's email and reset
+> their password. If a feature seems to need writes, read issue #416 first —
+> that trade was made deliberately and reversing it re-arms the same risk.
 
 Dashboard checklist (lives entirely in Supabase + Keycloak consoles, never in code):
 

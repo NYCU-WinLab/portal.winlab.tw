@@ -1,24 +1,26 @@
-// Mapping between the editable profile fields and Keycloak's admin-API user
-// representation. firstName/lastName live top-level on the representation;
-// every other editable field is a custom attribute (string arrays in
-// Keycloak). Pure functions only in this half of the file — the admin-API
-// I/O lives below and is intentionally thin.
+// Reads a member's account fields out of Keycloak's user representation for
+// display on /profile. firstName/lastName live top-level on the
+// representation; every other field is a custom attribute (string arrays in
+// Keycloak). Pure mapping in the top half, thin Admin-API reads below.
+//
+// Nothing here writes. Members edit their own account in Keycloak's Account
+// Console, which is why this app no longer needs a credential that can — see
+// lib/keycloak/admin.ts and issue #416.
 
-import type { EditableProfileField, ProfileUpdate } from "@/lib/profile/schema"
-import { EDITABLE_PROFILE_FIELDS } from "@/lib/profile/schema"
 import {
-  adminEnv,
   adminToken,
   errorDetail,
-  isRejectedByKeycloak,
-  keycloakAdminConfigured,
+  keycloakConfigured,
   KeycloakAdminError,
-  type KeycloakAdminEnv,
+  keycloakEnv,
+  type KeycloakEnv,
 } from "@/lib/keycloak/admin"
+import type { ProfileField } from "@/lib/profile/schema"
+import { PROFILE_FIELDS } from "@/lib/profile/schema"
 
-// Re-exported so existing importers of this module keep working — the
-// plumbing moved to lib/keycloak/admin.ts when /rooms started needing it too.
-export { isRejectedByKeycloak, keycloakAdminConfigured, KeycloakAdminError }
+// Re-exported so importers of this module keep working — the plumbing moved to
+// lib/keycloak/admin.ts when /rooms started needing it too.
+export { keycloakConfigured, KeycloakAdminError }
 
 export type KeycloakUserRepresentation = {
   firstName?: string
@@ -27,28 +29,28 @@ export type KeycloakUserRepresentation = {
   [key: string]: unknown
 }
 
-const TOP_LEVEL_FIELDS: ReadonlySet<EditableProfileField> = new Set([
+const TOP_LEVEL_FIELDS: ReadonlySet<ProfileField> = new Set([
   "firstName",
   "lastName",
 ])
 
-function adminUserUrl(env: KeycloakAdminEnv, sub: string): string {
+function adminUserUrl(env: KeycloakEnv, sub: string): string {
   return `${env.url}/admin/realms/${encodeURIComponent(env.realm)}/users/${encodeURIComponent(sub)}`
 }
 
-// Three states, because "no edit section" and "edit section is temporarily
-// broken" are different things to a member staring at the page. Never throws:
-// /profile must render even when Keycloak is unreachable, otherwise an IdP
-// blip takes down the stats and the sign-out button with it.
-export type EditableProfileResult =
-  | { status: "ok"; profile: Record<EditableProfileField, string> }
+// Three states, because "no account section" and "account section is
+// temporarily broken" are different things to a member staring at the page.
+// Never throws: /profile must render even when Keycloak is unreachable,
+// otherwise an IdP blip takes down the stats and the sign-out button with it.
+export type ProfileFieldsResult =
+  | { status: "ok"; profile: Record<ProfileField, string> }
   | { status: "unconfigured" }
   | { status: "unavailable" }
 
-export async function getEditableProfile(
+export async function getProfileFields(
   sub: string
-): Promise<EditableProfileResult> {
-  const env = adminEnv()
+): Promise<ProfileFieldsResult> {
+  const env = keycloakEnv()
   if (!env) return { status: "unconfigured" }
   try {
     const token = await adminToken(env)
@@ -75,55 +77,18 @@ export async function getEditableProfile(
   }
 }
 
-// GET-merge-PUT because Keycloak's admin PUT replaces the attribute map
-// wholesale — sending only the edited keys would erase every attribute the
-// portal doesn't know about.
-export async function updateKeycloakProfile(
-  sub: string,
-  update: ProfileUpdate
-): Promise<void> {
-  const env = adminEnv()
-  if (!env) throw new Error("keycloak admin env not configured")
-  const token = await adminToken(env)
-  const getRes = await fetch(adminUserUrl(env, sub), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  })
-  if (!getRes.ok)
-    throw new KeycloakAdminError(
-      "get",
-      getRes.status,
-      await errorDetail(getRes)
-    )
-  const rep = (await getRes.json()) as KeycloakUserRepresentation
-  const putRes = await fetch(adminUserUrl(env, sub), {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(applyProfileToRepresentation(rep, update)),
-  })
-  if (!putRes.ok)
-    throw new KeycloakAdminError(
-      "put",
-      putRes.status,
-      await errorDetail(putRes)
-    )
-}
-
-// Read another user's attributes, by email. Unlike the functions above this
-// is not about the caller editing their own profile — it exists so an admin
-// building the presenter roster can pull someone's 入學學年 from the IdP
-// instead of retyping it. Callers MUST gate on admin themselves; this only
-// knows how to fetch.
+// Read another member's attributes, by email. Unlike getProfileFields this is
+// not about the caller's own account — it exists so an admin building the
+// presenter roster can pull someone's 入學學年 from the IdP instead of
+// retyping it. Callers MUST gate on admin themselves; this only knows how to
+// fetch.
 //
-// Never throws, for the same reason getEditableProfile doesn't: a Keycloak
-// blip should degrade to "type it in by hand", not break the page.
+// Never throws, for the same reason as above: a Keycloak blip should degrade
+// to "type it in by hand", not break the page.
 export async function lookupAttributesByEmail(
   email: string
 ): Promise<Record<string, string[]> | null> {
-  const env = adminEnv()
+  const env = keycloakEnv()
   if (!env || email.length === 0) return null
   try {
     const token = await adminToken(env)
@@ -152,10 +117,10 @@ export async function lookupAttributesByEmail(
 
 export function profileFromRepresentation(
   rep: KeycloakUserRepresentation
-): Record<EditableProfileField, string> {
+): Record<ProfileField, string> {
   const attributes = rep.attributes ?? {}
-  const profile = {} as Record<EditableProfileField, string>
-  for (const field of EDITABLE_PROFILE_FIELDS) {
+  const profile = {} as Record<ProfileField, string>
+  for (const field of PROFILE_FIELDS) {
     if (TOP_LEVEL_FIELDS.has(field)) {
       const value = rep[field]
       profile[field] = typeof value === "string" ? value : ""
@@ -180,26 +145,4 @@ export function keycloakSubFromIdentities(
   const sub = identity.identity_data?.sub
   if (typeof sub === "string" && sub.length > 0) return sub
   return identity.id && identity.id.length > 0 ? identity.id : null
-}
-
-export function applyProfileToRepresentation(
-  rep: KeycloakUserRepresentation,
-  update: ProfileUpdate
-): KeycloakUserRepresentation {
-  const next: KeycloakUserRepresentation = {
-    ...rep,
-    attributes: { ...(rep.attributes ?? {}) },
-  }
-  for (const field of EDITABLE_PROFILE_FIELDS) {
-    const value = update[field]
-    if (value === undefined) continue
-    if (TOP_LEVEL_FIELDS.has(field)) {
-      next[field] = value
-    } else if (value === "") {
-      delete next.attributes![field]
-    } else {
-      next.attributes![field] = [value]
-    }
-  }
-  return next
 }
