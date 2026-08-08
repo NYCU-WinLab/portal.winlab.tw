@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -19,7 +19,12 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Textarea } from "@workspace/ui/components/textarea"
 
-import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
+import {
+  useAttendeeGroups,
+  useGroupEpics,
+  useLabUsers,
+} from "@/hooks/rooms/use-lab-users"
+import type { GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCreateRecurring,
   useDeleteRecurring,
@@ -32,6 +37,7 @@ import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
 import { DeliverablesField } from "./deliverables-field"
+import { EpicField } from "./epic-field"
 import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
@@ -60,13 +66,24 @@ export function RecurringTab() {
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [agenda, setAgenda] = useState("")
-  const [deliverables, setDeliverables] = useState<string[]>([])
+  // The epic every occurrence of this series reports into, if any.
+  const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [intervalWeeks, setIntervalWeeks] = useState(1)
   const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const [includeAdvisor, setIncludeAdvisor] = useState(true)
+
+  const epicsQuery = useGroupEpics(groupName)
+
+  // An epic belongs to one group; switching groups invalidates the pick.
+  useEffect(() => setEpic(null), [groupName])
+
+  function handleEpicChange(next: GitLabEpic | null) {
+    setEpic(next)
+    if (next?.description && !agenda.trim()) setAgenda(next.description)
+  }
 
   // Mirrors what the server derives; the server recomputes rather than
   // trusting this.
@@ -80,7 +97,7 @@ export function RecurringTab() {
       {
         titleSuffix,
         agenda,
-        deliverables,
+        issueRefs: epic ? [`&${epic.iid}`] : [],
         weekday,
         startTime,
         durationMinutes,
@@ -95,7 +112,7 @@ export function RecurringTab() {
           setTitleSuffix(DEFAULT_TOPIC_SUFFIX)
           setGroupName(null)
           setAgenda("")
-          setDeliverables([])
+          setEpic(null)
           setAttendees([])
         },
         onError: (err) => toast.error(errorMessage(err, "建立失敗")),
@@ -121,6 +138,13 @@ export function RecurringTab() {
           onSuffixChange={setTitleSuffix}
         />
 
+        <EpicField
+          id="recurring-epic"
+          epics={epicsQuery.data}
+          value={epic?.iid ?? null}
+          onChange={handleEpicChange}
+        />
+
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="recurring-agenda" className="text-xs">
             討論事項（可不填）
@@ -134,11 +158,7 @@ export function RecurringTab() {
           />
         </div>
 
-        <DeliverablesField
-          id="recurring-deliverables"
-          value={deliverables}
-          onChange={setDeliverables}
-        />
+        <DeliverablesField value={epic?.deliverables ?? []} />
 
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">星期</Label>

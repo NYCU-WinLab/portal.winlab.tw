@@ -15,6 +15,10 @@ export const queryKeys = {
   attendeeGroups: {
     all: ["rooms", "attendee-groups"] as const,
   },
+  groupEpics: {
+    byGroup: (groupName: string) =>
+      ["rooms", "group-epics", groupName] as const,
+  },
   recurring: {
     all: ["rooms", "recurring"] as const,
   },

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
-import { getAttendeeGroups } from "@/app/rooms/actions"
+import { getAttendeeGroups, getGroupEpics } from "@/app/rooms/actions"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -52,5 +52,23 @@ export function useAttendeeGroups() {
     queryKey: queryKeys.attendeeGroups.all,
     queryFn: () => getAttendeeGroups(),
     staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * Open GitLab epics for the group a booking is being made under.
+ *
+ * Disabled until a group is picked: a personal booking has no epic to attach
+ * to, and asking anyway would cost a Keycloak walk to be told so. Short stale
+ * time compared to the group list — someone opening an epic and then booking
+ * a meeting for it in the same sitting is the expected order of events, not
+ * an edge case.
+ */
+export function useGroupEpics(groupName: string | null) {
+  return useQuery({
+    queryKey: queryKeys.groupEpics.byGroup(groupName ?? ""),
+    queryFn: () => getGroupEpics(groupName),
+    enabled: !!groupName,
+    staleTime: 60_000,
   })
 }
