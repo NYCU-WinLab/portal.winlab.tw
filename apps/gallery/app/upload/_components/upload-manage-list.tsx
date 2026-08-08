@@ -33,6 +33,7 @@ import {
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
 import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
+import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
 import {
   describeSequenceGaps,
   findSequenceGaps,
@@ -114,9 +115,7 @@ function UploadListItem({
           {image.name}
         </p>
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-          {new Date(image.created_at).toLocaleDateString(undefined, {
-            dateStyle: "medium",
-          })}
+          {formatUploadedDate(image.created_at)}
           {isVideo && image.duration_seconds
             ? ` · ${image.duration_seconds}s video`
             : ""}
@@ -424,7 +423,7 @@ export function UploadManageList({
   )
   const [sortMode, setSortMode] = useState<"date" | "name">("date")
   const nameCollator = useMemo(
-    () => new Intl.Collator(undefined, { sensitivity: "base", numeric: true }),
+    () => new Intl.Collator("en", { sensitivity: "base", numeric: true }),
     []
   )
 
