@@ -25,6 +25,7 @@ import {
 } from "@/lib/rooms/keycloak-groups"
 import {
   fetchEpic,
+  fetchEpicDeliverables,
   fetchOpenEpics,
   type EpicsResult,
 } from "@/lib/gitlab/client"
@@ -135,15 +136,34 @@ export async function getGroupEpics(
 }
 
 /**
+ * What this meeting owes, for the form to show before anyone commits to it.
+ *
+ * Takes the Keycloak group leaf for the same reason `getGroupEpics` does: the
+ * GitLab path is resolved server-side, so this can't be pointed at an epic in
+ * some group the caller isn't booking under.
+ */
+export async function getEpicDeliverables(
+  groupName: string | null,
+  iid: number
+): Promise<string[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const groupPath = await gitlabPathForGroup(groupName)
+  if (!groupPath) return []
+  return fetchEpicDeliverables(groupPath, iid)
+}
+
+/**
  * What a booking's chosen epics actually are, and what they say this meeting
  * owes.
  *
  * Both halves are resolved from GitLab rather than taken from the form. The
  * references are pinned to the group being booked under — a reference to
  * anything else is dropped rather than forwarded, since it would put a marker
- * comment on some other project's epic. The deliverables are then whatever
- * that epic carries: an ad-hoc meeting has none, and a meeting that has some
- * got them from its epic. There is no third source, which is the point.
+ * comment on some other project's epic. The deliverables then come from the
+ * issues linked under those epics, because the epic is the meeting and owes
+ * nothing itself. An ad-hoc meeting has no epic and therefore none.
  *
  * Never throws. A GitLab outage costs the booking its epic link, not the
  * room — the pipeline's fallback for a booking with no ISSUE_REFS is to open
@@ -166,18 +186,22 @@ async function resolveEpicLink(
 
   if (refs.length === 0) return empty
 
-  // Confirms each epic exists and is readable before it's stored — and the
-  // same call is what the deliverables come from, so this costs no extra
-  // round trip.
+  // Confirms each epic exists and is readable before it's stored. An epic
+  // that comes back null is dropped rather than failing the booking — the
+  // marker is worth losing, the room isn't.
   const epics = (
     await Promise.all(refs.map((ref) => fetchEpic(groupPath, ref.iid)))
   ).filter((epic) => epic !== null)
+
+  const deliverables = await Promise.all(
+    epics.map((epic) => fetchEpicDeliverables(groupPath, epic.iid))
+  )
 
   return {
     issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
     // Re-normalised rather than concatenated: two epics can each be in
     // canonical order and still interleave when joined.
-    deliverables: sanitizeDeliverables(epics.flatMap((e) => e.deliverables)),
+    deliverables: sanitizeDeliverables(deliverables.flat()),
   }
 }
 

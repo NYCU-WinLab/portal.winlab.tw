@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  deliverablesFromIssues,
   deliverablesFromLabels,
   isPublicEpic,
   readEpic,
@@ -12,7 +13,6 @@ function raw(overrides: Record<string, unknown> = {}) {
     iid: 4,
     title: "Link budget rework",
     description: "Re-run the budget against the new antenna.",
-    labels: ["Deliverable::Report", "workflow::doing"],
     web_url: "https://gitlab.winlab.tw/groups/winlab/tasa-satsim/-/epics/4",
     confidential: false,
     ...overrides,
@@ -68,7 +68,6 @@ describe("readEpic", () => {
       iid: 4,
       title: "Link budget rework",
       description: "Re-run the budget against the new antenna.",
-      deliverables: ["Deliverable::Report"],
       webUrl: "https://gitlab.winlab.tw/groups/winlab/tasa-satsim/-/epics/4",
     })
   })
@@ -89,17 +88,12 @@ describe("readEpic", () => {
     expect(readEpic(raw({ title: "  " }))).toBeNull()
   })
 
-  test("survives labels arriving as something other than strings", () => {
-    expect(readEpic(raw({ labels: [1, null, "Deliverable::Demo"] }))).toEqual({
-      iid: 4,
-      title: "Link budget rework",
-      description: "Re-run the budget against the new antenna.",
-      deliverables: ["Deliverable::Demo"],
-      webUrl: "https://gitlab.winlab.tw/groups/winlab/tasa-satsim/-/epics/4",
-    })
-    expect(
-      readEpic(raw({ labels: "Deliverable::Demo" }))?.deliverables
-    ).toEqual([])
+  // The epic is the meeting; it owes nothing itself. Reading its own labels
+  // is the mistake this shape exists to prevent.
+  test("reports no deliverables of its own, whatever it is labelled", () => {
+    expect(readEpic(raw({ labels: ["Deliverable::Demo"] }))).not.toHaveProperty(
+      "deliverables"
+    )
   })
 })
 
@@ -117,5 +111,60 @@ describe("readEpics", () => {
   test("a non-array response is no epics, not a crash", () => {
     expect(readEpics(null)).toEqual([])
     expect(readEpics({ message: "403 Forbidden" })).toEqual([])
+  })
+})
+
+describe("deliverablesFromIssues", () => {
+  const issue = (labels: unknown) => ({ labels })
+
+  // What the meeting owes lives on the issues linked under its epic, so this
+  // is a union across all of them rather than a read of any single one.
+  test("unions the deliverable labels across linked issues", () => {
+    expect(
+      deliverablesFromIssues([
+        issue(["Deliverable::Report", "workflow::doing"]),
+        issue(["Deliverable::Presentation"]),
+      ])
+    ).toEqual(["Deliverable::Presentation", "Deliverable::Report"])
+  })
+
+  test("de-duplicates when two issues owe the same thing", () => {
+    expect(
+      deliverablesFromIssues([
+        issue(["Deliverable::Code"]),
+        issue(["Deliverable::Code"]),
+      ])
+    ).toEqual(["Deliverable::Code"])
+  })
+
+  // An epic whose issues carry no deliverable labels is a meeting that owes
+  // nothing — the same answer as having no epic, reached honestly.
+  test("an epic whose issues owe nothing reports nothing", () => {
+    expect(
+      deliverablesFromIssues([issue(["workflow::doing"]), issue([])])
+    ).toEqual([])
+    expect(deliverablesFromIssues([])).toEqual([])
+  })
+
+  // Unlike the picker this does NOT skip confidential issues: it reads only
+  // which of four fixed public label values appear, and names no issue.
+  // Skipping them would drop a real deliverable from the meeting's summary.
+  test("counts a confidential issue's deliverable without naming it", () => {
+    expect(
+      deliverablesFromIssues([
+        { confidential: true, title: "secret", labels: ["Deliverable::Demo"] },
+      ])
+    ).toEqual(["Deliverable::Demo"])
+  })
+
+  test("survives rows that aren't shaped like issues", () => {
+    expect(deliverablesFromIssues(null)).toEqual([])
+    expect(deliverablesFromIssues({ message: "403 Forbidden" })).toEqual([])
+    expect(
+      deliverablesFromIssues([null, "nope", issue("Deliverable::Code")])
+    ).toEqual([])
+    expect(
+      deliverablesFromIssues([issue([1, null, "Deliverable::Code"])])
+    ).toEqual(["Deliverable::Code"])
   })
 })

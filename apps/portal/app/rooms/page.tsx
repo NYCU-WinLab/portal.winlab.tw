@@ -32,6 +32,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import {
   useAttendeeGroups,
+  useEpicDeliverables,
   useGroupEpics,
   useLabUsers,
 } from "@/hooks/rooms/use-lab-users"
@@ -256,6 +257,7 @@ function BookingSuggestion({
   // new one, and the agenda and deliverables come from it.
   const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const epicsQuery = useGroupEpics(groupName)
+  const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
 
   // An epic belongs to exactly one group, so switching groups invalidates the
   // pick. Left in place it would be silently dropped server-side (the ref
@@ -425,7 +427,11 @@ function BookingSuggestion({
                 </p>
               </div>
 
-              <DeliverablesField value={epic?.deliverables ?? []} />
+              <DeliverablesField
+                value={deliverablesQuery.data ?? []}
+                loading={deliverablesQuery.isFetching}
+                hasEpic={!!epic}
+              />
 
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">與會人員</Label>

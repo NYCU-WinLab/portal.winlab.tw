@@ -21,6 +21,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import {
   useAttendeeGroups,
+  useEpicDeliverables,
   useGroupEpics,
   useLabUsers,
 } from "@/hooks/rooms/use-lab-users"
@@ -76,6 +77,7 @@ export function RecurringTab() {
   const [includeAdvisor, setIncludeAdvisor] = useState(true)
 
   const epicsQuery = useGroupEpics(groupName)
+  const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
 
   // An epic belongs to one group; switching groups invalidates the pick.
   useEffect(() => setEpic(null), [groupName])
@@ -158,7 +160,11 @@ export function RecurringTab() {
           />
         </div>
 
-        <DeliverablesField value={epic?.deliverables ?? []} />
+        <DeliverablesField
+          value={deliverablesQuery.data ?? []}
+          loading={deliverablesQuery.isFetching}
+          hasEpic={!!epic}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">星期</Label>

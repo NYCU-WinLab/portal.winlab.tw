@@ -2,7 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query"
 
-import { getAttendeeGroups, getGroupEpics } from "@/app/rooms/actions"
+import {
+  getAttendeeGroups,
+  getEpicDeliverables,
+  getGroupEpics,
+} from "@/app/rooms/actions"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -69,6 +73,26 @@ export function useGroupEpics(groupName: string | null) {
     queryKey: queryKeys.groupEpics.byGroup(groupName ?? ""),
     queryFn: () => getGroupEpics(groupName),
     enabled: !!groupName,
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * What the picked epic's linked issues say this meeting owes.
+ *
+ * A second round trip, and deliberately only for the epic actually chosen:
+ * the deliverables live on the issues under an epic, not on the epic itself,
+ * so pre-loading them for a whole group's worth of epics would be one request
+ * each to fill a badge row nobody has asked for yet.
+ */
+export function useEpicDeliverables(
+  groupName: string | null,
+  iid: number | null
+) {
+  return useQuery({
+    queryKey: queryKeys.epicDeliverables.byEpic(groupName ?? "", iid ?? 0),
+    queryFn: () => getEpicDeliverables(groupName, iid!),
+    enabled: !!groupName && iid !== null,
     staleTime: 60_000,
   })
 }
