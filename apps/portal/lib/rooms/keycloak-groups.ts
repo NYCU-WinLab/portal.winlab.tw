@@ -45,6 +45,16 @@ export interface AttendeeGroup {
   description: string | null
   /** Full path including parents, e.g. "/winlab-projects/ai". */
   path: string
+  /**
+   * The group's GitLab group path, from the `gitlab_path` attribute.
+   *
+   * Keycloak is flat (`/winlab-projects/tasa-satsim`) where GitLab nests
+   * (`winlab/network-system-design/tasa-satsim`), so the two can't be derived
+   * from each other — this attribute is the only mapping between them. Null
+   * for a group nobody has linked yet, which is a real state: those groups
+   * get no epic picker rather than a wrong one.
+   */
+  gitlabPath: string | null
   members: KeycloakGroupMember[]
 }
 
@@ -74,6 +84,16 @@ function groupDescription(group: RawGroup): string | null {
   if (native) return native
   const attribute = group.attributes?.description?.[0]?.trim()
   return attribute || null
+}
+
+/**
+ * Keycloak stores every attribute as an array of strings, so the value is
+ * `attributes.gitlab_path[0]` rather than a plain field. A group that was
+ * given the attribute and then had it cleared comes back as `[""]`, which is
+ * the same as never having had one.
+ */
+function groupGitlabPath(group: RawGroup): string | null {
+  return group.attributes?.gitlab_path?.[0]?.trim() || null
 }
 
 type RawMember = {
@@ -147,32 +167,74 @@ async function collectSubGroups(
   out.push(...nested.flat())
 }
 
+/**
+ * Every subgroup in the realm, with its attributes, and how many top-level
+ * groups it came from.
+ *
+ * Walks the roots concurrently. Serially this was one /children round trip
+ * per top-level group before anything else could start — 15 of them here,
+ * which is most of the wait before the picker can render.
+ */
+async function collectRealmSubGroups(
+  env: KeycloakAdminEnv,
+  token: string
+): Promise<{ subGroups: RawGroup[]; rootGroupCount: number }> {
+  const roots = await getJson<RawGroup[]>(
+    `${adminRealmUrl(env)}/groups?briefRepresentation=false&max=500`,
+    token
+  )
+  const perRoot = await Promise.all(
+    roots.map(async (root) => {
+      const found: RawGroup[] = []
+      await collectSubGroups(env, token, root, 0, found)
+      return found
+    })
+  )
+  return { subGroups: perRoot.flat(), rootGroupCount: roots.length }
+}
+
+/**
+ * The GitLab group path a Keycloak group leaf maps to, or null.
+ *
+ * Resolved here rather than taken from the browser: the caller only sends the
+ * group name the booking was made under, and a client-supplied GitLab path
+ * would let anyone read any group the `read_api` token can see. A leaf that
+ * matches more than one group resolves to nothing — guessing which one was
+ * meant is how a meeting ends up filed under the wrong project.
+ */
+export async function gitlabPathForGroup(
+  groupName: string | null | undefined
+): Promise<string | null> {
+  const name = groupName?.trim()
+  if (!name) return null
+
+  const env = adminEnv()
+  if (!env) return null
+
+  try {
+    const token = await adminToken(env)
+    const { subGroups } = await collectRealmSubGroups(env, token)
+    const matches = subGroups.filter((g) => g.name === name)
+    if (matches.length !== 1) return null
+    return groupGitlabPath(matches[0]!)
+  } catch (err) {
+    console.error("[rooms] keycloak gitlab_path lookup failed", err)
+    return null
+  }
+}
+
 export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
   const env = adminEnv()
   if (!env) return { status: "unconfigured" }
 
   try {
     const token = await adminToken(env)
-    const base = adminRealmUrl(env)
-
-    const roots = await getJson<RawGroup[]>(
-      `${base}/groups?briefRepresentation=false&max=500`,
+    const { subGroups, rootGroupCount } = await collectRealmSubGroups(
+      env,
       token
     )
-
-    // Walk the roots concurrently. Serially this was one /children round
-    // trip per top-level group before anything else could start — 15 of
-    // them here, which is most of the wait before the picker can render.
-    const perRoot = await Promise.all(
-      roots.map(async (root) => {
-        const found: RawGroup[] = []
-        await collectSubGroups(env, token, root, 0, found)
-        return found
-      })
-    )
-    const subGroups = perRoot.flat()
     if (subGroups.length === 0) {
-      return { status: "ok", groups: [], rootGroupCount: roots.length }
+      return { status: "ok", groups: [], rootGroupCount }
     }
 
     const groups = await Promise.all(
@@ -181,10 +243,11 @@ export async function fetchAttendeeGroups(): Promise<AttendeeGroupsResult> {
         name: group.name,
         description: groupDescription(group),
         path: group.path,
+        gitlabPath: groupGitlabPath(group),
         members: await fetchGroupMembers(env, token, group.id),
       }))
     )
-    return { status: "ok", groups, rootGroupCount: roots.length }
+    return { status: "ok", groups, rootGroupCount }
   } catch (err) {
     const detail =
       err instanceof KeycloakAdminError

@@ -15,6 +15,14 @@ export const queryKeys = {
   attendeeGroups: {
     all: ["rooms", "attendee-groups"] as const,
   },
+  groupEpics: {
+    byGroup: (groupName: string) =>
+      ["rooms", "group-epics", groupName] as const,
+  },
+  epicDeliverables: {
+    byEpic: (groupName: string, iid: number) =>
+      ["rooms", "epic-deliverables", groupName, iid] as const,
+  },
   recurring: {
     all: ["rooms", "recurring"] as const,
   },

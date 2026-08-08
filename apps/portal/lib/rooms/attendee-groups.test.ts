@@ -11,13 +11,15 @@ import type { AttendeeGroup } from "./keycloak-groups"
 function group(
   name: string,
   members: { email: string | null; name?: string; username?: string }[],
-  description: string | null = null
+  description: string | null = null,
+  gitlabPath: string | null = null
 ): AttendeeGroup {
   return {
     id: `g-${name}`,
     name,
     description,
     path: `/winlab-projects/${name}`,
+    gitlabPath,
     members: members.map((m, i) => ({
       id: `kc-${name}-${i}`,
       email: m.email,
@@ -28,6 +30,22 @@ function group(
 }
 
 describe("toPickableGroups", () => {
+  // The browser learns whether an epic picker is worth offering, not the
+  // path itself — the action resolves that again from Keycloak so a caller
+  // can't point it at a group they aren't booking under.
+  test("reports whether a group is linked to GitLab, not where", () => {
+    const [linked] = toPickableGroups([
+      group("tasa", [{ email: "a@winlab.tw" }], null, "winlab/tasa-satsim"),
+    ])
+    expect(linked!.gitlabLinked).toBe(true)
+    expect(linked).not.toHaveProperty("gitlabPath")
+
+    const [unlinked] = toPickableGroups([
+      group("ai", [{ email: "b@winlab.tw" }]),
+    ])
+    expect(unlinked!.gitlabLinked).toBe(false)
+  })
+
   test("a member is invitable on Keycloak's data alone — no Portal account needed", () => {
     const [g] = toPickableGroups([
       group("ai", [{ email: "nobody@winlab.tw", name: "Never Logged In" }]),
