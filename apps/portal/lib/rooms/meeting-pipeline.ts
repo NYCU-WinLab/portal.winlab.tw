@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { deliverablesParam } from "./deliverables"
+import { issueRefsParam } from "./epic-refs"
 import {
   hashCallbackToken,
   newCallbackToken,
@@ -38,6 +39,15 @@ export interface MeetingRequestInput {
   agenda?: string | null
   /** GitLab `Deliverable::*` labels, already validated against the list. */
   deliverables?: readonly string[]
+  /**
+   * The epics this meeting belongs to, canonicalised as `group&iid`.
+   *
+   * Load-bearing: with it the pipeline puts a booking marker on that epic;
+   * without it it opens a fresh group-level epic that has no parent
+   * workstream and has to be re-filed by hand. Empty is a real answer for an
+   * ad-hoc meeting, but it should be a chosen one.
+   */
+  issueRefs?: readonly string[]
 }
 
 export interface MeetingCancelInput {
@@ -88,6 +98,8 @@ export async function triggerMeetingPipeline(
     if (input.agenda) form.set("variables[AGENDA]", input.agenda)
     const deliverables = deliverablesParam(input.deliverables ?? [])
     if (deliverables) form.set("variables[DELIVERABLES]", deliverables)
+    const issueRefs = issueRefsParam(input.issueRefs ?? [])
+    if (issueRefs) form.set("variables[ISSUE_REFS]", issueRefs)
   })
 }
 
