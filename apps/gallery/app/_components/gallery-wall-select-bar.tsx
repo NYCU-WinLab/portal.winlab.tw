@@ -19,6 +19,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryImagesPin } from "@/app/actions"
+import { removeImagesFromGalleryAlbumBySlug } from "@/app/actions/albums"
 import { setGalleryFavorites } from "@/app/actions/favorites"
 import { attachGalleryTagToImages } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
@@ -40,12 +41,14 @@ export function GalleryWallSelectBar({
   selectedIds,
   selectedZipItems = [],
   savedFilterActive = false,
+  albumFilterSlug = null,
   onToggleMode,
   onToggleSelectAll,
   onClear,
   onAdded,
   onUnsaved,
   onPinned,
+  onRemovedFromAlbum,
 }: {
   selectionMode: boolean
   selectedCount: number
@@ -61,12 +64,15 @@ export function GalleryWallSelectBar({
   }>
   /** When viewing ?saved=1, offer bulk Unsave. */
   savedFilterActive?: boolean
+  /** When viewing ?album=, offer bulk Remove from that album. */
+  albumFilterSlug?: string | null
   onToggleMode: () => void
   onToggleSelectAll: () => void
   onClear: () => void
   onAdded?: () => void
   onUnsaved?: () => void
   onPinned?: (pinned: boolean) => void
+  onRemovedFromAlbum?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
@@ -109,6 +115,32 @@ export function GalleryWallSelectBar({
       }
       toast.success(result.data.message)
       onPinned?.(pinned)
+      onClear()
+    })
+  }
+
+  const removeSelectedFromAlbum = () => {
+    const slug = albumFilterSlug?.trim()
+    if (
+      !slug ||
+      selectedIds.length === 0 ||
+      pending ||
+      saveOpenBusy ||
+      !isSignedIn
+    ) {
+      return
+    }
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await removeImagesFromGalleryAlbumBySlug(slug, selectedIds)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      const n = result.data.removed
+      toast.success(`Removed ${n} photo${n === 1 ? "" : "s"} from this album.`)
+      onRemovedFromAlbum?.()
       onClear()
     })
   }
@@ -319,6 +351,18 @@ export function GalleryWallSelectBar({
                       onClick={unsaveSelected}
                     >
                       Unsave
+                    </Button>
+                  ) : null}
+                  {albumFilterSlug ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                      onClick={removeSelectedFromAlbum}
+                    >
+                      Remove
                     </Button>
                   ) : null}
                   <form

@@ -410,6 +410,33 @@ export async function removeImagesFromGalleryAlbum(
   return { ok: true, data: { removed: ids.length } }
 }
 
+export async function removeImagesFromGalleryAlbumBySlug(
+  albumSlug: string,
+  imageIds: string[]
+): Promise<AlbumActionResult<{ removed: number }>> {
+  const slug = normalizeGalleryAlbumSlug(albumSlug)
+  if (!slug) return { ok: false, error: "Missing album." }
+
+  const auth = await requireSignedIn()
+  if (!auth.ok) return auth
+
+  const { data: album, error } = await auth.supabase
+    .from("gallery_albums")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle()
+
+  if (error) {
+    if (isGalleryAlbumsUnavailable(error)) {
+      return { ok: false, error: "Albums are not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
+  if (!album) return { ok: false, error: "Album not found." }
+
+  return removeImagesFromGalleryAlbum(album.id, imageIds)
+}
+
 export async function reorderGalleryAlbumImages(
   albumId: string,
   imageIds: string[]

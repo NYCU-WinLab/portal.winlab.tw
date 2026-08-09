@@ -291,6 +291,7 @@ export function GalleryInfiniteWall({
               selectedIds={orderedSelected}
               selectedZipItems={selectedZipItems}
               savedFilterActive={Boolean(filters.savedOnly)}
+              albumFilterSlug={filters.albumSlug}
               onToggleMode={toggleSelectionMode}
               onToggleSelectAll={toggleSelectAll}
               onClear={clearSelection}
@@ -310,6 +311,13 @@ export function GalleryInfiniteWall({
                       ? { ...image, pinned_at: pinnedAt }
                       : image
                   )
+                )
+              }}
+              onRemovedFromAlbum={() => {
+                if (!filters.albumSlug) return
+                const remove = new Set(orderedSelected)
+                setImages((prev) =>
+                  prev.filter((image) => !remove.has(image.id))
                 )
               }}
             />
