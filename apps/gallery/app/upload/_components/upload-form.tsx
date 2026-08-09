@@ -20,7 +20,11 @@ import {
 } from "@/lib/gallery/upload-pipeline"
 
 /** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
-export function UploadForm() {
+export function UploadForm({
+  videoAvailable = true,
+}: {
+  videoAvailable?: boolean
+}) {
   const formRef = useRef<HTMLFormElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
@@ -49,7 +53,10 @@ export function UploadForm() {
 
   useEffect(() => {
     const urls = selectedFiles.slice(0, 6).map((file) => {
-      if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+      if (
+        file.type.startsWith("image/") ||
+        (videoAvailable && file.type.startsWith("video/"))
+      ) {
         return URL.createObjectURL(file)
       }
       return ""
@@ -60,12 +67,17 @@ export function UploadForm() {
         if (url) URL.revokeObjectURL(url)
       }
     }
-  }, [selectedFiles])
+  }, [selectedFiles, videoAvailable])
 
   function assignFiles(files: File[]) {
-    const next = files.filter((file) => file.size > 0)
+    const next = files.filter((file) => {
+      if (file.size <= 0) return false
+      if (file.type.startsWith("image/")) return true
+      if (videoAvailable && file.type.startsWith("video/")) return true
+      return false
+    })
     if (next.length === 0) {
-      toast.error("Pick a photo or clip.")
+      toast.error(videoAvailable ? "Pick a photo or clip." : "Pick a photo.")
       return
     }
     setFailedUploads([])
@@ -192,14 +204,14 @@ export function UploadForm() {
           htmlFor="gallery-file"
           className={cn(gallerySerif(), "text-base")}
         >
-          Photos & clips
+          {videoAvailable ? "Photos & clips" : "Photos"}
         </Label>
         <input
           ref={fileInputRef}
           id="gallery-file"
           name="file"
           type="file"
-          accept="image/*,video/*"
+          accept={videoAvailable ? "image/*,video/*" : "image/*"}
           required={selectedFiles.length === 0}
           multiple
           disabled={pending}
@@ -258,7 +270,9 @@ export function UploadForm() {
             >
               {selectedFiles.length > 0
                 ? "Click to replace, or hang them with Upload selected."
-                : "Click to browse — images, HEIC, and short clips welcome."}
+                : videoAvailable
+                  ? "Click to browse — images, HEIC, and short clips welcome."
+                  : "Click to browse — images and HEIC welcome."}
             </span>
           </div>
         </label>
