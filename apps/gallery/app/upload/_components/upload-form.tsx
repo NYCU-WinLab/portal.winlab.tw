@@ -131,7 +131,12 @@ export function UploadForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-6">
+    <form
+      ref={formRef}
+      onSubmit={onSubmit}
+      aria-busy={pending || status.kind === "working"}
+      className="flex flex-col gap-6"
+    >
       <div className="flex flex-col gap-1.5">
         <p
           className={cn(
@@ -438,7 +443,11 @@ export function UploadForm({
         ) : null}
       </div>
       {status.kind === "working" ? (
-        <div className="flex flex-col gap-2 rounded-xl border border-zinc-900/12 bg-zinc-900/[0.04] px-4 py-3">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex flex-col gap-2 rounded-xl border border-zinc-900/12 bg-zinc-900/[0.04] px-4 py-3"
+        >
           {status.batch ? (
             <p
               className={cn(
@@ -473,6 +482,7 @@ export function UploadForm({
         type="submit"
         size="lg"
         disabled={pending || status.kind === "working"}
+        aria-busy={pending || status.kind === "working"}
         className={cn(gallerySans(), "h-12 rounded-full")}
       >
         {pending || status.kind === "working"
