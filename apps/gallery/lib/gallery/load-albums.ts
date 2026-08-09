@@ -5,6 +5,7 @@ import type {
   GalleryAlbumPhoto,
   GalleryAlbumSummary,
 } from "@/lib/gallery/albums"
+import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
 
 type ListRow = {
   id: string
@@ -48,7 +49,7 @@ export async function loadGalleryAlbumSummaries(
   })
 
   if (error) {
-    if (/gallery_list_albums/i.test(error.message)) return []
+    if (isGalleryAlbumsUnavailable(error)) return []
     console.error("[gallery] list albums failed", error)
     return []
   }
@@ -85,7 +86,9 @@ export async function loadGalleryAlbumBySlug(
     .maybeSingle()
 
   if (albumError) {
-    console.error("[gallery] load album failed", albumError)
+    if (!isGalleryAlbumsUnavailable(albumError)) {
+      console.error("[gallery] load album failed", albumError)
+    }
     return null
   }
   if (!album) return null
@@ -100,7 +103,7 @@ export async function loadGalleryAlbumBySlug(
       supabase.rpc("gallery_album_photos", { p_slug: normalized }),
     ])
 
-  if (photosError) {
+  if (photosError && !isGalleryAlbumsUnavailable(photosError)) {
     console.error("[gallery] load album photos failed", photosError)
   }
 
@@ -150,7 +153,9 @@ export async function loadMyGalleryAlbums(
     .order("updated_at", { ascending: false })
 
   if (error) {
-    console.error("[gallery] load my albums failed", error)
+    if (!isGalleryAlbumsUnavailable(error)) {
+      console.error("[gallery] load my albums failed", error)
+    }
     return []
   }
 

@@ -121,7 +121,7 @@ export function isGalleryAlbumsUnavailable(
     return true
   }
   if (
-    /gallery_wall_cover_ids_for_album|gallery_album_add_images|gallery_album_remove_images|gallery_album_reorder_images/i.test(
+    /gallery_wall_cover_ids_for_album|gallery_album_add_images|gallery_album_remove_images|gallery_album_reorder_images|gallery_list_albums|gallery_album_photos/i.test(
       message
     )
   ) {
@@ -137,4 +137,16 @@ export function isGalleryAlbumsUnavailable(
     return true
   }
   return false
+}
+
+/** After bulk remove, keep cover pointing at a remaining photo (or null). */
+export function nextAlbumCoverAfterRemove(
+  coverImageId: string | null | undefined,
+  remainingImageIds: string[],
+  removedIds: string[]
+): string | null {
+  const cover = coverImageId ?? null
+  if (cover == null) return null
+  if (!removedIds.includes(cover)) return cover
+  return remainingImageIds[0] ?? null
 }

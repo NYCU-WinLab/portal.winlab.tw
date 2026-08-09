@@ -51,6 +51,7 @@ import type {
 import {
   GALLERY_ALBUM_DESCRIPTION_MAX,
   GALLERY_ALBUM_TITLE_MAX,
+  nextAlbumCoverAfterRemove,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -192,19 +193,31 @@ export function GalleryAlbumManagePanel({
   })
 
   const removePhoto = (imageId: string) => {
+    const previousPhotos = photos
+    const previousCover = coverImageId
+    const remaining = photos.filter((p) => p.image_id !== imageId)
+    setPhotos(remaining)
+    setCoverImageId(
+      nextAlbumCoverAfterRemove(
+        coverImageId,
+        remaining.map((p) => p.image_id),
+        [imageId]
+      )
+    )
+    setSelected((prev) => {
+      if (!prev.has(imageId)) return prev
+      const copy = new Set(prev)
+      copy.delete(imageId)
+      return copy
+    })
     startTransition(async () => {
       const result = await removeImageFromGalleryAlbum(album.id, imageId)
       if (!result.ok) {
+        setPhotos(previousPhotos)
+        setCoverImageId(previousCover)
         toast.error(result.error)
         return
       }
-      setPhotos((prev) => prev.filter((p) => p.image_id !== imageId))
-      setSelected((prev) => {
-        if (!prev.has(imageId)) return prev
-        const copy = new Set(prev)
-        copy.delete(imageId)
-        return copy
-      })
       toast.success("Removed from album")
       router.refresh()
     })
@@ -214,12 +227,22 @@ export function GalleryAlbumManagePanel({
     const ids = Array.from(selected)
     if (ids.length === 0) return
     const previous = photos
-    setPhotos((prev) => prev.filter((p) => !selected.has(p.image_id)))
+    const previousCover = coverImageId
+    const remaining = photos.filter((p) => !selected.has(p.image_id))
+    setPhotos(remaining)
+    setCoverImageId(
+      nextAlbumCoverAfterRemove(
+        coverImageId,
+        remaining.map((p) => p.image_id),
+        ids
+      )
+    )
     setSelected(new Set())
     startTransition(async () => {
       const result = await removeImagesFromGalleryAlbum(album.id, ids)
       if (!result.ok) {
         setPhotos(previous)
+        setCoverImageId(previousCover)
         setSelected(new Set(ids))
         toast.error(result.error)
         return

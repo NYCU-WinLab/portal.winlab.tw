@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   GALLERY_ALBUM_PHOTOS_MAX,
   isGalleryAlbumsUnavailable,
+  nextAlbumCoverAfterRemove,
   normalizeAlbumPositions,
   normalizeGalleryAlbumDescription,
   normalizeGalleryAlbumImageIds,
@@ -91,8 +92,27 @@ describe("isGalleryAlbumsUnavailable", () => {
         message: "Could not find the function gallery_album_reorder_images",
       })
     ).toBe(true)
+    expect(
+      isGalleryAlbumsUnavailable({
+        message: "Could not find the function gallery_list_albums",
+      })
+    ).toBe(true)
     expect(isGalleryAlbumsUnavailable({ message: "permission denied" })).toBe(
       false
     )
+  })
+})
+
+describe("nextAlbumCoverAfterRemove", () => {
+  test("keeps cover when it was not removed", () => {
+    expect(nextAlbumCoverAfterRemove("a", ["a", "b"], ["b"])).toBe("a")
+  })
+
+  test("advances to the next remaining photo", () => {
+    expect(nextAlbumCoverAfterRemove("a", ["b", "c"], ["a"])).toBe("b")
+  })
+
+  test("clears cover when nothing remains", () => {
+    expect(nextAlbumCoverAfterRemove("a", [], ["a"])).toBe(null)
   })
 })

@@ -411,8 +411,8 @@ export async function removeImagesFromGalleryAlbum(
     return { ok: true, data: { removed: Number(removedCount) || 0 } }
   }
 
-  // Soft-fall back when migration 20260814010000 is not applied yet.
-  if (!/gallery_album_remove_images/i.test(rpcError.message)) {
+  // Soft-fall back when migration / RPC is not applied yet.
+  if (!isGalleryAlbumsUnavailable(rpcError)) {
     return { ok: false, error: rpcError.message }
   }
 
