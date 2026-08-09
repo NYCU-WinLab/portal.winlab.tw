@@ -63,11 +63,14 @@ export default async function UploadPage() {
     isGalleryAlbumsReady(supabase),
   ])
 
-  let imageRows: ManageUploadRow[] | null =
-    (imagesFull.data as ManageUploadRow[] | null) ?? null
+  let imageRows: ManageUploadRow[] | null = asManageRows(imagesFull.data)
   let takenAtAvailable = true
   let pinAvailable = true
   let sequenceAvailable = true
+
+  function asManageRows(data: unknown): ManageUploadRow[] | null {
+    return (data as ManageUploadRow[] | null) ?? null
+  }
 
   async function loadManageSelect(select: string) {
     return supabase
@@ -91,11 +94,11 @@ export default async function UploadPage() {
         if (barePin.error && isGalleryPinnedAtUnavailable(barePin.error)) {
           pinAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (barePin.error) {
           imageRows = null
         } else {
-          imageRows = (barePin.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(barePin.data)
         }
       } else if (
         bareFull.error &&
@@ -108,17 +111,16 @@ export default async function UploadPage() {
         if (bareTaken.error && isGalleryTakenAtUnavailable(bareTaken.error)) {
           takenAtAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (bareTaken.error) {
           imageRows = null
         } else {
-          imageRows =
-            (bareTaken.data as unknown as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bareTaken.data)
         }
       } else if (bareFull.error) {
         imageRows = null
       } else {
-        imageRows = (bareFull.data as ManageUploadRow[] | null) ?? null
+        imageRows = asManageRows(bareFull.data)
       }
     } else if (isGalleryTakenAtUnavailable(imagesFull.error)) {
       takenAtAvailable = false
@@ -132,11 +134,11 @@ export default async function UploadPage() {
         if (barePin.error && isGalleryPinnedAtUnavailable(barePin.error)) {
           pinAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (barePin.error) {
           imageRows = null
         } else {
-          imageRows = (barePin.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(barePin.data)
         }
       } else if (withPin.error && isGalleryPinnedAtUnavailable(withPin.error)) {
         pinAvailable = false
@@ -144,16 +146,16 @@ export default async function UploadPage() {
         if (core.error && isGallerySequenceUnavailable(core.error)) {
           sequenceAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (core.error) {
           imageRows = null
         } else {
-          imageRows = (core.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(core.data)
         }
       } else if (withPin.error) {
         imageRows = null
       } else {
-        imageRows = (withPin.data as ManageUploadRow[] | null) ?? null
+        imageRows = asManageRows(withPin.data)
       }
     } else if (isGalleryPinnedAtUnavailable(imagesFull.error)) {
       pinAvailable = false
@@ -169,12 +171,11 @@ export default async function UploadPage() {
         if (bareTaken.error && isGalleryTakenAtUnavailable(bareTaken.error)) {
           takenAtAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (bareTaken.error) {
           imageRows = null
         } else {
-          imageRows =
-            (bareTaken.data as unknown as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bareTaken.data)
         }
       } else if (
         withTaken.error &&
@@ -185,17 +186,16 @@ export default async function UploadPage() {
         if (core.error && isGallerySequenceUnavailable(core.error)) {
           sequenceAvailable = false
           const bare = await loadManageSelect(MANAGE_SELECT_BARE)
-          imageRows = (bare.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(bare.data)
         } else if (core.error) {
           imageRows = null
         } else {
-          imageRows = (core.data as ManageUploadRow[] | null) ?? null
+          imageRows = asManageRows(core.data)
         }
       } else if (withTaken.error) {
         imageRows = null
       } else {
-        imageRows =
-          (withTaken.data as unknown as ManageUploadRow[] | null) ?? null
+        imageRows = asManageRows(withTaken.data)
       }
     } else {
       imageRows = null
@@ -215,7 +215,7 @@ export default async function UploadPage() {
       <div className="flex flex-col gap-10 sm:gap-12">
         <GalleryPageHero
           title="Manage"
-          lead="Develop shots in the darkroom tray, then pin them to the lab paper wall — sequences, covers, and the occasional axolotl cameo."
+          lead="Develop shots in the darkroom tray, then pin them to the lab paper wall ??sequences, covers, and the occasional axolotl cameo."
         />
 
         {user.isAdmin ? (
@@ -253,7 +253,7 @@ export default async function UploadPage() {
           </div>
           {myImages.length === 0 ? (
             <p className={gallerySectionLeadClass()}>
-              Nothing hung yet — drop a photo above to claim a spot on the wall.
+              Nothing hung yet ??drop a photo above to claim a spot on the wall.
             </p>
           ) : (
             <UploadManageList
