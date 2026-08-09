@@ -1,7 +1,11 @@
+"use client"
+
 import Link from "next/link"
+import { useState } from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import type { GalleryMemoryPhoto } from "@/lib/gallery/memories"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -14,7 +18,17 @@ export function GalleryMemoriesTeaser({
   photos: GalleryMemoryPhoto[]
   dayLabel: string
 }) {
+  const [slideshowOpen, setSlideshowOpen] = useState(false)
+
   if (photos.length === 0) return null
+
+  const slideshowPhotos = photos.map((photo) => ({
+    image_id: photo.id,
+    name: photo.name,
+    image_path: photo.image_path,
+    media_type: photo.media_type,
+    poster_path: photo.poster_path,
+  }))
 
   const preview = photos.slice(0, 3)
   const extra = Math.max(0, photos.length - preview.length)
@@ -75,17 +89,37 @@ export function GalleryMemoriesTeaser({
               </span>
             ) : null}
           </div>
-          <Link
-            href="/memories"
-            className={cn(
-              gallerySans(),
-              "shrink-0 text-sm underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
-            )}
-          >
-            Open
-          </Link>
+          <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setSlideshowOpen(true)}
+              className={cn(
+                gallerySans(),
+                "inline-flex h-8 items-center rounded-md border border-input bg-background px-2.5 text-xs shadow-xs",
+                "hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              Slideshow
+            </button>
+            <Link
+              href="/memories"
+              className={cn(
+                gallerySans(),
+                "text-sm underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
+              )}
+            >
+              Open
+            </Link>
+          </div>
         </div>
       </div>
+
+      <AlbumSlideshow
+        photos={slideshowPhotos}
+        albumTitle={`Memories · ${dayLabel}`}
+        open={slideshowOpen}
+        onOpenChange={setSlideshowOpen}
+      />
     </aside>
   )
 }
