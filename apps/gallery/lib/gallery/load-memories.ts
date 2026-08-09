@@ -42,12 +42,20 @@ export function isGalleryMemoriesUnavailable(
   if (!error) return false
   const code = error.code ?? ""
   const message = error.message ?? ""
+  if (code === "PGRST202" || code === "PGRST205" || code === "42P01") {
+    return true
+  }
+  if (
+    /gallery_memories_on_this_day/i.test(message) &&
+    (/could not find/i.test(message) ||
+      /does not exist/i.test(message) ||
+      /schema cache/i.test(message))
+  ) {
+    return true
+  }
   return (
-    code === "PGRST202" ||
-    code === "PGRST205" ||
-    code === "42P01" ||
-    /gallery_memories_on_this_day/i.test(message) ||
-    /could not find|does not exist|schema cache/i.test(message)
+    /could not find the function/i.test(message) ||
+    /schema cache/i.test(message)
   )
 }
 
