@@ -28,7 +28,7 @@ export function isGalleryTagsUnavailable(
     code === "PGRST205" ||
     code === "PGRST202" ||
     code === "42P01" ||
-    /gallery_image_tags|gallery_tags|gallery_list_popular_tags|gallery_wall_cover_ids_for_tag/i.test(
+    /gallery_image_tags|gallery_tags|gallery_list_popular_tags|gallery_wall_cover_ids_for_tag|gallery_wall_cover_ids_for_query|gallery_admin_rename_tag|gallery_admin_merge_tags/i.test(
       message
     ) ||
     /schema cache/i.test(message) ||

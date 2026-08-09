@@ -1,4 +1,7 @@
+"use client"
+
 import Link from "next/link"
+import { useState } from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -18,6 +21,46 @@ function coverSrc(album: GalleryAlbumSummary): string | null {
   return getGalleryThumbUrl(album.cover_image_path)
 }
 
+function AlbumCoverThumb({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-3 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/mark.png"
+          alt=""
+          width={36}
+          height={36}
+          className="size-8 object-contain opacity-40 grayscale"
+          draggable={false}
+        />
+        <span
+          className={cn(
+            gallerySans(),
+            "text-[10px] tracking-wide text-zinc-500/90"
+          )}
+        >
+          Preview unavailable
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/polaroid:scale-[1.03]"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 export function GalleryAlbumCard({ album }: { album: GalleryAlbumSummary }) {
   const src = coverSrc(album)
 
@@ -29,14 +72,7 @@ export function GalleryAlbumCard({ album }: { album: GalleryAlbumSummary }) {
       <figure className={cn(galleryPolaroidClass(), "p-3 pb-4")}>
         <div className="relative aspect-[4/5] overflow-hidden rounded-[1px] bg-zinc-200/80">
           {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/polaroid:scale-[1.03]"
-              loading="lazy"
-              decoding="async"
-            />
+            <AlbumCoverThumb src={src} />
           ) : (
             <div
               className={cn(

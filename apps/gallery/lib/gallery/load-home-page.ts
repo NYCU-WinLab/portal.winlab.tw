@@ -65,7 +65,8 @@ type WallFilterable = {
  */
 function applyWallFilters(
   query: WallFilterable,
-  filters: GalleryHomeFilters
+  filters: GalleryHomeFilters,
+  options: { skipQuery?: boolean } = {}
 ): WallFilterable {
   let next = query
   if (filters.uploaderId) {
@@ -77,7 +78,7 @@ function applyWallFilters(
   if (filters.uploadedAfter) {
     next = next.gte("created_at", filters.uploadedAfter)
   }
-  if (filters.query) {
+  if (filters.query && !options.skipQuery) {
     next = next.ilike("name", `%${filters.query}%`)
   }
   return next
@@ -86,10 +87,15 @@ function applyWallFilters(
 // Unconstrained passthrough: keeps the caller's builder type while routing the
 // value through applyWallFilters. The unknown casts stop TS from structurally
 // comparing the (deeply recursive) PostgREST builder against WallFilterable.
-function withWallFilters<T>(query: T, filters: GalleryHomeFilters): T {
+function withWallFilters<T>(
+  query: T,
+  filters: GalleryHomeFilters,
+  options: { skipQuery?: boolean } = {}
+): T {
   return applyWallFilters(
     query as unknown as WallFilterable,
-    filters
+    filters,
+    options
   ) as unknown as T
 }
 
@@ -198,6 +204,56 @@ async function resolveTagCoverIds(
   const tagCoverIds = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (tagCoverIds.length === 0) return "none"
   return tagCoverIds
+}
+
+/**
+ * Title + tag search via RPC. Returns:
+ * - null: no query
+ * - "legacy": RPC missing → caller should fall back to name ILIKE
+ * - "none": no matching covers
+ * - string[]: cover ids
+ */
+async function resolveQueryCoverIds(
+  supabase: SupabaseClient,
+  query: string | null
+): Promise<"none" | "legacy" | string[] | null> {
+  if (!query) return null
+  const { data: coverIdRows, error } = await supabase.rpc(
+    "gallery_wall_cover_ids_for_query",
+    { p_query: query }
+  )
+  if (error) {
+    if (
+      isGalleryTagsUnavailable(error) ||
+      /gallery_wall_cover_ids_for_query/i.test(error.message ?? "")
+    ) {
+      return "legacy"
+    }
+    console.error("[gallery] failed to resolve search covers", error)
+    throw new Error(error.message || "Failed to search the wall.")
+  }
+  const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
+  if (ids.length === 0) return "none"
+  return ids
+}
+
+/** Intersect optional cover-id filters; "none" wins; null means unconstrained. */
+function intersectCoverIdFilters(
+  ...filters: Array<"none" | string[] | null>
+): "none" | string[] | null {
+  let current: string[] | null = null
+  for (const filter of filters) {
+    if (filter === null) continue
+    if (filter === "none") return "none"
+    if (current === null) {
+      current = filter
+      continue
+    }
+    const allowed = new Set(filter)
+    current = current.filter((id) => allowed.has(id))
+    if (current.length === 0) return "none"
+  }
+  return current
 }
 
 function toGalleryImageBase(image: CoverRow): GalleryImage {
@@ -321,8 +377,17 @@ async function loadGalleryHomeRangeViaView(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult | null> {
-  const tagCoverIds = await resolveTagCoverIds(supabase, filters.tagSlug)
-  if (tagCoverIds === "none") {
+  const [tagCoverIds, queryCoverIds] = await Promise.all([
+    resolveTagCoverIds(supabase, filters.tagSlug),
+    resolveQueryCoverIds(supabase, filters.query),
+  ])
+  const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
+  const coverIdFilter = intersectCoverIdFilters(
+    tagCoverIds,
+    queryCoverIds === "legacy" ? null : queryCoverIds
+  )
+
+  if (coverIdFilter === "none") {
     const members = userId
       ? buildMembers(
           ((
@@ -337,9 +402,9 @@ async function loadGalleryHomeRangeViaView(
   }
 
   let rowsBase = supabase.from("gallery_wall_page").select(WALL_PAGE_COLUMNS)
-  rowsBase = withWallFilters(rowsBase, filters)
-  if (tagCoverIds) {
-    rowsBase = rowsBase.in("id", tagCoverIds)
+  rowsBase = withWallFilters(rowsBase, filters, { skipQuery: skipQueryIlike })
+  if (coverIdFilter) {
+    rowsBase = rowsBase.in("id", coverIdFilter)
   }
   const rowsQuery = rowsBase
     .order("pinned_at", { ascending: false, nullsFirst: false })
@@ -349,9 +414,9 @@ async function loadGalleryHomeRangeViaView(
   let countBase = supabase
     .from("gallery_wall_covers")
     .select("id", { count: "exact", head: true })
-  countBase = withWallFilters(countBase, filters)
-  if (tagCoverIds) {
-    countBase = countBase.in("id", tagCoverIds)
+  countBase = withWallFilters(countBase, filters, { skipQuery: skipQueryIlike })
+  if (coverIdFilter) {
+    countBase = countBase.in("id", coverIdFilter)
   }
 
   const [rowsResult, countResult, membersResult] = await Promise.all([
@@ -424,8 +489,17 @@ async function loadGalleryHomeRangeLegacy(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult> {
-  const tagCoverIds = await resolveTagCoverIds(supabase, filters.tagSlug)
-  if (tagCoverIds === "none") {
+  const [tagCoverIds, queryCoverIds] = await Promise.all([
+    resolveTagCoverIds(supabase, filters.tagSlug),
+    resolveQueryCoverIds(supabase, filters.query),
+  ])
+  const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
+  const coverIdFilter = intersectCoverIdFilters(
+    tagCoverIds,
+    queryCoverIds === "legacy" ? null : queryCoverIds
+  )
+
+  if (coverIdFilter === "none") {
     const members = userId
       ? buildMembers(
           ((
@@ -450,9 +524,9 @@ async function loadGalleryHomeRangeLegacy(
       let base = supabase
         .from("gallery_wall_covers")
         .select(COVER_COLUMNS, { count: "exact" })
-      base = withWallFilters(base, filters)
-      if (tagCoverIds) {
-        base = base.in("id", tagCoverIds)
+      base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
+      if (coverIdFilter) {
+        base = base.in("id", coverIdFilter)
       }
       return base
         .order("pinned_at", { ascending: false, nullsFirst: false })

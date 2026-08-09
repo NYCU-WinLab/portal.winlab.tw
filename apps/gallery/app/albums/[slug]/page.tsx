@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 
 import { GalleryAlbumManagePanel } from "@/app/albums/_components/album-manage-panel"
 import { GalleryAlbumPhotoGrid } from "@/app/albums/_components/album-photo-grid"
+import { DownloadAlbumButton } from "@/app/_components/download-album-button"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import { GalleryEmptyState, gallerySans } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
@@ -90,18 +91,43 @@ export default async function GalleryAlbumDetailPage({
               `${album.photos.length} photo${album.photos.length === 1 ? "" : "s"} curated by ${album.owner_name}.`
             }
           />
-          <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-            by {album.owner_name}
-            <span aria-hidden> · </span>
-            {album.photos.length} photo
-            {album.photos.length === 1 ? "" : "s"}
-            <span aria-hidden> · </span>
+          <p
+            className={cn(
+              gallerySans(),
+              "flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+            )}
+          >
+            <span>
+              by {album.owner_name}
+              <span aria-hidden> · </span>
+              {album.photos.length} photo
+              {album.photos.length === 1 ? "" : "s"}
+            </span>
+            <span aria-hidden className="text-muted-foreground/50">
+              ·
+            </span>
             <a
               href={`/albums/${album.slug}`}
               className="underline-offset-2 hover:underline"
             >
               shareable link
             </a>
+            {album.photos.length > 0 ? (
+              <>
+                <span aria-hidden className="text-muted-foreground/50">
+                  ·
+                </span>
+                <DownloadAlbumButton
+                  variant="text"
+                  albumTitle={album.title}
+                  items={album.photos.map((photo) => ({
+                    name: photo.name,
+                    image_path: photo.image_path,
+                    position: photo.position,
+                  }))}
+                />
+              </>
+            ) : null}
           </p>
         </div>
 

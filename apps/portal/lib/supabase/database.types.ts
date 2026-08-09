@@ -2317,6 +2317,27 @@ export type Database = {
         Args: { p_tag_slug: string }
         Returns: string[]
       }
+      gallery_wall_cover_ids_for_query: {
+        Args: { p_query: string }
+        Returns: string[]
+      }
+      gallery_admin_rename_tag: {
+        Args: { p_tag_id: string; p_new_name: string }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      gallery_admin_merge_tags: {
+        Args: { p_source_id: string; p_target_id: string }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+          moved_count: number
+        }[]
+      }
       gallery_wall_cover_rank: { Args: { p_image_id: string }; Returns: number }
       gallery_memories_on_this_day: {
         Args: {

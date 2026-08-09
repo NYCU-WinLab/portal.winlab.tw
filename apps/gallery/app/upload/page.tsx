@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 
 import { MediaHealthPanel } from "@/app/upload/_components/media-health-panel"
 import { SeasonalThemePanel } from "@/app/upload/_components/seasonal-theme-panel"
+import { TagAdminPanel } from "@/app/upload/_components/tag-admin-panel"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import { UploadManageList } from "@/app/upload/_components/upload-manage-list"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
@@ -59,6 +60,7 @@ export default async function UploadPage() {
               activeThemeId={seasonalThemeId}
               settingsReady={settingsReady}
             />
+            <TagAdminPanel />
             <MediaHealthPanel />
           </>
         ) : null}

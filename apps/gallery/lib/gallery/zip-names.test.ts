@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  albumIndexPadWidth,
+  buildAlbumEntryName,
+  buildAlbumZipFilename,
   buildSequenceEntryName,
   buildSequenceZipFilename,
   ensureExtension,
   extensionFromPath,
   safeFolderName,
+  sortAlbumZipItems,
   sortSequenceZipItems,
   uniquifyName,
 } from "@/lib/gallery/zip-names"
@@ -92,5 +96,40 @@ describe("buildSequenceEntryName", () => {
 describe("buildSequenceZipFilename", () => {
   test("suffixes -story.zip on a safe folder name", () => {
     expect(buildSequenceZipFilename("Friday BBQ")).toBe("Friday_BBQ-story.zip")
+  })
+})
+
+describe("sortAlbumZipItems", () => {
+  test("orders by position then original order", () => {
+    const sorted = sortAlbumZipItems([
+      { name: "c", image_path: "c.jpg", position: 2 },
+      { name: "a", image_path: "a.jpg", position: 0 },
+      { name: "orphan", image_path: "o.jpg", position: null },
+      { name: "b", image_path: "b.jpg", position: 1 },
+    ])
+    expect(sorted.map((item) => item.name)).toEqual(["a", "b", "c", "orphan"])
+  })
+})
+
+describe("buildAlbumEntryName", () => {
+  test("pads to total width for large albums", () => {
+    expect(albumIndexPadWidth(100)).toBe(3)
+    const used = new Set<string>()
+    expect(
+      buildAlbumEntryName(used, 0, { name: "shot", image_path: "u/a.jpg" }, 100)
+    ).toBe("001_shot.jpg")
+  })
+
+  test("uses two digits for small albums", () => {
+    const used = new Set<string>()
+    expect(
+      buildAlbumEntryName(used, 0, { name: "shot", image_path: "u/a.jpg" }, 3)
+    ).toBe("01_shot.jpg")
+  })
+})
+
+describe("buildAlbumZipFilename", () => {
+  test("suffixes -album.zip on a safe folder name", () => {
+    expect(buildAlbumZipFilename("Lab trip")).toBe("Lab_trip-album.zip")
   })
 })

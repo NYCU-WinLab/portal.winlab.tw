@@ -200,3 +200,101 @@ export async function attachGalleryTagsToImage(
     }
   }
 }
+
+export async function adminRenameGalleryTag(
+  tagId: string,
+  rawName: string
+): Promise<TagActionResult<GalleryTag>> {
+  if (!tagId) return { ok: false, error: "Missing tag id." }
+  const name = normalizeGalleryTagName(rawName)
+  if (!name) return { ok: false, error: "Tag name is empty or invalid." }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!profile?.is_admin) {
+    return { ok: false, error: "Only admins can rename tags." }
+  }
+
+  const { data, error } = await supabase.rpc("gallery_admin_rename_tag", {
+    p_tag_id: tagId,
+    p_new_name: name,
+  })
+
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: "Tag admin is not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row?.id) return { ok: false, error: "Rename failed." }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return {
+    ok: true,
+    data: { id: row.id, name: row.name, slug: row.slug },
+  }
+}
+
+export async function adminMergeGalleryTags(
+  sourceTagId: string,
+  targetTagId: string
+): Promise<TagActionResult<GalleryTag & { moved_count: number }>> {
+  if (!sourceTagId || !targetTagId) {
+    return { ok: false, error: "Missing source or target tag." }
+  }
+  if (sourceTagId === targetTagId) {
+    return { ok: false, error: "Pick two different tags to merge." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!profile?.is_admin) {
+    return { ok: false, error: "Only admins can merge tags." }
+  }
+
+  const { data, error } = await supabase.rpc("gallery_admin_merge_tags", {
+    p_source_id: sourceTagId,
+    p_target_id: targetTagId,
+  })
+
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: "Tag admin is not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row?.id) return { ok: false, error: "Merge failed." }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return {
+    ok: true,
+    data: {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      moved_count: Number(row.moved_count) || 0,
+    },
+  }
+}

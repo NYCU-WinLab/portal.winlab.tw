@@ -89,3 +89,56 @@ export function buildSequenceZipFilename(coverName: string): string {
 
 /** Soft cap so a runaway sequence cannot OOM the tab. */
 export const SEQUENCE_ZIP_MAX_ITEMS = 40
+
+export type AlbumZipSource = {
+  name: string
+  image_path: string
+  position?: number | null
+}
+
+/**
+ * Sort for album ZIP order: numeric position ascending, then original order.
+ * Missing positions sort after numbered shots, preserving relative order.
+ */
+export function sortAlbumZipItems<T extends AlbumZipSource>(items: T[]): T[] {
+  return items
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      const ai = a.item.position
+      const bi = b.item.position
+      const aNum = typeof ai === "number"
+      const bNum = typeof bi === "number"
+      if (aNum && bNum && ai !== bi) return ai - bi
+      if (aNum !== bNum) return aNum ? -1 : 1
+      return a.originalIndex - b.originalIndex
+    })
+    .map(({ item }) => item)
+}
+
+/** Pad width for album entry indexes (200 max → 3 digits). */
+export function albumIndexPadWidth(total: number): number {
+  return Math.max(2, String(Math.max(total, 1)).length)
+}
+
+/** `01_cover.jpg` / `001_cover.jpg`-style entry name for albums. */
+export function buildAlbumEntryName(
+  used: Set<string>,
+  displayIndex: number,
+  item: AlbumZipSource,
+  total = 0
+): string {
+  const width = albumIndexPadWidth(total > 0 ? total : displayIndex + 1)
+  const padded = String(displayIndex + 1).padStart(width, "0")
+  const withExt = ensureExtension(item.name, item.image_path)
+  return uniquifyName(used, `${padded}_${withExt}`)
+}
+
+export function buildAlbumZipFilename(albumTitle: string): string {
+  return `${safeFolderName(albumTitle)}-album.zip`
+}
+
+/**
+ * Soft cap aligned with GALLERY_ALBUM_PHOTOS_MAX so a full album still zips
+ * without OOM-ing a typical tab.
+ */
+export const ALBUM_ZIP_MAX_ITEMS = 200

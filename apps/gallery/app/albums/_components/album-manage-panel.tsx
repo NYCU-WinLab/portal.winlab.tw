@@ -33,6 +33,7 @@ import {
   reorderGalleryAlbumImages,
   updateGalleryAlbum,
 } from "@/app/actions/albums"
+import { DownloadAlbumButton } from "@/app/_components/download-album-button"
 import {
   galleryPanelClass,
   gallerySans,
@@ -186,10 +187,26 @@ export function GalleryAlbumManagePanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={saveMeta} disabled={pending}>
           Save details
         </Button>
+        {photos.length > 0 ? (
+          <DownloadAlbumButton
+            className={cn(
+              gallerySans(),
+              "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+              "hover:bg-accent hover:text-accent-foreground"
+            )}
+            albumTitle={title.trim() || album.title}
+            items={photos.map((photo) => ({
+              name: photo.name,
+              image_path: photo.image_path,
+              position: photo.position,
+            }))}
+            disabled={pending}
+          />
+        ) : null}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button type="button" variant="outline" disabled={pending}>

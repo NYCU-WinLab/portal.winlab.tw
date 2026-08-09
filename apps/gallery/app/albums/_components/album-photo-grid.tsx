@@ -29,6 +29,57 @@ function mediaFor(photo: GalleryAlbumPhoto): string {
   return getGalleryImageUrl(photo.image_path)
 }
 
+function AlbumThumb({
+  photo,
+  className,
+}: {
+  photo: GalleryAlbumPhoto
+  className?: string
+}) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-2 text-center",
+          className
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/mark.png"
+          alt=""
+          width={32}
+          height={32}
+          className="size-7 object-contain opacity-40 grayscale"
+          draggable={false}
+        />
+        <span
+          className={cn(
+            gallerySans(),
+            "text-[10px] tracking-wide text-zinc-500/90"
+          )}
+        >
+          Preview unavailable
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={thumbFor(photo)}
+      alt={photo.name}
+      className={cn("h-full w-full object-cover", className)}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 export function GalleryAlbumPhotoGrid({
   photos,
 }: {
@@ -49,13 +100,9 @@ export function GalleryAlbumPhotoGrid({
             >
               <figure className={cn(galleryPolaroidClass(), "p-2.5 pb-3")}>
                 <div className="relative aspect-[4/5] overflow-hidden rounded-[1px] bg-zinc-200/80">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={thumbFor(photo)}
-                    alt={photo.name}
-                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/polaroid:scale-[1.03]"
-                    loading="lazy"
-                    decoding="async"
+                  <AlbumThumb
+                    photo={photo}
+                    className="transition-transform duration-500 ease-out group-hover/polaroid:scale-[1.03]"
                   />
                 </div>
                 <figcaption

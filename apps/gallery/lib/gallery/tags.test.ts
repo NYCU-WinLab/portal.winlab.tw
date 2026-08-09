@@ -72,6 +72,16 @@ describe("isGalleryTagsUnavailable", () => {
     ).toBe(true)
   })
 
+  test("detects missing search RPC", () => {
+    expect(
+      isGalleryTagsUnavailable({
+        code: "PGRST202",
+        message:
+          "Could not find the function public.gallery_wall_cover_ids_for_query",
+      })
+    ).toBe(true)
+  })
+
   test("ignores unrelated errors", () => {
     expect(
       isGalleryTagsUnavailable({
