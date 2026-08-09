@@ -717,12 +717,19 @@ export function UploadManageList({
     }
   }
 
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    selectionAnchorIdRef.current = null
+  }
+
+  const endSelectionMode = () => {
+    clearSelection()
+    setSelectionMode(false)
+  }
+
   const toggleSelectionMode = () => {
     setSelectionMode((mode) => {
-      if (mode) {
-        setSelectedIds(new Set())
-        selectionAnchorIdRef.current = null
-      }
+      if (mode) clearSelection()
       return !mode
     })
   }
@@ -742,9 +749,7 @@ export function UploadManageList({
         return
       if (event.key === "Escape") {
         event.preventDefault()
-        setSelectedIds(new Set())
-        selectionAnchorIdRef.current = null
-        setSelectionMode(false)
+        endSelectionMode()
         return
       }
       if (
@@ -758,8 +763,15 @@ export function UploadManageList({
           const allVisibleSelected =
             visibleSelectableItems.length > 0 &&
             visibleSelectableItems.every((item) => current.has(item.id))
-          if (allVisibleSelected) return new Set()
-          return new Set(visibleSelectableItems.map((item) => item.id))
+          if (allVisibleSelected) {
+            selectionAnchorIdRef.current = null
+            return new Set()
+          }
+          const next = new Set(visibleSelectableItems.map((item) => item.id))
+          selectionAnchorIdRef.current =
+            visibleSelectableItems[visibleSelectableItems.length - 1]?.id ??
+            null
+          return next
         })
       }
     }
@@ -783,8 +795,7 @@ export function UploadManageList({
         toast.success(
           `Deleted ${selectedItems.length} work${selectedItems.length === 1 ? "" : "s"}.`
         )
-        setSelectedIds(new Set())
-        setSelectionMode(false)
+        endSelectionMode()
         setConfirmOpen(false)
       } else {
         toast.error(result.error)
@@ -815,8 +826,7 @@ export function UploadManageList({
           `Set capture date on ${result.updated} work${result.updated === 1 ? "" : "s"}.`
         )
         setBulkDateOpen(false)
-        setSelectedIds(new Set())
-        setSelectionMode(false)
+        endSelectionMode()
       } else {
         toast.error(result.error)
       }
@@ -847,8 +857,7 @@ export function UploadManageList({
       )
       setBulkTagOpen(false)
       setBulkTagDraft("")
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      endSelectionMode()
     })
   }
 
@@ -875,8 +884,7 @@ export function UploadManageList({
       )
       setBulkUntagOpen(false)
       setBulkUntagDraft("")
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      endSelectionMode()
     })
   }
 
@@ -951,8 +959,7 @@ export function UploadManageList({
         return
       }
       toast.success(result.data.message)
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      endSelectionMode()
     })
   }
 
@@ -968,8 +975,7 @@ export function UploadManageList({
         return
       }
       toast.success(result.message)
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      endSelectionMode()
     })
   }
 
@@ -1004,8 +1010,7 @@ export function UploadManageList({
       setBulkAlbumDraft("")
       setBulkAlbumOpen(false)
       selectionAnchorIdRef.current = null
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      endSelectionMode()
     })
   }
   const openSlideshow = (
@@ -1101,12 +1106,15 @@ export function UploadManageList({
             type="button"
             onClick={() => {
               if (allSelected) {
-                setSelectedIds(new Set())
+                clearSelection()
                 return
               }
               setSelectedIds(
                 new Set(visibleSelectableItems.map((item) => item.id))
               )
+              selectionAnchorIdRef.current =
+                visibleSelectableItems[visibleSelectableItems.length - 1]?.id ??
+                null
             }}
             className={galleryPillClass()}
           >
@@ -1141,12 +1149,15 @@ export function UploadManageList({
                 type="button"
                 onClick={() => {
                   if (allSelected) {
-                    setSelectedIds(new Set())
+                    clearSelection()
                     return
                   }
                   setSelectedIds(
                     new Set(visibleSelectableItems.map((item) => item.id))
                   )
+                  selectionAnchorIdRef.current =
+                    visibleSelectableItems[visibleSelectableItems.length - 1]
+                      ?.id ?? null
                 }}
                 className={galleryPillClass()}
               >
@@ -1167,8 +1178,7 @@ export function UploadManageList({
                       (isPending || selectedItems.length === 0) && "opacity-40"
                     )}
                     onAdded={() => {
-                      setSelectedIds(new Set())
-                      setSelectionMode(false)
+                      endSelectionMode()
                     }}
                   />
                   <button
