@@ -11,16 +11,16 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
-import type { GalleryAlbumPhoto } from "@/lib/gallery/albums"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
   nextSlideshowIndex,
   prevSlideshowIndex,
+  type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
-function mediaUrl(photo: GalleryAlbumPhoto): string {
+function mediaUrl(photo: GallerySlideshowPhoto): string {
   if (photo.media_type === "video") {
     return photo.poster_path
       ? getGalleryThumbUrl(photo.poster_path, 1600)
@@ -33,10 +33,12 @@ export function AlbumSlideshowButton({
   photos,
   albumTitle,
   className,
+  triggerLabel = "Slideshow",
 }: {
-  photos: GalleryAlbumPhoto[]
+  photos: GallerySlideshowPhoto[]
   albumTitle: string
   className?: string
+  triggerLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const [index, setIndex] = useState(0)
@@ -99,7 +101,7 @@ export function AlbumSlideshowButton({
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>
-        Slideshow
+        {triggerLabel}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -165,25 +167,14 @@ export function AlbumSlideshowButton({
           </header>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-8 sm:px-10">
-            {photo.media_type === "video" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={photo.image_id}
-                src={mediaUrl(photo)}
-                alt={photo.name}
-                className="max-h-full max-w-full object-contain"
-                draggable={false}
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={photo.image_id}
-                src={mediaUrl(photo)}
-                alt={photo.name}
-                className="max-h-full max-w-full object-contain"
-                draggable={false}
-              />
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={photo.image_id}
+              src={mediaUrl(photo)}
+              alt={photo.name}
+              className="max-h-full max-w-full object-contain"
+              draggable={false}
+            />
           </div>
 
           <p

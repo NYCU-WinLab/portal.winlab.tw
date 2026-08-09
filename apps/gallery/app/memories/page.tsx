@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { AlbumSlideshowButton } from "@/app/albums/_components/album-slideshow"
 import { MemoriesDayNavigator } from "@/app/memories/_components/memories-day-navigator"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
@@ -14,6 +15,7 @@ import {
   isMemoriesViewingToday,
   resolveMemoriesCalendarDay,
 } from "@/lib/gallery/memories"
+import { flattenMemoryGroupsForSlideshow } from "@/lib/gallery/slideshow"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -44,6 +46,7 @@ export default async function MemoriesPage({
     day: day.day,
   })
   const groups = groupMemoriesByYear(photos)
+  const slideshowPhotos = flattenMemoryGroupsForSlideshow(groups)
 
   return (
     <GalleryThemedShell
@@ -64,6 +67,18 @@ export default async function MemoriesPage({
             }
           />
           <MemoriesDayNavigator day={day} />
+          {slideshowPhotos.length > 0 ? (
+            <AlbumSlideshowButton
+              photos={slideshowPhotos}
+              albumTitle={`Memories · ${label}`}
+              triggerLabel="Slideshow"
+              className={cn(
+                gallerySans(),
+                "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+                "hover:bg-accent hover:text-accent-foreground"
+              )}
+            />
+          ) : null}
         </div>
 
         {groups.length === 0 ? (

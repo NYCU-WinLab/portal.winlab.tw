@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   clampSlideshowIntervalMs,
+  flattenMemoryGroupsForSlideshow,
   GALLERY_SLIDESHOW_DEFAULT_MS,
   nextSlideshowIndex,
   prevSlideshowIndex,
@@ -34,5 +35,51 @@ describe("slideshow index wrap", () => {
   test("empty stays zero", () => {
     expect(nextSlideshowIndex(5, 0)).toBe(0)
     expect(prevSlideshowIndex(5, 0)).toBe(0)
+  })
+})
+
+describe("flattenMemoryGroupsForSlideshow", () => {
+  test("preserves year-group order and maps ids", () => {
+    expect(
+      flattenMemoryGroupsForSlideshow([
+        {
+          photos: [
+            {
+              id: "a",
+              name: "A",
+              image_path: "u/a.jpg",
+              media_type: "image",
+              poster_path: null,
+            },
+          ],
+        },
+        {
+          photos: [
+            {
+              id: "b",
+              name: "B",
+              image_path: "u/b.jpg",
+              media_type: "video",
+              poster_path: "u/b-p.jpg",
+            },
+          ],
+        },
+      ])
+    ).toEqual([
+      {
+        image_id: "a",
+        name: "A",
+        image_path: "u/a.jpg",
+        media_type: "image",
+        poster_path: null,
+      },
+      {
+        image_id: "b",
+        name: "B",
+        image_path: "u/b.jpg",
+        media_type: "video",
+        poster_path: "u/b-p.jpg",
+      },
+    ])
   })
 })
