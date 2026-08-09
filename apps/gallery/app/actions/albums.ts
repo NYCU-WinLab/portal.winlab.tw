@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import {
   GALLERY_ALBUM_PHOTOS_MAX,
+  isGalleryAlbumsUnavailable,
   normalizeAlbumPositions,
   normalizeGalleryAlbumDescription,
   normalizeGalleryAlbumImageIds,
@@ -218,9 +219,19 @@ export async function deleteGalleryAlbum(
 export async function addImageToGalleryAlbum(
   albumId: string,
   imageId: string
-): Promise<AlbumActionResult> {
-  if (!albumId || !imageId) {
-    return { ok: false, error: "Missing album or image id." }
+): Promise<AlbumActionResult<{ added: number }>> {
+  return addImagesToGalleryAlbum(albumId, [imageId])
+}
+
+export async function addImagesToGalleryAlbum(
+  albumId: string,
+  imageIds: string[]
+): Promise<AlbumActionResult<{ added: number }>> {
+  if (!albumId) return { ok: false, error: "Missing album id." }
+
+  const ids = normalizeGalleryAlbumImageIds(imageIds)
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
   }
 
   const auth = await requireSignedIn()
@@ -235,13 +246,32 @@ export async function addImageToGalleryAlbum(
   if (albumError) return { ok: false, error: albumError.message }
   if (!album) return { ok: false, error: "Album not found." }
 
+  const { data: addedCount, error: rpcError } = await auth.supabase.rpc(
+    "gallery_album_add_images",
+    {
+      p_album_id: albumId,
+      p_image_ids: ids,
+    }
+  )
+
+  if (!rpcError) {
+    revalidateAlbumPaths(album.slug)
+    return { ok: true, data: { added: Number(addedCount) || 0 } }
+  }
+
+  // Soft-fall back when migration 20260814020000 is not applied yet.
+  if (!isGalleryAlbumsUnavailable(rpcError)) {
+    return { ok: false, error: rpcError.message }
+  }
+
   const { count, error: countError } = await auth.supabase
     .from("gallery_album_images")
     .select("image_id", { count: "exact", head: true })
     .eq("album_id", albumId)
 
   if (countError) return { ok: false, error: countError.message }
-  if ((count ?? 0) >= GALLERY_ALBUM_PHOTOS_MAX) {
+  const existing = count ?? 0
+  if (existing >= GALLERY_ALBUM_PHOTOS_MAX) {
     return {
       ok: false,
       error: `At most ${GALLERY_ALBUM_PHOTOS_MAX} photos per album.`,
@@ -256,36 +286,47 @@ export async function addImageToGalleryAlbum(
     .limit(1)
     .maybeSingle()
 
-  const nextPosition = (maxPos?.position ?? -1) + 1
+  let nextPosition = (maxPos?.position ?? -1) + 1
+  let added = 0
+  let firstAdded: string | null = null
+  const capacity = GALLERY_ALBUM_PHOTOS_MAX - existing
 
-  const { error: linkError } = await auth.supabase
-    .from("gallery_album_images")
-    .insert({
-      album_id: albumId,
-      image_id: imageId,
-      position: nextPosition,
-      added_by: auth.userId,
-    })
+  for (const imageId of ids.slice(0, capacity)) {
+    const { error: linkError } = await auth.supabase
+      .from("gallery_album_images")
+      .insert({
+        album_id: albumId,
+        image_id: imageId,
+        position: nextPosition,
+        added_by: auth.userId,
+      })
 
-  if (linkError) {
-    if (/duplicate|unique|23505/i.test(linkError.message)) {
-      return { ok: true }
+    if (linkError) {
+      if (/duplicate|unique|23505/i.test(linkError.message)) continue
+      return { ok: false, error: linkError.message }
     }
-    return { ok: false, error: linkError.message }
+    if (!firstAdded) firstAdded = imageId
+    added += 1
+    nextPosition += 1
   }
 
-  if (!album.cover_image_id) {
+  if (!album.cover_image_id && firstAdded) {
     await auth.supabase
       .from("gallery_albums")
       .update({
-        cover_image_id: imageId,
+        cover_image_id: firstAdded,
         updated_at: new Date().toISOString(),
       })
+      .eq("id", albumId)
+  } else if (added > 0) {
+    await auth.supabase
+      .from("gallery_albums")
+      .update({ updated_at: new Date().toISOString() })
       .eq("id", albumId)
   }
 
   revalidateAlbumPaths(album.slug)
-  return { ok: true }
+  return { ok: true, data: { added } }
 }
 
 export async function removeImageFromGalleryAlbum(

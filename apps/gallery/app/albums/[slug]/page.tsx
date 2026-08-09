@@ -124,19 +124,31 @@ export default async function GalleryAlbumDetailPage({
               label={canManage ? "Copy share link" : "Share album"}
             />
             {album.photos.length > 0 ? (
-              <DownloadAlbumButton
-                className={cn(
-                  gallerySans(),
-                  "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
-                  "hover:bg-accent hover:text-accent-foreground"
-                )}
-                albumTitle={album.title}
-                items={album.photos.map((photo) => ({
-                  name: photo.name,
-                  image_path: photo.image_path,
-                  position: photo.position,
-                }))}
-              />
+              <>
+                <Link
+                  href={`/?album=${encodeURIComponent(album.slug)}`}
+                  className={cn(
+                    gallerySans(),
+                    "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+                    "hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  View on wall
+                </Link>
+                <DownloadAlbumButton
+                  className={cn(
+                    gallerySans(),
+                    "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+                    "hover:bg-accent hover:text-accent-foreground"
+                  )}
+                  albumTitle={album.title}
+                  items={album.photos.map((photo) => ({
+                    name: photo.name,
+                    image_path: photo.image_path,
+                    position: photo.position,
+                  }))}
+                />
+              </>
             ) : null}
           </div>
           {canManage ? (

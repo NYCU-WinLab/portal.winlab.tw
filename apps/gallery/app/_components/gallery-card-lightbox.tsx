@@ -7,7 +7,6 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
-  IconDownload,
   IconLink,
   IconPin,
   IconX,
@@ -16,6 +15,7 @@ import {
 import { DialogClose } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { DownloadOriginalButton } from "@/app/_components/download-original-button"
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { FavoritePhotoButton } from "@/app/_components/favorite-photo-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
@@ -130,20 +130,11 @@ export function GalleryLightboxMediaPane({
         />
       ) : null}
       {isSignedIn ? (
-        <a
-          href={mediaUrl}
-          download
-          aria-label="Save original"
-          className={cn(
-            "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
-            "inline-flex h-11 w-11 items-center justify-center rounded-full",
-            "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-            "transition-colors hover:bg-white",
-            "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-          )}
-        >
-          <IconDownload className="h-5 w-5" />
-        </a>
+        <DownloadOriginalButton
+          displayName={activeItem?.name ?? image.name}
+          imagePath={activeItem?.image_path ?? image.image_path}
+          className="absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20"
+        />
       ) : null}
       {!mediaLoaded && !lightboxFailed ? (
         <div

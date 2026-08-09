@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   GALLERY_ALBUM_PHOTOS_MAX,
+  isGalleryAlbumsUnavailable,
   normalizeAlbumPositions,
   normalizeGalleryAlbumDescription,
   normalizeGalleryAlbumImageIds,
@@ -70,5 +71,23 @@ describe("normalizeGalleryAlbumImageIds", () => {
     expect(
       normalizeGalleryAlbumImageIds([" a ", "b", "a", "", "c", "b"])
     ).toEqual(["a", "b", "c"])
+  })
+})
+
+describe("isGalleryAlbumsUnavailable", () => {
+  test("detects missing album RPCs", () => {
+    expect(
+      isGalleryAlbumsUnavailable({
+        message: "Could not find the function gallery_album_add_images",
+      })
+    ).toBe(true)
+    expect(
+      isGalleryAlbumsUnavailable({
+        message: "Could not find the function gallery_wall_cover_ids_for_album",
+      })
+    ).toBe(true)
+    expect(isGalleryAlbumsUnavailable({ message: "permission denied" })).toBe(
+      false
+    )
   })
 })

@@ -8,6 +8,8 @@ export type GalleryHomeFilters = {
   tagSlug: string | null
   /** Signed-in only: wall covers for the viewer's saved favorites. */
   savedOnly: boolean
+  /** Album slug — wall covers for photos in that album. */
+  albumSlug: string | null
 }
 
 export const EMPTY_GALLERY_HOME_FILTERS: GalleryHomeFilters = {
@@ -17,6 +19,7 @@ export const EMPTY_GALLERY_HOME_FILTERS: GalleryHomeFilters = {
   query: null,
   tagSlug: null,
   savedOnly: false,
+  albumSlug: null,
 }
 
 export function parseGalleryHomeFilters(params: {
@@ -26,6 +29,7 @@ export function parseGalleryHomeFilters(params: {
   q?: string
   tag?: string
   saved?: string
+  album?: string
 }): GalleryHomeFilters {
   const media =
     params.media === "image" || params.media === "video" ? params.media : "all"
@@ -37,7 +41,18 @@ export function parseGalleryHomeFilters(params: {
     tagRaw && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tagRaw) ? tagRaw : null
   const savedRaw = params.saved?.trim().toLowerCase()
   const savedOnly = savedRaw === "1" || savedRaw === "true"
-  return { uploaderId, media, uploadedAfter, query, tagSlug, savedOnly }
+  const albumRaw = params.album?.trim().toLowerCase() || null
+  const albumSlug =
+    albumRaw && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(albumRaw) ? albumRaw : null
+  return {
+    uploaderId,
+    media,
+    uploadedAfter,
+    query,
+    tagSlug,
+    savedOnly,
+    albumSlug,
+  }
 }
 
 export function hasActiveGalleryFilters(filters: GalleryHomeFilters): boolean {
@@ -47,7 +62,8 @@ export function hasActiveGalleryFilters(filters: GalleryHomeFilters): boolean {
     filters.uploadedAfter !== null ||
     filters.query !== null ||
     filters.tagSlug !== null ||
-    filters.savedOnly
+    filters.savedOnly ||
+    filters.albumSlug !== null
   )
 }
 
@@ -72,6 +88,7 @@ export function buildGalleryHomeHref({
   if (filters?.query) params.set("q", filters.query)
   if (filters?.tagSlug) params.set("tag", filters.tagSlug)
   if (filters?.savedOnly) params.set("saved", "1")
+  if (filters?.albumSlug) params.set("album", filters.albumSlug)
   if (photoId) params.set("photo", photoId)
   if (commentId) params.set("comment", commentId)
   const qs = params.toString()
@@ -103,6 +120,7 @@ export function describeGalleryFilterSummary(
 ): string[] {
   const parts: string[] = []
   if (filters.savedOnly) parts.push("Saved")
+  if (filters.albumSlug) parts.push(`Album · ${filters.albumSlug}`)
   if (filters.tagSlug) {
     parts.push(tagLabel?.trim() || `#${filters.tagSlug}`)
   }

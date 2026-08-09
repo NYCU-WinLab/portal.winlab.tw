@@ -9,6 +9,7 @@ import {
 } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
+  IconAlbum,
   IconChevronDown,
   IconFilter,
   IconBookmark,
@@ -173,6 +174,7 @@ export function GalleryHomeFiltersBar({
     if (!active) return "Filters"
     const bits: string[] = []
     if (filters.savedOnly) bits.push("Saved")
+    if (filters.albumSlug) bits.push(`Album · ${filters.albumSlug}`)
     if (filters.tagSlug) bits.push(`#${filters.tagSlug}`)
     if (filters.media !== "all") {
       bits.push(
@@ -192,6 +194,7 @@ export function GalleryHomeFiltersBar({
     filters.media,
     filters.savedOnly,
     filters.tagSlug,
+    filters.albumSlug,
     filters.uploaderId,
     uploaderLabel,
   ])
@@ -225,6 +228,7 @@ export function GalleryHomeFiltersBar({
       query: null,
       tagSlug: null,
       savedOnly: false,
+      albumSlug: null,
     })
   }
 
@@ -318,6 +322,22 @@ export function GalleryHomeFiltersBar({
                 Saved
               </span>
             </FilterPill>
+            {filters.albumSlug ? (
+              <FilterPill
+                active
+                disabled={isPending}
+                onClick={() => apply({ ...filters, albumSlug: null })}
+              >
+                <span className="inline-flex max-w-[9rem] items-center gap-1">
+                  <IconAlbum
+                    className="size-3 shrink-0 opacity-80"
+                    aria-hidden
+                  />
+                  <span className="truncate">{filters.albumSlug}</span>
+                  <IconX className="size-3 shrink-0 opacity-70" aria-hidden />
+                </span>
+              </FilterPill>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -474,6 +494,23 @@ export function GalleryHomeFiltersBar({
                 Saved
               </span>
             </FilterPill>
+
+            {filters.albumSlug ? (
+              <FilterPill
+                active
+                disabled={isPending}
+                onClick={() => apply({ ...filters, albumSlug: null })}
+              >
+                <span className="inline-flex max-w-[12rem] items-center gap-1">
+                  <IconAlbum
+                    className="size-3 shrink-0 opacity-80"
+                    aria-hidden
+                  />
+                  <span className="truncate">{filters.albumSlug}</span>
+                  <IconX className="size-3 shrink-0 opacity-70" aria-hidden />
+                </span>
+              </FilterPill>
+            ) : null}
 
             <FilterDivider />
 

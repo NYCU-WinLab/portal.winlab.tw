@@ -16,10 +16,11 @@ describe("parseGalleryHomeFilters", () => {
       query: null,
       tagSlug: null,
       savedOnly: false,
+      albumSlug: null,
     })
   })
 
-  test("parses uploader, media, after, query, tag, and saved", () => {
+  test("parses uploader, media, after, query, tag, saved, and album", () => {
     expect(
       parseGalleryHomeFilters({
         uploader: "user-1",
@@ -28,6 +29,7 @@ describe("parseGalleryHomeFilters", () => {
         q: "mop",
         tag: "Lab-Trip",
         saved: "1",
+        album: "Lab-Retreat",
       })
     ).toEqual({
       uploaderId: "user-1",
@@ -36,13 +38,15 @@ describe("parseGalleryHomeFilters", () => {
       query: "mop",
       tagSlug: "lab-trip",
       savedOnly: true,
+      albumSlug: "lab-retreat",
     })
   })
 
-  test("ignores invalid media and tag values", () => {
+  test("ignores invalid media, tag, and album values", () => {
     expect(parseGalleryHomeFilters({ media: "gif" }).media).toBe("all")
     expect(parseGalleryHomeFilters({ tag: "!!!" }).tagSlug).toBeNull()
     expect(parseGalleryHomeFilters({ saved: "yes" }).savedOnly).toBe(false)
+    expect(parseGalleryHomeFilters({ album: "!!!" }).albumSlug).toBeNull()
   })
 })
 
@@ -56,6 +60,7 @@ describe("hasActiveGalleryFilters", () => {
         query: null,
         tagSlug: null,
         savedOnly: false,
+        albumSlug: null,
       })
     ).toBe(true)
     expect(
@@ -66,6 +71,7 @@ describe("hasActiveGalleryFilters", () => {
         query: null,
         tagSlug: null,
         savedOnly: false,
+        albumSlug: null,
       })
     ).toBe(true)
     expect(
@@ -76,6 +82,7 @@ describe("hasActiveGalleryFilters", () => {
         query: "test",
         tagSlug: null,
         savedOnly: false,
+        albumSlug: null,
       })
     ).toBe(true)
     expect(
@@ -86,6 +93,7 @@ describe("hasActiveGalleryFilters", () => {
         query: null,
         tagSlug: "lab-trip",
         savedOnly: false,
+        albumSlug: null,
       })
     ).toBe(true)
     expect(
@@ -96,6 +104,7 @@ describe("hasActiveGalleryFilters", () => {
         query: null,
         tagSlug: null,
         savedOnly: true,
+        albumSlug: null,
       })
     ).toBe(true)
     expect(
@@ -106,6 +115,18 @@ describe("hasActiveGalleryFilters", () => {
         query: null,
         tagSlug: null,
         savedOnly: false,
+        albumSlug: "lab-trip",
+      })
+    ).toBe(true)
+    expect(
+      hasActiveGalleryFilters({
+        uploaderId: null,
+        media: "all",
+        uploadedAfter: null,
+        query: null,
+        tagSlug: null,
+        savedOnly: false,
+        albumSlug: null,
       })
     ).toBe(false)
   })
@@ -124,17 +145,18 @@ describe("buildGalleryHomeHref", () => {
           query: "hello",
           tagSlug: "lab",
           savedOnly: true,
+          albumSlug: "retreat",
         },
         photoId: "p1",
       })
     ).toBe(
-      "/?page=2&uploader=u1&media=video&after=2026-01-01&q=hello&tag=lab&saved=1&photo=p1"
+      "/?page=2&uploader=u1&media=video&after=2026-01-01&q=hello&tag=lab&saved=1&album=retreat&photo=p1"
     )
   })
 })
 
 describe("describeGalleryFilterSummary", () => {
-  test("lists active chips including Saved", () => {
+  test("lists active chips including Saved and album", () => {
     expect(
       describeGalleryFilterSummary(
         {
@@ -144,9 +166,10 @@ describe("describeGalleryFilterSummary", () => {
           query: "mop",
           tagSlug: null,
           savedOnly: true,
+          albumSlug: "lab-trip",
         },
         []
       )
-    ).toEqual(["Saved", '"mop"'])
+    ).toEqual(["Saved", "Album · lab-trip", '"mop"'])
   })
 })

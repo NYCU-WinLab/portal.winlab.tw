@@ -13,6 +13,7 @@ export type GalleryWallFiltersInput = {
   q?: string
   tag?: string
   saved?: string
+  album?: string
 }
 
 export async function fetchGalleryWallPage(

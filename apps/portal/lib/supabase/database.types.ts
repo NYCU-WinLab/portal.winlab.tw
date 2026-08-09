@@ -2358,6 +2358,14 @@ export type Database = {
         Args: Record<string, never>
         Returns: string[]
       }
+      gallery_wall_cover_ids_for_album: {
+        Args: { p_slug: string }
+        Returns: string[]
+      }
+      gallery_album_add_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
       gallery_album_remove_images: {
         Args: { p_album_id: string; p_image_ids: string[] }
         Returns: number

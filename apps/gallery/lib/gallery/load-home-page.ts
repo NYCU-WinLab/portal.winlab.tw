@@ -1,5 +1,6 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 
+import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { findSequenceGaps } from "@/lib/gallery/manage-uploads"
@@ -264,6 +265,31 @@ async function resolveFavoriteCoverIds(
   return ids
 }
 
+/**
+ * Album membership as wall cover ids (sequence → cover).
+ * - null: filter not requested
+ * - "none": empty album / missing migration / unknown slug
+ * - string[]: cover ids
+ */
+async function resolveAlbumCoverIds(
+  supabase: SupabaseClient,
+  albumSlug: string | null
+): Promise<"none" | string[] | null> {
+  if (!albumSlug) return null
+  const { data: coverIdRows, error } = await supabase.rpc(
+    "gallery_wall_cover_ids_for_album",
+    { p_slug: albumSlug }
+  )
+  if (error) {
+    if (isGalleryAlbumsUnavailable(error)) return "none"
+    console.error("[gallery] failed to resolve album covers", error)
+    throw new Error(error.message || "Failed to filter by album.")
+  }
+  const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
+  if (ids.length === 0) return "none"
+  return ids
+}
+
 async function loadFavoritedImageIds(
   supabase: SupabaseClient,
   userId: string | null,
@@ -441,16 +467,19 @@ async function loadGalleryHomeRangeViaView(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult | null> {
-  const [tagCoverIds, queryCoverIds, favoriteCoverIds] = await Promise.all([
-    resolveTagCoverIds(supabase, filters.tagSlug),
-    resolveQueryCoverIds(supabase, filters.query),
-    resolveFavoriteCoverIds(supabase, userId, filters.savedOnly),
-  ])
+  const [tagCoverIds, queryCoverIds, favoriteCoverIds, albumCoverIds] =
+    await Promise.all([
+      resolveTagCoverIds(supabase, filters.tagSlug),
+      resolveQueryCoverIds(supabase, filters.query),
+      resolveFavoriteCoverIds(supabase, userId, filters.savedOnly),
+      resolveAlbumCoverIds(supabase, filters.albumSlug),
+    ])
   const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
   const coverIdFilter = intersectCoverIdFilters(
     tagCoverIds,
     queryCoverIds === "legacy" ? null : queryCoverIds,
-    favoriteCoverIds
+    favoriteCoverIds,
+    albumCoverIds
   )
 
   if (coverIdFilter === "none") {
@@ -562,16 +591,19 @@ async function loadGalleryHomeRangeLegacy(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult> {
-  const [tagCoverIds, queryCoverIds, favoriteCoverIds] = await Promise.all([
-    resolveTagCoverIds(supabase, filters.tagSlug),
-    resolveQueryCoverIds(supabase, filters.query),
-    resolveFavoriteCoverIds(supabase, userId, filters.savedOnly),
-  ])
+  const [tagCoverIds, queryCoverIds, favoriteCoverIds, albumCoverIds] =
+    await Promise.all([
+      resolveTagCoverIds(supabase, filters.tagSlug),
+      resolveQueryCoverIds(supabase, filters.query),
+      resolveFavoriteCoverIds(supabase, userId, filters.savedOnly),
+      resolveAlbumCoverIds(supabase, filters.albumSlug),
+    ])
   const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
   const coverIdFilter = intersectCoverIdFilters(
     tagCoverIds,
     queryCoverIds === "legacy" ? null : queryCoverIds,
-    favoriteCoverIds
+    favoriteCoverIds,
+    albumCoverIds
   )
 
   if (coverIdFilter === "none") {
@@ -753,6 +785,7 @@ const DEFAULT_FILTERS: GalleryHomeFilters = {
   query: null,
   tagSlug: null,
   savedOnly: false,
+  albumSlug: null,
 }
 
 export async function loadGalleryHomePage(

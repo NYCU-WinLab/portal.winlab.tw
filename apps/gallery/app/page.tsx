@@ -38,6 +38,7 @@ type GalleryHomePageProps = {
     q?: string
     tag?: string
     saved?: string
+    album?: string
   }>
 }
 
@@ -66,7 +67,7 @@ export async function generateMetadata({
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment, uploader, media, after, q, tag, saved } =
+  const { page, photo, comment, uploader, media, after, q, tag, saved, album } =
     await searchParams
   const filters = parseGalleryHomeFilters({
     uploader,
@@ -75,6 +76,7 @@ export default async function GalleryHomePage({
     q,
     tag,
     saved,
+    album,
   })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
@@ -142,14 +144,25 @@ export default async function GalleryHomePage({
               popularTags={popularTags}
             />
           </Suspense>
-        ) : filters.tagSlug ? (
+        ) : filters.tagSlug || filters.albumSlug ? (
           <p className="mx-auto mb-6 max-w-md px-6 text-center text-xs text-zinc-600">
-            Showing tag{" "}
-            <span className="font-medium text-foreground">
-              #
-              {popularTags.find((item) => item.slug === filters.tagSlug)
-                ?.slug ?? filters.tagSlug}
-            </span>
+            {filters.albumSlug ? (
+              <>
+                Showing album{" "}
+                <span className="font-medium text-foreground">
+                  {filters.albumSlug}
+                </span>
+              </>
+            ) : (
+              <>
+                Showing tag{" "}
+                <span className="font-medium text-foreground">
+                  #
+                  {popularTags.find((item) => item.slug === filters.tagSlug)
+                    ?.slug ?? filters.tagSlug}
+                </span>
+              </>
+            )}
           </p>
         ) : null}
         <Suspense
@@ -171,6 +184,8 @@ export default async function GalleryHomePage({
               filters.uploadedAfter ?? "",
               filters.query ?? "",
               filters.tagSlug ?? "",
+              filters.savedOnly ? "1" : "",
+              filters.albumSlug ?? "",
               String(currentPage),
             ].join("|")}
             initialImages={images}

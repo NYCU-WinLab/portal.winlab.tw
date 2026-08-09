@@ -103,3 +103,38 @@ export function normalizeAlbumPositions(
     position,
   }))
 }
+
+/**
+ * Migration / PostgREST schema-cache miss for album RPCs — fail quietly so the
+ * wall still loads (and actions can soft-fall back to direct table writes).
+ */
+export function isGalleryAlbumsUnavailable(
+  error: {
+    code?: string
+    message?: string
+  } | null
+): boolean {
+  if (!error) return false
+  const code = error.code ?? ""
+  const message = error.message ?? ""
+  if (code === "PGRST205" || code === "PGRST202" || code === "42P01") {
+    return true
+  }
+  if (
+    /gallery_wall_cover_ids_for_album|gallery_album_add_images|gallery_album_remove_images/i.test(
+      message
+    )
+  ) {
+    return true
+  }
+  if (
+    /gallery_albums|gallery_album_images|gallery_album_photos/i.test(message) &&
+    (/schema cache/i.test(message) ||
+      /does not exist/i.test(message) ||
+      /could not find/i.test(message) ||
+      /PGRST/i.test(message))
+  ) {
+    return true
+  }
+  return false
+}
