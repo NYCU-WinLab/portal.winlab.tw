@@ -41,6 +41,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { createGalleryAlbumWithImages } from "@/app/actions/albums"
 import { setGalleryImagesPin } from "@/app/actions"
 import { setGalleryFavorites } from "@/app/actions/favorites"
 import {
@@ -581,6 +582,8 @@ export function UploadManageList({
   const [bulkTagDraft, setBulkTagDraft] = useState("")
   const [bulkUntagOpen, setBulkUntagOpen] = useState(false)
   const [bulkUntagDraft, setBulkUntagDraft] = useState("")
+  const [bulkAlbumOpen, setBulkAlbumOpen] = useState(false)
+  const [bulkAlbumDraft, setBulkAlbumDraft] = useState("")
   const [zipBusy, setZipBusy] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
@@ -682,7 +685,14 @@ export function UploadManageList({
     if (!selectionMode) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
-      if (confirmOpen || bulkDateOpen || bulkTagOpen || bulkUntagOpen) return
+      if (
+        confirmOpen ||
+        bulkDateOpen ||
+        bulkTagOpen ||
+        bulkUntagOpen ||
+        bulkAlbumOpen
+      )
+        return
       if (event.key === "Escape") {
         event.preventDefault()
         setSelectedIds(new Set())
@@ -714,6 +724,7 @@ export function UploadManageList({
     bulkDateOpen,
     bulkTagOpen,
     bulkUntagOpen,
+    bulkAlbumOpen,
     visibleSelectableItems,
   ])
 
@@ -917,6 +928,41 @@ export function UploadManageList({
     })
   }
 
+  const createAlbumFromSelection = () => {
+    const title = bulkAlbumDraft.trim()
+    if (!title || selectedItems.length === 0 || isPending) return
+    startTransition(async () => {
+      const result = await createGalleryAlbumWithImages({
+        title,
+        imageIds: selectedItems.map((item) => item.id),
+      })
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      const { title: albumTitle, slug, added } = result.data
+      toast.success(
+        added > 0
+          ? `Album “${albumTitle}” with ${added} photo${added === 1 ? "" : "s"}`
+          : `Album “${albumTitle}” created`,
+        {
+          description: `/albums/${slug}`,
+          action: {
+            label: "Open",
+            onClick: () => {
+              window.location.href = `/albums/${slug}`
+            },
+          },
+        }
+      )
+      setBulkAlbumDraft("")
+      setBulkAlbumOpen(false)
+      selectionAnchorIdRef.current = null
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    })
+  }
+
   if (images.length === 0) return null
 
   const allSelected =
@@ -1060,6 +1106,18 @@ export function UploadManageList({
               <button
                 type="button"
                 onClick={() => {
+                  setBulkAlbumDraft("")
+                  setBulkAlbumOpen(true)
+                }}
+                disabled={isPending || selectedItems.length === 0}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                New album
+                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setBulkTagDraft("")
                   setBulkTagOpen(true)
                 }}
@@ -1180,6 +1238,15 @@ export function UploadManageList({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem
+                    disabled={isPending || selectedItems.length === 0}
+                    onSelect={() => {
+                      setBulkAlbumDraft("")
+                      setBulkAlbumOpen(true)
+                    }}
+                  >
+                    New album…
+                  </DropdownMenuItem>
                   {takenAtAvailable ? (
                     <DropdownMenuItem
                       disabled={isPending || selectedItems.length === 0}
@@ -1429,6 +1496,57 @@ export function UploadManageList({
               disabled={isPending}
             >
               Untag
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkAlbumOpen} onOpenChange={setBulkAlbumOpen}>
+        <DialogContent className="gap-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl italic">
+              New album
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label
+              className={cn(gallerySans(), "text-sm text-muted-foreground")}
+              htmlFor="bulk-manage-album"
+            >
+              Create an album with {selectedItems.length} selected work
+              {selectedItems.length === 1 ? "" : "s"}.
+            </label>
+            <Input
+              id="bulk-manage-album"
+              value={bulkAlbumDraft}
+              onChange={(e) => setBulkAlbumDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  createAlbumFromSelection()
+                }
+              }}
+              placeholder="Album title…"
+              disabled={isPending}
+              className="text-base"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBulkAlbumOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={createAlbumFromSelection}
+              disabled={isPending || !bulkAlbumDraft.trim()}
+            >
+              Create
             </Button>
           </DialogFooter>
         </DialogContent>
