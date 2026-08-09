@@ -60,6 +60,106 @@ export function flattenVisibleManageIds(
   return ids
 }
 
+type ManageSlideshowSource = Pick<
+  ManageUploadRow,
+  | "id"
+  | "name"
+  | "image_path"
+  | "media_type"
+  | "poster_path"
+  | "sequence_id"
+  | "sequence_index"
+>
+
+export type ManageSlideshowPhoto = {
+  image_id: string
+  name: string
+  image_path: string
+  media_type: "image" | "video"
+  poster_path: string | null
+}
+
+function toManageSlideshowPhoto(
+  image: ManageSlideshowSource
+): ManageSlideshowPhoto | null {
+  if (!image.image_path) return null
+  return {
+    image_id: image.id,
+    name: image.name,
+    image_path: image.image_path,
+    media_type: image.media_type,
+    poster_path: image.poster_path,
+  }
+}
+
+/** Selected Manage rows → slideshow deck (selection order, no expansion). */
+export function manageSelectionToSlideshowPhotos(
+  orderedSelectedIds: readonly string[],
+  images: readonly ManageSlideshowSource[]
+): ManageSlideshowPhoto[] {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  const photos: ManageSlideshowPhoto[] = []
+  for (const id of orderedSelectedIds) {
+    const image = byId.get(id)
+    if (!image) continue
+    const photo = toManageSlideshowPhoto(image)
+    if (photo) photos.push(photo)
+  }
+  return photos
+}
+
+/**
+ * Like manageSelectionToSlideshowPhotos, but the first selected shot in a
+ * sequence expands to every sibling (story order). Later selections from the
+ * same sequence are skipped.
+ */
+export function expandManageSelectionSlideshowPhotos(
+  orderedSelectedIds: readonly string[],
+  images: readonly ManageSlideshowSource[]
+): ManageSlideshowPhoto[] {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  const bySequence = new Map<string, ManageSlideshowSource[]>()
+  for (const image of images) {
+    if (!image.sequence_id) continue
+    const bucket = bySequence.get(image.sequence_id) ?? []
+    bucket.push(image)
+    bySequence.set(image.sequence_id, bucket)
+  }
+  for (const [sequenceId, bucket] of bySequence) {
+    bySequence.set(
+      sequenceId,
+      [...bucket].sort((a, b) => {
+        const ai =
+          typeof a.sequence_index === "number" ? a.sequence_index : Infinity
+        const bi =
+          typeof b.sequence_index === "number" ? b.sequence_index : Infinity
+        if (ai !== bi) return ai - bi
+        return a.id.localeCompare(b.id)
+      })
+    )
+  }
+
+  const photos: ManageSlideshowPhoto[] = []
+  const seenSequences = new Set<string>()
+  for (const id of orderedSelectedIds) {
+    const image = byId.get(id)
+    if (!image) continue
+    if (image.sequence_id) {
+      if (seenSequences.has(image.sequence_id)) continue
+      seenSequences.add(image.sequence_id)
+      const siblings = bySequence.get(image.sequence_id) ?? [image]
+      for (const shot of siblings) {
+        const photo = toManageSlideshowPhoto(shot)
+        if (photo) photos.push(photo)
+      }
+      continue
+    }
+    const photo = toManageSlideshowPhoto(image)
+    if (photo) photos.push(photo)
+  }
+  return photos
+}
+
 export function isGalleryTakenAtUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {

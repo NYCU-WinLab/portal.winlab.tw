@@ -10,6 +10,8 @@ import {
   countUploadDayRows,
   filterUploadDayRows,
   flattenVisibleManageIds,
+  manageSelectionToSlideshowPhotos,
+  expandManageSelectionSlideshowPhotos,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -205,5 +207,68 @@ describe("filterIncompleteSequences", () => {
       filterIncompleteSequences([complete, incomplete]).map((s) => s.sequenceId)
     ).toEqual(["gap"])
     expect(countIncompleteSequences([complete, incomplete])).toBe(1)
+  })
+})
+
+describe("manageSelectionToSlideshowPhotos", () => {
+  const rows: ManageUploadRow[] = [
+    {
+      id: "a",
+      name: "A",
+      image_path: "u/a.jpg",
+      media_type: "image",
+      poster_path: null,
+      duration_seconds: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      pinned_at: null,
+      sequence_id: null,
+      sequence_index: null,
+    },
+    {
+      id: "b",
+      name: "B",
+      image_path: "u/b.jpg",
+      media_type: "image",
+      poster_path: null,
+      duration_seconds: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      pinned_at: null,
+      sequence_id: "seq",
+      sequence_index: 1,
+    },
+    {
+      id: "c",
+      name: "C",
+      image_path: "u/c.jpg",
+      media_type: "image",
+      poster_path: null,
+      duration_seconds: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      pinned_at: null,
+      sequence_id: "seq",
+      sequence_index: 0,
+    },
+  ]
+
+  test("keeps selection order without expanding", () => {
+    expect(
+      manageSelectionToSlideshowPhotos(["b", "a"], rows).map((p) => p.image_id)
+    ).toEqual(["b", "a"])
+  })
+
+  test("expands the first selected sequence shot to siblings", () => {
+    expect(
+      expandManageSelectionSlideshowPhotos(["b", "a"], rows).map(
+        (p) => p.image_id
+      )
+    ).toEqual(["c", "b", "a"])
+  })
+
+  test("skips later selections from an already-expanded sequence", () => {
+    expect(
+      expandManageSelectionSlideshowPhotos(["b", "c", "a"], rows).map(
+        (p) => p.image_id
+      )
+    ).toEqual(["c", "b", "a"])
   })
 })

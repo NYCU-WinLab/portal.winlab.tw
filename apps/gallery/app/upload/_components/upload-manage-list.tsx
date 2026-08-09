@@ -41,6 +41,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { createGalleryAlbumWithImages } from "@/app/actions/albums"
 import { setGalleryImagesPin } from "@/app/actions"
 import { setGalleryFavorites } from "@/app/actions/favorites"
@@ -79,12 +80,18 @@ import {
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
 import {
+  shuffleSlideshowPhotos,
+  type GallerySlideshowPhoto,
+} from "@/lib/gallery/slideshow"
+import {
   countIncompleteSequences,
   countUploadDayRows,
   describeSequenceGaps,
   filterIncompleteSequences,
   findSequenceGaps,
   flattenVisibleManageIds,
+  manageSelectionToSlideshowPhotos,
+  expandManageSelectionSlideshowPhotos,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
   rowNeedsCaptureDate,
@@ -584,6 +591,11 @@ export function UploadManageList({
   const [bulkUntagDraft, setBulkUntagDraft] = useState("")
   const [bulkAlbumOpen, setBulkAlbumOpen] = useState(false)
   const [bulkAlbumDraft, setBulkAlbumDraft] = useState("")
+  const [slideshowOpen, setSlideshowOpen] = useState(false)
+  const [slideshowDeck, setSlideshowDeck] = useState<GallerySlideshowPhoto[]>(
+    []
+  )
+  const [slideshowTitle, setSlideshowTitle] = useState("Manage selection")
   const [zipBusy, setZipBusy] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
@@ -658,6 +670,21 @@ export function UploadManageList({
     [visibleTimeline]
   )
 
+  const orderedSelectedIds = useMemo(
+    () => visibleOrderIds.filter((id) => selectedIds.has(id)),
+    [visibleOrderIds, selectedIds]
+  )
+  const selectedSlideshowPhotos = useMemo(
+    () => manageSelectionToSlideshowPhotos(orderedSelectedIds, images),
+    [orderedSelectedIds, images]
+  )
+  const selectedStorySlideshowPhotos = useMemo(
+    () => expandManageSelectionSlideshowPhotos(orderedSelectedIds, images),
+    [orderedSelectedIds, images]
+  )
+  const canSlideshow = selectedSlideshowPhotos.length > 0
+  const canStorySlideshow = selectedStorySlideshowPhotos.length > 0
+
   const toggleSelected = (id: string, options?: { shiftKey?: boolean }) => {
     const anchor = selectionAnchorIdRef.current
     setSelectedIds((prev) => {
@@ -690,7 +717,8 @@ export function UploadManageList({
         bulkDateOpen ||
         bulkTagOpen ||
         bulkUntagOpen ||
-        bulkAlbumOpen
+        bulkAlbumOpen ||
+        slideshowOpen
       )
         return
       if (event.key === "Escape") {
@@ -962,6 +990,26 @@ export function UploadManageList({
       setSelectionMode(false)
     })
   }
+  const openSlideshow = (
+    mode: "covers" | "shuffled" | "stories" = "covers"
+  ) => {
+    const source =
+      mode === "stories"
+        ? selectedStorySlideshowPhotos
+        : selectedSlideshowPhotos
+    if (source.length === 0) return
+    setSlideshowDeck(
+      mode === "shuffled" ? shuffleSlideshowPhotos(source) : source
+    )
+    setSlideshowTitle(
+      mode === "shuffled"
+        ? "Manage selection · shuffled"
+        : mode === "stories"
+          ? "Manage selection · stories"
+          : "Manage selection"
+    )
+    setSlideshowOpen(true)
+  }
 
   if (images.length === 0) return null
 
@@ -1117,6 +1165,15 @@ export function UploadManageList({
               </button>
               <button
                 type="button"
+                onClick={() => openSlideshow("covers")}
+                disabled={!canSlideshow}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                Play
+                {canSlideshow ? ` (${selectedSlideshowPhotos.length})` : ""}
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setBulkTagDraft("")
                   setBulkTagOpen(true)
@@ -1247,6 +1304,22 @@ export function UploadManageList({
                   >
                     New album…
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!canSlideshow}
+                    onSelect={() => openSlideshow("shuffled")}
+                  >
+                    Play shuffled
+                  </DropdownMenuItem>
+                  {canStorySlideshow &&
+                  selectedStorySlideshowPhotos.length !==
+                    selectedSlideshowPhotos.length ? (
+                    <DropdownMenuItem
+                      disabled={!canStorySlideshow}
+                      onSelect={() => openSlideshow("stories")}
+                    >
+                      Play with stories
+                    </DropdownMenuItem>
+                  ) : null}
                   {takenAtAvailable ? (
                     <DropdownMenuItem
                       disabled={isPending || selectedItems.length === 0}
@@ -1358,6 +1431,14 @@ export function UploadManageList({
           </ul>
         )
       })}
+
+      <AlbumSlideshow
+        photos={slideshowDeck}
+        albumTitle={slideshowTitle}
+        open={slideshowOpen}
+        onOpenChange={setSlideshowOpen}
+        startIndex={0}
+      />
 
       <Dialog open={bulkDateOpen} onOpenChange={setBulkDateOpen}>
         <DialogContent className="gap-6">
