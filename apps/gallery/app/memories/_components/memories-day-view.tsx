@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   Dialog,
@@ -35,6 +35,14 @@ export function MemoriesDayView({
   const [slideshowStart, setSlideshowStart] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxFailed, setLightboxFailed] = useState(false)
+  const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+
+  const onSlideshowOpenChange = (open: boolean) => {
+    setSlideshowOpen(open)
+    if (!open) {
+      queueMicrotask(() => slideshowButtonRef.current?.focus())
+    }
+  }
 
   const photoById = useMemo(() => {
     const map = new Map<string, GalleryMemoryYearGroup["photos"][number]>()
@@ -62,6 +70,7 @@ export function MemoriesDayView({
     <div className="flex flex-col gap-10 sm:gap-12">
       {slideshowPhotos.length > 0 ? (
         <button
+          ref={slideshowButtonRef}
           type="button"
           onClick={() => openSlideshowAtIndex(0)}
           className={cn(
@@ -170,7 +179,7 @@ export function MemoriesDayView({
         photos={slideshowPhotos}
         albumTitle={slideshowTitle}
         open={slideshowOpen}
-        onOpenChange={setSlideshowOpen}
+        onOpenChange={onSlideshowOpenChange}
         startIndex={slideshowStart}
       />
     </div>

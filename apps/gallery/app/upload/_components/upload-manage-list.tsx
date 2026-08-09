@@ -668,6 +668,7 @@ export function UploadManageList({
     []
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Manage selection")
+  const slideshowButtonRef = useRef<HTMLButtonElement>(null)
   const [zipBusy, setZipBusy] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
@@ -1132,6 +1133,13 @@ export function UploadManageList({
       endSelectionMode()
     })
   }
+  const handleSlideshowOpenChange = (open: boolean) => {
+    setSlideshowOpen(open)
+    if (!open) {
+      queueMicrotask(() => slideshowButtonRef.current?.focus())
+    }
+  }
+
   const openSlideshow = (
     mode: "covers" | "shuffled" | "stories" = "covers"
   ) => {
@@ -1150,7 +1158,7 @@ export function UploadManageList({
           ? "Manage selection · stories"
           : "Manage selection"
     )
-    setSlideshowOpen(true)
+    handleSlideshowOpenChange(true)
   }
 
   if (images.length === 0) return null
@@ -1343,6 +1351,7 @@ export function UploadManageList({
                 </>
               ) : null}
               <button
+                ref={slideshowButtonRef}
                 type="button"
                 onClick={() => openSlideshow("covers")}
                 disabled={!canSlideshow}
@@ -1675,7 +1684,7 @@ export function UploadManageList({
         photos={slideshowDeck}
         albumTitle={slideshowTitle}
         open={slideshowOpen}
-        onOpenChange={setSlideshowOpen}
+        onOpenChange={handleSlideshowOpenChange}
         startIndex={0}
       />
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition, type FormEvent } from "react"
+import { useRef, useState, useTransition, type FormEvent } from "react"
 import {
   IconAlbum,
   IconBookmark,
@@ -129,10 +129,16 @@ export function GalleryWallSelectBar({
     []
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Wall selection")
+  const slideshowButtonRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    onSlideshowOpenChange?.(slideshowOpen)
-  }, [onSlideshowOpenChange, slideshowOpen])
+  const handleSlideshowOpenChange = (open: boolean) => {
+    setSlideshowOpen(open)
+    onSlideshowOpenChange?.(open)
+    if (!open) {
+      // Dialog stole focus — put keyboard users back on Play.
+      queueMicrotask(() => slideshowButtonRef.current?.focus())
+    }
+  }
 
   const openSlideshow = (
     mode: "covers" | "shuffled" | "stories" = "covers"
@@ -152,7 +158,7 @@ export function GalleryWallSelectBar({
           ? "Wall selection · stories"
           : "Wall selection"
     )
-    setSlideshowOpen(true)
+    handleSlideshowOpenChange(true)
   }
 
   const canSlideshow = selectedSlideshowPhotos.length > 0
@@ -502,6 +508,7 @@ export function GalleryWallSelectBar({
                   Links
                 </Button>
                 <Button
+                  ref={slideshowButtonRef}
                   type="button"
                   variant="outline"
                   size="sm"
@@ -772,7 +779,7 @@ export function GalleryWallSelectBar({
         photos={slideshowDeck}
         albumTitle={slideshowTitle}
         open={slideshowOpen}
-        onOpenChange={setSlideshowOpen}
+        onOpenChange={handleSlideshowOpenChange}
         startIndex={0}
       />
     </>

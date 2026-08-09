@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   Dialog,
@@ -96,7 +96,21 @@ export function GalleryAlbumPhotoGrid({
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
+  const photoButtonRefs = useRef(new Map<string, HTMLButtonElement>())
+  const slideshowReturnIdRef = useRef<string | null>(null)
   const active = photos.find((p) => p.image_id === openId) ?? null
+
+  const handleSlideshowOpenChange = (open: boolean) => {
+    setSlideshowOpen(open)
+    if (!open) {
+      // Lightbox already closed — return keyboard focus to the polaroid.
+      const returnId = slideshowReturnIdRef.current
+      slideshowReturnIdRef.current = null
+      queueMicrotask(() => {
+        if (returnId) photoButtonRefs.current.get(returnId)?.focus()
+      })
+    }
+  }
   const slideshowPhotos = useMemo(
     () =>
       photos.map(
@@ -113,8 +127,9 @@ export function GalleryAlbumPhotoGrid({
 
   const startSlideshowAt = (imageId: string) => {
     setSlideshowStart(findSlideshowIndexByImageId(slideshowPhotos, imageId))
+    slideshowReturnIdRef.current = imageId
     setOpenId(null)
-    setSlideshowOpen(true)
+    handleSlideshowOpenChange(true)
   }
 
   return (
@@ -124,6 +139,10 @@ export function GalleryAlbumPhotoGrid({
           <li key={photo.image_id}>
             <button
               type="button"
+              ref={(node) => {
+                if (node) photoButtonRefs.current.set(photo.image_id, node)
+                else photoButtonRefs.current.delete(photo.image_id)
+              }}
               onClick={() => {
                 setLightboxFailed(false)
                 setOpenId(photo.image_id)
@@ -238,7 +257,7 @@ export function GalleryAlbumPhotoGrid({
         photos={slideshowPhotos}
         albumTitle={albumTitle}
         open={slideshowOpen}
-        onOpenChange={setSlideshowOpen}
+        onOpenChange={handleSlideshowOpenChange}
         startIndex={slideshowStart}
       />
     </>
