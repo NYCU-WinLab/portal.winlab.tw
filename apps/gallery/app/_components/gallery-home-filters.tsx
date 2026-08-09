@@ -246,6 +246,7 @@ export function GalleryHomeFiltersBar({
   return (
     <nav
       aria-label="Filter gallery"
+      aria-busy={isPending || undefined}
       className={cn(
         gallerySans(),
         "gallery-home-filters mb-8 flex flex-col items-center sm:mb-10"
