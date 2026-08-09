@@ -24,7 +24,9 @@ import {
 import { parseGalleryTagList } from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type ActionResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string }
 export type RegisterResult =
   | { ok: true; id: string }
   | { ok: false; error: string }
@@ -327,6 +329,13 @@ export async function deleteGalleryImage(
     .remove(targets)
   if (storageError) {
     console.error("[gallery] storage delete failed", storageError)
+    revalidatePath("/")
+    revalidatePath("/upload")
+    return {
+      ok: true,
+      warning:
+        "Removed from the wall, but a storage file may still remain. Retry delete or purge via Media health.",
+    }
   }
 
   revalidatePath("/")
@@ -364,6 +373,7 @@ export async function deleteGalleryImages(
     return { ok: false, error: "Some selected works could not be deleted." }
   }
 
+  let warning: string | undefined
   for (const item of items) {
     const result = await deleteGalleryImage(
       item.id,
@@ -371,9 +381,10 @@ export async function deleteGalleryImages(
       item.posterPath
     )
     if (!result.ok) return result
+    if (result.warning) warning = result.warning
   }
 
-  return { ok: true }
+  return warning ? { ok: true, warning } : { ok: true }
 }
 
 export async function updateGallerySequenceOrder(

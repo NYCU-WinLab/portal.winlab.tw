@@ -33,7 +33,7 @@ export type ScanMediaHealthPageResult =
   | MediaHealthActionError
 
 export type AdminDeleteBrokenResult =
-  | { ok: true; deleted: number }
+  | { ok: true; deleted: number; warning?: string }
   | MediaHealthActionError
 
 async function requireGalleryAdmin(): Promise<
@@ -259,6 +259,14 @@ export async function adminDeleteBrokenGalleryImages(
       "[gallery] admin media-health storage delete failed",
       storageError
     )
+    revalidatePath("/")
+    revalidatePath("/upload")
+    return {
+      ok: true,
+      deleted: ids.length,
+      warning:
+        "Removed from the wall, but some storage files may still remain.",
+    }
   }
 
   revalidatePath("/")

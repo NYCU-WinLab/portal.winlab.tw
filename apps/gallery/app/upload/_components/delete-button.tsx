@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import {
@@ -30,12 +30,29 @@ export function DeleteButton({
   name: string
 }) {
   const [pending, startTransition] = useTransition()
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  function onOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
+  }
 
   function onConfirm() {
+    if (pending) return
     startTransition(async () => {
       const result = await deleteGalleryImage(id, imagePath, posterPath)
       if (result.ok) {
-        toast.success(`Deleted "${name}"`)
+        if (result.warning) {
+          toast.warning(`Deleted "${name}"`, {
+            description: result.warning,
+          })
+        } else {
+          toast.success(`Deleted "${name}"`)
+        }
+        setOpen(false)
       } else {
         toast.error(result.error)
       }
@@ -43,9 +60,10 @@ export function DeleteButton({
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="ghost"
           disabled={pending}
           aria-busy={pending}

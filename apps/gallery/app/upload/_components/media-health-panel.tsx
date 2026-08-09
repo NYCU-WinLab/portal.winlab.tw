@@ -142,9 +142,12 @@ export function MediaHealthPanel() {
       const deletedIds = new Set(items.map((item) => item.id))
       setFindings((prev) => prev.filter((f) => !deletedIds.has(f.id)))
       setSelected(new Set())
-      toast.success(
-        `Removed ${result.deleted} broken shot${result.deleted === 1 ? "" : "s"} from the wall.`
-      )
+      const message = `Removed ${result.deleted} broken shot${result.deleted === 1 ? "" : "s"} from the wall.`
+      if (result.warning) {
+        toast.warning(message, { description: result.warning })
+      } else {
+        toast.success(message)
+      }
     })
   }
 
