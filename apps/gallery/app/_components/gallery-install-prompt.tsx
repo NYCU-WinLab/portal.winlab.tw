@@ -72,6 +72,23 @@ export function GalleryInstallPrompt() {
     setDeferredPrompt(null)
   }
 
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      writeStorageItem(
+        window.localStorage,
+        GALLERY_PWA_INSTALL_DISMISS_KEY,
+        "1"
+      )
+      setVisible(false)
+      setDeferredPrompt(null)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [visible])
+
   const install = async () => {
     if (!deferredPrompt) return
     try {
@@ -87,6 +104,9 @@ export function GalleryInstallPrompt() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gallery-install-prompt-title"
       className={cn(
         gallerySans(),
         "fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(env(safe-area-inset-bottom),1rem)]"
@@ -103,7 +123,10 @@ export function GalleryInstallPrompt() {
           unoptimized
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">
+          <p
+            id="gallery-install-prompt-title"
+            className="text-sm font-medium text-foreground"
+          >
             Keep Gallery in your pocket
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
