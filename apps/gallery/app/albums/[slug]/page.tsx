@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 
 import { GalleryAlbumManagePanel } from "@/app/albums/_components/album-manage-panel"
 import { GalleryAlbumPhotoGrid } from "@/app/albums/_components/album-photo-grid"
+import { AlbumSlideshowButton } from "@/app/albums/_components/album-slideshow"
 import { DownloadAlbumButton } from "@/app/_components/download-album-button"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import { ShareAlbumButton } from "@/app/_components/share-album-button"
@@ -125,6 +126,15 @@ export default async function GalleryAlbumDetailPage({
             />
             {album.photos.length > 0 ? (
               <>
+                <AlbumSlideshowButton
+                  photos={album.photos}
+                  albumTitle={album.title}
+                  className={cn(
+                    gallerySans(),
+                    "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+                    "hover:bg-accent hover:text-accent-foreground"
+                  )}
+                />
                 <Link
                   href={`/?album=${encodeURIComponent(album.slug)}`}
                   className={cn(
