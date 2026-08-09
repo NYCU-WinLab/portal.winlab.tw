@@ -45,6 +45,25 @@ export function GalleryAlbumsSearch({
     })
   }
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const hasQuery = Boolean(draft.trim() || initialQuery.trim())
+      if (!hasQuery) return
+      event.preventDefault()
+      setDraft("")
+      const params = new URLSearchParams()
+      if (mineOnly) params.set("mine", "1")
+      const qs = params.toString()
+      startTransition(() => {
+        router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
+      })
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [draft, initialQuery, mineOnly, router])
+
   return (
     <form
       onSubmit={submit}
