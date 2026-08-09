@@ -195,7 +195,7 @@ function UploadListItem({
             navigateHomeOnPin
           />
         ) : null}
-        <ViewOnWallLink photoId={wallPhotoId} />
+        <ViewOnWallLink photoId={wallPhotoId} name={image.name} />
         {takenAtAvailable ? (
           <TakenAtEditor
             id={image.id}
