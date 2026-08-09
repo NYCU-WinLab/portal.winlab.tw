@@ -32,6 +32,7 @@ import {
   updateGalleryImagesTakenAt,
   updateGallerySequenceOrder,
 } from "@/app/upload/actions"
+import { attachGalleryTagToImages } from "@/app/actions/tags"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { ManageTagsEditor } from "@/app/upload/_components/manage-tags-editor"
 import { RenameButton } from "@/app/upload/_components/rename-button"
@@ -47,6 +48,7 @@ import {
 } from "@/components/gallery-chrome"
 import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
+import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import {
   countIncompleteSequences,
   countUploadDayRows,
@@ -534,6 +536,8 @@ export function UploadManageList({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkDateOpen, setBulkDateOpen] = useState(false)
   const [bulkDateDraft, setBulkDateDraft] = useState("")
+  const [bulkTagOpen, setBulkTagOpen] = useState(false)
+  const [bulkTagDraft, setBulkTagDraft] = useState("")
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [uploadDayOnly, setUploadDayOnly] = useState(false)
@@ -653,6 +657,35 @@ export function UploadManageList({
       } else {
         toast.error(result.error)
       }
+    })
+  }
+
+  const confirmBulkTag = () => {
+    const name = bulkTagDraft.trim()
+    if (!name) {
+      toast.error("Enter a tag.")
+      return
+    }
+    startTransition(async () => {
+      const result = await attachGalleryTagToImages(
+        selectedItems.map((item) => item.id),
+        name
+      )
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(
+        describeBulkTagAttach({
+          tagName: result.data.tag.name,
+          attached: result.data.attached,
+          selected: selectedItems.length,
+        })
+      )
+      setBulkTagOpen(false)
+      setBulkTagDraft("")
+      setSelectedIds(new Set())
+      setSelectionMode(false)
     })
   }
 
@@ -785,6 +818,18 @@ export function UploadManageList({
               ) : null}
               <button
                 type="button"
+                onClick={() => {
+                  setBulkTagDraft("")
+                  setBulkTagOpen(true)
+                }}
+                disabled={isPending || selectedItems.length === 0}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                Tag
+                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+              </button>
+              <button
+                type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={isPending || selectedItems.length === 0}
                 className={cn(
@@ -883,6 +928,53 @@ export function UploadManageList({
               disabled={isPending}
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkTagOpen} onOpenChange={setBulkTagOpen}>
+        <DialogContent className="gap-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl italic">
+              Tag selected
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label
+              className={cn(gallerySans(), "text-sm text-muted-foreground")}
+              htmlFor="bulk-manage-tag"
+            >
+              Apply one tag to {selectedItems.length} selected work
+              {selectedItems.length === 1 ? "" : "s"}.
+            </label>
+            <Input
+              id="bulk-manage-tag"
+              value={bulkTagDraft}
+              onChange={(e) => setBulkTagDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  confirmBulkTag()
+                }
+              }}
+              disabled={isPending}
+              placeholder="retreat, axolotl…"
+              className="text-base"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBulkTagOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmBulkTag} disabled={isPending}>
+              Tag
             </Button>
           </DialogFooter>
         </DialogContent>
