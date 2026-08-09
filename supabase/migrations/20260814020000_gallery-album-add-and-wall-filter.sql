@@ -35,6 +35,25 @@ begin
     raise exception 'Album not found';
   end if;
 
+  -- INSERT under RLS raises for non-owners; soft-return 0 like bulk remove's
+  -- DELETE no-op so callers can treat denial as "added nothing".
+  if not exists (
+    select 1
+    from public.gallery_albums ga
+    where ga.id = p_album_id
+      and (
+        ga.created_by = auth.uid()
+        or exists (
+          select 1
+          from public.user_profiles up
+          where up.id = auth.uid()
+            and up.is_admin = true
+        )
+      )
+  ) then
+    return 0;
+  end if;
+
   select array_agg(x)
   into v_ids
   from (
