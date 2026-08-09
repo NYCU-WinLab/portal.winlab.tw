@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -73,6 +74,10 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
+  selectWallIdRange,
+  toggleWallSelection,
+} from "@/lib/gallery/wall-selection"
+import {
   countIncompleteSequences,
   countUploadDayRows,
   describeSequenceGaps,
@@ -132,7 +137,7 @@ function UploadListItem({
   siblings: ManageUploadRow[]
   sequenceControls?: ReactNode
   selected: boolean
-  onToggleSelected: () => void
+  onToggleSelected: (options?: { shiftKey?: boolean }) => void
   selectionMode: boolean
   isAdmin?: boolean
   showWallPin?: boolean
@@ -164,7 +169,12 @@ function UploadListItem({
         <input
           type="checkbox"
           checked={selected}
-          onChange={onToggleSelected}
+          onChange={() => onToggleSelected()}
+          onClick={(event) => {
+            if (!event.shiftKey) return
+            event.preventDefault()
+            onToggleSelected({ shiftKey: true })
+          }}
           aria-label={`Select ${image.name}`}
           className="size-4 shrink-0 accent-foreground"
         />
@@ -273,7 +283,7 @@ function UploadSequenceGroup({
   allImages: ManageUploadRow[]
   selectionMode: boolean
   selectedIds: Set<string>
-  onToggleSelected: (id: string) => void
+  onToggleSelected: (id: string, options?: { shiftKey?: boolean }) => void
   isAdmin?: boolean
   takenAtAvailable?: boolean
 }) {
@@ -442,7 +452,9 @@ function UploadSequenceGroup({
               image={image}
               siblings={allImages}
               selected={selectedIds.has(image.id)}
-              onToggleSelected={() => onToggleSelected(image.id)}
+              onToggleSelected={(options) =>
+                onToggleSelected(image.id, options)
+              }
               selectionMode={selectionMode}
               isAdmin={isAdmin}
               showWallPin={image.sequence_index === 0}
@@ -637,18 +649,31 @@ export function UploadManageList({
     selectedIds.has(item.id)
   )
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const selectionAnchorIdRef = useRef<string | null>(null)
+  const visibleOrderIds = useMemo(
+    () => flattenVisibleManageIds(visibleTimeline),
+    [visibleTimeline]
+  )
+
+  const toggleSelected = (id: string, options?: { shiftKey?: boolean }) => {
+    const anchor = selectionAnchorIdRef.current
+    setSelectedIds((prev) => {
+      if (options?.shiftKey && anchor) {
+        return selectWallIdRange(prev, visibleOrderIds, anchor, id)
+      }
+      return toggleWallSelection(prev, id)
     })
+    if (!options?.shiftKey) {
+      selectionAnchorIdRef.current = id
+    }
   }
 
   const toggleSelectionMode = () => {
     setSelectionMode((mode) => {
-      if (mode) setSelectedIds(new Set())
+      if (mode) {
+        setSelectedIds(new Set())
+        selectionAnchorIdRef.current = null
+      }
       return !mode
     })
   }
@@ -661,6 +686,7 @@ export function UploadManageList({
       if (event.key === "Escape") {
         event.preventDefault()
         setSelectedIds(new Set())
+        selectionAnchorIdRef.current = null
         setSelectionMode(false)
         return
       }
@@ -923,6 +949,11 @@ export function UploadManageList({
         >
           {selectionMode ? "Cancel selection" : "Select"}
         </button>
+        {selectionMode ? (
+          <span className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+            Shift+click for ranges · A selects visible
+          </span>
+        ) : null}
         {incompleteCount > 0 ? (
           <button
             type="button"
@@ -1249,7 +1280,9 @@ export function UploadManageList({
               image={entry.row}
               siblings={images}
               selected={selectedIds.has(entry.row.id)}
-              onToggleSelected={() => toggleSelected(entry.row.id)}
+              onToggleSelected={(options) =>
+                toggleSelected(entry.row.id, options)
+              }
               selectionMode={selectionMode}
               isAdmin={isAdmin}
               showWallPin
