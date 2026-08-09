@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { MediaHealthPanel } from "@/app/upload/_components/media-health-panel"
 import { SeasonalThemePanel } from "@/app/upload/_components/seasonal-theme-panel"
 import { UploadForm } from "@/app/upload/_components/upload-form"
 import { UploadManageList } from "@/app/upload/_components/upload-manage-list"
@@ -53,10 +54,13 @@ export default async function UploadPage() {
         />
 
         {user.isAdmin ? (
-          <SeasonalThemePanel
-            activeThemeId={seasonalThemeId}
-            settingsReady={settingsReady}
-          />
+          <>
+            <SeasonalThemePanel
+              activeThemeId={seasonalThemeId}
+              settingsReady={settingsReady}
+            />
+            <MediaHealthPanel />
+          </>
         ) : null}
 
         <section className={cn(galleryPanelClass(), "overflow-hidden !p-0")}>
