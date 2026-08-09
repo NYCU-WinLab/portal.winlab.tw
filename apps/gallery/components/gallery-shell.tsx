@@ -8,6 +8,7 @@ import { GalleryHeaderPitchline } from "@/components/gallery-header-pitchline"
 import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
+import { GalleryJumpToTop } from "@/app/_components/gallery-jump-to-top"
 import { GalleryPaperParallax } from "@/app/_components/gallery-paper-parallax"
 import {
   GalleryBrandMark,
@@ -118,6 +119,7 @@ export function GalleryShell({
       </main>
       {seasonalThemeId === "dragon-boat" ? <GalleryZongziSeeds /> : null}
       {seasonalThemeId === "world-cup" ? <GalleryFootballSeeds /> : null}
+      <GalleryJumpToTop />
     </div>
   )
 }
