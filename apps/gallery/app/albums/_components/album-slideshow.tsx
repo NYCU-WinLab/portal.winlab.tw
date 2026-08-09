@@ -141,9 +141,12 @@ export function AlbumSlideshow({
   useEffect(() => {
     if (!open || photos.length < 2) return
     const next = photos[nextSlideshowIndex(index, photos.length)]
-    if (!next) return
-    const img = new window.Image()
-    img.src = mediaUrl(next)
+    const prev = photos[prevSlideshowIndex(index, photos.length)]
+    for (const photo of [next, prev]) {
+      if (!photo) continue
+      const img = new window.Image()
+      img.src = mediaUrl(photo)
+    }
   }, [index, open, photos])
 
   useEffect(() => {

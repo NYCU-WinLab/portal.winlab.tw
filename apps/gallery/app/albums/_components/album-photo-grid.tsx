@@ -17,6 +17,10 @@ import {
   gallerySerif,
 } from "@/components/gallery-chrome"
 import type { GalleryAlbumPhoto } from "@/lib/gallery/albums"
+import {
+  findSlideshowIndexByImageId,
+  type GallerySlideshowPhoto,
+} from "@/lib/gallery/slideshow"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
@@ -94,19 +98,20 @@ export function GalleryAlbumPhotoGrid({
   const active = photos.find((p) => p.image_id === openId) ?? null
   const slideshowPhotos = useMemo(
     () =>
-      photos.map((photo) => ({
-        image_id: photo.image_id,
-        name: photo.name,
-        image_path: photo.image_path,
-        media_type: photo.media_type,
-        poster_path: photo.poster_path,
-      })),
+      photos.map(
+        (photo): GallerySlideshowPhoto => ({
+          image_id: photo.image_id,
+          name: photo.name,
+          image_path: photo.image_path,
+          media_type: photo.media_type,
+          poster_path: photo.poster_path,
+        })
+      ),
     [photos]
   )
 
   const startSlideshowAt = (imageId: string) => {
-    const index = photos.findIndex((photo) => photo.image_id === imageId)
-    setSlideshowStart(index >= 0 ? index : 0)
+    setSlideshowStart(findSlideshowIndexByImageId(slideshowPhotos, imageId))
     setOpenId(null)
     setSlideshowOpen(true)
   }
