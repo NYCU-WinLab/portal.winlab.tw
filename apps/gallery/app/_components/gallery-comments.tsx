@@ -416,6 +416,7 @@ export function GalleryComments({
                           type="button"
                           onClick={() => toggleLike(comment.id)}
                           disabled={!isSignedIn || isPending}
+                          aria-busy={isPending || undefined}
                           className={cn(
                             galleryPillClass(),
                             "inline-flex items-center gap-1",
@@ -620,6 +621,7 @@ export function GalleryComments({
               size="sm"
               className={cn(gallerySans(), "h-8 rounded-full px-3 text-xs")}
               disabled={!isSignedIn || isPending || !draft.trim()}
+              aria-busy={isPending || undefined}
               onClick={submit}
             >
               Post
