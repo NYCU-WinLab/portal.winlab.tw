@@ -16,6 +16,7 @@ import {
   resolveManageSelectionWallPhotoIds,
   pruneManageSelectionIds,
   isGalleryPinnedAtUnavailable,
+  isGallerySequenceUnavailable,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -323,6 +324,26 @@ describe("isGalleryPinnedAtUnavailable", () => {
       isGalleryPinnedAtUnavailable({
         code: "42501",
         message: "permission denied",
+      })
+    ).toBe(false)
+  })
+})
+
+describe("isGallerySequenceUnavailable", () => {
+  test("detects missing sequence_id column", () => {
+    expect(
+      isGallerySequenceUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'sequence_id' column in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores unrelated errors", () => {
+    expect(
+      isGallerySequenceUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'pinned_at' column",
       })
     ).toBe(false)
   })

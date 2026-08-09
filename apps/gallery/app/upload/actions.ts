@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache"
 
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
-import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
+import {
+  isGallerySequenceUnavailable,
+  isGalleryTakenAtUnavailable,
+} from "@/lib/gallery/manage-uploads"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import {
   buildSequenceRenamePatches,
@@ -344,6 +347,13 @@ export async function updateGallerySequenceOrder(
     .eq("created_by", userId)
 
   if (fetchError) {
+    if (isGallerySequenceUnavailable(fetchError)) {
+      return {
+        ok: false,
+        error:
+          "Sequences are not available yet — apply the gallery sequence migration.",
+      }
+    }
     return { ok: false, error: `Sequence load failed: ${fetchError.message}` }
   }
 
@@ -367,6 +377,13 @@ export async function updateGallerySequenceOrder(
       .eq("sequence_id", sequenceId)
 
     if (error) {
+      if (isGallerySequenceUnavailable(error)) {
+        return {
+          ok: false,
+          error:
+            "Sequences are not available yet — apply the gallery sequence migration.",
+        }
+      }
       return {
         ok: false,
         error: `Could not reorder sequence: ${error.message}`,
@@ -402,6 +419,21 @@ export async function renameGalleryImage(
     .single()
 
   if (currentRowError) {
+    if (isGallerySequenceUnavailable(currentRowError)) {
+      const { error: updateError } = await supabase
+        .from("gallery_images")
+        .update({ name: nextName })
+        .eq("id", id)
+        .eq("created_by", userId)
+
+      if (updateError) {
+        return { ok: false, error: `Rename failed: ${updateError.message}` }
+      }
+
+      revalidatePath("/")
+      revalidatePath("/upload")
+      return { ok: true, names: [{ id, name: nextName }] }
+    }
     return {
       ok: false,
       error: `Could not load this work: ${currentRowError.message}`,
@@ -425,6 +457,21 @@ export async function renameGalleryImage(
       .order("sequence_index", { ascending: true })
 
     if (seqLoadError) {
+      if (isGallerySequenceUnavailable(seqLoadError)) {
+        const { error: updateError } = await supabase
+          .from("gallery_images")
+          .update({ name: nextName })
+          .eq("id", id)
+          .eq("created_by", userId)
+
+        if (updateError) {
+          return { ok: false, error: `Rename failed: ${updateError.message}` }
+        }
+
+        revalidatePath("/")
+        revalidatePath("/upload")
+        return { ok: true, names: [{ id, name: nextName }] }
+      }
       return {
         ok: false,
         error: `Rename sequence failed: ${seqLoadError.message}`,

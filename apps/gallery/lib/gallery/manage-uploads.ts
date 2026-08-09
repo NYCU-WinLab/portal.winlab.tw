@@ -254,6 +254,23 @@ export function isGalleryPinnedAtUnavailable(
   )
 }
 
+/** True when gallery_images.sequence_id / sequence_index are missing. */
+export function isGallerySequenceUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  if (!/sequence_id|sequence_index/i.test(message)) return false
+  return (
+    code === "PGRST204" ||
+    code === "42703" ||
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find/i.test(message)
+  )
+}
+
 /** True when gallery_images.pinned_at is selectable (pin migration applied). */
 export async function isGalleryPinReady(
   supabase: SupabaseClient
