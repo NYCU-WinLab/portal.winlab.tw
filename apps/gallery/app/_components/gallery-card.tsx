@@ -640,6 +640,12 @@ export function GalleryCard({
               <DialogTitle className="sr-only">
                 {activeItem?.name ?? image.name}
               </DialogTitle>
+              <p className="sr-only" aria-live="polite" aria-atomic="true">
+                {activeItem?.name ?? image.name}
+                {isSequence
+                  ? ` · shot ${activeIndex + 1} of ${sequenceMedia.length}`
+                  : ""}
+              </p>
               <div className="gallery-lightbox-layout">
                 <GalleryLightboxMediaPane
                   gestureProps={gestureProps as Record<string, unknown>}
