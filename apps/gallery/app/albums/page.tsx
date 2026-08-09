@@ -13,7 +13,7 @@ import {
 } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumSummaries } from "@/lib/gallery/load-albums"
-import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import { albumMatchesQuery, isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 import { cn } from "@workspace/ui/lib/utils"
@@ -27,25 +27,6 @@ export const metadata: Metadata = {
 
 type AlbumsPageProps = {
   searchParams: Promise<{ mine?: string; q?: string }>
-}
-
-function albumMatchesQuery(
-  album: {
-    title: string
-    slug: string
-    description: string | null
-    owner_name: string
-  },
-  query: string
-): boolean {
-  const needle = query.trim().toLowerCase()
-  if (!needle) return true
-  return (
-    album.title.toLowerCase().includes(needle) ||
-    album.slug.includes(needle) ||
-    (album.description?.toLowerCase().includes(needle) ?? false) ||
-    album.owner_name.toLowerCase().includes(needle)
-  )
 }
 
 export default async function GalleryAlbumsPage({
@@ -197,15 +178,30 @@ export default async function GalleryAlbumsPage({
                         : "When lab members curate collections, they will show up here."
                 }
                 action={
-                  <Link
-                    href={query || mineOnly ? "/albums" : "/"}
-                    className={cn(
-                      gallerySans(),
-                      "text-sm text-foreground underline-offset-2 hover:underline"
-                    )}
-                  >
-                    {query || mineOnly ? "Show all albums" : "Back to the wall"}
-                  </Link>
+                  <p className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+                    {query ? (
+                      <Link
+                        href={mineOnly ? "/albums?mine=1" : "/albums"}
+                        className={cn(
+                          gallerySans(),
+                          "text-sm text-foreground underline-offset-2 hover:underline"
+                        )}
+                      >
+                        Clear search
+                      </Link>
+                    ) : null}
+                    <Link
+                      href={query || mineOnly ? "/albums" : "/"}
+                      className={cn(
+                        gallerySans(),
+                        "text-sm text-foreground underline-offset-2 hover:underline"
+                      )}
+                    >
+                      {query || mineOnly
+                        ? "Show all albums"
+                        : "Back to the wall"}
+                    </Link>
+                  </p>
                 }
               />
             ) : (
