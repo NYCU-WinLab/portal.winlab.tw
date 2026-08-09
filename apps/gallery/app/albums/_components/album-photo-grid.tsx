@@ -124,7 +124,10 @@ export function GalleryAlbumPhotoGrid({
           <li key={photo.image_id}>
             <button
               type="button"
-              onClick={() => setOpenId(photo.image_id)}
+              onClick={() => {
+                setLightboxFailed(false)
+                setOpenId(photo.image_id)
+              }}
               className="group/polaroid block w-full text-left focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
             >
               <figure className={cn(galleryPolaroidClass(), "p-2.5 pb-3")}>
