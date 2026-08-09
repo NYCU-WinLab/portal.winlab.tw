@@ -51,6 +51,8 @@ export function MediaHealthPanel() {
 
   const summary = summarizeFindings(findings)
   const selectedCount = selected.size
+  const allFindingsSelected =
+    findings.length > 0 && findings.every((finding) => selected.has(finding.id))
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -180,10 +182,24 @@ export function MediaHealthPanel() {
               variant="ghost"
               size="sm"
               disabled={isPending}
-              onClick={selectAllBroken}
+              aria-pressed={allFindingsSelected}
+              aria-label={
+                allFindingsSelected
+                  ? "Clear all selected broken shots"
+                  : `Select all ${findings.length} broken shots`
+              }
+              onClick={() => {
+                if (allFindingsSelected) {
+                  clearSelection()
+                  return
+                }
+                selectAllBroken()
+              }}
               className={gallerySans()}
             >
-              Select all ({findings.length})
+              {allFindingsSelected
+                ? "Clear all"
+                : `Select all (${findings.length})`}
             </Button>
             {selected.size > 0 ? (
               <>
