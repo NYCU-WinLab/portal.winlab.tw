@@ -17,6 +17,10 @@ import {
 } from "@/lib/gallery/bulk-pin"
 import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
+  isActivityNotificationsUnavailable,
+  isGalleryMentionsTableUnavailable,
+} from "@/lib/gallery/notifications"
+import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
@@ -523,6 +527,13 @@ export async function markGalleryActivityNotificationsRead(
     .is("read_at", null)
 
   if (error) {
+    if (isActivityNotificationsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Notifications are not available yet — apply the gallery activity notifications migration.",
+      }
+    }
     return {
       ok: false,
       error: `Could not mark notifications read: ${error.message}`,
@@ -555,6 +566,13 @@ export async function markGalleryMentionsRead(
     .is("read_at", null)
 
   if (error) {
+    if (isGalleryMentionsTableUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Mentions are not available yet — apply the gallery comment mentions migration.",
+      }
+    }
     return {
       ok: false,
       error: `Could not mark mentions read: ${error.message}`,
