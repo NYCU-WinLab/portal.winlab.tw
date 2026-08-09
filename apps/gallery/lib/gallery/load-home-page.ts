@@ -343,7 +343,7 @@ function applyFavoriteFlags(
 }
 
 /** Intersect optional cover-id filters; "none" wins; null means unconstrained. */
-function intersectCoverIdFilters(
+export function intersectCoverIdFilters(
   ...filters: Array<"none" | string[] | null>
 ): "none" | string[] | null {
   let current: string[] | null = null
