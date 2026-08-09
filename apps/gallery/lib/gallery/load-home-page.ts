@@ -3,7 +3,10 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
-import { findSequenceGaps } from "@/lib/gallery/manage-uploads"
+import {
+  findSequenceGaps,
+  isGalleryPinnedAtUnavailable,
+} from "@/lib/gallery/manage-uploads"
 import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
@@ -17,8 +20,9 @@ import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
 
-const COVER_COLUMNS =
-  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index"
+const COVER_COLUMNS_CORE =
+  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index"
+const COVER_COLUMNS = `${COVER_COLUMNS_CORE}, pinned_at`
 
 // gallery_wall_page = gallery_wall_covers + reaction/comment aggregates.
 const WALL_PAGE_COLUMNS = `${COVER_COLUMNS}, uploader_name, reaction_counts, reaction_names, my_reaction, comment_count`
@@ -425,12 +429,27 @@ async function loadSequenceRowsById(
     .order("sequence_index", { ascending: true })
     .order("created_at", { ascending: true })
 
+  let rows = sequenceRows
   if (sequenceError) {
-    console.error("[gallery] failed to load sequence rows", sequenceError)
-    return sequenceRowsById
+    if (isGalleryPinnedAtUnavailable(sequenceError)) {
+      const fallback = await supabase
+        .from("gallery_images")
+        .select(COVER_COLUMNS_CORE)
+        .in("sequence_id", sequenceIds)
+        .order("sequence_index", { ascending: true })
+        .order("created_at", { ascending: true })
+      if (fallback.error) {
+        console.error("[gallery] failed to load sequence rows", fallback.error)
+        return sequenceRowsById
+      }
+      rows = fallback.data as unknown as typeof sequenceRows
+    } else {
+      console.error("[gallery] failed to load sequence rows", sequenceError)
+      return sequenceRowsById
+    }
   }
 
-  for (const row of (sequenceRows ?? []) as CoverRow[]) {
+  for (const row of (rows ?? []) as CoverRow[]) {
     const sequenceId = row.sequence_id
     if (!sequenceId) continue
     const bucket = sequenceRowsById.get(sequenceId) ?? []
@@ -581,6 +600,8 @@ async function loadGalleryHomeRangeViaView(
 
   if (rowsResult.error) {
     if (isMissingWallPageView(rowsResult.error)) return null
+    // View still references pinned_at — fall back to legacy covers query.
+    if (isGalleryPinnedAtUnavailable(rowsResult.error)) return null
     console.error("[gallery] failed to load wall page", rowsResult.error)
     throw new Error(rowsResult.error.message || "Failed to load gallery.")
   }
@@ -686,7 +707,7 @@ async function loadGalleryHomeRangeLegacy(
     ? sliceCoverIdsForPage(coverIdFilter, from, to)
     : null
 
-  const [profilesResult, imagesResult] = await Promise.all([
+  const [profilesResult, imagesResultInitial] = await Promise.all([
     userId
       ? supabase
           .from("user_profiles")
@@ -717,6 +738,42 @@ async function loadGalleryHomeRangeLegacy(
         .range(from, to)
     })(),
   ])
+
+  let imagesResult: {
+    data: CoverRow[] | null
+    error: PostgrestError | null
+    count?: number | null
+  } = imagesResultInitial as {
+    data: CoverRow[] | null
+    error: PostgrestError | null
+    count?: number | null
+  }
+  if (imagesResult.error && isGalleryPinnedAtUnavailable(imagesResult.error)) {
+    imagesResult = (await (() => {
+      let base = supabase
+        .from("gallery_wall_covers")
+        .select(COVER_COLUMNS_CORE, { count: "exact" })
+      base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
+      if (pageCoverIds) {
+        if (pageCoverIds.length === 0) {
+          return Promise.resolve({
+            data: [] as CoverRow[],
+            error: null,
+            count: coverIdFilter?.length ?? 0,
+          })
+        }
+        return base.in("id", pageCoverIds)
+      }
+      if (coverIdFilter) {
+        base = base.in("id", coverIdFilter)
+      }
+      return base.order("created_at", { ascending: false }).range(from, to)
+    })()) as {
+      data: CoverRow[] | null
+      error: PostgrestError | null
+      count?: number | null
+    }
+  }
 
   if (imagesResult.error) {
     console.error("[gallery] failed to load images", imagesResult.error)
