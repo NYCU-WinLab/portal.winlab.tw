@@ -12,7 +12,7 @@ import {
 } from "@/components/gallery-chrome"
 import {
   buildGalleryHomeHref,
-  describeGalleryFilterSummary,
+  describeGalleryFilteredEmpty,
   hasActiveGalleryFilters,
   type GalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
@@ -252,15 +252,11 @@ export function GalleryGrid({
   if (images.length === 0) {
     const filtersActive = filters ? hasActiveGalleryFilters(filters) : false
     if (filtersActive && filters) {
-      const summary = describeGalleryFilterSummary(filters, members).join(" · ")
+      const empty = describeGalleryFilteredEmpty(filters, members)
       return (
         <GalleryEmptyState
-          title="No matches"
-          description={
-            summary
-              ? `Nothing matches ${summary}.`
-              : "Nothing matches these filters."
-          }
+          title={empty.title}
+          description={empty.description}
           action={
             <button
               type="button"

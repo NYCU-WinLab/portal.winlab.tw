@@ -136,3 +136,71 @@ export function describeGalleryFilterSummary(
   if (filters.query) parts.push(`"${filters.query}"`)
   return parts
 }
+
+function isOnlyFilter(
+  filters: GalleryHomeFilters,
+  key: keyof GalleryHomeFilters
+): boolean {
+  const baseline = { ...EMPTY_GALLERY_HOME_FILTERS, [key]: filters[key] }
+  return (
+    filters.uploaderId === baseline.uploaderId &&
+    filters.media === baseline.media &&
+    filters.uploadedAfter === baseline.uploadedAfter &&
+    filters.query === baseline.query &&
+    filters.tagSlug === baseline.tagSlug &&
+    filters.savedOnly === baseline.savedOnly &&
+    filters.albumSlug === baseline.albumSlug
+  )
+}
+
+/**
+ * Prefer a specific empty-state when exactly one filter is active;
+ * otherwise fall back to the chip summary sentence.
+ */
+export function describeGalleryFilteredEmpty(
+  filters: GalleryHomeFilters,
+  members: { id: string; name: string | null; email: string | null }[],
+  tagLabel?: string | null
+): { title: string; description: string } {
+  if (filters.savedOnly && isOnlyFilter(filters, "savedOnly")) {
+    return {
+      title: "No saved photos yet",
+      description: "Tap the bookmark on a polaroid to keep it here.",
+    }
+  }
+  if (filters.albumSlug && isOnlyFilter(filters, "albumSlug")) {
+    return {
+      title: "This album is empty",
+      description: `Nothing is filed under ${filters.albumSlug} yet.`,
+    }
+  }
+  if (filters.tagSlug && isOnlyFilter(filters, "tagSlug")) {
+    const label = tagLabel?.trim() || `#${filters.tagSlug}`
+    return {
+      title: "No photos with this tag",
+      description: `Nothing is tagged ${label} on the wall yet.`,
+    }
+  }
+  if (filters.query && isOnlyFilter(filters, "query")) {
+    return {
+      title: "No search hits",
+      description: `Nothing matches “${filters.query}”.`,
+    }
+  }
+  if (filters.media === "video" && isOnlyFilter(filters, "media")) {
+    return {
+      title: "No videos on the wall",
+      description: "Hang a clip from Manage, or clear the Videos filter.",
+    }
+  }
+
+  const summary = describeGalleryFilterSummary(filters, members, tagLabel).join(
+    " · "
+  )
+  return {
+    title: "No matches",
+    description: summary
+      ? `Nothing matches ${summary}.`
+      : "Nothing matches these filters.",
+  }
+}

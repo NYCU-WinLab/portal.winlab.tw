@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  EMPTY_GALLERY_HOME_FILTERS,
   buildGalleryHomeHref,
   describeGalleryFilterSummary,
+  describeGalleryFilteredEmpty,
   hasActiveGalleryFilters,
   parseGalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
@@ -171,5 +173,51 @@ describe("describeGalleryFilterSummary", () => {
         []
       )
     ).toEqual(["Saved", "Album · lab-trip", '"mop"'])
+  })
+})
+
+describe("describeGalleryFilteredEmpty", () => {
+  test("uses Saved-specific copy when only Saved is on", () => {
+    expect(
+      describeGalleryFilteredEmpty(
+        {
+          ...EMPTY_GALLERY_HOME_FILTERS,
+          savedOnly: true,
+        },
+        []
+      ).title
+    ).toBe("No saved photos yet")
+  })
+
+  test("uses tag-specific copy when only a tag is on", () => {
+    expect(
+      describeGalleryFilteredEmpty(
+        {
+          ...EMPTY_GALLERY_HOME_FILTERS,
+          tagSlug: "lab-day",
+        },
+        [],
+        "Lab day"
+      )
+    ).toEqual({
+      title: "No photos with this tag",
+      description: "Nothing is tagged Lab day on the wall yet.",
+    })
+  })
+
+  test("falls back to chip summary for combined filters", () => {
+    expect(
+      describeGalleryFilteredEmpty(
+        {
+          ...EMPTY_GALLERY_HOME_FILTERS,
+          savedOnly: true,
+          query: "axolotl",
+        },
+        []
+      )
+    ).toEqual({
+      title: "No matches",
+      description: 'Nothing matches Saved · "axolotl".',
+    })
   })
 })
