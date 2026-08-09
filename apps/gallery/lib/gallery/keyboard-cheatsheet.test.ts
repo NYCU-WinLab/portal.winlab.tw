@@ -17,10 +17,11 @@ describe("isCheatSheetToggleKey", () => {
 })
 
 describe("GALLERY_WALL_SHORTCUTS", () => {
-  test("documents Esc closing cheat sheet before Select/filters", () => {
+  test("documents Esc closing cheat sheet before Select/filters/offline", () => {
     const esc = GALLERY_WALL_SHORTCUTS.find((row) => row.keys.includes("Esc"))
     expect(esc?.action.toLowerCase()).toContain("cheat sheet")
     expect(esc?.action.toLowerCase()).toContain("filter")
+    expect(esc?.action.toLowerCase()).toContain("offline")
   })
 })
 
@@ -34,10 +35,11 @@ describe("GALLERY_MANAGE_SHORTCUTS", () => {
     expect(joined).toContain("?")
   })
 
-  test("documents Esc closing cheat sheet before Select/filters", () => {
+  test("documents Esc closing cheat sheet before Select/filters/offline", () => {
     const esc = GALLERY_MANAGE_SHORTCUTS.find((row) => row.keys.includes("Esc"))
     expect(esc?.action.toLowerCase()).toContain("cheat sheet")
     expect(esc?.action.toLowerCase()).toContain("filter")
+    expect(esc?.action.toLowerCase()).toContain("offline")
   })
 })
 

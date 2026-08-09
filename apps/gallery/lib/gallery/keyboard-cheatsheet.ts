@@ -11,7 +11,10 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["Space"], action: "Toggle select (in Select mode)" },
   { keys: ["A"], action: "Select all / clear all" },
   { keys: ["Shift+click"], action: "Range-select from last toggle" },
-  { keys: ["Esc"], action: "Close cheat sheet / exit Select / clear filters" },
+  {
+    keys: ["Esc"],
+    action: "Close cheat sheet / exit Select / clear filters / dismiss offline",
+  },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
@@ -20,7 +23,10 @@ export const GALLERY_MANAGE_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["click"], action: "Toggle select on a row" },
   { keys: ["A"], action: "Select / clear all visible" },
   { keys: ["Shift+click"], action: "Range-select from last toggle" },
-  { keys: ["Esc"], action: "Close cheat sheet / exit Select / clear filters" },
+  {
+    keys: ["Esc"],
+    action: "Close cheat sheet / exit Select / clear filters / dismiss offline",
+  },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
