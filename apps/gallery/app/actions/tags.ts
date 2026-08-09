@@ -104,51 +104,65 @@ export async function attachGalleryTag(
   imageId: string,
   rawName: string
 ): Promise<TagActionResult<GalleryTag>> {
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  const result = await attachGalleryTagToImages([imageId], rawName)
+  if (!result.ok) return result
+  if (!result.data.tag) {
+    return { ok: false, error: "Could not attach that tag." }
+  }
+  return { ok: true, data: result.data.tag }
+}
+
+export async function attachGalleryTagToImages(
+  imageIds: string[],
+  rawName: string
+): Promise<TagActionResult<{ tag: GalleryTag; attached: number }>> {
+  const ids = Array.from(
+    new Set(imageIds.map((id) => id.trim()).filter(Boolean))
+  ).slice(0, 200)
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
+  }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Please sign in first." }
 
-  const { count, error: countError } = await supabase
-    .from("gallery_image_tags")
-    .select("tag_id", { count: "exact", head: true })
-    .eq("image_id", imageId)
-
-  if (countError) {
-    if (isGalleryTagsUnavailable(countError)) {
-      return { ok: false, error: "Tags are not available yet." }
-    }
-    return { ok: false, error: countError.message }
-  }
-  if ((count ?? 0) >= GALLERY_TAGS_PER_IMAGE_MAX) {
-    return {
-      ok: false,
-      error: `At most ${GALLERY_TAGS_PER_IMAGE_MAX} tags per photo.`,
-    }
-  }
-
   const ensured = await ensureGalleryTag(supabase, userId, rawName)
   if (!ensured.ok) return ensured
 
-  const { error: linkError } = await supabase
-    .from("gallery_image_tags")
-    .insert({
-      image_id: imageId,
-      tag_id: ensured.data.id,
-      created_by: userId,
-    })
+  let attached = 0
+  for (const imageId of ids) {
+    const { count, error: countError } = await supabase
+      .from("gallery_image_tags")
+      .select("tag_id", { count: "exact", head: true })
+      .eq("image_id", imageId)
 
-  if (linkError) {
-    if (/duplicate|unique|23505/i.test(linkError.message)) {
-      return { ok: true, data: ensured.data }
+    if (countError) {
+      if (isGalleryTagsUnavailable(countError)) {
+        return { ok: false, error: "Tags are not available yet." }
+      }
+      return { ok: false, error: countError.message }
     }
-    return { ok: false, error: linkError.message }
+    if ((count ?? 0) >= GALLERY_TAGS_PER_IMAGE_MAX) continue
+
+    const { error: linkError } = await supabase
+      .from("gallery_image_tags")
+      .insert({
+        image_id: imageId,
+        tag_id: ensured.data.id,
+        created_by: userId,
+      })
+
+    if (linkError) {
+      if (/duplicate|unique|23505/i.test(linkError.message)) continue
+      return { ok: false, error: linkError.message }
+    }
+    attached += 1
   }
 
   revalidatePath("/")
-  return { ok: true, data: ensured.data }
+  return { ok: true, data: { tag: ensured.data, attached } }
 }
 
 export async function detachGalleryTag(

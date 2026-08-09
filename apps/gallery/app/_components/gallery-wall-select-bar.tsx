@@ -1,22 +1,26 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, type FormEvent } from "react"
 import {
   IconAlbum,
   IconBookmark,
   IconCheckbox,
   IconFileZip,
   IconSquare,
+  IconTag,
   IconX,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryFavorites } from "@/app/actions/favorites"
+import { attachGalleryTagToImages } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
@@ -57,6 +61,31 @@ export function GalleryWallSelectBar({
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
   const [zipBusy, setZipBusy] = useState(false)
+  const [tagDraft, setTagDraft] = useState("")
+
+  const tagSelected = (event?: FormEvent) => {
+    event?.preventDefault()
+    const name = tagDraft.trim()
+    if (!name || selectedIds.length === 0 || pending || saveOpenBusy) return
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await attachGalleryTagToImages(selectedIds, name)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(
+        describeBulkTagAttach({
+          tagName: result.data.tag.name,
+          attached: result.data.attached,
+          selected: selectedIds.length,
+        })
+      )
+      setTagDraft("")
+      onClear()
+    })
+  }
 
   const saveSelected = () => {
     if (selectedIds.length === 0 || pending || saveOpenBusy) return
@@ -236,6 +265,37 @@ export function GalleryWallSelectBar({
                       Unsave
                     </Button>
                   ) : null}
+                  <form
+                    onSubmit={tagSelected}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Input
+                      value={tagDraft}
+                      onChange={(e) => setTagDraft(e.target.value)}
+                      placeholder="Tag…"
+                      aria-label="Tag to apply to selection"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(
+                        gallerySans(),
+                        "h-8 w-[7.5rem] text-[11px] sm:w-28"
+                      )}
+                    />
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        selectedCount === 0 || pending || !tagDraft.trim()
+                      }
+                      className={cn(
+                        gallerySans(),
+                        "h-8 gap-1.5 text-[11px] uppercase"
+                      )}
+                    >
+                      <IconTag className="size-3.5" aria-hidden />
+                      Tag
+                    </Button>
+                  </form>
                   <GalleryAddToAlbum
                     imageIds={selectedIds}
                     triggerLabel={
