@@ -102,7 +102,7 @@ export function GalleryCard({
   onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
   selectionMode?: boolean
   selected?: boolean
-  onToggleSelected?: (imageId: string) => void
+  onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
 }) {
   const isOwner = Boolean(viewerId && image.created_by === viewerId)
   const router = useRouter()
@@ -460,7 +460,9 @@ export function GalleryCard({
                       ? `Deselect ${activeItem?.name ?? image.name}`
                       : `Select ${activeItem?.name ?? image.name}`
                   }
-                  onClick={() => onToggleSelected?.(image.id)}
+                  onClick={(event) =>
+                    onToggleSelected?.(image.id, { shiftKey: event.shiftKey })
+                  }
                   className="relative block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {thumbFailed ? (

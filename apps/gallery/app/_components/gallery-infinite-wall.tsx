@@ -17,6 +17,7 @@ import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 import {
   orderedSelectedWallIds,
+  selectWallIdRange,
   toggleSelectAllWallIds,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
@@ -80,6 +81,7 @@ export function GalleryInfiniteWall({
   const [shuffled, setShuffled] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const selectionAnchorIdRef = useRef<string | null>(null)
   const loadOrderIdsRef = useRef(initialImages.map((image) => image.id))
   const shuffledRef = useRef(false)
   const prefetchingRef = useRef(false)
@@ -256,12 +258,30 @@ export function GalleryInfiniteWall({
   }, [])
 
   const clearSelection = useCallback(() => {
+    selectionAnchorIdRef.current = null
     setSelectedIds(new Set())
   }, [])
 
-  const toggleSelected = useCallback((imageId: string) => {
-    setSelectedIds((prev) => toggleWallSelection(prev, imageId))
-  }, [])
+  const toggleSelected = useCallback(
+    (imageId: string, options?: { shiftKey?: boolean }) => {
+      setSelectedIds((prev) => {
+        if (options?.shiftKey && selectionAnchorIdRef.current) {
+          return selectWallIdRange(
+            prev,
+            wallIds,
+            selectionAnchorIdRef.current,
+            imageId
+          )
+        }
+        selectionAnchorIdRef.current = imageId
+        return toggleWallSelection(prev, imageId)
+      })
+      if (!options?.shiftKey) {
+        selectionAnchorIdRef.current = imageId
+      }
+    },
+    [wallIds]
+  )
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => toggleSelectAllWallIds(prev, wallIds))

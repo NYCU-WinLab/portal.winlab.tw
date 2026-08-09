@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   describeWallSelectionCount,
   orderedSelectedWallIds,
+  selectWallIdRange,
   toggleSelectAllWallIds,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
@@ -41,12 +42,12 @@ describe("toggleSelectAllWallIds", () => {
 describe("orderedSelectedWallIds", () => {
   test("preserves wall order and drops unselected", () => {
     expect(
-      orderedSelectedWallIds(["c", "a", "b", "d"], new Set(["b", "c"]))
-    ).toEqual(["c", "b"])
+      orderedSelectedWallIds(["a", "b", "c"], new Set(["c", "a"]))
+    ).toEqual(["a", "c"])
   })
 
   test("returns empty when nothing selected", () => {
-    expect(orderedSelectedWallIds(["a", "b"], new Set())).toEqual([])
+    expect(orderedSelectedWallIds(["a"], new Set())).toEqual([])
   })
 })
 
@@ -55,5 +56,25 @@ describe("describeWallSelectionCount", () => {
     expect(describeWallSelectionCount(0)).toBe("Nothing selected")
     expect(describeWallSelectionCount(1)).toBe("1 photo selected")
     expect(describeWallSelectionCount(4)).toBe("4 photos selected")
+  })
+})
+
+describe("selectWallIdRange", () => {
+  test("selects inclusive contiguous range", () => {
+    expect([
+      ...selectWallIdRange(new Set(["a"]), ["a", "b", "c", "d"], "a", "c"),
+    ]).toEqual(["a", "b", "c"])
+  })
+
+  test("works backwards", () => {
+    expect([
+      ...selectWallIdRange(new Set(), ["a", "b", "c"], "c", "a"),
+    ]).toEqual(["a", "b", "c"])
+  })
+
+  test("falls back to toggle when anchor missing", () => {
+    expect([
+      ...selectWallIdRange(new Set(), ["a", "b"], "missing", "b"),
+    ]).toEqual(["b"])
   })
 })

@@ -58,7 +58,7 @@ export function GalleryGrid({
   onArtworkRenamed?: (imageId: string, patches: ArtworkNamePatch[]) => void
   selectionMode?: boolean
   selectedIds?: ReadonlySet<string>
-  onToggleSelected?: (imageId: string) => void
+  onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
   onExitSelectionMode?: () => void
 }) {
   const router = useRouter()
@@ -179,7 +179,9 @@ export function GalleryGrid({
         ) {
           event.preventDefault()
           const image = images[focusIndex]
-          if (image) onToggleSelected(image.id)
+          if (image) {
+            onToggleSelected(image.id, { shiftKey: event.shiftKey })
+          }
         }
         return
       }

@@ -38,3 +38,28 @@ export function describeWallSelectionCount(count: number): string {
   if (count === 1) return "1 photo selected"
   return `${count} photos selected`
 }
+
+/**
+ * Add every wall id between `fromId` and `toId` (inclusive) to the selection.
+ * If either id is missing from the wall order, falls back to toggling `toId`.
+ */
+export function selectWallIdRange(
+  selected: ReadonlySet<string>,
+  wallOrderIds: readonly string[],
+  fromId: string,
+  toId: string
+): Set<string> {
+  const fromIndex = wallOrderIds.indexOf(fromId)
+  const toIndex = wallOrderIds.indexOf(toId)
+  if (fromIndex < 0 || toIndex < 0) {
+    return toggleWallSelection(selected, toId)
+  }
+  const start = Math.min(fromIndex, toIndex)
+  const end = Math.max(fromIndex, toIndex)
+  const next = new Set(selected)
+  for (let i = start; i <= end; i += 1) {
+    const id = wallOrderIds[i]
+    if (id) next.add(id)
+  }
+  return next
+}
