@@ -15,6 +15,16 @@ import {
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -130,6 +140,7 @@ export function GalleryWallSelectBar({
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Wall selection")
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+  const [confirmKind, setConfirmKind] = useState<"album" | "tag" | null>(null)
 
   const handleSlideshowOpenChange = (open: boolean) => {
     setSlideshowOpen(open)
@@ -225,6 +236,7 @@ export function GalleryWallSelectBar({
     ) {
       return
     }
+    setConfirmKind(null)
     setSaveOpenBusy(true)
     startTransition(async () => {
       const result = await removeImagesFromGalleryAlbumBySlug(slug, selectedIds)
@@ -251,6 +263,7 @@ export function GalleryWallSelectBar({
     ) {
       return
     }
+    setConfirmKind(null)
     setSaveOpenBusy(true)
     startTransition(async () => {
       const result = await detachGalleryTagFromImagesBySlug(selectedIds, slug)
@@ -735,7 +748,7 @@ export function GalleryWallSelectBar({
                         {albumFilterSlug && albumsAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
-                            onSelect={() => removeSelectedFromAlbum()}
+                            onSelect={() => setConfirmKind("album")}
                           >
                             Remove from album
                           </DropdownMenuItem>
@@ -743,7 +756,7 @@ export function GalleryWallSelectBar({
                         {tagFilterSlug && tagsAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
-                            onSelect={() => untagSelected()}
+                            onSelect={() => setConfirmKind("tag")}
                           >
                             Untag
                           </DropdownMenuItem>
@@ -782,6 +795,42 @@ export function GalleryWallSelectBar({
         onOpenChange={handleSlideshowOpenChange}
         startIndex={0}
       />
+
+      <AlertDialog
+        open={confirmKind !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmKind(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmKind === "tag"
+                ? `Untag ${selectedCount} selected photo${selectedCount === 1 ? "" : "s"}?`
+                : `Remove ${selectedCount} photo${selectedCount === 1 ? "" : "s"} from this album?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmKind === "tag"
+                ? "Detaches the active tag filter from the selection. Photos stay on the wall."
+                : "Removes the selection from this album only. Photos stay on the wall."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={overflowBusy}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={overflowBusy}
+              onClick={() => {
+                if (confirmKind === "tag") untagSelected()
+                else removeSelectedFromAlbum()
+              }}
+            >
+              {confirmKind === "tag" ? "Untag" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
