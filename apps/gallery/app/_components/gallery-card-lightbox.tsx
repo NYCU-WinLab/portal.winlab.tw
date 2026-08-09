@@ -264,6 +264,7 @@ export function GalleryLightboxSocialAside({
   sequenceMedia,
   isSignedIn,
   isAdmin,
+  pinAvailable = true,
   isOwner = false,
   viewerId,
   viewerName,
@@ -293,6 +294,7 @@ export function GalleryLightboxSocialAside({
   sequenceMedia: GallerySequenceItem[]
   isSignedIn: boolean
   isAdmin: boolean
+  pinAvailable?: boolean
   isOwner?: boolean
   viewerId: string | null
   viewerName: string
@@ -378,7 +380,7 @@ export function GalleryLightboxSocialAside({
                   : "Reactions & comments · swipe up"}
             </span>
           </button>
-          {isAdmin ? (
+          {isAdmin && pinAvailable ? (
             <PinWallButton
               imageId={image.id}
               pinnedAt={pinnedAt}
@@ -493,7 +495,7 @@ export function GalleryLightboxSocialAside({
           tags={activeItem?.tags ?? image.tags ?? []}
           canEdit={isSignedIn}
         />
-        {isAdmin ? (
+        {isAdmin && pinAvailable ? (
           <div className="gallery-lightbox-aside-pin flex justify-end">
             <PinWallButton
               imageId={image.id}

@@ -61,6 +61,7 @@ export function GalleryInfiniteWall({
   viewerName,
   members,
   isAdmin,
+  pinAvailable = true,
   openPhotoId = null,
   openCommentId = null,
 }: {
@@ -73,6 +74,7 @@ export function GalleryInfiniteWall({
   viewerName: string
   members: GalleryMember[]
   isAdmin: boolean
+  pinAvailable?: boolean
   openPhotoId?: string | null
   openCommentId?: string | null
 }) {
@@ -316,6 +318,7 @@ export function GalleryInfiniteWall({
               allSelected={allSelected}
               isSignedIn={isSignedIn}
               isAdmin={isAdmin}
+              pinAvailable={pinAvailable}
               selectedIds={orderedSelected}
               selectedZipItems={selectedZipItems}
               selectedSlideshowPhotos={selectedSlideshowPhotos}
@@ -370,6 +373,7 @@ export function GalleryInfiniteWall({
         viewerName={viewerName}
         members={members}
         isAdmin={isAdmin}
+        pinAvailable={pinAvailable}
         openPhotoId={selectionMode ? null : openPhotoId}
         openCommentId={selectionMode ? null : openCommentId}
         hasMore={hasMore}

@@ -28,6 +28,7 @@ export function GalleryGrid({
   viewerName,
   members,
   isAdmin = false,
+  pinAvailable = true,
   openPhotoId = null,
   openCommentId = null,
   hasMore = false,
@@ -49,6 +50,7 @@ export function GalleryGrid({
   viewerName: string
   members: GalleryMember[]
   isAdmin?: boolean
+  pinAvailable?: boolean
   openPhotoId?: string | null
   openCommentId?: string | null
   hasMore?: boolean
@@ -303,6 +305,7 @@ export function GalleryGrid({
               viewerName={viewerName}
               members={members}
               isAdmin={isAdmin}
+              pinAvailable={pinAvailable}
               priorityLcp={index === 0}
               initialOpen={false}
               highlightCommentId={

@@ -70,6 +70,7 @@ export function GalleryCard({
   viewerName,
   members,
   isAdmin = false,
+  pinAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
@@ -90,6 +91,7 @@ export function GalleryCard({
   viewerName: string
   members: GalleryMember[]
   isAdmin?: boolean
+  pinAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
@@ -657,6 +659,7 @@ export function GalleryCard({
                   sequenceMedia={sequenceMedia}
                   isSignedIn={isSignedIn}
                   isAdmin={isAdmin}
+                  pinAvailable={pinAvailable}
                   isOwner={isOwner}
                   viewerId={viewerId}
                   viewerName={viewerName}

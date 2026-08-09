@@ -59,6 +59,7 @@ export function GalleryWallSelectBar({
   allSelected,
   isSignedIn,
   isAdmin = false,
+  pinAvailable = true,
   selectedIds,
   selectedZipItems = [],
   selectedSlideshowPhotos = [],
@@ -81,6 +82,7 @@ export function GalleryWallSelectBar({
   allSelected: boolean
   isSignedIn: boolean
   isAdmin?: boolean
+  pinAvailable?: boolean
   selectedIds: string[]
   /** Ordered covers for ZIP download (name + storage path). */
   selectedZipItems?: Array<{
@@ -178,7 +180,14 @@ export function GalleryWallSelectBar({
   }
 
   const pinSelected = (pinned: boolean) => {
-    if (selectedIds.length === 0 || pending || saveOpenBusy || !isAdmin) return
+    if (
+      selectedIds.length === 0 ||
+      pending ||
+      saveOpenBusy ||
+      !isAdmin ||
+      !pinAvailable
+    )
+      return
     setSaveOpenBusy(true)
     startTransition(async () => {
       const result = await setGalleryImagesPin(selectedIds, pinned)
@@ -706,7 +715,7 @@ export function GalleryWallSelectBar({
                             Untag
                           </DropdownMenuItem>
                         ) : null}
-                        {isAdmin ? (
+                        {isAdmin && pinAvailable ? (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem

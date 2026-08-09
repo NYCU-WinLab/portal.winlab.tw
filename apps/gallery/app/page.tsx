@@ -11,6 +11,7 @@ import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
+import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
 import {
   formatMemoriesDayLabel,
   galleryTaipeiCalendarDay,
@@ -105,6 +106,7 @@ export default async function GalleryHomePage({
     { images, members, currentPage, hasMore },
     popularTagsResult,
     memoriesResult,
+    pinAvailable,
   ] = await Promise.all([
     loadGalleryHomePages(supabase, {
       throughPage,
@@ -117,6 +119,7 @@ export default async function GalleryHomePage({
       day: today.day,
       limit: 12,
     }),
+    isGalleryPinReady(supabase),
   ])
   const memoryPhotos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
@@ -186,6 +189,7 @@ export default async function GalleryHomePage({
               viewerName={user?.name ?? "You"}
               members={members}
               isAdmin={user?.isAdmin ?? false}
+              pinAvailable={pinAvailable}
             />
           }
         >
@@ -209,6 +213,7 @@ export default async function GalleryHomePage({
             viewerName={user?.name ?? "You"}
             members={members}
             isAdmin={user?.isAdmin ?? false}
+            pinAvailable={pinAvailable}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />
