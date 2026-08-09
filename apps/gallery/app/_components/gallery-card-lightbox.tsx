@@ -16,6 +16,7 @@ import {
 import { DialogClose } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
 import { GalleryImageTags } from "@/app/_components/gallery-image-tags"
@@ -476,6 +477,9 @@ export function GalleryLightboxSocialAside({
               scrollToWallTop
             />
           </div>
+        ) : null}
+        {isSignedIn ? (
+          <GalleryAddToAlbum imageId={activeItem?.id ?? image.id} />
         ) : null}
         <ReactionBar
           counts={counts}

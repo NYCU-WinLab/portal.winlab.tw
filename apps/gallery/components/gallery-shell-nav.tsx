@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import {
+  IconAlbum,
   IconExternalLink,
   IconLayoutGrid,
   IconLogin,
@@ -28,7 +29,7 @@ import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
 import type { GalleryNotification } from "@/lib/gallery/notifications"
 
-export type GalleryShellActive = "home" | "manage"
+export type GalleryShellActive = "home" | "manage" | "albums"
 
 export function GalleryShellNav({
   active,
@@ -58,6 +59,13 @@ export function GalleryShellNav({
       <nav className="hidden shrink-0 items-center gap-4 md:flex">
         <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
           Portal
+        </GalleryNavLink>
+        <GalleryNavLink
+          href="/albums"
+          active={active === "albums"}
+          tone="shell"
+        >
+          Albums
         </GalleryNavLink>
         {signedIn ? (
           <>
@@ -116,6 +124,15 @@ export function GalleryShellNav({
                 <IconExternalLink className="size-4 shrink-0" aria-hidden />
                 Portal
               </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href="/albums"
+                className="flex cursor-pointer items-center gap-2"
+              >
+                <IconAlbum className="size-4 shrink-0" aria-hidden />
+                Albums
+              </Link>
             </DropdownMenuItem>
             {signedIn && active !== "manage" ? (
               <DropdownMenuItem asChild>
