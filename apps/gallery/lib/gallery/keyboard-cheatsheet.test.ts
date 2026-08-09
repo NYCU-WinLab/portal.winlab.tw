@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   GALLERY_MANAGE_SHORTCUTS,
   GALLERY_SLIDESHOW_SHORTCUTS,
+  GALLERY_WALL_SHORTCUTS,
   isCheatSheetToggleKey,
 } from "@/lib/gallery/keyboard-cheatsheet"
 
@@ -15,6 +16,13 @@ describe("isCheatSheetToggleKey", () => {
   })
 })
 
+describe("GALLERY_WALL_SHORTCUTS", () => {
+  test("documents Esc clearing empty filters", () => {
+    const esc = GALLERY_WALL_SHORTCUTS.find((row) => row.keys.includes("Esc"))
+    expect(esc?.action.toLowerCase()).toContain("filter")
+  })
+})
+
 describe("GALLERY_MANAGE_SHORTCUTS", () => {
   test("covers Select-mode keys", () => {
     const joined = GALLERY_MANAGE_SHORTCUTS.flatMap((row) => row.keys).join(" ")
@@ -23,6 +31,11 @@ describe("GALLERY_MANAGE_SHORTCUTS", () => {
     expect(joined).toContain("Shift+click")
     expect(joined).toContain("Esc")
     expect(joined).toContain("?")
+  })
+
+  test("documents Esc clearing list filters", () => {
+    const esc = GALLERY_MANAGE_SHORTCUTS.find((row) => row.keys.includes("Esc"))
+    expect(esc?.action.toLowerCase()).toContain("filter")
   })
 })
 
