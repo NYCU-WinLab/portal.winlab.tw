@@ -1,7 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState, type TouchEvent } from "react"
-import { IconPlayerPause, IconPlayerPlay, IconX } from "@tabler/icons-react"
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconX,
+} from "@tabler/icons-react"
 
 import {
   Dialog,
@@ -275,6 +281,42 @@ export function AlbumSlideshow({
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
+          {photos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                aria-label="Previous slide"
+                onClick={() =>
+                  setIndex((current) =>
+                    prevSlideshowIndex(current, photos.length)
+                  )
+                }
+                className={cn(
+                  "absolute top-1/2 left-2 z-10 hidden -translate-y-1/2 sm:inline-flex",
+                  "size-11 items-center justify-center rounded-full text-zinc-200",
+                  "bg-black/25 hover:bg-black/45"
+                )}
+              >
+                <IconChevronLeft className="size-6" aria-hidden />
+              </button>
+              <button
+                type="button"
+                aria-label="Next slide"
+                onClick={() =>
+                  setIndex((current) =>
+                    nextSlideshowIndex(current, photos.length)
+                  )
+                }
+                className={cn(
+                  "absolute top-1/2 right-2 z-10 hidden -translate-y-1/2 sm:inline-flex",
+                  "size-11 items-center justify-center rounded-full text-zinc-200",
+                  "bg-black/25 hover:bg-black/45"
+                )}
+              >
+                <IconChevronRight className="size-6" aria-hidden />
+              </button>
+            </>
+          ) : null}
           {photo.media_type === "video" ? (
             <video
               key={photo.image_id}
