@@ -7,6 +7,8 @@ import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import {
   findSequenceGaps,
   isGalleryPinnedAtUnavailable,
+  isGallerySequenceUnavailable,
+  isGalleryVideoColumnsUnavailable,
 } from "@/lib/gallery/manage-uploads"
 import {
   EMPTY_REACTION_COUNTS,
@@ -22,8 +24,9 @@ import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
 
-const COVER_COLUMNS_CORE =
-  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index"
+const COVER_COLUMNS_MINIMAL = "id, name, image_path, created_by, created_at"
+const COVER_COLUMNS_WITH_SEQ = `${COVER_COLUMNS_MINIMAL}, sequence_id, sequence_index`
+const COVER_COLUMNS_CORE = `${COVER_COLUMNS_WITH_SEQ}, media_type, poster_path, duration_seconds`
 const COVER_COLUMNS = `${COVER_COLUMNS_CORE}, pinned_at`
 
 // gallery_wall_page = gallery_wall_covers + reaction/comment aggregates.
@@ -441,10 +444,43 @@ async function loadSequenceRowsById(
         .order("sequence_index", { ascending: true })
         .order("created_at", { ascending: true })
       if (fallback.error) {
-        console.error("[gallery] failed to load sequence rows", fallback.error)
+        if (isGalleryVideoColumnsUnavailable(fallback.error)) {
+          const noVideo = await supabase
+            .from("gallery_images")
+            .select(COVER_COLUMNS_WITH_SEQ)
+            .in("sequence_id", sequenceIds)
+            .order("sequence_index", { ascending: true })
+            .order("created_at", { ascending: true })
+          if (noVideo.error) {
+            console.error(
+              "[gallery] failed to load sequence rows",
+              noVideo.error
+            )
+            return sequenceRowsById
+          }
+          rows = noVideo.data as unknown as typeof sequenceRows
+        } else {
+          console.error(
+            "[gallery] failed to load sequence rows",
+            fallback.error
+          )
+          return sequenceRowsById
+        }
+      } else {
+        rows = fallback.data as unknown as typeof sequenceRows
+      }
+    } else if (isGalleryVideoColumnsUnavailable(sequenceError)) {
+      const noVideo = await supabase
+        .from("gallery_images")
+        .select(`${COVER_COLUMNS_WITH_SEQ}, pinned_at`)
+        .in("sequence_id", sequenceIds)
+        .order("sequence_index", { ascending: true })
+        .order("created_at", { ascending: true })
+      if (noVideo.error) {
+        console.error("[gallery] failed to load sequence rows", noVideo.error)
         return sequenceRowsById
       }
-      rows = fallback.data as unknown as typeof sequenceRows
+      rows = noVideo.data as unknown as typeof sequenceRows
     } else {
       console.error("[gallery] failed to load sequence rows", sequenceError)
       return sequenceRowsById
@@ -604,6 +640,8 @@ async function loadGalleryHomeRangeViaView(
     if (isMissingWallPageView(rowsResult.error)) return null
     // View still references pinned_at — fall back to legacy covers query.
     if (isGalleryPinnedAtUnavailable(rowsResult.error)) return null
+    if (isGalleryVideoColumnsUnavailable(rowsResult.error)) return null
+    if (isGallerySequenceUnavailable(rowsResult.error)) return null
     console.error("[gallery] failed to load wall page", rowsResult.error)
     throw new Error(rowsResult.error.message || "Failed to load gallery.")
   }
@@ -755,6 +793,63 @@ async function loadGalleryHomeRangeLegacy(
       let base = supabase
         .from("gallery_wall_covers")
         .select(COVER_COLUMNS_CORE, { count: "exact" })
+      base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
+      if (pageCoverIds) {
+        if (pageCoverIds.length === 0) {
+          return Promise.resolve({
+            data: [] as CoverRow[],
+            error: null,
+            count: coverIdFilter?.length ?? 0,
+          })
+        }
+        return base.in("id", pageCoverIds)
+      }
+      if (coverIdFilter) {
+        base = base.in("id", coverIdFilter)
+      }
+      return base.order("created_at", { ascending: false }).range(from, to)
+    })()) as {
+      data: CoverRow[] | null
+      error: PostgrestError | null
+      count?: number | null
+    }
+  }
+
+  if (
+    imagesResult.error &&
+    isGalleryVideoColumnsUnavailable(imagesResult.error)
+  ) {
+    imagesResult = (await (() => {
+      let base = supabase
+        .from("gallery_wall_covers")
+        .select(COVER_COLUMNS_WITH_SEQ, { count: "exact" })
+      base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
+      if (pageCoverIds) {
+        if (pageCoverIds.length === 0) {
+          return Promise.resolve({
+            data: [] as CoverRow[],
+            error: null,
+            count: coverIdFilter?.length ?? 0,
+          })
+        }
+        return base.in("id", pageCoverIds)
+      }
+      if (coverIdFilter) {
+        base = base.in("id", coverIdFilter)
+      }
+      return base.order("created_at", { ascending: false }).range(from, to)
+    })()) as {
+      data: CoverRow[] | null
+      error: PostgrestError | null
+      count?: number | null
+    }
+  }
+
+  if (imagesResult.error && isGallerySequenceUnavailable(imagesResult.error)) {
+    imagesResult = (await (() => {
+      let base = supabase
+        .from("gallery_wall_covers")
+        .select(COVER_COLUMNS_MINIMAL, { count: "exact" })
       base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
       if (pageCoverIds) {
         if (pageCoverIds.length === 0) {
