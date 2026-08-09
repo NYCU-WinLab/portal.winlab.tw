@@ -145,7 +145,37 @@ export function GalleryGrid({
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
       if (openIndex !== null) return
-      if (selectionMode) return
+
+      if (selectionMode) {
+        if (event.key === "j" || event.key === "ArrowRight") {
+          event.preventDefault()
+          setKeyboardNavActive(true)
+          setFocusIndex((index) => {
+            const atEnd = index >= images.length - 1
+            if (atEnd && hasMore && onLoadMore && !loadingMore) {
+              void onLoadMore()
+            }
+            return Math.min(images.length - 1, Math.max(0, index + 1))
+          })
+          return
+        }
+        if (event.key === "k" || event.key === "ArrowLeft") {
+          event.preventDefault()
+          setKeyboardNavActive(true)
+          setFocusIndex((index) => Math.max(0, index - 1))
+          return
+        }
+        if (
+          (event.key === " " || event.key === "Enter") &&
+          focusIndex >= 0 &&
+          onToggleSelected
+        ) {
+          event.preventDefault()
+          const image = images[focusIndex]
+          if (image) onToggleSelected(image.id)
+        }
+        return
+      }
 
       if (event.key === "j" || event.key === "ArrowRight") {
         event.preventDefault()
@@ -176,9 +206,10 @@ export function GalleryGrid({
   }, [
     focusIndex,
     hasMore,
-    images.length,
+    images,
     loadingMore,
     onLoadMore,
+    onToggleSelected,
     openIndex,
     selectionMode,
   ])
@@ -272,10 +303,7 @@ export function GalleryGrid({
                 }
               }}
               gridFocused={
-                !selectionMode &&
-                keyboardNavActive &&
-                focusIndex === index &&
-                openIndex === null
+                keyboardNavActive && focusIndex === index && openIndex === null
               }
               hasWallPrev={openIndex === index && index > 0}
               hasWallNext={

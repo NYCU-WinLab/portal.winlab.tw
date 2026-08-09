@@ -107,6 +107,12 @@ export function GalleryInfiniteWall({
     warmThumbUrls(images)
   }, [images])
 
+  // Filter changes remount a new page payload; drop a stale selection.
+  useEffect(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [filtersInput])
+
   const wallIds = useMemo(() => images.map((image) => image.id), [images])
   const orderedSelected = useMemo(
     () => orderedSelectedWallIds(wallIds, selectedIds),

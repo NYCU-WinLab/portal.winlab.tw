@@ -8,6 +8,7 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["J", "→"], action: "Next photo" },
   { keys: ["K", "←"], action: "Previous photo" },
   { keys: ["Enter"], action: "Open lightbox" },
+  { keys: ["Space"], action: "Toggle select (in Select mode)" },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
