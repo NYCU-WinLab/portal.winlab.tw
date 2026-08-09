@@ -162,6 +162,7 @@ export async function attachGalleryTagToImages(
   }
 
   revalidatePath("/")
+  revalidatePath("/upload")
   return { ok: true, data: { tag: ensured.data, attached } }
 }
 
@@ -192,6 +193,7 @@ export async function detachGalleryTag(
   }
 
   revalidatePath("/")
+  revalidatePath("/upload")
   return { ok: true }
 }
 
@@ -241,6 +243,7 @@ export async function detachGalleryTagFromImagesBySlug(
   }
 
   revalidatePath("/")
+  revalidatePath("/upload")
   return {
     ok: true,
     data: { detached: count ?? 0, tagName: tag.name },
