@@ -140,7 +140,9 @@ export function GalleryWallSelectBar({
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Wall selection")
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
-  const [confirmKind, setConfirmKind] = useState<"album" | "tag" | null>(null)
+  const [confirmKind, setConfirmKind] = useState<
+    "album" | "tag" | "unsave" | null
+  >(null)
 
   const handleSlideshowOpenChange = (open: boolean) => {
     setSlideshowOpen(open)
@@ -746,7 +748,7 @@ export function GalleryWallSelectBar({
                         {savedFilterActive && favoritesAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
-                            onSelect={() => unsaveSelected()}
+                            onSelect={() => setConfirmKind("unsave")}
                           >
                             Unsave
                           </DropdownMenuItem>
@@ -813,12 +815,16 @@ export function GalleryWallSelectBar({
             <AlertDialogTitle>
               {confirmKind === "tag"
                 ? `Untag ${selectedCount} selected photo${selectedCount === 1 ? "" : "s"}?`
-                : `Remove ${selectedCount} photo${selectedCount === 1 ? "" : "s"} from this album?`}
+                : confirmKind === "unsave"
+                  ? `Unsave ${selectedCount} selected photo${selectedCount === 1 ? "" : "s"}?`
+                  : `Remove ${selectedCount} photo${selectedCount === 1 ? "" : "s"} from this album?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmKind === "tag"
                 ? "Detaches the active tag filter from the selection. Photos stay on the wall."
-                : "Removes the selection from this album only. Photos stay on the wall."}
+                : confirmKind === "unsave"
+                  ? "Removes the selection from your Saved list. Photos stay on the wall."
+                  : "Removes the selection from this album only. Photos stay on the wall."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -829,10 +835,15 @@ export function GalleryWallSelectBar({
               disabled={overflowBusy}
               onClick={() => {
                 if (confirmKind === "tag") untagSelected()
+                else if (confirmKind === "unsave") unsaveSelected()
                 else removeSelectedFromAlbum()
               }}
             >
-              {confirmKind === "tag" ? "Untag" : "Remove"}
+              {confirmKind === "tag"
+                ? "Untag"
+                : confirmKind === "unsave"
+                  ? "Unsave"
+                  : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
