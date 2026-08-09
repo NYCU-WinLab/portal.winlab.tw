@@ -16,22 +16,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { updateGalleryImageTakenAt } from "@/app/upload/actions"
 import { gallerySans } from "@/components/gallery-chrome"
-import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
-
-function toTaipeiDateInput(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ""
-  const day = galleryTaipeiCalendarDay(date)
-  const month = String(day.month).padStart(2, "0")
-  const datePart = String(day.day).padStart(2, "0")
-  return `${day.year}-${month}-${datePart}`
-}
-
-function fromTaipeiDateInput(value: string): string {
-  // Noon Taipei so Memories calendar day matches the date picker.
-  return `${value.trim()}T12:00:00+08:00`
-}
+import {
+  fromTaipeiDateInput,
+  toTaipeiDateInput,
+} from "@/lib/gallery/taipei-date-input"
 
 export function TakenAtEditor({
   id,
