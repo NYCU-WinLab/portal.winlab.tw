@@ -5,6 +5,7 @@ import { useState } from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { ShareAlbumButton } from "@/app/_components/share-album-button"
 import {
   galleryPolaroidClass,
   gallerySans,
@@ -61,45 +62,70 @@ function AlbumCoverThumb({ src }: { src: string }) {
   )
 }
 
-export function GalleryAlbumCard({ album }: { album: GalleryAlbumSummary }) {
+export function GalleryAlbumCard({
+  album,
+  showShare = false,
+}: {
+  album: GalleryAlbumSummary
+  showShare?: boolean
+}) {
   const src = coverSrc(album)
 
   return (
-    <Link
-      href={`/albums/${album.slug}`}
-      className="group/polaroid block focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
-    >
-      <figure className={cn(galleryPolaroidClass(), "p-3 pb-4")}>
-        <div className="relative aspect-[4/5] overflow-hidden rounded-[1px] bg-zinc-200/80">
-          {src ? (
-            <AlbumCoverThumb src={src} />
-          ) : (
-            <div
+    <div className="group/polaroid relative">
+      <Link
+        href={`/albums/${album.slug}`}
+        className="block focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+      >
+        <figure className={cn(galleryPolaroidClass(), "p-3 pb-4")}>
+          <div className="relative aspect-[4/5] overflow-hidden rounded-[1px] bg-zinc-200/80">
+            {src ? (
+              <AlbumCoverThumb src={src} />
+            ) : (
+              <div
+                className={cn(
+                  gallerySans(),
+                  "flex h-full items-center justify-center px-4 text-center text-xs text-zinc-500"
+                )}
+              >
+                Empty album
+              </div>
+            )}
+          </div>
+          <figcaption className="mt-3 space-y-1 px-0.5">
+            <p
               className={cn(
-                gallerySans(),
-                "flex h-full items-center justify-center px-4 text-center text-xs text-zinc-500"
+                gallerySerif(),
+                "truncate text-lg leading-tight text-foreground"
               )}
             >
-              Empty album
-            </div>
-          )}
+              {album.title}
+            </p>
+            <p
+              className={cn(gallerySans(), "text-[11px] text-muted-foreground")}
+            >
+              {album.photo_count} photo{album.photo_count === 1 ? "" : "s"}
+              <span aria-hidden> · </span>
+              {album.owner_name}
+            </p>
+          </figcaption>
+        </figure>
+      </Link>
+      {showShare ? (
+        <div
+          className="absolute top-5 right-5 z-10 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within/polaroid:opacity-100 sm:group-hover/polaroid:opacity-100"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <ShareAlbumButton
+            slug={album.slug}
+            title={album.title}
+            variant="icon"
+            label="Copy share link"
+            className="h-8 w-8 bg-white/90 shadow-md"
+          />
         </div>
-        <figcaption className="mt-3 space-y-1 px-0.5">
-          <p
-            className={cn(
-              gallerySerif(),
-              "truncate text-lg leading-tight text-foreground"
-            )}
-          >
-            {album.title}
-          </p>
-          <p className={cn(gallerySans(), "text-[11px] text-muted-foreground")}>
-            {album.photo_count} photo{album.photo_count === 1 ? "" : "s"}
-            <span aria-hidden> · </span>
-            {album.owner_name}
-          </p>
-        </figcaption>
-      </figure>
-    </Link>
+      ) : null}
+    </div>
   )
 }

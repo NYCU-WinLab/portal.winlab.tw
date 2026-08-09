@@ -144,7 +144,24 @@ export async function updateGalleryAlbum(input: {
   }
 
   if (input.coverImageId !== undefined) {
-    patch.cover_image_id = input.coverImageId
+    if (input.coverImageId === null) {
+      patch.cover_image_id = null
+    } else {
+      const { data: member, error: memberError } = await auth.supabase
+        .from("gallery_album_images")
+        .select("image_id")
+        .eq("album_id", input.albumId)
+        .eq("image_id", input.coverImageId)
+        .maybeSingle()
+      if (memberError) return { ok: false, error: memberError.message }
+      if (!member) {
+        return {
+          ok: false,
+          error: "Cover photo must already be in this album.",
+        }
+      }
+      patch.cover_image_id = input.coverImageId
+    }
   }
 
   const { data, error } = await auth.supabase

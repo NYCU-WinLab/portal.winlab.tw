@@ -18,14 +18,21 @@ import {
 import {
   GALLERY_ALBUM_DESCRIPTION_MAX,
   GALLERY_ALBUM_TITLE_MAX,
+  normalizeGalleryAlbumSlug,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
+import {
+  buildGalleryAlbumShareUrl,
+  shareOrCopyAlbumLink,
+} from "@/lib/gallery/album-share"
 
 export function GalleryAlbumCreateForm({ className }: { className?: string }) {
   const router = useRouter()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [pending, startTransition] = useTransition()
+
+  const slugPreview = normalizeGalleryAlbumSlug(title)
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -44,7 +51,22 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
         toast.error(result.error)
         return
       }
-      toast.success(`Album “${result.data.title}” is ready`)
+      const shareUrl = buildGalleryAlbumShareUrl(result.data.slug)
+      try {
+        await shareOrCopyAlbumLink({
+          slug: result.data.slug,
+          title: result.data.title,
+        })
+        toast.success(`Album “${result.data.title}” ready — link copied`, {
+          description: shareUrl ?? undefined,
+        })
+      } catch {
+        toast.success(`Album “${result.data.title}” is ready`, {
+          description: shareUrl
+            ? `Share: ${shareUrl}`
+            : "Open the album to copy its share link.",
+        })
+      }
       setTitle("")
       setDescription("")
       router.push(`/albums/${result.data.slug}`)
@@ -87,9 +109,18 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
           rows={3}
         />
         <p className={cn(gallerySectionLeadClass(), "text-xs")}>
-          Shareable URL becomes{" "}
-          <span className="text-foreground">/albums/&lt;slug&gt;</span> from the
-          title.
+          {slugPreview ? (
+            <>
+              Shareable URL becomes{" "}
+              <span className="text-foreground">/albums/{slugPreview}</span>
+            </>
+          ) : (
+            <>
+              Shareable URL becomes{" "}
+              <span className="text-foreground">/albums/&lt;slug&gt;</span> from
+              the title.
+            </>
+          )}
         </p>
       </div>
       <Button type="submit" disabled={pending}>

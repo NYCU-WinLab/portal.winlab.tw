@@ -6,6 +6,7 @@ import { GalleryAlbumManagePanel } from "@/app/albums/_components/album-manage-p
 import { GalleryAlbumPhotoGrid } from "@/app/albums/_components/album-photo-grid"
 import { DownloadAlbumButton } from "@/app/_components/download-album-button"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
+import { ShareAlbumButton } from "@/app/_components/share-album-button"
 import { GalleryEmptyState, gallerySans } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumBySlug } from "@/lib/gallery/load-albums"
@@ -55,6 +56,14 @@ export async function generateMetadata({
         ? [{ url: ogImage, width: 1200, height: 1500 }]
         : undefined,
     },
+    twitter: {
+      card: "summary_large_image",
+      title: album.title,
+      description:
+        album.description ??
+        `Album curated by ${album.owner_name} on the WinLab gallery wall.`,
+      images: ogImage ? [ogImage] : undefined,
+    },
   }
 }
 
@@ -103,32 +112,37 @@ export default async function GalleryAlbumDetailPage({
               {album.photos.length} photo
               {album.photos.length === 1 ? "" : "s"}
             </span>
-            <span aria-hidden className="text-muted-foreground/50">
-              ·
-            </span>
-            <a
-              href={`/albums/${album.slug}`}
-              className="underline-offset-2 hover:underline"
-            >
-              shareable link
-            </a>
-            {album.photos.length > 0 ? (
-              <>
-                <span aria-hidden className="text-muted-foreground/50">
-                  ·
-                </span>
-                <DownloadAlbumButton
-                  variant="text"
-                  albumTitle={album.title}
-                  items={album.photos.map((photo) => ({
-                    name: photo.name,
-                    image_path: photo.image_path,
-                    position: photo.position,
-                  }))}
-                />
-              </>
-            ) : null}
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <ShareAlbumButton
+              slug={album.slug}
+              title={album.title}
+              emphasize={canManage}
+              label={canManage ? "Copy share link" : "Share album"}
+            />
+            {album.photos.length > 0 ? (
+              <DownloadAlbumButton
+                className={cn(
+                  gallerySans(),
+                  "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+                  "hover:bg-accent hover:text-accent-foreground"
+                )}
+                albumTitle={album.title}
+                items={album.photos.map((photo) => ({
+                  name: photo.name,
+                  image_path: photo.image_path,
+                  position: photo.position,
+                }))}
+              />
+            ) : null}
+          </div>
+          {canManage ? (
+            <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+              Anyone with the link can open{" "}
+              <span className="text-foreground">/albums/{album.slug}</span> —
+              copy it above to share.
+            </p>
+          ) : null}
         </div>
 
         {album.photos.length === 0 ? (

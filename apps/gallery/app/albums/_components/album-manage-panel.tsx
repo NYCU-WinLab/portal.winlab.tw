@@ -34,6 +34,7 @@ import {
   updateGalleryAlbum,
 } from "@/app/actions/albums"
 import { DownloadAlbumButton } from "@/app/_components/download-album-button"
+import { ShareAlbumButton } from "@/app/_components/share-album-button"
 import {
   galleryPanelClass,
   gallerySans,
@@ -66,6 +67,7 @@ export function GalleryAlbumManagePanel({
   const [title, setTitle] = useState(album.title)
   const [description, setDescription] = useState(album.description ?? "")
   const [photos, setPhotos] = useState(album.photos)
+  const [coverImageId, setCoverImageId] = useState(album.cover_image_id)
   const [pending, startTransition] = useTransition()
 
   const photoIds = useMemo(() => photos.map((p) => p.image_id), [photos])
@@ -130,6 +132,24 @@ export function GalleryAlbumManagePanel({
     })
   }
 
+  const setCover = (imageId: string) => {
+    const previous = coverImageId
+    setCoverImageId(imageId)
+    startTransition(async () => {
+      const result = await updateGalleryAlbum({
+        albumId: album.id,
+        coverImageId: imageId,
+      })
+      if (!result.ok) {
+        setCoverImageId(previous)
+        toast.error(result.error)
+        return
+      }
+      toast.success("Cover updated")
+      router.refresh()
+    })
+  }
+
   const onDelete = () => {
     startTransition(async () => {
       const result = await deleteGalleryAlbum(album.id)
@@ -183,6 +203,27 @@ export function GalleryAlbumManagePanel({
             maxLength={GALLERY_ALBUM_DESCRIPTION_MAX}
             disabled={pending}
             rows={3}
+          />
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          gallerySans(),
+          "rounded-md border border-border/60 bg-background/60 px-3 py-2.5 text-xs text-muted-foreground"
+        )}
+      >
+        <p className="font-medium text-foreground">Share this album</p>
+        <p className="mt-0.5">
+          Copy the link and send it — anyone signed into Gallery can open{" "}
+          <span className="text-foreground">/albums/{album.slug}</span>.
+        </p>
+        <div className="mt-2">
+          <ShareAlbumButton
+            slug={album.slug}
+            title={title.trim() || album.title}
+            emphasize
+            disabled={pending}
           />
         </div>
       </div>
@@ -274,6 +315,20 @@ export function GalleryAlbumManagePanel({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending || coverImageId === photo.image_id}
+                    className={cn(
+                      gallerySans(),
+                      "h-8 px-2 text-[11px]",
+                      coverImageId === photo.image_id && "text-foreground"
+                    )}
+                    onClick={() => setCover(photo.image_id)}
+                  >
+                    {coverImageId === photo.image_id ? "Cover" : "Set cover"}
+                  </Button>
                   <Button
                     type="button"
                     size="icon-sm"

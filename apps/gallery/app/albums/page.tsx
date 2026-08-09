@@ -23,10 +23,22 @@ export const metadata: Metadata = {
   description: "Curated photo collections from the WinLab paper wall.",
 }
 
-export default async function GalleryAlbumsPage() {
+type AlbumsPageProps = {
+  searchParams: Promise<{ mine?: string }>
+}
+
+export default async function GalleryAlbumsPage({
+  searchParams,
+}: AlbumsPageProps) {
+  const { mine } = await searchParams
+  const mineOnly = mine === "1" || mine === "true"
   const supabase = await createClient()
   const user = await getCurrentUser()
   const albums = await loadGalleryAlbumSummaries(supabase)
+  const visibleAlbums =
+    mineOnly && user
+      ? albums.filter((album) => album.created_by === user.id)
+      : albums
 
   return (
     <GalleryThemedShell active="albums" signedIn={Boolean(user)}>
@@ -70,28 +82,8 @@ export default async function GalleryAlbumsPage() {
           </p>
         )}
 
-        {albums.length === 0 ? (
-          <GalleryEmptyState
-            title="No albums yet"
-            description={
-              user
-                ? "Name a collection above, then add photos from any lightbox on the wall."
-                : "When lab members curate collections, they will show up here."
-            }
-            action={
-              <Link
-                href="/"
-                className={cn(
-                  gallerySans(),
-                  "text-sm text-foreground underline-offset-2 hover:underline"
-                )}
-              >
-                Back to the wall
-              </Link>
-            }
-          />
-        ) : (
-          <section className="space-y-4">
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
               <p
                 className={cn(
@@ -110,15 +102,64 @@ export default async function GalleryAlbumsPage() {
                 On the shelf
               </h2>
             </div>
+            {user ? (
+              <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+                {mineOnly ? (
+                  <Link
+                    href="/albums"
+                    className="underline-offset-2 hover:underline"
+                  >
+                    Show all albums
+                  </Link>
+                ) : (
+                  <Link
+                    href="/albums?mine=1"
+                    className="underline-offset-2 hover:underline"
+                  >
+                    My albums only
+                  </Link>
+                )}
+              </p>
+            ) : null}
+          </div>
+          {visibleAlbums.length === 0 ? (
+            <GalleryEmptyState
+              title={mineOnly ? "You have no albums yet" : "No albums yet"}
+              description={
+                mineOnly
+                  ? "Create one above, or clear the filter to browse everyone else’s collections."
+                  : user
+                    ? "Name a collection above, then add photos from any lightbox on the wall."
+                    : "When lab members curate collections, they will show up here."
+              }
+              action={
+                <Link
+                  href={mineOnly ? "/albums" : "/"}
+                  className={cn(
+                    gallerySans(),
+                    "text-sm text-foreground underline-offset-2 hover:underline"
+                  )}
+                >
+                  {mineOnly ? "Show all albums" : "Back to the wall"}
+                </Link>
+              }
+            />
+          ) : (
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
-              {albums.map((album) => (
+              {visibleAlbums.map((album) => (
                 <li key={album.id}>
-                  <GalleryAlbumCard album={album} />
+                  <GalleryAlbumCard
+                    album={album}
+                    showShare={
+                      Boolean(user) &&
+                      (user?.id === album.created_by || Boolean(user?.isAdmin))
+                    }
+                  />
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </GalleryThemedShell>
   )
