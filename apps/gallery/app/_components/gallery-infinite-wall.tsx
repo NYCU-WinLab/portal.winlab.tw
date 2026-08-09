@@ -369,6 +369,7 @@ export function GalleryInfiniteWall({
           setSelectionMode(false)
           setSelectedIds(new Set())
         }}
+        onToggleSelectAll={toggleSelectAll}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />

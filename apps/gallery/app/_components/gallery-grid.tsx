@@ -40,6 +40,7 @@ export function GalleryGrid({
   selectedIds,
   onToggleSelected,
   onExitSelectionMode,
+  onToggleSelectAll,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -60,6 +61,7 @@ export function GalleryGrid({
   selectedIds?: ReadonlySet<string>
   onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
   onExitSelectionMode?: () => void
+  onToggleSelectAll?: () => void
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -154,6 +156,11 @@ export function GalleryGrid({
           onExitSelectionMode?.()
           return
         }
+        if (event.key === "a" || event.key === "A") {
+          event.preventDefault()
+          onToggleSelectAll?.()
+          return
+        }
         if (event.key === "j" || event.key === "ArrowRight") {
           event.preventDefault()
           setKeyboardNavActive(true)
@@ -220,6 +227,7 @@ export function GalleryGrid({
     onLoadMore,
     onToggleSelected,
     onExitSelectionMode,
+    onToggleSelectAll,
     openIndex,
     selectionMode,
   ])
