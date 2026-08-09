@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import {
   GALLERY_LIGHTBOX_SHORTCUTS,
+  GALLERY_MANAGE_SHORTCUTS,
   GALLERY_SLIDESHOW_SHORTCUTS,
   GALLERY_WALL_SHORTCUTS,
   isCheatSheetToggleKey,
@@ -56,11 +57,14 @@ function ShortcutTable({
 export function GalleryKeyboardCheatsheet({
   lightboxOpen = false,
   slideshowOpen = false,
+  manage = false,
   dark = false,
   className,
 }: {
   lightboxOpen?: boolean
   slideshowOpen?: boolean
+  /** Use on /upload Manage Select shortcuts. */
+  manage?: boolean
   /** Use on the dark fullscreen slideshow chrome. */
   dark?: boolean
   className?: string
@@ -83,13 +87,17 @@ export function GalleryKeyboardCheatsheet({
     ? GALLERY_SLIDESHOW_SHORTCUTS
     : lightboxOpen
       ? GALLERY_LIGHTBOX_SHORTCUTS
-      : GALLERY_WALL_SHORTCUTS
+      : manage
+        ? GALLERY_MANAGE_SHORTCUTS
+        : GALLERY_WALL_SHORTCUTS
 
   const contextLabel = slideshowOpen
     ? "During slideshow"
     : lightboxOpen
       ? "While viewing a photo"
-      : "On the wall"
+      : manage
+        ? "On Manage (Select mode)"
+        : "On the wall"
 
   return (
     <>
@@ -160,7 +168,7 @@ export function GalleryKeyboardCheatsheet({
             </button>
           </div>
           <ShortcutTable rows={primaryRows} dark={dark} />
-          {!slideshowOpen ? (
+          {!slideshowOpen && !manage ? (
             <div
               className={cn(
                 "mt-4 border-t pt-3",

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  GALLERY_MANAGE_SHORTCUTS,
   GALLERY_SLIDESHOW_SHORTCUTS,
   isCheatSheetToggleKey,
 } from "@/lib/gallery/keyboard-cheatsheet"
@@ -11,6 +12,16 @@ describe("isCheatSheetToggleKey", () => {
     expect(isCheatSheetToggleKey("/", true)).toBe(true)
     expect(isCheatSheetToggleKey("/", false)).toBe(false)
     expect(isCheatSheetToggleKey("a", false)).toBe(false)
+  })
+})
+
+describe("GALLERY_MANAGE_SHORTCUTS", () => {
+  test("covers Select-mode keys", () => {
+    const joined = GALLERY_MANAGE_SHORTCUTS.flatMap((row) => row.keys).join(" ")
+    expect(joined).toContain("A")
+    expect(joined).toContain("Shift+click")
+    expect(joined).toContain("Esc")
+    expect(joined).toContain("?")
   })
 })
 

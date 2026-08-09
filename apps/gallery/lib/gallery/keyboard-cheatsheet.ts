@@ -15,6 +15,14 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
+/** Manage (/upload) Select-mode shortcuts. */
+export const GALLERY_MANAGE_SHORTCUTS: GalleryShortcutRow[] = [
+  { keys: ["A"], action: "Select / clear all visible" },
+  { keys: ["Shift+click"], action: "Range-select from last toggle" },
+  { keys: ["Esc"], action: "Exit Select mode" },
+  { keys: ["?"], action: "Toggle this cheat sheet" },
+]
+
 /** Lightbox shortcuts. */
 export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["←", "→"], action: "Prev / next (sequence, then wall)" },

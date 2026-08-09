@@ -41,6 +41,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { createGalleryAlbumWithImages } from "@/app/actions/albums"
 import { setGalleryImagesPin } from "@/app/actions"
@@ -1145,6 +1146,11 @@ export function UploadManageList({
               : `Select all (${visibleSelectableItems.length})`}
           </button>
         ) : null}
+        <GalleryKeyboardCheatsheet
+          manage
+          slideshowOpen={slideshowOpen}
+          className="ml-auto sm:ml-0"
+        />
       </div>
 
       {selectionMode ? (
