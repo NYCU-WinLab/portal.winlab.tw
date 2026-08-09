@@ -6,9 +6,12 @@ import {
   findSlideshowIndexByImageId,
   flattenMemoryGroupsForSlideshow,
   GALLERY_SLIDESHOW_DEFAULT_MS,
+  GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY,
   nextSlideshowIndex,
   prevSlideshowIndex,
+  readStoredSlideshowIntervalMs,
   wallSelectionToSlideshowPhotos,
+  writeStoredSlideshowIntervalMs,
 } from "@/lib/gallery/slideshow"
 
 describe("clampSlideshowIntervalMs", () => {
@@ -21,6 +24,33 @@ describe("clampSlideshowIntervalMs", () => {
   test("clamps extremes", () => {
     expect(clampSlideshowIntervalMs(100)).toBe(1500)
     expect(clampSlideshowIntervalMs(60_000)).toBe(15_000)
+  })
+})
+
+describe("stored slideshow interval", () => {
+  test("reads and writes through a fake store", () => {
+    const store = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+    }
+
+    expect(readStoredSlideshowIntervalMs(storage)).toBe(
+      GALLERY_SLIDESHOW_DEFAULT_MS
+    )
+    expect(writeStoredSlideshowIntervalMs(2500, storage)).toBe(2500)
+    expect(store.get(GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY)).toBe("2500")
+    expect(readStoredSlideshowIntervalMs(storage)).toBe(2500)
+    expect(writeStoredSlideshowIntervalMs(50, storage)).toBe(1500)
+  })
+
+  test("tolerates null storage", () => {
+    expect(readStoredSlideshowIntervalMs(null)).toBe(
+      GALLERY_SLIDESHOW_DEFAULT_MS
+    )
+    expect(writeStoredSlideshowIntervalMs(3000, null)).toBe(3000)
   })
 })
 

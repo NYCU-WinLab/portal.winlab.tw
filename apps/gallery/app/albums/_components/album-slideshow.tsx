@@ -15,10 +15,11 @@ import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-ch
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
-  clampSlideshowIntervalMs,
   clampSlideshowStartIndex,
   nextSlideshowIndex,
   prevSlideshowIndex,
+  readStoredSlideshowIntervalMs,
+  writeStoredSlideshowIntervalMs,
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -55,8 +56,14 @@ export function AlbumSlideshow({
     if (!open) return
     setIndex(clampSlideshowStartIndex(startIndex, photos.length))
     setPaused(false)
-    setIntervalMs(GALLERY_SLIDESHOW_DEFAULT_MS)
+    setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
   }, [open, startIndex, photos.length])
+
+  const bumpInterval = (delta: number) => {
+    setIntervalMs((ms) =>
+      writeStoredSlideshowIntervalMs(ms + delta, window.localStorage)
+    )
+  }
 
   useEffect(() => {
     if (!open || photos.length < 2) return
@@ -87,12 +94,12 @@ export function AlbumSlideshow({
       }
       if (event.key === "[" || event.key === "-") {
         event.preventDefault()
-        setIntervalMs((ms) => clampSlideshowIntervalMs(ms - 500))
+        bumpInterval(-500)
         return
       }
       if (event.key === "]" || event.key === "=" || event.key === "+") {
         event.preventDefault()
-        setIntervalMs((ms) => clampSlideshowIntervalMs(ms + 500))
+        bumpInterval(500)
         return
       }
       if (
