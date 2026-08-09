@@ -536,10 +536,12 @@ export function UploadManageList({
   images,
   isAdmin = false,
   takenAtAvailable = true,
+  favoritesAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
   takenAtAvailable?: boolean
+  favoritesAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -944,7 +946,7 @@ export function UploadManageList({
   }
 
   const setSelectedFavorites = (saved: boolean) => {
-    if (selectedItems.length === 0 || isPending) return
+    if (!favoritesAvailable || selectedItems.length === 0 || isPending) return
     startTransition(async () => {
       const result = await setGalleryFavorites(
         selectedItems.map((item) => item.id),
@@ -1247,22 +1249,26 @@ export function UploadManageList({
                   Untag
                   {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFavorites(true)}
-                  disabled={isPending || selectedItems.length === 0}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFavorites(false)}
-                  disabled={isPending || selectedItems.length === 0}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
-                >
-                  Unsave
-                </button>
+                {favoritesAvailable ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFavorites(true)}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFavorites(false)}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
+                    >
+                      Unsave
+                    </button>
+                  </>
+                ) : null}
                 {isAdmin ? (
                   <>
                     <button
@@ -1353,18 +1359,22 @@ export function UploadManageList({
                   >
                     Untag
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={isPending || selectedItems.length === 0}
-                    onSelect={() => setSelectedFavorites(true)}
-                  >
-                    Save
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={isPending || selectedItems.length === 0}
-                    onSelect={() => setSelectedFavorites(false)}
-                  >
-                    Unsave
-                  </DropdownMenuItem>
+                  {favoritesAvailable ? (
+                    <>
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => setSelectedFavorites(true)}
+                      >
+                        Save
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => setSelectedFavorites(false)}
+                      >
+                        Unsave
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
                   {isAdmin ? (
                     <>
                       <DropdownMenuItem

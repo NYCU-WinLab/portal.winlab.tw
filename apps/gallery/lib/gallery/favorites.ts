@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 /**
  * Migration not applied yet (or PostgREST schema cache miss) — fail quietly
  * so the wall still loads without a Next.js error overlay.
@@ -25,4 +27,16 @@ export function isGalleryFavoritesUnavailable(
     return true
   }
   return false
+}
+
+/** True when gallery_favorites is queryable (migration applied). */
+export async function isGalleryFavoritesReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_favorites")
+    .select("image_id")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryFavoritesUnavailable(error)
 }

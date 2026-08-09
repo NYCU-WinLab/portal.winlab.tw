@@ -15,6 +15,7 @@ import {
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import type { ManageUploadRow } from "@/lib/gallery/manage-uploads"
 import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
+import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import {
   getGallerySeasonalThemeId,
   isGallerySettingsReady,
@@ -34,8 +35,8 @@ export default async function UploadPage() {
   if (!user) redirect("/auth/login?next=/upload")
 
   const supabase = await createClient()
-  const [imagesWithTakenAt, seasonalThemeId, settingsReady] = await Promise.all(
-    [
+  const [imagesWithTakenAt, seasonalThemeId, settingsReady, favoritesReady] =
+    await Promise.all([
       supabase
         .from("gallery_images")
         .select(MANAGE_SELECT_WITH_TAKEN_AT)
@@ -43,8 +44,8 @@ export default async function UploadPage() {
         .order("created_at", { ascending: false }),
       getGallerySeasonalThemeId(supabase),
       isGallerySettingsReady(supabase),
-    ]
-  )
+      isGalleryFavoritesReady(supabase),
+    ])
 
   let imageRows: ManageUploadRow[] | null =
     (imagesWithTakenAt.data as ManageUploadRow[] | null) ?? null
@@ -119,6 +120,7 @@ export default async function UploadPage() {
               images={myImages}
               isAdmin={user.isAdmin}
               takenAtAvailable={takenAtAvailable}
+              favoritesAvailable={favoritesReady}
             />
           )}
         </section>
