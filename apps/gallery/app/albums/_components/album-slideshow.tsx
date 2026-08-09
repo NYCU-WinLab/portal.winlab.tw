@@ -14,6 +14,7 @@ import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
+  clampSlideshowIntervalMs,
   clampSlideshowStartIndex,
   nextSlideshowIndex,
   prevSlideshowIndex,
@@ -47,11 +48,13 @@ export function AlbumSlideshow({
     clampSlideshowStartIndex(startIndex, photos.length)
   )
   const [paused, setPaused] = useState(false)
+  const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
 
   useEffect(() => {
     if (!open) return
     setIndex(clampSlideshowStartIndex(startIndex, photos.length))
     setPaused(false)
+    setIntervalMs(GALLERY_SLIDESHOW_DEFAULT_MS)
   }, [open, startIndex, photos.length])
 
   useEffect(() => {
@@ -68,9 +71,9 @@ export function AlbumSlideshow({
     if (current?.media_type === "video") return
     const id = window.setInterval(() => {
       setIndex((current) => nextSlideshowIndex(current, photos.length))
-    }, GALLERY_SLIDESHOW_DEFAULT_MS)
+    }, intervalMs)
     return () => window.clearInterval(id)
-  }, [open, paused, photos, index])
+  }, [open, paused, photos, index, intervalMs])
 
   useEffect(() => {
     if (!open) return
@@ -79,6 +82,16 @@ export function AlbumSlideshow({
       if (event.key === " " || event.code === "Space") {
         event.preventDefault()
         setPaused((value) => !value)
+        return
+      }
+      if (event.key === "[" || event.key === "-") {
+        event.preventDefault()
+        setIntervalMs((ms) => clampSlideshowIntervalMs(ms - 500))
+        return
+      }
+      if (event.key === "]" || event.key === "=" || event.key === "+") {
+        event.preventDefault()
+        setIntervalMs((ms) => clampSlideshowIntervalMs(ms + 500))
         return
       }
       if (
@@ -133,6 +146,7 @@ export function AlbumSlideshow({
             >
               {index + 1} / {photos.length}
               {paused ? " · paused" : ""}
+              {` · ${(intervalMs / 1000).toFixed(1)}s`}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -199,7 +213,7 @@ export function AlbumSlideshow({
             "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
           )}
         >
-          {photo.name} · Space pause · ← → step · Esc close
+          {photo.name} · Space pause · [ ] speed · ← → step · Esc close
         </p>
       </DialogContent>
     </Dialog>
