@@ -22,8 +22,10 @@ import {
 /** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
 export function UploadForm({
   videoAvailable = true,
+  sequencesAvailable = true,
 }: {
   videoAvailable?: boolean
+  sequencesAvailable?: boolean
 }) {
   const formRef = useRef<HTMLFormElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -40,7 +42,7 @@ export function UploadForm({
     cancelUpload,
     runUpload,
     retryFailedUploads,
-  } = useGalleryUpload()
+  } = useGalleryUpload({ sequencesAvailable })
 
   const fileNames = selectedFiles.map((file) => file.name)
   const trimmedName = name.trim()
