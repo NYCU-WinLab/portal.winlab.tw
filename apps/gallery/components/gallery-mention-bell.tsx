@@ -28,6 +28,10 @@ import {
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
+  notificationSummary,
+  truncateNotificationBody,
+} from "@/lib/gallery/notification-copy"
+import {
   fetchGalleryActivityNotification,
   fetchGalleryMentionNotification,
   isActivityNotificationsUnavailable,
@@ -35,27 +39,6 @@ import {
   type GalleryNotification,
 } from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/client"
-
-function truncateBody(body: string, max = 72): string {
-  const trimmed = body.trim()
-  if (trimmed.length <= max) return trimmed
-  return `${trimmed.slice(0, max - 1)}…`
-}
-
-function notificationSummary(notification: GalleryNotification): string {
-  const actor = notification.actor_name
-  const work = notification.image_name
-  if (notification.kind === "mention") {
-    return `${actor} mentioned you on ${work}`
-  }
-  if (notification.kind === "reply") {
-    return `${actor} replied to your comment on ${work}`
-  }
-  if (notification.kind === "comment_like") {
-    return `${actor} liked your comment on ${work}`
-  }
-  return `${actor} reacted to ${work}`
-}
 
 export function GalleryMentionBell({
   viewerId,
@@ -359,7 +342,7 @@ export function GalleryMentionBell({
               </span>
               {notification.body ? (
                 <span className="line-clamp-2 text-[11px] text-muted-foreground">
-                  {truncateBody(notification.body)}
+                  {truncateNotificationBody(notification.body)}
                 </span>
               ) : null}
               <span className="text-[10px] text-muted-foreground/80">
