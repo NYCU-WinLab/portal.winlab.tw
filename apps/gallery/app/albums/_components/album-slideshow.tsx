@@ -11,6 +11,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
@@ -150,6 +151,7 @@ export function AlbumSlideshow({
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <GalleryKeyboardCheatsheet slideshowOpen dark />
             <button
               type="button"
               onClick={() => setPaused((value) => !value)}

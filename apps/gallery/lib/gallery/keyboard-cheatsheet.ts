@@ -27,6 +27,16 @@ export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
+/** Album / Memories slideshow shortcuts. */
+export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
+  { keys: ["Space"], action: "Pause / resume" },
+  { keys: ["[", "]"], action: "Slower / faster" },
+  { keys: ["←", "→"], action: "Previous / next slide" },
+  { keys: ["J", "K"], action: "Next / previous (vim)" },
+  { keys: ["Esc"], action: "Close slideshow" },
+  { keys: ["?"], action: "Toggle this cheat sheet" },
+]
+
 export function isCheatSheetToggleKey(key: string, shiftKey: boolean): boolean {
   // "?" comes through as Shift+/ on most layouts; some send key === "?"
   return key === "?" || (key === "/" && shiftKey)
