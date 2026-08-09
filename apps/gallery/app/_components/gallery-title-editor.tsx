@@ -32,6 +32,7 @@ export function GalleryTitleEditor({
 }: GalleryTitleEditorProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
+  const editTriggerRef = useRef<HTMLButtonElement>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const [pending, startTransition] = useTransition()
@@ -45,6 +46,11 @@ export function GalleryTitleEditor({
     return () => window.cancelAnimationFrame(frame)
   }, [editing])
 
+  function endEditing() {
+    setEditing(false)
+    queueMicrotask(() => editTriggerRef.current?.focus())
+  }
+
   function beginEdit() {
     setDraft(name)
     setEditing(true)
@@ -52,7 +58,7 @@ export function GalleryTitleEditor({
 
   function cancel() {
     setDraft(name)
-    setEditing(false)
+    endEditing()
   }
 
   function save() {
@@ -65,7 +71,7 @@ export function GalleryTitleEditor({
       }
       onRenamed?.(result.names)
       toast.success("Title updated")
-      setEditing(false)
+      endEditing()
     })
   }
 
@@ -168,6 +174,7 @@ export function GalleryTitleEditor({
       )}
     >
       <button
+        ref={editTriggerRef}
         type="button"
         onClick={(event) => {
           event.preventDefault()
