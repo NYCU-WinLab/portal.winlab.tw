@@ -160,6 +160,20 @@ export function expandManageSelectionSlideshowPhotos(
   return photos
 }
 
+/** ZIP entries for Manage selection with sequence sibling expansion. */
+export function expandManageSelectionZipItems(
+  orderedSelectedIds: readonly string[],
+  images: readonly ManageSlideshowSource[]
+): Array<{ name: string; image_path: string; position: number }> {
+  return expandManageSelectionSlideshowPhotos(orderedSelectedIds, images).map(
+    (photo, position) => ({
+      name: photo.name,
+      image_path: photo.image_path,
+      position,
+    })
+  )
+}
+
 export function isGalleryTakenAtUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {

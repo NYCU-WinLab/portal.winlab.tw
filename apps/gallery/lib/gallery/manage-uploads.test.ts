@@ -12,6 +12,7 @@ import {
   flattenVisibleManageIds,
   manageSelectionToSlideshowPhotos,
   expandManageSelectionSlideshowPhotos,
+  expandManageSelectionZipItems,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -270,5 +271,13 @@ describe("manageSelectionToSlideshowPhotos", () => {
         (p) => p.image_id
       )
     ).toEqual(["c", "b", "a"])
+  })
+
+  test("maps expanded slides to ZIP positions", () => {
+    expect(expandManageSelectionZipItems(["b", "a"], rows)).toEqual([
+      { name: "C", image_path: "u/c.jpg", position: 0 },
+      { name: "B", image_path: "u/b.jpg", position: 1 },
+      { name: "A", image_path: "u/a.jpg", position: 2 },
+    ])
   })
 })

@@ -92,6 +92,7 @@ import {
   flattenVisibleManageIds,
   manageSelectionToSlideshowPhotos,
   expandManageSelectionSlideshowPhotos,
+  expandManageSelectionZipItems,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
   rowNeedsCaptureDate,
@@ -684,6 +685,10 @@ export function UploadManageList({
   )
   const canSlideshow = selectedSlideshowPhotos.length > 0
   const canStorySlideshow = selectedStorySlideshowPhotos.length > 0
+  const selectedZipCount = useMemo(
+    () => expandManageSelectionZipItems(orderedSelectedIds, images).length,
+    [orderedSelectedIds, images]
+  )
 
   const toggleSelected = (id: string, options?: { shiftKey?: boolean }) => {
     const anchor = selectionAnchorIdRef.current
@@ -753,6 +758,7 @@ export function UploadManageList({
     bulkTagOpen,
     bulkUntagOpen,
     bulkAlbumOpen,
+    slideshowOpen,
     visibleSelectableItems,
   ])
 
@@ -861,17 +867,12 @@ export function UploadManageList({
   }
 
   const downloadSelectedZip = async () => {
-    if (zipBusy || selectedItems.length === 0) return
+    if (zipBusy || orderedSelectedIds.length === 0) return
+    const zipItems = expandManageSelectionZipItems(orderedSelectedIds, images)
+    if (zipItems.length === 0) return
     setZipBusy(true)
-    const toastId = toast.loading(
-      `Preparing selection… 0/${selectedItems.length}`
-    )
+    const toastId = toast.loading(`Preparing selection… 0/${zipItems.length}`)
     try {
-      const zipItems = selectedItems.map((item, position) => ({
-        name: item.name,
-        image_path: item.imagePath,
-        position,
-      }))
       const result = await downloadAlbumZip(zipItems, {
         zipName: buildAlbumZipFilename("manage-selection"),
         onProgress: ({ completed, total }) => {
@@ -1213,13 +1214,13 @@ export function UploadManageList({
                 <button
                   type="button"
                   onClick={() => void downloadSelectedZip()}
-                  disabled={isPending || zipBusy || selectedItems.length === 0}
+                  disabled={isPending || zipBusy || selectedZipCount === 0}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
                   {zipBusy
                     ? "ZIP…"
-                    : selectedItems.length > 0
-                      ? `ZIP (${selectedItems.length})`
+                    : selectedZipCount > 0
+                      ? `ZIP (${selectedZipCount})`
                       : "ZIP"}
                 </button>
                 <button
@@ -1329,12 +1330,10 @@ export function UploadManageList({
                     </DropdownMenuItem>
                   ) : null}
                   <DropdownMenuItem
-                    disabled={
-                      isPending || zipBusy || selectedItems.length === 0
-                    }
+                    disabled={isPending || zipBusy || selectedZipCount === 0}
                     onSelect={() => void downloadSelectedZip()}
                   >
-                    ZIP
+                    {selectedZipCount > 0 ? `ZIP (${selectedZipCount})` : "ZIP"}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={isPending || selectedItems.length === 0}
