@@ -94,7 +94,7 @@ export default async function UploadPage() {
               activeThemeId={seasonalThemeId}
               settingsReady={settingsReady}
             />
-            <TagAdminPanel />
+            {tagsReady ? <TagAdminPanel /> : null}
             <MediaHealthPanel />
           </>
         ) : null}
