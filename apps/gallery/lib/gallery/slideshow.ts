@@ -1,3 +1,5 @@
+import { readStorageItem, writeStorageItem } from "@/lib/gallery/safe-storage"
+
 export const GALLERY_SLIDESHOW_DEFAULT_MS = 4000
 export const GALLERY_SLIDESHOW_MIN_MS = 1500
 export const GALLERY_SLIDESHOW_MAX_MS = 15000
@@ -26,14 +28,9 @@ export function clampSlideshowIntervalMs(raw: number): number {
 export function readStoredSlideshowIntervalMs(
   storage: Pick<Storage, "getItem"> | null | undefined
 ): number {
-  if (!storage) return GALLERY_SLIDESHOW_DEFAULT_MS
-  try {
-    const raw = storage.getItem(GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY)
-    if (raw == null || raw === "") return GALLERY_SLIDESHOW_DEFAULT_MS
-    return clampSlideshowIntervalMs(Number(raw))
-  } catch {
-    return GALLERY_SLIDESHOW_DEFAULT_MS
-  }
+  const raw = readStorageItem(storage, GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY)
+  if (raw == null || raw === "") return GALLERY_SLIDESHOW_DEFAULT_MS
+  return clampSlideshowIntervalMs(Number(raw))
 }
 
 /** Persist an interval preference; returns the clamped value written. */
@@ -42,12 +39,11 @@ export function writeStoredSlideshowIntervalMs(
   storage: Pick<Storage, "setItem"> | null | undefined
 ): number {
   const clamped = clampSlideshowIntervalMs(ms)
-  if (!storage) return clamped
-  try {
-    storage.setItem(GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY, String(clamped))
-  } catch {
-    // private mode / quota — keep the in-memory value anyway
-  }
+  writeStorageItem(
+    storage,
+    GALLERY_SLIDESHOW_INTERVAL_STORAGE_KEY,
+    String(clamped)
+  )
   return clamped
 }
 
