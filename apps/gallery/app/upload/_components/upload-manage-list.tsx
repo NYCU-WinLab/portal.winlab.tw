@@ -1217,7 +1217,10 @@ export function UploadManageList({
             <p className={cn(gallerySans(), "text-sm text-foreground")}>
               {selectedVisibleItems.length === 0
                 ? "Tap works to select"
-                : `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected`}
+                : selectedWallLinkCount > 0 &&
+                    selectedWallLinkCount !== selectedVisibleItems.length
+                  ? `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected · ${selectedWallLinkCount} wall link${selectedWallLinkCount === 1 ? "" : "s"}`
+                  : `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button
