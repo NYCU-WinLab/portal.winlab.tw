@@ -265,6 +265,9 @@ export function GalleryLightboxSocialAside({
   isSignedIn,
   isAdmin,
   pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
   isOwner = false,
   viewerId,
   viewerName,
@@ -295,6 +298,9 @@ export function GalleryLightboxSocialAside({
   isSignedIn: boolean
   isAdmin: boolean
   pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
   isOwner?: boolean
   viewerId: string | null
   viewerName: string
@@ -489,12 +495,14 @@ export function GalleryLightboxSocialAside({
             </div>
           ) : null}
         </div>
-        <GalleryImageTags
-          key={activeItem?.id ?? image.id}
-          imageId={activeItem?.id ?? image.id}
-          tags={activeItem?.tags ?? image.tags ?? []}
-          canEdit={isSignedIn}
-        />
+        {tagsAvailable ? (
+          <GalleryImageTags
+            key={activeItem?.id ?? image.id}
+            imageId={activeItem?.id ?? image.id}
+            tags={activeItem?.tags ?? image.tags ?? []}
+            canEdit={isSignedIn}
+          />
+        ) : null}
         {isAdmin && pinAvailable ? (
           <div className="gallery-lightbox-aside-pin flex justify-end">
             <PinWallButton
@@ -507,12 +515,16 @@ export function GalleryLightboxSocialAside({
         ) : null}
         {isSignedIn ? (
           <div className="flex flex-wrap items-center gap-2">
-            <FavoritePhotoButton
-              imageId={image.id}
-              initialFavorited={favorited ?? Boolean(image.is_favorited)}
-              onChanged={onFavoritedChange}
-            />
-            <GalleryAddToAlbum imageIds={[activeItem?.id ?? image.id]} />
+            {favoritesAvailable ? (
+              <FavoritePhotoButton
+                imageId={image.id}
+                initialFavorited={favorited ?? Boolean(image.is_favorited)}
+                onChanged={onFavoritedChange}
+              />
+            ) : null}
+            {albumsAvailable ? (
+              <GalleryAddToAlbum imageIds={[activeItem?.id ?? image.id]} />
+            ) : null}
           </div>
         ) : null}
         <ReactionBar

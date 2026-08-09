@@ -71,6 +71,9 @@ export function GalleryCard({
   members,
   isAdmin = false,
   pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
@@ -92,6 +95,9 @@ export function GalleryCard({
   members: GalleryMember[]
   isAdmin?: boolean
   pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
@@ -660,6 +666,9 @@ export function GalleryCard({
                   isSignedIn={isSignedIn}
                   isAdmin={isAdmin}
                   pinAvailable={pinAvailable}
+                  favoritesAvailable={favoritesAvailable}
+                  albumsAvailable={albumsAvailable}
+                  tagsAvailable={tagsAvailable}
                   isOwner={isOwner}
                   viewerId={viewerId}
                   viewerName={viewerName}

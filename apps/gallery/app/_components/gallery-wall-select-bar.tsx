@@ -60,6 +60,9 @@ export function GalleryWallSelectBar({
   isSignedIn,
   isAdmin = false,
   pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
   selectedIds,
   selectedZipItems = [],
   selectedSlideshowPhotos = [],
@@ -83,6 +86,9 @@ export function GalleryWallSelectBar({
   isSignedIn: boolean
   isAdmin?: boolean
   pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
   selectedIds: string[]
   /** Ordered covers for ZIP download (name + storage path). */
   selectedZipItems?: Array<{
@@ -296,7 +302,13 @@ export function GalleryWallSelectBar({
   }
 
   const saveSelected = () => {
-    if (selectedIds.length === 0 || pending || saveOpenBusy) return
+    if (
+      !favoritesAvailable ||
+      selectedIds.length === 0 ||
+      pending ||
+      saveOpenBusy
+    )
+      return
     setSaveOpenBusy(true)
     startTransition(async () => {
       const result = await setGalleryFavorites(selectedIds, true)
@@ -311,7 +323,13 @@ export function GalleryWallSelectBar({
   }
 
   const unsaveSelected = () => {
-    if (selectedIds.length === 0 || pending || saveOpenBusy) return
+    if (
+      !favoritesAvailable ||
+      selectedIds.length === 0 ||
+      pending ||
+      saveOpenBusy
+    )
+      return
     setSaveOpenBusy(true)
     startTransition(async () => {
       const result = await setGalleryFavorites(selectedIds, false)
@@ -499,32 +517,36 @@ export function GalleryWallSelectBar({
                 </Button>
                 {isSignedIn ? (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(
-                        gallerySans(),
-                        "h-8 gap-1.5 text-[11px] uppercase"
-                      )}
-                      onClick={saveSelected}
-                    >
-                      <IconBookmark className="size-3.5" aria-hidden />
-                      {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
-                    </Button>
-                    <GalleryAddToAlbum
-                      imageIds={selectedIds}
-                      triggerLabel={
-                        selectedCount > 0
-                          ? `Add ${selectedCount}`
-                          : "Add to album"
-                      }
-                      onAdded={() => {
-                        onAdded?.()
-                        onClear()
-                      }}
-                    />
+                    {favoritesAvailable ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={selectedCount === 0 || pending}
+                        className={cn(
+                          gallerySans(),
+                          "h-8 gap-1.5 text-[11px] uppercase"
+                        )}
+                        onClick={saveSelected}
+                      >
+                        <IconBookmark className="size-3.5" aria-hidden />
+                        {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
+                      </Button>
+                    ) : null}
+                    {albumsAvailable ? (
+                      <GalleryAddToAlbum
+                        imageIds={selectedIds}
+                        triggerLabel={
+                          selectedCount > 0
+                            ? `Add ${selectedCount}`
+                            : "Add to album"
+                        }
+                        onAdded={() => {
+                          onAdded?.()
+                          onClear()
+                        }}
+                      />
+                    ) : null}
                   </>
                 ) : (
                   <Button
@@ -544,7 +566,7 @@ export function GalleryWallSelectBar({
                 )}
               </div>
 
-              {tagFormOpen ? (
+              {tagFormOpen && tagsAvailable ? (
                 <form
                   onSubmit={tagSelected}
                   className="flex shrink-0 items-center gap-1.5"
@@ -591,7 +613,7 @@ export function GalleryWallSelectBar({
                 </form>
               ) : null}
 
-              {albumFormOpen ? (
+              {albumFormOpen && albumsAvailable ? (
                 <form
                   onSubmit={createAlbumFromSelection}
                   className="flex shrink-0 items-center gap-1.5"
@@ -673,25 +695,29 @@ export function GalleryWallSelectBar({
                     ) : null}
                     {isSignedIn ? (
                       <>
-                        <DropdownMenuItem
-                          disabled={overflowBusy}
-                          onSelect={() => {
-                            setAlbumFormOpen(false)
-                            setTagFormOpen(true)
-                          }}
-                        >
-                          Tag…
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={overflowBusy}
-                          onSelect={() => {
-                            setTagFormOpen(false)
-                            setAlbumFormOpen(true)
-                          }}
-                        >
-                          New album…
-                        </DropdownMenuItem>
-                        {savedFilterActive ? (
+                        {tagsAvailable ? (
+                          <DropdownMenuItem
+                            disabled={overflowBusy}
+                            onSelect={() => {
+                              setAlbumFormOpen(false)
+                              setTagFormOpen(true)
+                            }}
+                          >
+                            Tag…
+                          </DropdownMenuItem>
+                        ) : null}
+                        {albumsAvailable ? (
+                          <DropdownMenuItem
+                            disabled={overflowBusy}
+                            onSelect={() => {
+                              setTagFormOpen(false)
+                              setAlbumFormOpen(true)
+                            }}
+                          >
+                            New album…
+                          </DropdownMenuItem>
+                        ) : null}
+                        {savedFilterActive && favoritesAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
                             onSelect={() => unsaveSelected()}
@@ -699,7 +725,7 @@ export function GalleryWallSelectBar({
                             Unsave
                           </DropdownMenuItem>
                         ) : null}
-                        {albumFilterSlug ? (
+                        {albumFilterSlug && albumsAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
                             onSelect={() => removeSelectedFromAlbum()}
@@ -707,7 +733,7 @@ export function GalleryWallSelectBar({
                             Remove from album
                           </DropdownMenuItem>
                         ) : null}
-                        {tagFilterSlug ? (
+                        {tagFilterSlug && tagsAvailable ? (
                           <DropdownMenuItem
                             disabled={overflowBusy}
                             onSelect={() => untagSelected()}

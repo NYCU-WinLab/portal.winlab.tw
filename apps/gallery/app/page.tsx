@@ -9,6 +9,8 @@ import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { GalleryMemoriesTeaser } from "@/app/_components/gallery-memories-teaser"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
 import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
@@ -23,7 +25,10 @@ import {
 } from "@/lib/gallery/og-metadata"
 import { resolveGalleryPhotoDeepLink } from "@/lib/gallery/photo-deep-link"
 import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
-import { isGalleryTagsUnavailable } from "@/lib/gallery/tags"
+import {
+  isGalleryTagsReady,
+  isGalleryTagsUnavailable,
+} from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -107,6 +112,9 @@ export default async function GalleryHomePage({
     popularTagsResult,
     memoriesResult,
     pinAvailable,
+    favoritesAvailable,
+    albumsAvailable,
+    tagsAvailable,
   ] = await Promise.all([
     loadGalleryHomePages(supabase, {
       throughPage,
@@ -120,6 +128,9 @@ export default async function GalleryHomePage({
       limit: 12,
     }),
     isGalleryPinReady(supabase),
+    isGalleryFavoritesReady(supabase),
+    isGalleryAlbumsReady(supabase),
+    isGalleryTagsReady(supabase),
   ])
   const memoryPhotos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
@@ -190,6 +201,9 @@ export default async function GalleryHomePage({
               members={members}
               isAdmin={user?.isAdmin ?? false}
               pinAvailable={pinAvailable}
+              favoritesAvailable={favoritesAvailable}
+              albumsAvailable={albumsAvailable}
+              tagsAvailable={tagsAvailable}
             />
           }
         >
@@ -214,6 +228,9 @@ export default async function GalleryHomePage({
             members={members}
             isAdmin={user?.isAdmin ?? false}
             pinAvailable={pinAvailable}
+            favoritesAvailable={favoritesAvailable}
+            albumsAvailable={albumsAvailable}
+            tagsAvailable={tagsAvailable}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />

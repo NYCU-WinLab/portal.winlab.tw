@@ -29,6 +29,9 @@ export function GalleryGrid({
   members,
   isAdmin = false,
   pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
   openPhotoId = null,
   openCommentId = null,
   hasMore = false,
@@ -51,6 +54,9 @@ export function GalleryGrid({
   members: GalleryMember[]
   isAdmin?: boolean
   pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
   openPhotoId?: string | null
   openCommentId?: string | null
   hasMore?: boolean
@@ -306,6 +312,9 @@ export function GalleryGrid({
               members={members}
               isAdmin={isAdmin}
               pinAvailable={pinAvailable}
+              favoritesAvailable={favoritesAvailable}
+              albumsAvailable={albumsAvailable}
+              tagsAvailable={tagsAvailable}
               priorityLcp={index === 0}
               initialOpen={false}
               highlightCommentId={
