@@ -255,34 +255,38 @@ function UploadListItem({
         data-manage-actions
         onClick={(event) => event.stopPropagation()}
       >
-        {isAdmin && showWallPin ? (
-          <PinWallButton
-            imageId={wallPhotoId}
-            pinnedAt={image.pinned_at}
-            navigateHomeOnPin
-          />
-        ) : null}
-        <ViewOnWallLink photoId={wallPhotoId} name={image.name} />
-        {takenAtAvailable ? (
-          <TakenAtEditor
-            id={image.id}
-            takenAt={takenAt}
-            createdAt={image.created_at}
-            imageName={image.name}
-            hintUploadDay={uploadDayHint}
-            onUpdated={setTakenAt}
-          />
-        ) : null}
-        {tagsAvailable ? (
-          <ManageTagsEditor imageId={image.id} imageName={image.name} />
-        ) : null}
-        <RenameButton id={image.id} name={image.name} />
-        <DeleteButton
-          id={image.id}
-          imagePath={image.image_path}
-          posterPath={image.poster_path}
-          name={image.name}
-        />
+        {selectionMode ? null : (
+          <>
+            {isAdmin && showWallPin ? (
+              <PinWallButton
+                imageId={wallPhotoId}
+                pinnedAt={image.pinned_at}
+                navigateHomeOnPin
+              />
+            ) : null}
+            <ViewOnWallLink photoId={wallPhotoId} name={image.name} />
+            {takenAtAvailable ? (
+              <TakenAtEditor
+                id={image.id}
+                takenAt={takenAt}
+                createdAt={image.created_at}
+                imageName={image.name}
+                hintUploadDay={uploadDayHint}
+                onUpdated={setTakenAt}
+              />
+            ) : null}
+            {tagsAvailable ? (
+              <ManageTagsEditor imageId={image.id} imageName={image.name} />
+            ) : null}
+            <RenameButton id={image.id} name={image.name} />
+            <DeleteButton
+              id={image.id}
+              imagePath={image.image_path}
+              posterPath={image.poster_path}
+              name={image.name}
+            />
+          </>
+        )}
       </div>
     </li>
   )
@@ -465,7 +469,7 @@ function UploadSequenceGroup({
           />
         ) : null}
       </div>
-      {gapLabel ? (
+      {gapLabel && !selectionMode ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className={cn(gallerySans(), "text-xs text-amber-800")}>
             Incomplete · {gapLabel}
@@ -508,58 +512,65 @@ function UploadSequenceGroup({
               tagsAvailable={tagsAvailable}
               sequenceIndex={index}
               reorderHandle={
-                <button
-                  type="button"
-                  aria-label={`Reorder ${image.name}`}
-                  disabled={isPending || selectionMode}
-                  className={cn(
-                    "inline-flex size-11 shrink-0 touch-none items-center justify-center rounded-md",
-                    "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                    "disabled:opacity-40"
-                  )}
-                  onPointerDown={(event) => onHandlePointerDown(index, event)}
-                  onPointerMove={onHandlePointerMove}
-                  onPointerUp={onHandlePointerUp}
-                  onPointerCancel={onHandlePointerCancel}
-                >
-                  <IconGripVertical className="size-5" aria-hidden />
-                </button>
+                selectionMode ? null : (
+                  <button
+                    type="button"
+                    aria-label={`Reorder ${image.name}`}
+                    disabled={isPending}
+                    className={cn(
+                      "inline-flex size-11 shrink-0 touch-none items-center justify-center rounded-md",
+                      "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      "disabled:opacity-40"
+                    )}
+                    onPointerDown={(event) => onHandlePointerDown(index, event)}
+                    onPointerMove={onHandlePointerMove}
+                    onPointerUp={onHandlePointerUp}
+                    onPointerCancel={onHandlePointerCancel}
+                  >
+                    <IconGripVertical className="size-5" aria-hidden />
+                  </button>
+                )
               }
               sequenceControls={
-                <>
-                  {image.sequence_index === 0 ? (
-                    <span
-                      className={cn(galleryPillClass(), "pointer-events-none")}
-                    >
-                      Cover
-                    </span>
-                  ) : (
+                selectionMode ? undefined : (
+                  <>
+                    {image.sequence_index === 0 ? (
+                      <span
+                        className={cn(
+                          galleryPillClass(),
+                          "pointer-events-none"
+                        )}
+                      >
+                        Cover
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => setCover(index)}
+                        className={galleryPillClass()}
+                      >
+                        Set cover
+                      </button>
+                    )}
                     <button
                       type="button"
-                      disabled={isPending}
-                      onClick={() => setCover(index)}
+                      disabled={isPending || index === 0}
+                      onClick={() => move(index, index - 1)}
                       className={galleryPillClass()}
                     >
-                      Set cover
+                      Up
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={isPending || index === 0}
-                    onClick={() => move(index, index - 1)}
-                    className={galleryPillClass()}
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || index === items.length - 1}
-                    onClick={() => move(index, index + 1)}
-                    className={galleryPillClass()}
-                  >
-                    Down
-                  </button>
-                </>
+                    <button
+                      type="button"
+                      disabled={isPending || index === items.length - 1}
+                      onClick={() => move(index, index + 1)}
+                      className={galleryPillClass()}
+                    >
+                      Down
+                    </button>
+                  </>
+                )
               }
             />
           )
