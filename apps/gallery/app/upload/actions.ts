@@ -7,6 +7,7 @@ import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
 import {
   isGallerySequenceUnavailable,
   isGalleryTakenAtUnavailable,
+  isGalleryVideoColumnsUnavailable,
 } from "@/lib/gallery/manage-uploads"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import {
@@ -229,6 +230,34 @@ export async function registerGalleryImage(
     const retry = await supabase
       .from("gallery_images")
       .insert(withoutSequence)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
+
+  // Soft-fail: video columns missing — images peel fields; videos abort.
+  if (insertError && isGalleryVideoColumnsUnavailable(insertError)) {
+    if (input.mediaType === "video") {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      return {
+        ok: false,
+        error:
+          "Video uploads are not available yet — apply the gallery video migration.",
+      }
+    }
+    const {
+      media_type: _mediaType,
+      poster_path: _posterPath,
+      duration_seconds: _duration,
+      ...withoutVideo
+    } = insertPayload
+    void _mediaType
+    void _posterPath
+    void _duration
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutVideo)
       .select("id")
       .single()
     inserted = retry.data

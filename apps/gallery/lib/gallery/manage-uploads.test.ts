@@ -17,6 +17,7 @@ import {
   pruneManageSelectionIds,
   isGalleryPinnedAtUnavailable,
   isGallerySequenceUnavailable,
+  isGalleryVideoColumnsUnavailable,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -344,6 +345,26 @@ describe("isGallerySequenceUnavailable", () => {
       isGallerySequenceUnavailable({
         code: "PGRST204",
         message: "Could not find the 'pinned_at' column",
+      })
+    ).toBe(false)
+  })
+})
+
+describe("isGalleryVideoColumnsUnavailable", () => {
+  test("detects missing media_type column", () => {
+    expect(
+      isGalleryVideoColumnsUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'media_type' column in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores unrelated errors", () => {
+    expect(
+      isGalleryVideoColumnsUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'taken_at' column",
       })
     ).toBe(false)
   })

@@ -271,6 +271,23 @@ export function isGallerySequenceUnavailable(
   )
 }
 
+/** True when gallery video columns (media_type / poster / duration) are missing. */
+export function isGalleryVideoColumnsUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  if (!/media_type|poster_path|duration_seconds/i.test(message)) return false
+  return (
+    code === "PGRST204" ||
+    code === "42703" ||
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find/i.test(message)
+  )
+}
+
 /** True when gallery_images.pinned_at is selectable (pin migration applied). */
 export async function isGalleryPinReady(
   supabase: SupabaseClient
