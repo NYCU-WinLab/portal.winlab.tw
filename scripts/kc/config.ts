@@ -5,8 +5,10 @@
 //
 //   cli  — view-users only. The default. What this machine and any coding
 //          agent uses. A leak cannot mutate the realm.
-//   app  — manage-users. The same credential the deployed portal uses for
-//          /profile self-service edits. Only reachable via `--profile app`.
+//   app  — manage-users. Admin tooling only (e.g. `kc import-attributes`).
+//          The deployed portal does NOT use this, and must not: it reads with
+//          a view-users-only client and sends /profile edits to Keycloak's own
+//          Account Console. Only reachable via `--profile app`.
 //
 // Nothing here ever returns a secret to a caller that wants to print it —
 // use `redactor()` on any string headed for stdout.
