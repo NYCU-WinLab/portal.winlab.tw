@@ -371,11 +371,27 @@ export function GalleryCard({
                   {thumbFailed ? (
                     <div
                       className={cn(
-                        "mx-2.5 mt-2.5 flex items-center justify-center bg-muted/80 px-4 text-center text-xs text-muted-foreground",
+                        "mx-2.5 mt-2.5 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-4 text-center shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
                         frame.aspectClass
                       )}
                     >
-                      Preview unavailable
+                      <Image
+                        src="/icons/mark.png"
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="size-9 object-contain opacity-40 grayscale"
+                        draggable={false}
+                        unoptimized
+                      />
+                      <span
+                        className={cn(
+                          gallerySans(),
+                          "text-[11px] tracking-wide text-zinc-500/90"
+                        )}
+                      >
+                        Preview unavailable
+                      </span>
                     </div>
                   ) : (
                     <div
