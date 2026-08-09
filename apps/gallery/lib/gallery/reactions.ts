@@ -72,6 +72,38 @@ export function formatReactionSummary(counts: ReactionCounts): string {
     .join(" · ")
 }
 
+/**
+ * Coerce the `{ reaction: count }` jsonb the gallery_wall_page view returns into
+ * a fully-populated ReactionCounts. Unknown keys are dropped and negative /
+ * non-integer counts are floored to a safe non-negative integer.
+ */
+export function normalizeReactionCounts(input: unknown): ReactionCounts {
+  const counts = buildEmptyCounts()
+  if (!input || typeof input !== "object") return counts
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!isGalleryReaction(key)) continue
+    const n = typeof value === "number" ? value : Number(value)
+    counts[key] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  }
+  return counts
+}
+
+/**
+ * Coerce the `{ reaction: [name, ...] }` jsonb the gallery_wall_page view
+ * returns into a fully-populated ReactionNames. Unknown keys and non-string
+ * entries are dropped; a missing key becomes an empty array.
+ */
+export function normalizeReactionNames(input: unknown): ReactionNames {
+  const names = buildEmptyNames()
+  if (!input || typeof input !== "object") return names
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!isGalleryReaction(key)) continue
+    if (!Array.isArray(value)) continue
+    names[key] = value.filter((v): v is string => typeof v === "string")
+  }
+  return names
+}
+
 type VoteRow = { image_id: string; user_id: string; reaction: string }
 
 export function aggregateReactions(

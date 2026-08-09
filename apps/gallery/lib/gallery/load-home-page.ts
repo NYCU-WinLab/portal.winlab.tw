@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { findSequenceGaps } from "@/lib/gallery/manage-uploads"
@@ -7,10 +7,18 @@ import {
   EMPTY_REACTION_NAMES,
   aggregateReactions,
   isGalleryReaction,
+  normalizeReactionCounts,
+  normalizeReactionNames,
 } from "@/lib/gallery/reactions"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
+
+const COVER_COLUMNS =
+  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index"
+
+// gallery_wall_page = gallery_wall_covers + reaction/comment aggregates.
+const WALL_PAGE_COLUMNS = `${COVER_COLUMNS}, uploader_name, reaction_counts, reaction_names, my_reaction, comment_count`
 
 type ProfileRow = {
   id: string
@@ -30,6 +38,68 @@ type CoverRow = {
   pinned_at: string | null
   sequence_id: string | null
   sequence_index: number | null
+}
+
+type WallPageRow = CoverRow & {
+  uploader_name: string | null
+  reaction_counts: unknown
+  reaction_names: unknown
+  my_reaction: string | null
+  comment_count: number | null
+}
+
+// Non-recursive shape of the query-builder methods we chain here. Kept flat
+// (methods return WallFilterable, not the self-type) so TS doesn't try to
+// re-instantiate the full PostgREST builder generic against itself.
+type WallFilterable = {
+  eq(column: string, value: string): WallFilterable
+  gte(column: string, value: string): WallFilterable
+  ilike(column: string, value: string): WallFilterable
+}
+
+/**
+ * Apply the shared wall filters (uploader / media / after / query). Typed
+ * against the flat WallFilterable shape so TS never re-instantiates the full
+ * PostgREST builder generic; callers cast the result back to their builder.
+ */
+function applyWallFilters(
+  query: WallFilterable,
+  filters: GalleryHomeFilters
+): WallFilterable {
+  let next = query
+  if (filters.uploaderId) {
+    next = next.eq("created_by", filters.uploaderId)
+  }
+  if (filters.media === "image" || filters.media === "video") {
+    next = next.eq("media_type", filters.media)
+  }
+  if (filters.uploadedAfter) {
+    next = next.gte("created_at", filters.uploadedAfter)
+  }
+  if (filters.query) {
+    next = next.ilike("name", `%${filters.query}%`)
+  }
+  return next
+}
+
+// Unconstrained passthrough: keeps the caller's builder type while routing the
+// value through applyWallFilters. The unknown casts stop TS from structurally
+// comparing the (deeply recursive) PostgREST builder against WallFilterable.
+function withWallFilters<T>(query: T, filters: GalleryHomeFilters): T {
+  return applyWallFilters(
+    query as unknown as WallFilterable,
+    filters
+  ) as unknown as T
+}
+
+/** Missing relation (42P01) — the aggregate view has not been applied yet. */
+function isMissingWallPageView(error: PostgrestError | null): boolean {
+  if (!error) return false
+  return (
+    error.code === "42P01" ||
+    /gallery_wall_page/i.test(error.message) ||
+    /does not exist/i.test(error.message)
+  )
 }
 
 function buildNameById(rows: ProfileRow[]): Map<string, string> {
@@ -63,24 +133,195 @@ function buildCommentCountByImage(
   return counts
 }
 
-async function loadGalleryHomeRange(
-  supabase: SupabaseClient,
-  {
-    from,
-    to,
-    userId,
-    filters,
-  }: {
-    from: number
-    to: number
-    userId: string | null
-    filters: GalleryHomeFilters
+function toGalleryImageBase(image: CoverRow): GalleryImage {
+  return {
+    id: image.id,
+    name: image.name,
+    image_path: image.image_path,
+    media_type: image.media_type === "video" ? "video" : "image",
+    poster_path: image.poster_path ?? null,
+    duration_seconds: image.duration_seconds ?? null,
+    created_by: image.created_by,
+    created_at: image.created_at,
+    pinned_at: image.pinned_at ?? null,
+    sequence_id: image.sequence_id ?? null,
+    sequence_index:
+      typeof image.sequence_index === "number" ? image.sequence_index : null,
+    sequence_count: 1,
+    sequence_items: [],
+    sequence_missing_indexes: [],
+    comments: [],
+    comment_count: 0,
+    uploader_name: "Unknown",
+    reaction_counts: EMPTY_REACTION_COUNTS,
+    my_reaction: null,
+    reaction_names: EMPTY_REACTION_NAMES,
   }
-): Promise<{
+}
+
+/**
+ * Load the sibling rows of every sequence referenced by the cover rows, keyed
+ * by sequence_id. Multi-item sequences need their members for the lightbox.
+ */
+async function loadSequenceRowsById(
+  supabase: SupabaseClient,
+  coverRows: Pick<CoverRow, "sequence_id">[]
+): Promise<Map<string, CoverRow[]>> {
+  const sequenceIds = Array.from(
+    new Set(
+      coverRows
+        .map((image) => image.sequence_id)
+        .filter((id): id is string => typeof id === "string")
+    )
+  )
+
+  const sequenceRowsById = new Map<string, CoverRow[]>()
+  if (sequenceIds.length === 0) return sequenceRowsById
+
+  const { data: sequenceRows, error: sequenceError } = await supabase
+    .from("gallery_images")
+    .select(COVER_COLUMNS)
+    .in("sequence_id", sequenceIds)
+    .order("sequence_index", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (sequenceError) {
+    console.error("[gallery] failed to load sequence rows", sequenceError)
+    return sequenceRowsById
+  }
+
+  for (const row of (sequenceRows ?? []) as CoverRow[]) {
+    const sequenceId = row.sequence_id
+    if (!sequenceId) continue
+    const bucket = sequenceRowsById.get(sequenceId) ?? []
+    bucket.push(row)
+    sequenceRowsById.set(sequenceId, bucket)
+  }
+  return sequenceRowsById
+}
+
+/** Fill in sequence_count / sequence_items / gaps from the sibling rows. */
+function expandSequences(
+  images: GalleryImage[],
+  sequenceRowsById: Map<string, CoverRow[]>
+): void {
+  for (const image of images) {
+    if (!image.sequence_id) continue
+    const items = sequenceRowsById.get(image.sequence_id) ?? []
+    if (items.length === 0) continue
+    image.sequence_count = items.length
+    image.sequence_missing_indexes = findSequenceGaps(
+      items.map((item) => item.sequence_index)
+    ).gaps
+    if (items.length <= 1) continue
+    image.sequence_items = items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      image_path: item.image_path,
+      media_type: item.media_type === "video" ? "video" : "image",
+      poster_path: item.poster_path ?? null,
+      created_at: item.created_at,
+      sequence_index:
+        typeof item.sequence_index === "number" ? item.sequence_index : null,
+    }))
+  }
+}
+
+type RangeResult = {
   images: GalleryImage[]
   members: GalleryMember[]
   totalCount: number
-}> {
+}
+
+type RangeArgs = {
+  from: number
+  to: number
+  userId: string | null
+  filters: GalleryHomeFilters
+}
+
+/**
+ * Fast path: one query against the gallery_wall_page view (covers + reaction
+ * counts + reaction names + viewer reaction + comment count) plus a cheap
+ * head-only count and, for signed-in viewers, the member roster. Reaction and
+ * comment aggregation happens in Postgres, so the payload scales with covers,
+ * not with engagement.
+ */
+async function loadGalleryHomeRangeViaView(
+  supabase: SupabaseClient,
+  { from, to, userId, filters }: RangeArgs
+): Promise<RangeResult | null> {
+  const rowsBase = supabase.from("gallery_wall_page").select(WALL_PAGE_COLUMNS)
+  const rowsQuery = withWallFilters(rowsBase, filters)
+    .order("pinned_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .range(from, to)
+
+  const countBase = supabase
+    .from("gallery_wall_covers")
+    .select("id", { count: "exact", head: true })
+  const countQuery = withWallFilters(countBase, filters)
+
+  const [rowsResult, countResult, membersResult] = await Promise.all([
+    rowsQuery,
+    countQuery,
+    userId
+      ? supabase
+          .from("user_profiles")
+          .select("id, name")
+          .order("name", { ascending: true })
+      : Promise.resolve({ data: [] as ProfileRow[], error: null }),
+  ])
+
+  if (rowsResult.error) {
+    if (isMissingWallPageView(rowsResult.error)) return null
+    console.error("[gallery] failed to load wall page", rowsResult.error)
+    throw new Error(rowsResult.error.message || "Failed to load gallery.")
+  }
+  if (countResult.error) {
+    console.error("[gallery] failed to count wall covers", countResult.error)
+  }
+  if (membersResult.error) {
+    console.error("[gallery] failed to load members", membersResult.error)
+  }
+
+  const rows = (rowsResult.data ?? []) as WallPageRow[]
+  const sequenceRowsById = await loadSequenceRowsById(supabase, rows)
+
+  const images: GalleryImage[] = rows.map((row) => {
+    const base = toGalleryImageBase(row)
+    base.uploader_name = row.uploader_name?.trim() || "Unknown"
+    base.comment_count =
+      typeof row.comment_count === "number" ? row.comment_count : 0
+    base.reaction_counts = normalizeReactionCounts(row.reaction_counts)
+    base.reaction_names = normalizeReactionNames(row.reaction_names)
+    base.my_reaction =
+      typeof row.my_reaction === "string" && isGalleryReaction(row.my_reaction)
+        ? row.my_reaction
+        : null
+    return base
+  })
+
+  expandSequences(images, sequenceRowsById)
+
+  return {
+    images,
+    members: userId
+      ? buildMembers((membersResult.data ?? []) as ProfileRow[])
+      : [],
+    totalCount: countResult.count ?? 0,
+  }
+}
+
+/**
+ * Fallback path (pre-migration): fetch covers, then every vote and comment row
+ * for the page, and reduce them in JS. Kept so the wall keeps working before
+ * the gallery_wall_page view is applied.
+ */
+async function loadGalleryHomeRangeLegacy(
+  supabase: SupabaseClient,
+  { from, to, userId, filters }: RangeArgs
+): Promise<RangeResult> {
   const [profilesResult, imagesResult] = await Promise.all([
     userId
       ? supabase
@@ -89,27 +330,10 @@ async function loadGalleryHomeRange(
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     (() => {
-      let query = supabase
+      const base = supabase
         .from("gallery_wall_covers")
-        .select(
-          "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, pinned_at, sequence_id, sequence_index",
-          { count: "exact" }
-        )
-
-      if (filters.uploaderId) {
-        query = query.eq("created_by", filters.uploaderId)
-      }
-      if (filters.media === "image" || filters.media === "video") {
-        query = query.eq("media_type", filters.media)
-      }
-      if (filters.uploadedAfter) {
-        query = query.gte("created_at", filters.uploadedAfter)
-      }
-      if (filters.query) {
-        query = query.ilike("name", `%${filters.query}%`)
-      }
-
-      return query
+        .select(COVER_COLUMNS, { count: "exact" })
+      return withWallFilters(base, filters)
         .order("pinned_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .range(from, to)
@@ -128,37 +352,7 @@ async function loadGalleryHomeRange(
   }
 
   const coverRows = (imagesResult.data ?? []) as CoverRow[]
-  const sequenceIds = Array.from(
-    new Set(
-      coverRows
-        .map((image) => image.sequence_id)
-        .filter((id): id is string => typeof id === "string")
-    )
-  )
-
-  const sequenceRowsById = new Map<string, CoverRow[]>()
-  if (sequenceIds.length > 0) {
-    const { data: sequenceRows, error: sequenceError } = await supabase
-      .from("gallery_images")
-      .select(
-        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index"
-      )
-      .in("sequence_id", sequenceIds)
-      .order("sequence_index", { ascending: true })
-      .order("created_at", { ascending: true })
-
-    if (sequenceError) {
-      console.error("[gallery] failed to load sequence rows", sequenceError)
-    } else {
-      for (const row of (sequenceRows ?? []) as CoverRow[]) {
-        const sequenceId = row.sequence_id
-        if (!sequenceId) continue
-        const bucket = sequenceRowsById.get(sequenceId) ?? []
-        bucket.push(row)
-        sequenceRowsById.set(sequenceId, bucket)
-      }
-    }
-  }
+  const sequenceRowsById = await loadSequenceRowsById(supabase, coverRows)
 
   const imageIds = coverRows.map((image) => image.id)
   let countsByImage = new Map<string, typeof EMPTY_REACTION_COUNTS>()
@@ -233,62 +427,36 @@ async function loadGalleryHomeRange(
     }
   }
 
-  const members = userId
-    ? buildMembers((profilesResult.data ?? []) as ProfileRow[])
-    : []
-
-  const images: GalleryImage[] = coverRows.map((image) => ({
-    id: image.id,
-    name: image.name,
-    image_path: image.image_path,
-    media_type: image.media_type === "video" ? "video" : "image",
-    poster_path: image.poster_path ?? null,
-    duration_seconds: image.duration_seconds ?? null,
-    created_by: image.created_by,
-    created_at: image.created_at,
-    pinned_at: image.pinned_at ?? null,
-    sequence_id: image.sequence_id ?? null,
-    sequence_index:
-      typeof image.sequence_index === "number" ? image.sequence_index : null,
-    sequence_count: 1,
-    sequence_items: [],
-    sequence_missing_indexes: [],
-    comments: [],
-    comment_count: commentCountByImage.get(image.id) ?? 0,
-    uploader_name: image.created_by
+  const images: GalleryImage[] = coverRows.map((image) => {
+    const base = toGalleryImageBase(image)
+    base.comment_count = commentCountByImage.get(image.id) ?? 0
+    base.uploader_name = image.created_by
       ? (nameById.get(image.created_by) ?? "Unknown")
-      : "Unknown",
-    reaction_counts: countsByImage.get(image.id) ?? EMPTY_REACTION_COUNTS,
-    my_reaction: myReactionByImage.get(image.id) ?? null,
-    reaction_names: namesByImage.get(image.id) ?? EMPTY_REACTION_NAMES,
-  }))
+      : "Unknown"
+    base.reaction_counts = countsByImage.get(image.id) ?? EMPTY_REACTION_COUNTS
+    base.my_reaction = myReactionByImage.get(image.id) ?? null
+    base.reaction_names = namesByImage.get(image.id) ?? EMPTY_REACTION_NAMES
+    return base
+  })
 
-  for (const image of images) {
-    if (!image.sequence_id) continue
-    const items = sequenceRowsById.get(image.sequence_id) ?? []
-    if (items.length === 0) continue
-    image.sequence_count = items.length
-    image.sequence_missing_indexes = findSequenceGaps(
-      items.map((item) => item.sequence_index)
-    ).gaps
-    if (items.length <= 1) continue
-    image.sequence_items = items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      image_path: item.image_path,
-      media_type: item.media_type === "video" ? "video" : "image",
-      poster_path: item.poster_path ?? null,
-      created_at: item.created_at,
-      sequence_index:
-        typeof item.sequence_index === "number" ? item.sequence_index : null,
-    }))
-  }
+  expandSequences(images, sequenceRowsById)
 
   return {
     images,
-    members,
+    members: userId
+      ? buildMembers((profilesResult.data ?? []) as ProfileRow[])
+      : [],
     totalCount: imagesResult.count ?? 0,
   }
+}
+
+async function loadGalleryHomeRange(
+  supabase: SupabaseClient,
+  args: RangeArgs
+): Promise<RangeResult> {
+  const viaView = await loadGalleryHomeRangeViaView(supabase, args)
+  if (viaView) return viaView
+  return loadGalleryHomeRangeLegacy(supabase, args)
 }
 
 const DEFAULT_FILTERS: GalleryHomeFilters = {
