@@ -191,7 +191,10 @@ function UploadListItem({
         galleryPanelClass(),
         "flex items-center gap-3 !p-4 sm:gap-5",
         "data-[sequence-drop-target=true]:ring-2 data-[sequence-drop-target=true]:ring-foreground/40",
-        selectionMode && "cursor-pointer"
+        selectionMode && "cursor-pointer",
+        selectionMode &&
+          selected &&
+          "border-foreground/25 bg-foreground/[0.04] ring-1 ring-foreground/15"
       )}
     >
       {reorderHandle}
