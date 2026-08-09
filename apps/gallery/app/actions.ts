@@ -6,19 +6,12 @@ import {
   type GalleryReaction,
   isGalleryReaction,
 } from "@/lib/gallery/reactions"
-import { parseMentions } from "@/lib/gallery/mentions"
-import {
-  syncGalleryCommentLikeNotification,
-  syncGalleryCommentMentions,
-  syncGalleryReactionNotification,
-} from "@/lib/gallery/notification-sync"
 import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
 import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { setGallerySeasonalThemeId } from "@/lib/gallery/settings"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 export type ReactionActionResult = { ok: true } | { ok: false; error: string }
@@ -51,6 +44,7 @@ export async function setGalleryReaction(
     return { ok: false, error: `Reaction failed: ${fetchError.message}` }
   }
 
+  // Notification fan-out lives in gallery_notify_on_reaction (DB trigger).
   if (existing?.reaction === reaction) {
     const { error: deleteError } = await supabase
       .from("gallery_image_votes")
@@ -61,14 +55,6 @@ export async function setGalleryReaction(
     if (deleteError) {
       return { ok: false, error: `Reaction failed: ${deleteError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction: null,
-      mode: "remove",
-    })
   } else if (existing) {
     const { error: updateError } = await supabase
       .from("gallery_image_votes")
@@ -79,14 +65,6 @@ export async function setGalleryReaction(
     if (updateError) {
       return { ok: false, error: `Reaction failed: ${updateError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction,
-      mode: "update",
-    })
   } else {
     const { error: insertError } = await supabase
       .from("gallery_image_votes")
@@ -95,14 +73,6 @@ export async function setGalleryReaction(
     if (insertError) {
       return { ok: false, error: `Reaction failed: ${insertError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction,
-      mode: "insert",
-    })
   }
 
   revalidatePath("/")
@@ -139,11 +109,10 @@ export async function addGalleryComment(
   const userId = claimsData?.claims?.sub
   if (!userId) return { ok: false, error: "Please sign in first." }
 
-  let parentAuthorId: string | null = null
   if (parentId) {
     const { data: parent, error: parentError } = await supabase
       .from("gallery_comments")
-      .select("id, image_id, created_by")
+      .select("id, image_id")
       .eq("id", parentId)
       .maybeSingle()
     if (parentError) {
@@ -152,9 +121,9 @@ export async function addGalleryComment(
     if (!parent || parent.image_id !== imageId) {
       return { ok: false, error: "Invalid parent comment." }
     }
-    parentAuthorId = parent.created_by
   }
 
+  // Reply + @mention fan-out lives in gallery_notify_on_comment (DB trigger).
   const { data, error } = await supabase
     .from("gallery_comments")
     .insert({
@@ -171,32 +140,6 @@ export async function addGalleryComment(
       ok: false,
       error: `Comment failed: ${error?.message ?? "Unknown error."}`,
     }
-  }
-
-  const admin = createAdminClient()
-
-  if (parentAuthorId && parentAuthorId !== userId) {
-    const { error: replyNotifyError } = await admin
-      .from("gallery_activity_notifications")
-      .insert({
-        recipient_user_id: parentAuthorId,
-        kind: "reply",
-        image_id: imageId,
-        comment_id: data.id,
-        actor_user_id: userId,
-        body: trimmed.slice(0, 200),
-      })
-    if (replyNotifyError && replyNotifyError.code !== "23505") {
-      console.error(
-        "[gallery] failed to save reply notification",
-        replyNotifyError
-      )
-    }
-  }
-
-  const mentionNames = parseMentions(trimmed)
-  if (mentionNames.length > 0) {
-    await syncGalleryCommentMentions(admin, data.id, trimmed, userId)
   }
 
   revalidatePath("/", "layout")
@@ -270,9 +213,7 @@ export async function updateGalleryComment(
     }
   }
 
-  const admin = createAdminClient()
-  await syncGalleryCommentMentions(admin, commentId, trimmed, userId)
-
+  // Mention re-sync lives in gallery_notify_on_comment (DB trigger on body).
   revalidatePath("/", "layout")
   return { ok: true, data }
 }
@@ -332,6 +273,7 @@ export async function toggleGalleryCommentLike(
     return { ok: false, error: `Like failed: ${fetchError.message}` }
   }
 
+  // Comment-like notification fan-out lives in gallery_notify_on_comment_like.
   if (existing) {
     const { error: deleteError } = await supabase
       .from("gallery_comment_likes")
@@ -342,13 +284,6 @@ export async function toggleGalleryCommentLike(
     if (deleteError) {
       return { ok: false, error: `Like failed: ${deleteError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryCommentLikeNotification(admin, {
-      commentId,
-      actorUserId: userId,
-      liked: false,
-    })
   } else {
     const { error: insertError } = await supabase
       .from("gallery_comment_likes")
@@ -357,13 +292,6 @@ export async function toggleGalleryCommentLike(
     if (insertError) {
       return { ok: false, error: `Like failed: ${insertError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryCommentLikeNotification(admin, {
-      commentId,
-      actorUserId: userId,
-      liked: true,
-    })
   }
 
   const { count, error: countError } = await supabase
