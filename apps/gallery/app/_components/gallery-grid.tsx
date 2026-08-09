@@ -166,6 +166,17 @@ export function GalleryGrid({
       if (suspendKeyboard) return
       if (openIndex !== null) return
 
+      if (
+        event.key === "Escape" &&
+        images.length === 0 &&
+        filters &&
+        hasActiveGalleryFilters(filters)
+      ) {
+        event.preventDefault()
+        router.replace(buildGalleryHomeHref({}))
+        return
+      }
+
       if (selectionMode) {
         if (event.key === "Escape") {
           event.preventDefault()
@@ -236,6 +247,7 @@ export function GalleryGrid({
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [
+    filters,
     focusIndex,
     hasMore,
     images,
@@ -245,6 +257,7 @@ export function GalleryGrid({
     onExitSelectionMode,
     onToggleSelectAll,
     openIndex,
+    router,
     selectionMode,
     suspendKeyboard,
   ])
