@@ -137,15 +137,24 @@ export function ReactionBar({
     }
 
     document.addEventListener("pointerdown", onDocPointerDown, true)
-    return () => document.removeEventListener("pointerdown", onDocPointerDown, true)
+    return () =>
+      document.removeEventListener("pointerdown", onDocPointerDown, true)
+  }, [pickerOpen, closePicker])
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      event.stopPropagation()
+      closePicker()
+    }
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
   }, [pickerOpen, closePicker])
 
   const onZoneEnter = (e: React.PointerEvent) => {
-    if (
-      !canReact ||
-      e.pointerType === "touch" ||
-      touchAwaitingPick.current
-    )
+    if (!canReact || e.pointerType === "touch" || touchAwaitingPick.current)
       return
     clearHoverHide()
     clearHoverShow()
@@ -243,7 +252,7 @@ export function ReactionBar({
   return (
     <div
       ref={zoneRef}
-      className="relative shrink-0 touch-manipulation select-none [-webkit-touch-callout:none] not-italic"
+      className="relative shrink-0 touch-manipulation not-italic select-none [-webkit-touch-callout:none]"
       onPointerEnter={onZoneEnter}
       onPointerLeave={onZoneLeave}
       onPointerDown={onZonePointerDown}
@@ -256,7 +265,7 @@ export function ReactionBar({
         aria-label="Choose a reaction"
         aria-hidden={!pickerOpen}
         className={cn(
-          "absolute right-0 bottom-full z-20 mb-1 flex select-none items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg",
+          "absolute right-0 bottom-full z-20 mb-1 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg select-none",
           "transition-all duration-200 ease-out",
           pickerOpen
             ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
@@ -297,10 +306,8 @@ export function ReactionBar({
               }
               aria-pressed={active}
               className={cn(
-                "flex select-none items-center justify-center rounded-full transition-transform",
-                reaction === "point"
-                  ? "h-11 w-[3.25rem] px-1"
-                  : "h-11 w-11",
+                "flex items-center justify-center rounded-full transition-transform select-none",
+                reaction === "point" ? "h-11 w-[3.25rem] px-1" : "h-11 w-11",
                 (active || highlighted) && "scale-125 bg-foreground/10"
               )}
             >
@@ -318,13 +325,16 @@ export function ReactionBar({
         disabled={!canReact}
         onClick={onTriggerClick}
         onContextMenu={(e) => e.preventDefault()}
+        aria-expanded={pickerOpen}
+        aria-haspopup="menu"
+        aria-pressed={Boolean(myReaction)}
         aria-label={
           myReaction
             ? `Your reaction ${REACTION_EMOJI[myReaction]}. Hold or hover for more`
             : "React. Hold or hover for more"
         }
         className={cn(
-          "inline-flex select-none items-center gap-1 rounded-full border px-2.5 py-1 transition-colors",
+          "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors select-none",
           myReaction
             ? "border-foreground/20 bg-foreground/10 text-foreground"
             : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
