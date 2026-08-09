@@ -22,6 +22,16 @@ import {
   type MediaHealthFinding,
 } from "@/lib/gallery/media-health"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -37,8 +47,10 @@ export function MediaHealthPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [progress, setProgress] = useState<ScanProgress | null>(null)
   const [hasScanned, setHasScanned] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const summary = summarizeFindings(findings)
+  const selectedCount = selected.size
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -117,6 +129,7 @@ export function MediaHealthPanel() {
       return
     }
 
+    setConfirmOpen(false)
     startTransition(async () => {
       const result = await adminDeleteBrokenGalleryImages(items)
       if (!result.ok) {
@@ -188,7 +201,7 @@ export function MediaHealthPanel() {
                   variant="destructive"
                   size="sm"
                   disabled={isPending}
-                  onClick={runDelete}
+                  onClick={() => setConfirmOpen(true)}
                   className={cn(gallerySans(), "gap-1.5")}
                 >
                   <IconTrash className="size-3.5" aria-hidden />
@@ -297,6 +310,33 @@ export function MediaHealthPanel() {
           </ul>
         </div>
       ) : null}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Permanently delete {selectedCount} broken shot
+              {selectedCount === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected rows from the gallery and deletes their
+              storage objects. Cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>
+              Keep them
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={runDelete}
+              disabled={isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }
