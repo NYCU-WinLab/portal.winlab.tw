@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 
@@ -20,26 +21,38 @@ export function SignInButton({ next }: { next?: string }) {
 
   function onClick() {
     startTransition(async () => {
-      if (typeof window !== "undefined" && next && next.startsWith("/")) {
-        try {
-          sessionStorage.setItem(NEXT_STORAGE_KEY, next)
-        } catch {
-          /* private mode etc — fine, callback just sends to "/" */
+      try {
+        if (typeof window !== "undefined" && next && next.startsWith("/")) {
+          try {
+            sessionStorage.setItem(NEXT_STORAGE_KEY, next)
+          } catch {
+            /* private mode etc — fine, callback just sends to "/" */
+          }
         }
+        const supabase = createClient()
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "keycloak",
+          options: {
+            scopes: "openid",
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        })
+        if (error) {
+          toast.error(error.message || "Could not start sign-in.")
+        }
+      } catch {
+        toast.error("Could not start sign-in.")
       }
-      const supabase = createClient()
-      await supabase.auth.signInWithOAuth({
-        provider: "keycloak",
-        options: {
-          scopes: "openid",
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
     })
   }
 
   return (
-    <Button onClick={onClick} disabled={pending} className="w-full">
+    <Button
+      onClick={onClick}
+      disabled={pending}
+      aria-busy={pending}
+      className="w-full"
+    >
       {pending ? "Redirecting…" : "Continue with Keycloak"}
     </Button>
   )
