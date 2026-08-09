@@ -36,7 +36,9 @@ import {
 import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
 import {
+  countIncompleteSequences,
   describeSequenceGaps,
+  filterIncompleteSequences,
   findSequenceGaps,
   groupManageUploads,
   swapSequenceOrder,
@@ -476,6 +478,25 @@ export function UploadManageList({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [incompleteOnly, setIncompleteOnly] = useState(false)
+  const incompleteCount = useMemo(
+    () => countIncompleteSequences(sequences),
+    [sequences]
+  )
+
+  const visibleTimeline = useMemo(() => {
+    if (!incompleteOnly) return timeline
+    const incompleteIds = new Set(
+      filterIncompleteSequences(sequences).map(
+        (sequence) => sequence.sequenceId
+      )
+    )
+    return timeline.filter(
+      (entry) =>
+        entry.kind === "sequence" &&
+        incompleteIds.has(entry.sequence.sequenceId)
+    )
+  }, [incompleteOnly, sequences, timeline])
 
   const selectableItems = useMemo<SelectableItem[]>(
     () =>
@@ -556,6 +577,21 @@ export function UploadManageList({
         >
           {selectionMode ? "Cancel selection" : "Select"}
         </button>
+        {incompleteCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setIncompleteOnly((value) => !value)}
+            className={cn(
+              galleryPillClass(),
+              incompleteOnly && "border-foreground/25 bg-foreground/[0.06]"
+            )}
+            aria-pressed={incompleteOnly}
+          >
+            {incompleteOnly
+              ? `Incomplete only (${incompleteCount})`
+              : `Incomplete (${incompleteCount})`}
+          </button>
+        ) : null}
         {selectionMode ? (
           <button
             type="button"
@@ -627,7 +663,13 @@ export function UploadManageList({
         </div>
       ) : null}
 
-      {timeline.map((entry) => {
+      {visibleTimeline.length === 0 && incompleteOnly ? (
+        <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+          No incomplete sequences right now — every story has contiguous shots.
+        </p>
+      ) : null}
+
+      {visibleTimeline.map((entry) => {
         if (entry.kind === "sequence") {
           return (
             <UploadSequenceGroup

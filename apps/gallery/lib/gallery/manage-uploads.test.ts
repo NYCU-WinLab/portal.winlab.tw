@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  countIncompleteSequences,
   describeSequenceGaps,
+  filterIncompleteSequences,
   findSequenceGaps,
   groupManageUploads,
   swapSequenceOrder,
+  type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
 
@@ -93,5 +96,41 @@ describe("findSequenceGaps", () => {
   test("describeSequenceGaps labels cover specially", () => {
     expect(describeSequenceGaps([0])).toBe("Missing cover (shot 1)")
     expect(describeSequenceGaps([1, 3])).toBe("Missing shot 2, shot 4")
+  })
+})
+
+describe("filterIncompleteSequences", () => {
+  const baseRow: ManageUploadRow = {
+    id: "x",
+    name: "X",
+    image_path: "u/x.jpg",
+    media_type: "image",
+    poster_path: null,
+    duration_seconds: null,
+    created_at: "2026-01-01T00:00:00.000Z",
+    pinned_at: null,
+    sequence_id: "seq",
+    sequence_index: 0,
+  }
+
+  test("keeps only sequences with gaps", () => {
+    const complete = {
+      sequenceId: "ok",
+      items: [
+        { ...baseRow, id: "a", sequence_id: "ok", sequence_index: 0 },
+        { ...baseRow, id: "b", sequence_id: "ok", sequence_index: 1 },
+      ],
+    }
+    const incomplete = {
+      sequenceId: "gap",
+      items: [
+        { ...baseRow, id: "c", sequence_id: "gap", sequence_index: 0 },
+        { ...baseRow, id: "d", sequence_id: "gap", sequence_index: 2 },
+      ],
+    }
+    expect(
+      filterIncompleteSequences([complete, incomplete]).map((s) => s.sequenceId)
+    ).toEqual(["gap"])
+    expect(countIncompleteSequences([complete, incomplete])).toBe(1)
   })
 })

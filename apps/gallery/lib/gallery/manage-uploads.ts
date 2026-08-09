@@ -112,3 +112,21 @@ export function describeSequenceGaps(gaps: number[]): string | null {
   const labels = gaps.map((gap) => (gap === 0 ? "cover" : `shot ${gap + 1}`))
   return `Missing ${labels.join(", ")}`
 }
+
+/** Sequences with a gap in 0..max(present). */
+export function filterIncompleteSequences(
+  sequences: ManageUploadSequence[]
+): ManageUploadSequence[] {
+  return sequences.filter((sequence) => {
+    const gaps = findSequenceGaps(
+      sequence.items.map((item) => item.sequence_index)
+    ).gaps
+    return gaps.length > 0
+  })
+}
+
+export function countIncompleteSequences(
+  sequences: ManageUploadSequence[]
+): number {
+  return filterIncompleteSequences(sequences).length
+}

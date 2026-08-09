@@ -77,16 +77,30 @@ export default async function MemoriesPage({
               Empty tray
             </p>
             <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-              Nothing from a past {label} yet. Hang a polaroid today, and next
-              year it will show up here.
+              Nothing from a past {label} yet. Shots need a capture date (EXIF
+              or upload day) to land here. Hang a polaroid today, and next year
+              it will show up.
             </p>
-            <p className={cn(gallerySans(), "text-sm")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "flex flex-wrap gap-x-4 gap-y-2 text-sm"
+              )}
+            >
               <Link
                 href="/"
                 className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
               >
                 Back to the wall
               </Link>
+              {user ? (
+                <Link
+                  href="/upload"
+                  className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
+                >
+                  Upload a polaroid
+                </Link>
+              ) : null}
             </p>
           </section>
         ) : (
