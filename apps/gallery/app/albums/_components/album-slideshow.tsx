@@ -20,6 +20,7 @@ import {
   nextSlideshowIndex,
   prevSlideshowIndex,
   readStoredSlideshowIntervalMs,
+  slideshowIndexFromProgress,
   writeStoredSlideshowIntervalMs,
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
@@ -91,6 +92,20 @@ export function AlbumSlideshow({
     if (swipe === "prev") {
       setIndex((current) => prevSlideshowIndex(current, photos.length))
     }
+  }
+
+  const seekFromClientX = (
+    clientX: number,
+    target: EventTarget & HTMLElement
+  ) => {
+    const rect = target.getBoundingClientRect()
+    if (rect.width <= 0) return
+    setIndex(
+      slideshowIndexFromProgress(
+        (clientX - rect.left) / rect.width,
+        photos.length
+      )
+    )
   }
 
   useEffect(() => {
@@ -225,6 +240,35 @@ export function AlbumSlideshow({
             </button>
           </div>
         </header>
+
+        {photos.length > 1 ? (
+          <button
+            type="button"
+            aria-label="Slideshow progress"
+            className="group relative mx-4 h-3 shrink-0 touch-none sm:mx-6"
+            onClick={(event) => {
+              seekFromClientX(event.clientX, event.currentTarget)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return
+              event.preventDefault()
+              const rect = event.currentTarget.getBoundingClientRect()
+              seekFromClientX(rect.left + rect.width / 2, event.currentTarget)
+            }}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-white/15 transition group-hover:h-1"
+            />
+            <span
+              aria-hidden
+              className="absolute top-1/2 left-0 h-0.5 -translate-y-1/2 rounded-full bg-white/70 transition group-hover:h-1"
+              style={{
+                width: `${((index + 1) / photos.length) * 100}%`,
+              }}
+            />
+          </button>
+        ) : null}
 
         <div
           className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-4 pb-8 sm:px-10"

@@ -75,6 +75,18 @@ export function clampSlideshowStartIndex(
   return Math.min(Math.max(0, Math.trunc(startIndex)), length - 1)
 }
 
+/** Map a 0–1 scrubber ratio to a slide index. */
+export function slideshowIndexFromProgress(
+  ratio: number,
+  length: number
+): number {
+  if (length <= 0) return 0
+  if (!Number.isFinite(ratio)) return 0
+  const clamped = Math.min(1, Math.max(0, ratio))
+  if (clamped >= 1) return length - 1
+  return Math.floor(clamped * length)
+}
+
 /** Find a slideshow photo by image id; missing → 0. */
 export function findSlideshowIndexByImageId(
   photos: Array<{ image_id: string }>,

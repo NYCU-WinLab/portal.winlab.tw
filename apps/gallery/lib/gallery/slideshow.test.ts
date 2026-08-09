@@ -10,6 +10,7 @@ import {
   nextSlideshowIndex,
   prevSlideshowIndex,
   readStoredSlideshowIntervalMs,
+  slideshowIndexFromProgress,
   wallSelectionToSlideshowPhotos,
   writeStoredSlideshowIntervalMs,
 } from "@/lib/gallery/slideshow"
@@ -80,6 +81,21 @@ describe("clampSlideshowStartIndex", () => {
 
   test("empty list stays zero", () => {
     expect(clampSlideshowStartIndex(5, 0)).toBe(0)
+  })
+})
+
+describe("slideshowIndexFromProgress", () => {
+  test("maps ratio across the deck", () => {
+    expect(slideshowIndexFromProgress(0, 4)).toBe(0)
+    expect(slideshowIndexFromProgress(0.24, 4)).toBe(0)
+    expect(slideshowIndexFromProgress(0.25, 4)).toBe(1)
+    expect(slideshowIndexFromProgress(0.99, 4)).toBe(3)
+    expect(slideshowIndexFromProgress(1, 4)).toBe(3)
+  })
+
+  test("guards empty and non-finite", () => {
+    expect(slideshowIndexFromProgress(0.5, 0)).toBe(0)
+    expect(slideshowIndexFromProgress(Number.NaN, 3)).toBe(0)
   })
 })
 
