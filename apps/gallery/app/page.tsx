@@ -22,6 +22,7 @@ import {
 } from "@/lib/gallery/og-metadata"
 import { resolveGalleryPhotoDeepLink } from "@/lib/gallery/photo-deep-link"
 import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
+import { isGalleryTagsUnavailable } from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -119,14 +120,21 @@ export default async function GalleryHomePage({
   ])
 
   // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
-  const popularTags: GalleryTagSuggestion[] = popularTagsResult.error
-    ? []
-    : ((popularTagsResult.data ?? []) as GalleryTagSuggestion[]).map((row) => ({
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        use_count: Number(row.use_count) || 0,
-      }))
+  let popularTags: GalleryTagSuggestion[] = []
+  if (popularTagsResult.error) {
+    if (!isGalleryTagsUnavailable(popularTagsResult.error)) {
+      console.error("[gallery] popular tags failed", popularTagsResult.error)
+    }
+  } else {
+    popularTags = (
+      (popularTagsResult.data ?? []) as GalleryTagSuggestion[]
+    ).map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      use_count: Number(row.use_count) || 0,
+    }))
+  }
 
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>

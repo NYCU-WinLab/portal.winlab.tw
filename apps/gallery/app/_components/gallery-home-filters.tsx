@@ -392,6 +392,32 @@ export function GalleryHomeFiltersBar({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
+                <div
+                  className="flex items-center gap-1 px-2 py-1.5"
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <input
+                    type="text"
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault()
+                        applyTagDraft()
+                      }
+                    }}
+                    placeholder="slug…"
+                    className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
+                  />
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-foreground"
+                    onClick={applyTagDraft}
+                  >
+                    Go
+                  </button>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
                   Media
                 </DropdownMenuLabel>
