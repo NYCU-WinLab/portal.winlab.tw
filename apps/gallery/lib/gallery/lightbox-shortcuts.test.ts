@@ -6,6 +6,8 @@ describe("resolveLightboxShortcut", () => {
   test("maps navigation and social keys", () => {
     expect(resolveLightboxShortcut("ArrowLeft")).toBe("prev")
     expect(resolveLightboxShortcut("ArrowRight")).toBe("next")
+    expect(resolveLightboxShortcut("Home")).toBe("first")
+    expect(resolveLightboxShortcut("End")).toBe("last")
     expect(resolveLightboxShortcut("i")).toBe("toggle-details")
     expect(resolveLightboxShortcut("S")).toBe("share")
     expect(resolveLightboxShortcut("f")).toBe("favorite")

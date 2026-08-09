@@ -350,6 +350,14 @@ export function GalleryCard({
         goLightboxNext()
         return
       }
+      if (action === "first") {
+        setActiveIndex(0)
+        return
+      }
+      if (action === "last") {
+        setActiveIndex(Math.max(0, sequenceMedia.length - 1))
+        return
+      }
       if (action === "toggle-details") {
         setMobileDetailsOpen((open) => !open)
         return
@@ -375,6 +383,7 @@ export function GalleryCard({
     goLightboxNext,
     goLightboxPrev,
     isDialogOpen,
+    sequenceMedia.length,
     toggleFavoriteFromKeyboard,
   ])
 

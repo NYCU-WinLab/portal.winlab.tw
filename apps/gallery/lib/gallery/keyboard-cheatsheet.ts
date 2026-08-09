@@ -15,6 +15,7 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
 /** Lightbox shortcuts. */
 export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["←", "→"], action: "Prev / next (sequence, then wall)" },
+  { keys: ["Home", "End"], action: "First / last shot in sequence" },
   { keys: ["F"], action: "Toggle favorite" },
   { keys: ["D"], action: "Download original" },
   { keys: ["S"], action: "Share link" },
