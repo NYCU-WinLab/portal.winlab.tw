@@ -280,6 +280,7 @@ export function GalleryCard({
   })
 
   const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
+  const favoriteBusyRef = useRef(false)
 
   useEffect(() => {
     setFavorited(Boolean(image.is_favorited))
@@ -315,17 +316,23 @@ export function GalleryCard({
       toast.error("Sign in to save favorites.")
       return
     }
+    if (favoriteBusyRef.current) return
+    favoriteBusyRef.current = true
     const next = !favorited
     setFavorited(next)
-    const result = await toggleGalleryFavorite(image.id, next)
-    if (!result.ok) {
-      setFavorited(!next)
-      toast.error(result.error)
-      return
+    try {
+      const result = await toggleGalleryFavorite(image.id, next)
+      if (!result.ok) {
+        setFavorited(!next)
+        toast.error(result.error)
+        return
+      }
+      toast.success(
+        result.favorited ? "Saved to favorites" : "Removed from favorites"
+      )
+    } finally {
+      favoriteBusyRef.current = false
     }
-    toast.success(
-      result.favorited ? "Saved to favorites" : "Removed from favorites"
-    )
   }, [favorited, image.id, isSignedIn])
 
   const downloadOriginalFromKeyboard = useCallback(async () => {
