@@ -40,6 +40,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { setGalleryImagesPin } from "@/app/actions"
 import {
   deleteGalleryImages,
   updateGalleryImagesTakenAt,
@@ -853,6 +854,23 @@ export function UploadManageList({
     } catch {
       toast.error("Could not copy to the clipboard.")
     }
+  }
+
+  const pinSelected = (pinned: boolean) => {
+    if (!isAdmin || selectedItems.length === 0 || isPending) return
+    startTransition(async () => {
+      const result = await setGalleryImagesPin(
+        selectedItems.map((item) => item.id),
+        pinned
+      )
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(result.data.message)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    })
   }
 
   if (images.length === 0) return null
