@@ -290,6 +290,7 @@ export function GalleryLightboxSocialAside({
   commentPinAvailable = true,
   commentLikesAvailable = true,
   reactionsAvailable = true,
+  commentsAvailable = true,
 }: {
   image: GalleryImage
   activeItem: GallerySequenceItem | undefined
@@ -326,6 +327,7 @@ export function GalleryLightboxSocialAside({
   commentPinAvailable?: boolean
   commentLikesAvailable?: boolean
   reactionsAvailable?: boolean
+  commentsAvailable?: boolean
 }) {
   const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
   const reactionPeek = formatReactionSummary(counts)
@@ -543,19 +545,25 @@ export function GalleryLightboxSocialAside({
         ) : null}
       </div>
       <div className="gallery-lightbox-aside-comments flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-        <GalleryComments
-          imageId={image.id}
-          comments={comments}
-          onCommentsChange={setComments}
-          isSignedIn={isSignedIn}
-          viewerId={viewerId}
-          viewerName={viewerName}
-          members={members}
-          isAdmin={isAdmin}
-          highlightCommentId={highlightCommentId}
-          commentPinAvailable={commentPinAvailable}
-          commentLikesAvailable={commentLikesAvailable}
-        />
+        {commentsAvailable ? (
+          <GalleryComments
+            imageId={image.id}
+            comments={comments}
+            onCommentsChange={setComments}
+            isSignedIn={isSignedIn}
+            viewerId={viewerId}
+            viewerName={viewerName}
+            members={members}
+            isAdmin={isAdmin}
+            highlightCommentId={highlightCommentId}
+            commentPinAvailable={commentPinAvailable}
+            commentLikesAvailable={commentLikesAvailable}
+          />
+        ) : (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            Comments are not available yet.
+          </p>
+        )}
       </div>
     </aside>
   )

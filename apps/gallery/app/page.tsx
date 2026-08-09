@@ -11,6 +11,7 @@ import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
+import { isGalleryCommentsReady } from "@/lib/gallery/comment-edit"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
 import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
@@ -117,6 +118,7 @@ export default async function GalleryHomePage({
     albumsAvailable,
     tagsAvailable,
     reactionsAvailable,
+    commentsAvailable,
   ] = await Promise.all([
     loadGalleryHomePages(supabase, {
       throughPage,
@@ -134,6 +136,7 @@ export default async function GalleryHomePage({
     isGalleryAlbumsReady(supabase),
     isGalleryTagsReady(supabase),
     isGalleryReactionsReady(supabase),
+    isGalleryCommentsReady(supabase),
   ])
   const memoryPhotos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
@@ -215,6 +218,7 @@ export default async function GalleryHomePage({
               albumsAvailable={albumsAvailable}
               tagsAvailable={tagsAvailable}
               reactionsAvailable={reactionsAvailable}
+              commentsAvailable={commentsAvailable}
             />
           }
         >
@@ -243,6 +247,7 @@ export default async function GalleryHomePage({
             albumsAvailable={albumsAvailable}
             tagsAvailable={tagsAvailable}
             reactionsAvailable={reactionsAvailable}
+            commentsAvailable={commentsAvailable}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />

@@ -33,6 +33,7 @@ export function GalleryGrid({
   albumsAvailable = true,
   tagsAvailable = true,
   reactionsAvailable = true,
+  commentsAvailable = true,
   openPhotoId = null,
   openCommentId = null,
   hasMore = false,
@@ -59,6 +60,7 @@ export function GalleryGrid({
   albumsAvailable?: boolean
   tagsAvailable?: boolean
   reactionsAvailable?: boolean
+  commentsAvailable?: boolean
   openPhotoId?: string | null
   openCommentId?: string | null
   hasMore?: boolean
@@ -318,6 +320,7 @@ export function GalleryGrid({
               albumsAvailable={albumsAvailable}
               tagsAvailable={tagsAvailable}
               reactionsAvailable={reactionsAvailable}
+              commentsAvailable={commentsAvailable}
               priorityLcp={index === 0}
               initialOpen={false}
               highlightCommentId={

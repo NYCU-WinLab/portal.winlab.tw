@@ -66,6 +66,7 @@ export function GalleryInfiniteWall({
   albumsAvailable = true,
   tagsAvailable = true,
   reactionsAvailable = true,
+  commentsAvailable = true,
   openPhotoId = null,
   openCommentId = null,
 }: {
@@ -83,6 +84,7 @@ export function GalleryInfiniteWall({
   albumsAvailable?: boolean
   tagsAvailable?: boolean
   reactionsAvailable?: boolean
+  commentsAvailable?: boolean
   openPhotoId?: string | null
   openCommentId?: string | null
 }) {
@@ -389,6 +391,7 @@ export function GalleryInfiniteWall({
         albumsAvailable={albumsAvailable}
         tagsAvailable={tagsAvailable}
         reactionsAvailable={reactionsAvailable}
+        commentsAvailable={commentsAvailable}
         openPhotoId={selectionMode ? null : openPhotoId}
         openCommentId={selectionMode ? null : openCommentId}
         hasMore={hasMore}

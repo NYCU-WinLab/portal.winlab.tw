@@ -75,6 +75,7 @@ export function GalleryCard({
   albumsAvailable = true,
   tagsAvailable = true,
   reactionsAvailable = true,
+  commentsAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
@@ -100,6 +101,7 @@ export function GalleryCard({
   albumsAvailable?: boolean
   tagsAvailable?: boolean
   reactionsAvailable?: boolean
+  commentsAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
@@ -696,6 +698,7 @@ export function GalleryCard({
                   commentPinAvailable={commentPinAvailable}
                   commentLikesAvailable={commentLikesAvailable}
                   reactionsAvailable={lightboxReactionsAvailable}
+                  commentsAvailable={commentsAvailable}
                 />
               </div>
             </DialogContent>
@@ -719,24 +722,28 @@ export function GalleryCard({
             />
           ) : null}
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileDetailsOpen(true)
-                setIsDialogOpen(true)
-              }}
-              className={galleryPillClass()}
-            >
-              {wallCommentCount > 0
-                ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
-                : "Comment"}
-            </button>
-            <ReactionBar
-              counts={counts}
-              myReaction={myReaction}
-              canReact={canReact}
-              onReact={onReact}
-            />
+            {commentsAvailable ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDetailsOpen(true)
+                  setIsDialogOpen(true)
+                }}
+                className={galleryPillClass()}
+              >
+                {wallCommentCount > 0
+                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
+                  : "Comment"}
+              </button>
+            ) : null}
+            {reactionsAvailable ? (
+              <ReactionBar
+                counts={counts}
+                myReaction={myReaction}
+                canReact={canReact}
+                onReact={onReact}
+              />
+            ) : null}
           </div>
         </div>
       </figcaption>

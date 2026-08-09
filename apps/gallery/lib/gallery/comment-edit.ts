@@ -49,6 +49,35 @@ export function formatGallerySupabaseError(
   return parts.join(" | ") || "Unknown error"
 }
 
+export function isGalleryCommentsUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_comments/i.test(message) &&
+      !/updated_at/i.test(message) &&
+      !/pinned_at/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
+export async function isGalleryCommentsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_comments")
+    .select("id")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryCommentsUnavailable(error)
+}
+
 export async function loadGalleryCommentRows(
   supabase: SupabaseClient,
   imageIds: string[]
