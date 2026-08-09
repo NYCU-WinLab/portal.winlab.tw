@@ -119,6 +119,7 @@ export default async function GalleryHomePage({
     }),
   ])
   const memoryPhotos = memoriesResult.photos
+  const memoriesAvailable = memoriesResult.available
 
   // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
   let popularTags: GalleryTagSuggestion[] = []
@@ -141,10 +142,12 @@ export default async function GalleryHomePage({
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
         <GalleryHomeHero />
-        <GalleryMemoriesTeaser
-          photos={memoryPhotos}
-          dayLabel={formatMemoriesDayLabel(today.month, today.day)}
-        />
+        {memoriesAvailable ? (
+          <GalleryMemoriesTeaser
+            photos={memoryPhotos}
+            dayLabel={formatMemoriesDayLabel(today.month, today.day)}
+          />
+        ) : null}
         {user ? (
           <Suspense fallback={null}>
             <GalleryHomeFiltersBar
