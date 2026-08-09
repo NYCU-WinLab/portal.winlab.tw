@@ -264,6 +264,7 @@ export function GalleryAlbumManagePanel({
   }
 
   const removeSelected = () => {
+    if (pending) return
     const ids = Array.from(selected)
     if (ids.length === 0) return
     const previous = photos
@@ -316,6 +317,7 @@ export function GalleryAlbumManagePanel({
   }
 
   const onDelete = () => {
+    if (pending) return
     startTransition(async () => {
       const result = await deleteGalleryAlbum(album.id)
       if (!result.ok) {
@@ -434,8 +436,14 @@ export function GalleryAlbumManagePanel({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+              <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={pending}
+                aria-busy={pending || undefined}
+                onClick={onDelete}
+              >
+                {pending ? "Deleting…" : "Delete"}
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -488,9 +496,15 @@ export function GalleryAlbumManagePanel({
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={removeSelected}>
-                        Remove
+                      <AlertDialogCancel disabled={pending}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={pending}
+                        aria-busy={pending || undefined}
+                        onClick={removeSelected}
+                      >
+                        {pending ? "Removing…" : "Remove"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
