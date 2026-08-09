@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -28,10 +28,14 @@ export function RenameButton({
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(name)
   const [pending, startTransition] = useTransition()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   function openEditor(nextOpen: boolean) {
     if (nextOpen) setDraft(name)
     setOpen(nextOpen)
+    if (!nextOpen) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
   }
 
   function onSave() {
@@ -52,6 +56,7 @@ export function RenameButton({
   return (
     <Dialog open={open} onOpenChange={openEditor}>
       <Button
+        ref={triggerRef}
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}

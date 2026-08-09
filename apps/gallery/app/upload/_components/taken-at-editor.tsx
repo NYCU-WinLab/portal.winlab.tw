@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -41,10 +41,14 @@ export function TakenAtEditor({
     toTaipeiDateInput(takenAt ?? createdAt)
   )
   const [pending, startTransition] = useTransition()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   function openEditor(nextOpen: boolean) {
     if (nextOpen) setDraft(toTaipeiDateInput(takenAt ?? createdAt))
     setOpen(nextOpen)
+    if (!nextOpen) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
   }
 
   function onSave() {
@@ -70,6 +74,7 @@ export function TakenAtEditor({
   return (
     <Dialog open={open} onOpenChange={openEditor}>
       <Button
+        ref={triggerRef}
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
