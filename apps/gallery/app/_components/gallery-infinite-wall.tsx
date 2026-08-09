@@ -22,7 +22,10 @@ import {
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
 import { expandWallSelectionZipItems } from "@/lib/gallery/wall-selection-zip"
-import { wallSelectionToSlideshowPhotos } from "@/lib/gallery/slideshow"
+import {
+  expandWallSelectionSlideshowPhotos,
+  wallSelectionToSlideshowPhotos,
+} from "@/lib/gallery/slideshow"
 import {
   mergeGalleryWallPage,
   restoreGalleryWallOrder,
@@ -129,6 +132,10 @@ export function GalleryInfiniteWall({
   )
   const selectedSlideshowPhotos = useMemo(
     () => wallSelectionToSlideshowPhotos(orderedSelected, images),
+    [images, orderedSelected]
+  )
+  const selectedStorySlideshowPhotos = useMemo(
+    () => expandWallSelectionSlideshowPhotos(orderedSelected, images),
     [images, orderedSelected]
   )
   const allSelected =
@@ -312,6 +319,7 @@ export function GalleryInfiniteWall({
               selectedIds={orderedSelected}
               selectedZipItems={selectedZipItems}
               selectedSlideshowPhotos={selectedSlideshowPhotos}
+              selectedStorySlideshowPhotos={selectedStorySlideshowPhotos}
               savedFilterActive={Boolean(filters.savedOnly)}
               albumFilterSlug={filters.albumSlug}
               tagFilterSlug={filters.tagSlug}

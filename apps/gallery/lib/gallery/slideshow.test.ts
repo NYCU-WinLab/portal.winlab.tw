@@ -11,6 +11,7 @@ import {
   prevSlideshowIndex,
   readStoredSlideshowIntervalMs,
   slideshowIndexFromProgress,
+  expandWallSelectionSlideshowPhotos,
   wallSelectionToSlideshowPhotos,
   writeStoredSlideshowIntervalMs,
   shuffleSlideshowPhotos,
@@ -190,6 +191,57 @@ describe("wallSelectionToSlideshowPhotos", () => {
         image_path: "u/a.jpg",
         media_type: "image",
         poster_path: null,
+      },
+    ])
+  })
+})
+
+describe("expandWallSelectionSlideshowPhotos", () => {
+  test("expands multi-shot sequences to siblings", () => {
+    expect(
+      expandWallSelectionSlideshowPhotos(
+        ["story"],
+        [
+          {
+            id: "story",
+            name: "Cover",
+            image_path: "u/c.jpg",
+            media_type: "image",
+            poster_path: null,
+            sequence_count: 2,
+            sequence_items: [
+              {
+                id: "s0",
+                name: "Shot 0",
+                image_path: "u/0.jpg",
+                media_type: "image",
+                poster_path: null,
+              },
+              {
+                id: "s1",
+                name: "Shot 1",
+                image_path: "u/1.jpg",
+                media_type: "video",
+                poster_path: "u/1-p.jpg",
+              },
+            ],
+          },
+        ]
+      )
+    ).toEqual([
+      {
+        image_id: "s0",
+        name: "Shot 0",
+        image_path: "u/0.jpg",
+        media_type: "image",
+        poster_path: null,
+      },
+      {
+        image_id: "s1",
+        name: "Shot 1",
+        image_path: "u/1.jpg",
+        media_type: "video",
+        poster_path: "u/1-p.jpg",
       },
     ])
   })

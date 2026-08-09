@@ -59,6 +59,7 @@ export function GalleryWallSelectBar({
   selectedIds,
   selectedZipItems = [],
   selectedSlideshowPhotos = [],
+  selectedStorySlideshowPhotos = [],
   savedFilterActive = false,
   albumFilterSlug = null,
   tagFilterSlug = null,
@@ -86,6 +87,8 @@ export function GalleryWallSelectBar({
   }>
   /** Selected wall covers for slideshow (wall order). */
   selectedSlideshowPhotos?: GallerySlideshowPhoto[]
+  /** Selected covers expanded to sequence siblings for story playback. */
+  selectedStorySlideshowPhotos?: GallerySlideshowPhoto[]
   /** When viewing ?saved=1, offer bulk Unsave. */
   savedFilterActive?: boolean
   /** When viewing ?album=, offer bulk Remove from that album. */
@@ -120,19 +123,30 @@ export function GalleryWallSelectBar({
     onSlideshowOpenChange?.(slideshowOpen)
   }, [onSlideshowOpenChange, slideshowOpen])
 
-  const openSlideshow = (shuffled: boolean) => {
-    if (selectedSlideshowPhotos.length === 0) return
-    setSlideshowDeck(
-      shuffled
-        ? shuffleSlideshowPhotos(selectedSlideshowPhotos)
+  const openSlideshow = (
+    mode: "covers" | "shuffled" | "stories" = "covers"
+  ) => {
+    const source =
+      mode === "stories"
+        ? selectedStorySlideshowPhotos
         : selectedSlideshowPhotos
+    if (source.length === 0) return
+    setSlideshowDeck(
+      mode === "shuffled" ? shuffleSlideshowPhotos(source) : source
     )
-    setSlideshowTitle(shuffled ? "Wall selection · shuffled" : "Wall selection")
+    setSlideshowTitle(
+      mode === "shuffled"
+        ? "Wall selection · shuffled"
+        : mode === "stories"
+          ? "Wall selection · stories"
+          : "Wall selection"
+    )
     setSlideshowOpen(true)
   }
 
   const canSlideshow = selectedSlideshowPhotos.length > 0
-  const hasOverflowActions = isSignedIn || canSlideshow
+  const canStorySlideshow = selectedStorySlideshowPhotos.length > 0
+  const hasOverflowActions = isSignedIn || canSlideshow || canStorySlideshow
   const overflowBusy = pending || saveOpenBusy || selectedCount === 0
 
   const tagSelected = (event?: FormEvent) => {
@@ -465,7 +479,7 @@ export function GalleryWallSelectBar({
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"
                   )}
-                  onClick={() => openSlideshow(false)}
+                  onClick={() => openSlideshow("covers")}
                 >
                   <IconPlayerPlay className="size-3.5" aria-hidden />
                   Play
@@ -629,68 +643,82 @@ export function GalleryWallSelectBar({
                     {canSlideshow ? (
                       <DropdownMenuItem
                         disabled={!canSlideshow}
-                        onSelect={() => openSlideshow(true)}
+                        onSelect={() => openSlideshow("shuffled")}
                       >
                         Play shuffled
                       </DropdownMenuItem>
                     ) : null}
-                    <DropdownMenuItem
-                      disabled={overflowBusy}
-                      onSelect={() => {
-                        setAlbumFormOpen(false)
-                        setTagFormOpen(true)
-                      }}
-                    >
-                      Tag…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={overflowBusy}
-                      onSelect={() => {
-                        setTagFormOpen(false)
-                        setAlbumFormOpen(true)
-                      }}
-                    >
-                      New album…
-                    </DropdownMenuItem>
-                    {savedFilterActive ? (
+                    {canStorySlideshow &&
+                    selectedStorySlideshowPhotos.length !==
+                      selectedSlideshowPhotos.length ? (
                       <DropdownMenuItem
-                        disabled={overflowBusy}
-                        onSelect={() => unsaveSelected()}
+                        disabled={!canStorySlideshow}
+                        onSelect={() => openSlideshow("stories")}
                       >
-                        Unsave
+                        Play with stories
                       </DropdownMenuItem>
                     ) : null}
-                    {albumFilterSlug ? (
-                      <DropdownMenuItem
-                        disabled={overflowBusy}
-                        onSelect={() => removeSelectedFromAlbum()}
-                      >
-                        Remove from album
-                      </DropdownMenuItem>
-                    ) : null}
-                    {tagFilterSlug ? (
-                      <DropdownMenuItem
-                        disabled={overflowBusy}
-                        onSelect={() => untagSelected()}
-                      >
-                        Untag
-                      </DropdownMenuItem>
-                    ) : null}
-                    {isAdmin ? (
+                    {isSignedIn ? (
                       <>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           disabled={overflowBusy}
-                          onSelect={() => pinSelected(true)}
+                          onSelect={() => {
+                            setAlbumFormOpen(false)
+                            setTagFormOpen(true)
+                          }}
                         >
-                          Pin
+                          Tag…
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={overflowBusy}
-                          onSelect={() => pinSelected(false)}
+                          onSelect={() => {
+                            setTagFormOpen(false)
+                            setAlbumFormOpen(true)
+                          }}
                         >
-                          Unpin
+                          New album…
                         </DropdownMenuItem>
+                        {savedFilterActive ? (
+                          <DropdownMenuItem
+                            disabled={overflowBusy}
+                            onSelect={() => unsaveSelected()}
+                          >
+                            Unsave
+                          </DropdownMenuItem>
+                        ) : null}
+                        {albumFilterSlug ? (
+                          <DropdownMenuItem
+                            disabled={overflowBusy}
+                            onSelect={() => removeSelectedFromAlbum()}
+                          >
+                            Remove from album
+                          </DropdownMenuItem>
+                        ) : null}
+                        {tagFilterSlug ? (
+                          <DropdownMenuItem
+                            disabled={overflowBusy}
+                            onSelect={() => untagSelected()}
+                          >
+                            Untag
+                          </DropdownMenuItem>
+                        ) : null}
+                        {isAdmin ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={overflowBusy}
+                              onSelect={() => pinSelected(true)}
+                            >
+                              Pin
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={overflowBusy}
+                              onSelect={() => pinSelected(false)}
+                            >
+                              Unpin
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                       </>
                     ) : null}
                   </DropdownMenuContent>

@@ -146,6 +146,67 @@ export function wallSelectionToSlideshowPhotos(
   return photos
 }
 
+/**
+ * Like wallSelectionToSlideshowPhotos, but multi-shot sequences expand to
+ * every sibling (story order) — same expansion shape as ZIP.
+ */
+export function expandWallSelectionSlideshowPhotos(
+  orderedSelectedIds: string[],
+  images: Array<{
+    id: string
+    name: string
+    image_path: string
+    media_type: "image" | "video"
+    poster_path: string | null
+    sequence_count: number
+    sequence_items: Array<{
+      id: string
+      name: string
+      image_path: string
+      media_type: "image" | "video"
+      poster_path: string | null
+    }>
+  }>
+): GallerySlideshowPhoto[] {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  const photos: GallerySlideshowPhoto[] = []
+
+  for (const id of orderedSelectedIds) {
+    const image = byId.get(id)
+    if (!image) continue
+
+    const siblings =
+      image.sequence_count > 1 && image.sequence_items.length > 0
+        ? image.sequence_items
+        : null
+
+    if (siblings) {
+      for (const shot of siblings) {
+        if (!shot.image_path) continue
+        photos.push({
+          image_id: shot.id,
+          name: shot.name,
+          image_path: shot.image_path,
+          media_type: shot.media_type,
+          poster_path: shot.poster_path,
+        })
+      }
+      continue
+    }
+
+    if (!image.image_path) continue
+    photos.push({
+      image_id: image.id,
+      name: image.name,
+      image_path: image.image_path,
+      media_type: image.media_type,
+      poster_path: image.poster_path,
+    })
+  }
+
+  return photos
+}
+
 /** Fisher–Yates shuffle of slideshow photos (does not mutate input). */
 export function shuffleSlideshowPhotos(
   photos: GallerySlideshowPhoto[],
