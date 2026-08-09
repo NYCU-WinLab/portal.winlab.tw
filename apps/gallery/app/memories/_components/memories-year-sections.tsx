@@ -2,7 +2,6 @@
 
 import { cn } from "@workspace/ui/lib/utils"
 
-import { AlbumSlideshowButton } from "@/app/albums/_components/album-slideshow"
 import { MemoriesPhotoCard } from "@/app/memories/_components/memories-photo-card"
 import {
   gallerySans,
@@ -13,18 +12,19 @@ import {
   memoriesYearsAgoLabel,
   type GalleryMemoryYearGroup,
 } from "@/lib/gallery/memories"
-import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 
 export function MemoriesYearSections({
   groups,
   currentYear,
-  slideshowPhotos,
-  slideshowTitle,
+  canSlideshow,
+  onOpenPhoto,
+  onStartSlideshow,
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
-  slideshowPhotos: GallerySlideshowPhoto[]
-  slideshowTitle: string
+  canSlideshow: boolean
+  onOpenPhoto: (imageId: string) => void
+  onStartSlideshow: (startIndex: number) => void
 }) {
   if (groups.length === 0) return null
 
@@ -62,18 +62,18 @@ export function MemoriesYearSections({
                     : `${group.photos.length} polaroids from this day.`}
                 </p>
               </div>
-              {slideshowPhotos.length > 0 ? (
-                <AlbumSlideshowButton
-                  photos={slideshowPhotos}
-                  albumTitle={slideshowTitle}
-                  startIndex={startIndex}
-                  triggerLabel={`Slideshow ${group.year}`}
+              {canSlideshow ? (
+                <button
+                  type="button"
+                  onClick={() => onStartSlideshow(startIndex)}
                   className={cn(
                     gallerySans(),
                     "inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-[11px] tracking-wide uppercase shadow-xs",
                     "hover:bg-accent hover:text-accent-foreground"
                   )}
-                />
+                >
+                  Slideshow {group.year}
+                </button>
               ) : null}
             </div>
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-10 md:grid-cols-3">
@@ -82,6 +82,7 @@ export function MemoriesYearSections({
                   key={photo.id}
                   photo={photo}
                   currentYear={currentYear}
+                  onOpen={() => onOpenPhoto(photo.id)}
                 />
               ))}
             </div>

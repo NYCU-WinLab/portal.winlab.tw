@@ -44,6 +44,15 @@ export function clampSlideshowStartIndex(
   return Math.min(Math.max(0, Math.trunc(startIndex)), length - 1)
 }
 
+/** Find a slideshow photo by image id; missing → 0. */
+export function findSlideshowIndexByImageId(
+  photos: Array<{ image_id: string }>,
+  imageId: string
+): number {
+  const index = photos.findIndex((photo) => photo.image_id === imageId)
+  return index >= 0 ? index : 0
+}
+
 /** Flatten year groups into slideshow order (newest year first). */
 export function flattenMemoryGroupsForSlideshow(
   groups: Array<{

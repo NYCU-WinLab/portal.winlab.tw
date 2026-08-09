@@ -1,5 +1,6 @@
+"use client"
+
 import Image from "next/image"
-import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -15,9 +16,11 @@ import { getGalleryThumbUrl } from "@/lib/gallery/url"
 export function MemoriesPhotoCard({
   photo,
   currentYear,
+  onOpen,
 }: {
   photo: GalleryMemoryPhoto
   currentYear: number
+  onOpen: () => void
 }) {
   const frame = getPolaroidFrame(photo.id)
   const tape = getPolaroidTape(photo.id)
@@ -33,9 +36,10 @@ export function MemoriesPhotoCard({
         frame.maxWidthClass
       )}
     >
-      <Link
-        href={`/?photo=${encodeURIComponent(photo.id)}`}
-        className="block focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none"
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full text-left focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none"
       >
         <div
           className={cn(
@@ -115,7 +119,7 @@ export function MemoriesPhotoCard({
             </p>
           </div>
         </div>
-      </Link>
+      </button>
     </article>
   )
 }

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   clampSlideshowIntervalMs,
   clampSlideshowStartIndex,
+  findSlideshowIndexByImageId,
   flattenMemoryGroupsForSlideshow,
   GALLERY_SLIDESHOW_DEFAULT_MS,
   nextSlideshowIndex,
@@ -48,6 +49,14 @@ describe("clampSlideshowStartIndex", () => {
 
   test("empty list stays zero", () => {
     expect(clampSlideshowStartIndex(5, 0)).toBe(0)
+  })
+})
+
+describe("findSlideshowIndexByImageId", () => {
+  test("returns matching index or zero", () => {
+    const photos = [{ image_id: "a" }, { image_id: "b" }]
+    expect(findSlideshowIndexByImageId(photos, "b")).toBe(1)
+    expect(findSlideshowIndexByImageId(photos, "missing")).toBe(0)
   })
 })
 

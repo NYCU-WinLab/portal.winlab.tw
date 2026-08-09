@@ -2,9 +2,8 @@ import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
-import { AlbumSlideshowButton } from "@/app/albums/_components/album-slideshow"
 import { MemoriesDayNavigator } from "@/app/memories/_components/memories-day-navigator"
-import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
+import { MemoriesDayView } from "@/app/memories/_components/memories-day-view"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import { galleryPanelClass, gallerySans } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
@@ -67,18 +66,6 @@ export default async function MemoriesPage({
             }
           />
           <MemoriesDayNavigator day={day} />
-          {slideshowPhotos.length > 0 ? (
-            <AlbumSlideshowButton
-              photos={slideshowPhotos}
-              albumTitle={`Memories · ${label}`}
-              triggerLabel="Slideshow"
-              className={cn(
-                gallerySans(),
-                "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
-                "hover:bg-accent hover:text-accent-foreground"
-              )}
-            />
-          ) : null}
         </div>
 
         {groups.length === 0 ? (
@@ -119,7 +106,7 @@ export default async function MemoriesPage({
             </p>
           </section>
         ) : (
-          <MemoriesYearSections
+          <MemoriesDayView
             groups={groups}
             currentYear={day.year}
             slideshowPhotos={slideshowPhotos}
