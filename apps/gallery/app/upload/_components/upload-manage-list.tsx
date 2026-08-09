@@ -172,6 +172,7 @@ function UploadListItem({
       data-sequence-index={
         typeof sequenceIndex === "number" ? sequenceIndex : undefined
       }
+      aria-selected={selectionMode ? selected : undefined}
       onClick={
         selectionMode
           ? (event) => {
