@@ -93,6 +93,7 @@ export function GalleryAlbumPhotoGrid({
   albumTitle: string
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const [lightboxFailed, setLightboxFailed] = useState(false)
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
   const active = photos.find((p) => p.image_id === openId) ?? null
@@ -150,14 +151,29 @@ export function GalleryAlbumPhotoGrid({
       <Dialog
         open={Boolean(active)}
         onOpenChange={(open) => {
-          if (!open) setOpenId(null)
+          if (!open) {
+            setOpenId(null)
+            setLightboxFailed(false)
+          }
         }}
       >
         <DialogContent className="max-w-3xl border-0 bg-transparent p-0 shadow-none sm:max-w-3xl">
           {active ? (
             <div className="overflow-hidden rounded-lg bg-[#f7f7f5] shadow-2xl">
               <DialogTitle className="sr-only">{active.name}</DialogTitle>
-              {active.media_type === "video" ? (
+              {lightboxFailed ? (
+                <div
+                  className={cn(
+                    gallerySans(),
+                    "flex min-h-[40dvh] flex-col items-center justify-center gap-2 bg-zinc-200/70 px-6 text-center text-sm text-zinc-600"
+                  )}
+                >
+                  <span>Preview unavailable</span>
+                  <span className="text-xs text-muted-foreground">
+                    Open on the wall or start the slideshow to keep moving.
+                  </span>
+                </div>
+              ) : active.media_type === "video" ? (
                 <video
                   src={mediaFor(active)}
                   poster={
@@ -168,6 +184,7 @@ export function GalleryAlbumPhotoGrid({
                   controls
                   playsInline
                   className="max-h-[75dvh] w-full bg-zinc-900 object-contain"
+                  onError={() => setLightboxFailed(true)}
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -175,6 +192,7 @@ export function GalleryAlbumPhotoGrid({
                   src={mediaFor(active)}
                   alt={active.name}
                   className="max-h-[75dvh] w-full object-contain"
+                  onError={() => setLightboxFailed(true)}
                 />
               )}
               <div className="space-y-2 px-5 py-4">
