@@ -35,6 +35,7 @@ import {
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { isCommentEdited } from "@/lib/gallery/comment-edit"
+import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
@@ -662,29 +663,4 @@ export function GalleryComments({
       </AlertDialog>
     </div>
   )
-}
-
-function removeCommentWithDescendants(
-  comments: GalleryComment[],
-  targetId: string
-): GalleryComment[] {
-  const childrenByParent = new Map<string, string[]>()
-  for (const c of comments) {
-    if (!c.parent_id) continue
-    const bucket = childrenByParent.get(c.parent_id) ?? []
-    bucket.push(c.id)
-    childrenByParent.set(c.parent_id, bucket)
-  }
-
-  const toDelete = new Set<string>()
-  const queue = [targetId]
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (!current || toDelete.has(current)) continue
-    toDelete.add(current)
-    const children = childrenByParent.get(current) ?? []
-    for (const childId of children) queue.push(childId)
-  }
-
-  return comments.filter((c) => !toDelete.has(c.id))
 }
