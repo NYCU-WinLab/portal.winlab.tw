@@ -14,6 +14,7 @@ import {
   type MediaHealthFinding,
   type MediaHealthScanRow,
 } from "@/lib/gallery/media-health"
+import { isGalleryVideoColumnsUnavailable } from "@/lib/gallery/manage-uploads"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -134,11 +135,34 @@ export async function scanGalleryMediaHealthPage(
     .order("id", { ascending: false })
     .range(safeOffset, safeOffset + MEDIA_HEALTH_PAGE_SIZE - 1)
 
+  let rows: MediaHealthScanRow[] = (data ?? []) as MediaHealthScanRow[]
   if (error) {
-    return { ok: false, error: `Could not load media: ${error.message}` }
+    if (isGalleryVideoColumnsUnavailable(error)) {
+      const fallback = await supabase
+        .from("gallery_images")
+        .select("id, name, image_path, created_by, created_at")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(safeOffset, safeOffset + MEDIA_HEALTH_PAGE_SIZE - 1)
+      if (fallback.error) {
+        return {
+          ok: false,
+          error: `Could not load media: ${fallback.error.message}`,
+        }
+      }
+      rows = ((fallback.data ?? []) as Array<Record<string, unknown>>).map(
+        (row) =>
+          ({
+            ...row,
+            media_type: "image",
+            poster_path: null,
+          }) as MediaHealthScanRow
+      )
+    } else {
+      return { ok: false, error: `Could not load media: ${error.message}` }
+    }
   }
 
-  const rows = (data ?? []) as MediaHealthScanRow[]
   const probed = await mapWithConcurrency(
     rows,
     MEDIA_HEALTH_PROBE_CONCURRENCY,
@@ -188,7 +212,16 @@ export async function adminDeleteBrokenGalleryImages(
     }
   }
 
-  const admin = createAdminClient()
+  let admin
+  try {
+    admin = createAdminClient()
+  } catch {
+    return {
+      ok: false,
+      error:
+        "Admin storage client is not configured — set SUPABASE_SECRET_KEY for media health deletes.",
+    }
+  }
   const ids = items.map((item) => item.id)
 
   const { data: existing, error: fetchError } = await admin
