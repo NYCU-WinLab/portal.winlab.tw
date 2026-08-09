@@ -76,3 +76,12 @@ left join lateral (
 ) cc on true;
 
 grant select on public.gallery_wall_page to anon, authenticated, service_role;
+
+-- gallery_comments (20260602010000) was created relying on Supabase's default
+-- privileges for its table grant, so prod grants SELECT to anon / authenticated
+-- but the captured baseline + migrations that `db reset` / CI replay do not —
+-- the same silent prod-vs-local divergence #332 warns about. The comment_count
+-- lateral above reads gallery_comments under security_invoker, so the grant has
+-- to be real on both. Pin it explicitly; a no-op against prod, which already
+-- has it (the wall's comment counts have always rendered, anon included).
+grant select on public.gallery_comments to anon, authenticated, service_role;
