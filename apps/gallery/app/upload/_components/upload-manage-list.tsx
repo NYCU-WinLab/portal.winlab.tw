@@ -196,7 +196,7 @@ function UploadListItem({
         selectionMode && "cursor-pointer",
         selectionMode &&
           selected &&
-          "border-foreground/25 bg-foreground/[0.04] ring-1 ring-foreground/15"
+          "border-foreground/35 bg-foreground/[0.07] shadow-[inset_3px_0_0_0_currentColor] ring-2 ring-foreground/25"
       )}
     >
       {reorderHandle}

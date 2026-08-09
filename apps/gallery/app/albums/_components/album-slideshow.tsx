@@ -1,6 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState, type TouchEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type TouchEvent,
+} from "react"
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -143,6 +149,24 @@ export function AlbumSlideshow({
         photos.length
       )
     )
+  }
+
+  const onProgressPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    const target = event.currentTarget
+    target.setPointerCapture(event.pointerId)
+    setPaused(true)
+    seekFromClientX(event.clientX, target)
+  }
+
+  const onProgressPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    seekFromClientX(event.clientX, event.currentTarget)
+  }
+
+  const onProgressPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
   useEffect(() => {
@@ -318,10 +342,14 @@ export function AlbumSlideshow({
           <button
             type="button"
             aria-label="Slideshow progress"
+            aria-valuemin={1}
+            aria-valuemax={photos.length}
+            aria-valuenow={index + 1}
             className="group relative mx-4 h-3 shrink-0 touch-none sm:mx-6"
-            onClick={(event) => {
-              seekFromClientX(event.clientX, event.currentTarget)
-            }}
+            onPointerDown={onProgressPointerDown}
+            onPointerMove={onProgressPointerMove}
+            onPointerUp={onProgressPointerUp}
+            onPointerCancel={onProgressPointerUp}
             onKeyDown={(event) => {
               if (event.key !== "Enter" && event.key !== " ") return
               event.preventDefault()
