@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 export const GALLERY_ALBUM_TITLE_MAX = 80
 export const GALLERY_ALBUM_SLUG_MAX = 80
 export const GALLERY_ALBUM_DESCRIPTION_MAX = 500
@@ -137,6 +139,15 @@ export function isGalleryAlbumsUnavailable(
     return true
   }
   return false
+}
+
+/** True when gallery_albums is queryable (migration applied). */
+export async function isGalleryAlbumsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase.from("gallery_albums").select("id").limit(1)
+  if (!error) return true
+  return !isGalleryAlbumsUnavailable(error)
 }
 
 /** After bulk remove, keep cover pointing at a remaining photo (or null). */

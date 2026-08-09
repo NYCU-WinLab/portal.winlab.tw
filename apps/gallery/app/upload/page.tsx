@@ -15,6 +15,7 @@ import {
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import type { ManageUploadRow } from "@/lib/gallery/manage-uploads"
 import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import { isGalleryTagsReady } from "@/lib/gallery/tags"
 import {
@@ -42,6 +43,7 @@ export default async function UploadPage() {
     settingsReady,
     favoritesReady,
     tagsReady,
+    albumsReady,
   ] = await Promise.all([
     supabase
       .from("gallery_images")
@@ -52,6 +54,7 @@ export default async function UploadPage() {
     isGallerySettingsReady(supabase),
     isGalleryFavoritesReady(supabase),
     isGalleryTagsReady(supabase),
+    isGalleryAlbumsReady(supabase),
   ])
 
   let imageRows: ManageUploadRow[] | null =
@@ -129,6 +132,7 @@ export default async function UploadPage() {
               takenAtAvailable={takenAtAvailable}
               favoritesAvailable={favoritesReady}
               tagsAvailable={tagsReady}
+              albumsAvailable={albumsReady}
             />
           )}
         </section>

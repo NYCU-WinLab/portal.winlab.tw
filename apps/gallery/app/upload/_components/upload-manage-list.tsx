@@ -545,12 +545,14 @@ export function UploadManageList({
   takenAtAvailable = true,
   favoritesAvailable = true,
   tagsAvailable = true,
+  albumsAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
   takenAtAvailable?: boolean
   favoritesAvailable?: boolean
   tagsAvailable?: boolean
+  albumsAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -972,6 +974,7 @@ export function UploadManageList({
   }
 
   const createAlbumFromSelection = () => {
+    if (!albumsAvailable) return
     const title = bulkAlbumDraft.trim()
     if (!title || selectedItems.length === 0 || isPending) return
     startTransition(async () => {
@@ -1149,35 +1152,41 @@ export function UploadManageList({
               >
                 {allSelected ? "Clear" : "Select all"}
               </button>
-              <GalleryAddToAlbum
-                imageIds={selectedItems.map((item) => item.id)}
-                triggerLabel={
-                  selectedItems.length > 0
-                    ? `Album (${selectedItems.length})`
-                    : "Album"
-                }
-                triggerClassName={cn(
-                  galleryPillClass(),
-                  "h-auto gap-0 !text-xs normal-case",
-                  (isPending || selectedItems.length === 0) && "opacity-40"
-                )}
-                onAdded={() => {
-                  setSelectedIds(new Set())
-                  setSelectionMode(false)
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkAlbumDraft("")
-                  setBulkAlbumOpen(true)
-                }}
-                disabled={isPending || selectedItems.length === 0}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                New album
-                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-              </button>
+              {albumsAvailable ? (
+                <>
+                  <GalleryAddToAlbum
+                    imageIds={selectedItems.map((item) => item.id)}
+                    triggerLabel={
+                      selectedItems.length > 0
+                        ? `Album (${selectedItems.length})`
+                        : "Album"
+                    }
+                    triggerClassName={cn(
+                      galleryPillClass(),
+                      "h-auto gap-0 !text-xs normal-case",
+                      (isPending || selectedItems.length === 0) && "opacity-40"
+                    )}
+                    onAdded={() => {
+                      setSelectedIds(new Set())
+                      setSelectionMode(false)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkAlbumDraft("")
+                      setBulkAlbumOpen(true)
+                    }}
+                    disabled={isPending || selectedItems.length === 0}
+                    className={cn(galleryPillClass(), "disabled:opacity-40")}
+                  >
+                    New album
+                    {selectedItems.length > 0
+                      ? ` (${selectedItems.length})`
+                      : ""}
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={() => openSlideshow("covers")}
@@ -1320,15 +1329,17 @@ export function UploadManageList({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem
-                    disabled={isPending || selectedItems.length === 0}
-                    onSelect={() => {
-                      setBulkAlbumDraft("")
-                      setBulkAlbumOpen(true)
-                    }}
-                  >
-                    New album…
-                  </DropdownMenuItem>
+                  {albumsAvailable ? (
+                    <DropdownMenuItem
+                      disabled={isPending || selectedItems.length === 0}
+                      onSelect={() => {
+                        setBulkAlbumDraft("")
+                        setBulkAlbumOpen(true)
+                      }}
+                    >
+                      New album…
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem
                     disabled={!canSlideshow}
                     onSelect={() => openSlideshow("shuffled")}
