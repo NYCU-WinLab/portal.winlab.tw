@@ -66,6 +66,9 @@ async function ensureGalleryTag(
         }
       }
     }
+    if (isGalleryTagsUnavailable(insertError)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
     return { ok: false, error: insertError.message }
   }
 
@@ -156,6 +159,9 @@ export async function attachGalleryTagToImages(
 
     if (linkError) {
       if (/duplicate|unique|23505/i.test(linkError.message)) continue
+      if (isGalleryTagsUnavailable(linkError)) {
+        return { ok: false, error: "Tags are not available yet." }
+      }
       return { ok: false, error: linkError.message }
     }
     attached += 1
