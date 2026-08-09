@@ -1,14 +1,6 @@
 "use client"
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-  type Dispatch,
-  type SetStateAction,
-} from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import {
@@ -22,6 +14,7 @@ import { ReactionGlyph } from "@/app/_components/reaction-glyph"
 import { galleryPillClass } from "@/components/gallery-chrome"
 import { setGalleryReaction } from "@/app/actions"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
+import { nextReactionState } from "@/lib/gallery/reaction-optimistic"
 import {
   GALLERY_REACTIONS,
   type GalleryReaction,
@@ -31,53 +24,6 @@ import {
 } from "@/lib/gallery/reactions"
 import type { GalleryComment, GalleryImage } from "@/lib/gallery/types"
 import { createClient } from "@/lib/supabase/client"
-
-export function applyReactionOptimistic(
-  prev: GalleryReaction | null,
-  reaction: GalleryReaction,
-  viewerName: string,
-  setCounts: Dispatch<SetStateAction<ReactionCounts>>,
-  setNamesByReaction: Dispatch<SetStateAction<ReactionNames>>,
-  setMyReaction: Dispatch<SetStateAction<GalleryReaction | null>>
-) {
-  if (prev === reaction) {
-    setCounts((c) => ({
-      ...c,
-      [reaction]: Math.max(0, c[reaction] - 1),
-    }))
-    setNamesByReaction((n) => ({
-      ...n,
-      [reaction]: n[reaction].filter((name) => name !== viewerName),
-    }))
-    setMyReaction(null)
-    return "removed" as const
-  }
-  if (prev) {
-    setCounts((c) => ({
-      ...c,
-      [prev]: Math.max(0, c[prev] - 1),
-      [reaction]: c[reaction] + 1,
-    }))
-    setNamesByReaction((n) => ({
-      ...n,
-      [prev]: n[prev].filter((name) => name !== viewerName),
-      [reaction]: n[reaction].includes(viewerName)
-        ? n[reaction]
-        : [...n[reaction], viewerName],
-    }))
-    setMyReaction(reaction)
-    return "updated" as const
-  }
-  setCounts((c) => ({ ...c, [reaction]: c[reaction] + 1 }))
-  setNamesByReaction((n) => ({
-    ...n,
-    [reaction]: n[reaction].includes(viewerName)
-      ? n[reaction]
-      : [...n[reaction], viewerName],
-  }))
-  setMyReaction(reaction)
-  return "added" as const
-}
 
 export function ReactionSummary({
   total,
@@ -337,16 +283,18 @@ export function useGalleryCardSocial({
         return
       }
 
-      const outcome = applyReactionOptimistic(
+      const next = nextReactionState(
         myReaction,
         reaction,
         viewerName,
-        setCounts,
-        setNamesByReaction,
-        setMyReaction
+        counts,
+        namesByReaction
       )
-      if (outcome === "removed") toast.success("Reaction removed.")
-      else if (outcome === "updated") toast.success("Reaction updated.")
+      setCounts(next.counts)
+      setNamesByReaction(next.names)
+      setMyReaction(next.myReaction)
+      if (next.outcome === "removed") toast.success("Reaction removed.")
+      else if (next.outcome === "updated") toast.success("Reaction updated.")
       else toast.success("Reaction added.")
     })
   }
