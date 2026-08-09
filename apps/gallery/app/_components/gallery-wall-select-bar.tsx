@@ -422,6 +422,7 @@ export function GalleryWallSelectBar({
       <button
         type="button"
         onClick={onToggleMode}
+        aria-pressed={selectionMode}
         className={cn(
           gallerySans(),
           "inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
@@ -442,6 +443,10 @@ export function GalleryWallSelectBar({
         <button
           type="button"
           onClick={onToggleSelectAll}
+          aria-pressed={allSelected}
+          aria-label={
+            allSelected ? "Clear all selected photos" : "Select all photos"
+          }
           className={cn(
             gallerySans(),
             "inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
