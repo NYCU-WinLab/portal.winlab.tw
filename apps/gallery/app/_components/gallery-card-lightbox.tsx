@@ -287,6 +287,8 @@ export function GalleryLightboxSocialAside({
   onArtworkRenamed,
   favorited,
   onFavoritedChange,
+  commentPinAvailable = true,
+  commentLikesAvailable = true,
 }: {
   image: GalleryImage
   activeItem: GallerySequenceItem | undefined
@@ -320,6 +322,8 @@ export function GalleryLightboxSocialAside({
   onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
   favorited?: boolean
   onFavoritedChange?: (favorited: boolean) => void
+  commentPinAvailable?: boolean
+  commentLikesAvailable?: boolean
 }) {
   const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
   const reactionPeek = formatReactionSummary(counts)
@@ -545,6 +549,8 @@ export function GalleryLightboxSocialAside({
           members={members}
           isAdmin={isAdmin}
           highlightCommentId={highlightCommentId}
+          commentPinAvailable={commentPinAvailable}
+          commentLikesAvailable={commentLikesAvailable}
         />
       </div>
     </aside>

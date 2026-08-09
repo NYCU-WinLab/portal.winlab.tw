@@ -50,6 +50,8 @@ export function GalleryComments({
   isAdmin = false,
   highlightCommentId = null,
   loading = false,
+  commentPinAvailable = true,
+  commentLikesAvailable = true,
 }: {
   imageId: string
   comments: GalleryComment[]
@@ -61,6 +63,8 @@ export function GalleryComments({
   isAdmin?: boolean
   highlightCommentId?: string | null
   loading?: boolean
+  commentPinAvailable?: boolean
+  commentLikesAvailable?: boolean
 }) {
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
@@ -321,7 +325,10 @@ export function GalleryComments({
               const isEditing = editingId === comment.id
               const edited = isCommentEdited(comment)
               const canPin =
-                isAdmin && comment.parent_id === null && comment.depth === 0
+                isAdmin &&
+                commentPinAvailable &&
+                comment.parent_id === null &&
+                comment.depth === 0
               return (
                 <li
                   key={comment.id}
@@ -396,26 +403,28 @@ export function GalleryComments({
                   )}
                   {!isEditing ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleLike(comment.id)}
-                        disabled={!isSignedIn || isPending}
-                        className={cn(
-                          galleryPillClass(),
-                          "inline-flex items-center gap-1",
-                          comment.liked_by_me && "text-foreground"
-                        )}
-                        aria-pressed={comment.liked_by_me}
-                      >
-                        <IconThumbUp
+                      {commentLikesAvailable ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleLike(comment.id)}
+                          disabled={!isSignedIn || isPending}
                           className={cn(
-                            "size-3.5",
-                            comment.liked_by_me && "fill-current"
+                            galleryPillClass(),
+                            "inline-flex items-center gap-1",
+                            comment.liked_by_me && "text-foreground"
                           )}
-                          aria-hidden
-                        />
-                        {comment.like_count > 0 ? comment.like_count : "Like"}
-                      </button>
+                          aria-pressed={comment.liked_by_me}
+                        >
+                          <IconThumbUp
+                            className={cn(
+                              "size-3.5",
+                              comment.liked_by_me && "fill-current"
+                            )}
+                            aria-hidden
+                          />
+                          {comment.like_count > 0 ? comment.like_count : "Like"}
+                        </button>
+                      ) : null}
                       {isSignedIn ? (
                         <button
                           type="button"

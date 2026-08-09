@@ -76,5 +76,11 @@ export async function loadLightboxSocial(
     reaction_counts: counts,
     reaction_names: names,
     my_reaction: myReaction,
+    commentPinAvailable: commentLoad.error
+      ? false
+      : commentLoad.commentPinAvailable,
+    commentLikesAvailable: commentLoad.error
+      ? false
+      : commentLoad.commentLikesAvailable,
   }
 }
