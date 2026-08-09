@@ -5,6 +5,7 @@ export type GalleryHomeFilters = {
   media: GalleryMediaFilter
   uploadedAfter: string | null
   query: string | null
+  tagSlug: string | null
 }
 
 export const EMPTY_GALLERY_HOME_FILTERS: GalleryHomeFilters = {
@@ -12,6 +13,7 @@ export const EMPTY_GALLERY_HOME_FILTERS: GalleryHomeFilters = {
   media: "all",
   uploadedAfter: null,
   query: null,
+  tagSlug: null,
 }
 
 export function parseGalleryHomeFilters(params: {
@@ -19,13 +21,17 @@ export function parseGalleryHomeFilters(params: {
   media?: string
   after?: string
   q?: string
+  tag?: string
 }): GalleryHomeFilters {
   const media =
     params.media === "image" || params.media === "video" ? params.media : "all"
   const uploaderId = params.uploader?.trim() || null
   const uploadedAfter = params.after?.trim() || null
   const query = params.q?.trim() || null
-  return { uploaderId, media, uploadedAfter, query }
+  const tagRaw = params.tag?.trim().toLowerCase() || null
+  const tagSlug =
+    tagRaw && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tagRaw) ? tagRaw : null
+  return { uploaderId, media, uploadedAfter, query, tagSlug }
 }
 
 export function hasActiveGalleryFilters(filters: GalleryHomeFilters): boolean {
@@ -33,7 +39,8 @@ export function hasActiveGalleryFilters(filters: GalleryHomeFilters): boolean {
     filters.uploaderId !== null ||
     filters.media !== "all" ||
     filters.uploadedAfter !== null ||
-    filters.query !== null
+    filters.query !== null ||
+    filters.tagSlug !== null
   )
 }
 
@@ -56,6 +63,7 @@ export function buildGalleryHomeHref({
   }
   if (filters?.uploadedAfter) params.set("after", filters.uploadedAfter)
   if (filters?.query) params.set("q", filters.query)
+  if (filters?.tagSlug) params.set("tag", filters.tagSlug)
   if (photoId) params.set("photo", photoId)
   if (commentId) params.set("comment", commentId)
   const qs = params.toString()
@@ -82,9 +90,13 @@ function dateLabelFromAfter(after: string | null): string | null {
 
 export function describeGalleryFilterSummary(
   filters: GalleryHomeFilters,
-  members: { id: string; name: string | null; email: string | null }[]
+  members: { id: string; name: string | null; email: string | null }[],
+  tagLabel?: string | null
 ): string[] {
   const parts: string[] = []
+  if (filters.tagSlug) {
+    parts.push(tagLabel?.trim() || `#${filters.tagSlug}`)
+  }
   if (filters.uploaderId) {
     const member = members.find((item) => item.id === filters.uploaderId)
     parts.push(member?.name ?? member?.email ?? "Member")

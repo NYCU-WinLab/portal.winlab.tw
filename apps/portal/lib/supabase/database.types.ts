@@ -932,6 +932,56 @@ export type Database = {
           },
         ]
       }
+      gallery_image_tags: {
+        Row: {
+          created_at: string
+          created_by: string
+          image_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          image_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          image_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_image_tags_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_tags_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_tags_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gallery_images: {
         Row: {
           created_at: string
@@ -1005,6 +1055,38 @@ export type Database = {
           {
             foreignKeyName: "gallery_settings_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_tags: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_tags_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
@@ -2217,6 +2299,19 @@ export type Database = {
       gallery_admin_set_image_pin: {
         Args: { p_image_id: string; p_pinned: boolean }
         Returns: undefined
+      }
+      gallery_list_popular_tags: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+          use_count: number
+        }[]
+      }
+      gallery_wall_cover_ids_for_tag: {
+        Args: { p_tag_slug: string }
+        Returns: string[]
       }
       gallery_wall_cover_rank: { Args: { p_image_id: string }; Returns: number }
       get_game_leaderboard: {

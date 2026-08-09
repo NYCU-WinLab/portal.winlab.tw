@@ -11,6 +11,7 @@ export type GalleryWallFiltersInput = {
   media?: string
   after?: string
   q?: string
+  tag?: string
 }
 
 export async function fetchGalleryWallPage(

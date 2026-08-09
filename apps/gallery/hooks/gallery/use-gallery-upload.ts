@@ -100,7 +100,11 @@ export function useGalleryUpload() {
     }
   }
 
-  function runUpload(files: File[], baseName: string, opts?: RunOptions) {
+  function runUpload(
+    files: File[],
+    baseName: string,
+    opts?: RunOptions & { tagNames?: string[] }
+  ) {
     startTransition(async () => {
       const controller = beginAbortableRun()
       try {
@@ -109,6 +113,7 @@ export function useGalleryUpload() {
           baseName,
           setStatus,
           signal: controller.signal,
+          tagNames: opts?.tagNames,
         })
 
         if (abortRef.current === controller) abortRef.current = null

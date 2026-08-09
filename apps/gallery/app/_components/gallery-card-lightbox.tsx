@@ -18,6 +18,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
+import { GalleryImageTags } from "@/app/_components/gallery-image-tags"
 import { PinWallButton } from "@/app/_components/pin-wall-button"
 import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
 import {
@@ -460,6 +461,12 @@ export function GalleryLightboxSocialAside({
             </p>
           ) : null}
         </div>
+        <GalleryImageTags
+          key={activeItem?.id ?? image.id}
+          imageId={activeItem?.id ?? image.id}
+          tags={activeItem?.tags ?? image.tags ?? []}
+          canEdit={isSignedIn}
+        />
         {isAdmin ? (
           <div className="gallery-lightbox-aside-pin flex justify-end">
             <PinWallButton

@@ -84,6 +84,7 @@ export function GalleryInfiniteWall({
       media: filters.media !== "all" ? filters.media : undefined,
       after: filters.uploadedAfter ?? undefined,
       q: filters.query ?? undefined,
+      tag: filters.tagSlug ?? undefined,
     }),
     [filters]
   )

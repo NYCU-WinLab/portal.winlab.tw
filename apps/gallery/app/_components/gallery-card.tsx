@@ -109,6 +109,7 @@ export function GalleryCard({
             poster_path: image.poster_path,
             created_at: image.created_at,
             sequence_index: image.sequence_index,
+            tags: image.tags ?? [],
           },
         ]
   const isSequence = sequenceMedia.length > 1

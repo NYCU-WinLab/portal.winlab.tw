@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  useEffect,
   useMemo,
   useState,
   useTransition,
@@ -13,6 +12,7 @@ import {
   IconChevronDown,
   IconFilter,
   IconSearch,
+  IconTag,
   IconX,
 } from "@tabler/icons-react"
 
@@ -39,6 +39,7 @@ import {
   type GalleryMediaFilter,
 } from "@/lib/gallery/home-filters"
 import type { GalleryMember } from "@/lib/gallery/types"
+import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
 
 const MEDIA_OPTIONS: { value: GalleryMediaFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -110,18 +111,23 @@ function FilterPill({
 export function GalleryHomeFiltersBar({
   filters,
   members,
+  popularTags = [],
 }: {
   filters: GalleryHomeFilters
   members: GalleryMember[]
+  popularTags?: GalleryTagSuggestion[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [searchDraft, setSearchDraft] = useState(filters.query ?? "")
+  const [tagDraft, setTagDraft] = useState("")
+  const [prevQuery, setPrevQuery] = useState(filters.query)
 
-  useEffect(() => {
+  if (filters.query !== prevQuery) {
+    setPrevQuery(filters.query)
     setSearchDraft(filters.query ?? "")
-  }, [filters.query])
+  }
 
   const apply = (next: GalleryHomeFilters) => {
     const photo = searchParams.get("photo")
@@ -136,11 +142,24 @@ export function GalleryHomeFiltersBar({
     })
   }
 
+  const activeTag = useMemo(() => {
+    if (!filters.tagSlug) return null
+    return (
+      popularTags.find((tag) => tag.slug === filters.tagSlug) ?? {
+        id: filters.tagSlug,
+        name: filters.tagSlug,
+        slug: filters.tagSlug,
+        use_count: 0,
+      }
+    )
+  }, [filters.tagSlug, popularTags])
+
   const datePreset = datePresetFromAfter(filters.uploadedAfter)
   const active = hasActiveGalleryFilters(filters)
   const summaryParts = useMemo(
-    () => describeGalleryFilterSummary(filters, members),
-    [filters, members]
+    () =>
+      describeGalleryFilterSummary(filters, members, activeTag?.name ?? null),
+    [activeTag?.name, filters, members]
   )
 
   const uploaderLabel = useMemo(() => {
@@ -152,6 +171,7 @@ export function GalleryHomeFiltersBar({
   const mobileFilterLabel = useMemo(() => {
     if (!active) return "Filters"
     const bits: string[] = []
+    if (filters.tagSlug) bits.push(`#${filters.tagSlug}`)
     if (filters.media !== "all") {
       bits.push(
         MEDIA_OPTIONS.find((o) => o.value === filters.media)?.label ?? "Media"
@@ -164,7 +184,14 @@ export function GalleryHomeFiltersBar({
     }
     if (filters.uploaderId) bits.push(uploaderLabel)
     return bits.slice(0, 2).join(" · ") || "Filters"
-  }, [active, datePreset, filters.media, filters.uploaderId, uploaderLabel])
+  }, [
+    active,
+    datePreset,
+    filters.media,
+    filters.tagSlug,
+    filters.uploaderId,
+    uploaderLabel,
+  ])
 
   const onSearchSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -174,13 +201,26 @@ export function GalleryHomeFiltersBar({
     })
   }
 
+  const applyTagDraft = () => {
+    const slug = tagDraft.trim().toLowerCase().replace(/\s+/g, "-")
+    if (!slug) {
+      apply({ ...filters, tagSlug: null })
+      return
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return
+    setTagDraft("")
+    apply({ ...filters, tagSlug: slug })
+  }
+
   const clearAll = () => {
     setSearchDraft("")
+    setTagDraft("")
     apply({
       uploaderId: null,
       media: "all",
       uploadedAfter: null,
       query: null,
+      tagSlug: null,
     })
   }
 
@@ -289,6 +329,34 @@ export function GalleryHomeFiltersBar({
                 )}
               >
                 <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
+                  Tag
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs"
+                  onClick={() => apply({ ...filters, tagSlug: null })}
+                >
+                  Any tag
+                </DropdownMenuItem>
+                {popularTags.map((tag) => (
+                  <DropdownMenuItem
+                    key={tag.id}
+                    className="cursor-pointer text-xs"
+                    onClick={() =>
+                      apply({
+                        ...filters,
+                        tagSlug: tag.slug,
+                      })
+                    }
+                  >
+                    <span className="truncate">
+                      #{tag.slug}
+                      {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                    </span>
+                    {filters.tagSlug === tag.slug ? " ·" : ""}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
                   Media
                 </DropdownMenuLabel>
                 {MEDIA_OPTIONS.map((option) => (
@@ -378,6 +446,79 @@ export function GalleryHomeFiltersBar({
 
           {/* Desktop: expanded pill row */}
           <div className="hidden flex-wrap items-center justify-center gap-1.5 sm:flex">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  className={cn(
+                    galleryFilterChipClass(filters.tagSlug !== null),
+                    "inline-flex items-center gap-1",
+                    isPending && "opacity-50"
+                  )}
+                >
+                  <IconTag className="size-3 opacity-70" aria-hidden />
+                  <span className="max-w-[10rem] truncate">
+                    {activeTag ? `#${activeTag.slug}` : "Any tag"}
+                  </span>
+                  <IconChevronDown className="size-3 shrink-0 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="center"
+                className={cn(gallerySans(), "max-h-72 w-56 overflow-y-auto")}
+              >
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs"
+                  onClick={() => apply({ ...filters, tagSlug: null })}
+                >
+                  Any tag
+                </DropdownMenuItem>
+                {popularTags.map((tag) => (
+                  <DropdownMenuItem
+                    key={tag.id}
+                    className="cursor-pointer text-xs"
+                    onClick={() =>
+                      apply({
+                        ...filters,
+                        tagSlug: tag.slug,
+                      })
+                    }
+                  >
+                    <span className="truncate">
+                      {tag.name}
+                      {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <div className="flex items-center gap-1 px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault()
+                        applyTagDraft()
+                      }
+                    }}
+                    placeholder="slug…"
+                    className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
+                  />
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-foreground"
+                    onClick={applyTagDraft}
+                  >
+                    Go
+                  </button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <FilterDivider />
+
             {MEDIA_OPTIONS.map((option) => (
               <FilterPill
                 key={option.value}
@@ -496,7 +637,7 @@ export function GalleryHomeFiltersBar({
             </p>
           ) : (
             <p className={cn(gallerySans(), "text-[11px] text-zinc-500/90")}>
-              Media · when · who
+              Media · when · who · tags
             </p>
           )}
         </div>

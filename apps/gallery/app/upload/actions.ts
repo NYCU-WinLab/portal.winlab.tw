@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import {
   allObjectNamesPresent,
@@ -9,6 +10,7 @@ import {
   objectNamesFromPaths,
   storageSearchOptions,
 } from "@/lib/gallery/storage-verify"
+import { parseGalleryTagList } from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
@@ -24,6 +26,7 @@ export type RegisterMediaInput = {
   durationSeconds?: number | null
   sequenceId?: string | null
   sequenceIndex?: number | null
+  tagNames?: string[]
 }
 
 /**
@@ -198,6 +201,11 @@ export async function registerGalleryImage(
       ok: false,
       error: `Database insert failed: ${insertError?.message ?? "Unknown error."}`,
     }
+  }
+
+  const tagNames = parseGalleryTagList(input.tagNames)
+  if (tagNames.length > 0) {
+    await attachGalleryTagsToImage(inserted.id, tagNames, userId, supabase)
   }
 
   revalidatePath("/")

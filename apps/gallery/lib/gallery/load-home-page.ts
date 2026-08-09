@@ -10,6 +10,7 @@ import {
   normalizeReactionCounts,
   normalizeReactionNames,
 } from "@/lib/gallery/reactions"
+import type { GalleryTag } from "@/lib/gallery/tags"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
@@ -133,6 +134,69 @@ function buildCommentCountByImage(
   return counts
 }
 
+
+type ImageTagJoinRow = {
+  image_id: string
+  gallery_tags:
+    | { id: string; name: string; slug: string }
+    | { id: string; name: string; slug: string }[]
+    | null
+}
+
+function buildTagsByImage(rows: ImageTagJoinRow[]): Map<string, GalleryTag[]> {
+  const map = new Map<string, GalleryTag[]>()
+  for (const row of rows) {
+    const tagValue = row.gallery_tags
+    const tag = Array.isArray(tagValue) ? tagValue[0] : tagValue
+    if (!tag?.id || !tag.slug) continue
+    const bucket = map.get(row.image_id) ?? []
+    if (bucket.some((item) => item.id === tag.id)) continue
+    bucket.push({ id: tag.id, name: tag.name, slug: tag.slug })
+    map.set(row.image_id, bucket)
+  }
+  for (const [imageId, tags] of map) {
+    map.set(
+      imageId,
+      [...tags].sort((a, b) => a.name.localeCompare(b.name))
+    )
+  }
+  return map
+}
+
+async function loadTagsByImageIds(
+  supabase: SupabaseClient,
+  imageIds: string[]
+): Promise<Map<string, GalleryTag[]>> {
+  if (imageIds.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from("gallery_image_tags")
+    .select("image_id, gallery_tags(id, name, slug)")
+    .in("image_id", imageIds)
+  if (error) {
+    console.error("[gallery] failed to load tags", error)
+    return new Map()
+  }
+  return buildTagsByImage((data ?? []) as ImageTagJoinRow[])
+}
+
+async function resolveTagCoverIds(
+  supabase: SupabaseClient,
+  tagSlug: string | null
+): Promise<"none" | string[] | null> {
+  if (!tagSlug) return null
+  const { data: coverIdRows, error: tagCoverError } = await supabase.rpc(
+    "gallery_wall_cover_ids_for_tag",
+    { p_tag_slug: tagSlug }
+  )
+  if (tagCoverError) {
+    console.error("[gallery] failed to resolve tag covers", tagCoverError)
+    throw new Error(tagCoverError.message || "Failed to filter by tag.")
+  }
+  const tagCoverIds = ((coverIdRows ?? []) as string[]).filter(Boolean)
+  if (tagCoverIds.length === 0) return "none"
+  return tagCoverIds
+}
+
 function toGalleryImageBase(image: CoverRow): GalleryImage {
   return {
     id: image.id,
@@ -152,6 +216,7 @@ function toGalleryImageBase(image: CoverRow): GalleryImage {
     sequence_missing_indexes: [],
     comments: [],
     comment_count: 0,
+    tags: [],
     uploader_name: "Unknown",
     reaction_counts: EMPTY_REACTION_COUNTS,
     my_reaction: null,
@@ -203,7 +268,8 @@ async function loadSequenceRowsById(
 /** Fill in sequence_count / sequence_items / gaps from the sibling rows. */
 function expandSequences(
   images: GalleryImage[],
-  sequenceRowsById: Map<string, CoverRow[]>
+  sequenceRowsById: Map<string, CoverRow[]>,
+  tagsByImage: Map<string, GalleryTag[]> = new Map()
 ): void {
   for (const image of images) {
     if (!image.sequence_id) continue
@@ -223,6 +289,7 @@ function expandSequences(
       created_at: item.created_at,
       sequence_index:
         typeof item.sequence_index === "number" ? item.sequence_index : null,
+      tags: tagsByImage.get(item.id) ?? [],
     }))
   }
 }
@@ -251,20 +318,42 @@ async function loadGalleryHomeRangeViaView(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult | null> {
-  const rowsBase = supabase.from("gallery_wall_page").select(WALL_PAGE_COLUMNS)
-  const rowsQuery = withWallFilters(rowsBase, filters)
+  const tagCoverIds = await resolveTagCoverIds(supabase, filters.tagSlug)
+  if (tagCoverIds === "none") {
+    const members = userId
+      ? buildMembers(
+          ((
+            await supabase
+              .from("user_profiles")
+              .select("id, name")
+              .order("name", { ascending: true })
+          ).data ?? []) as ProfileRow[]
+        )
+      : []
+    return { images: [], members, totalCount: 0 }
+  }
+
+  let rowsBase = supabase.from("gallery_wall_page").select(WALL_PAGE_COLUMNS)
+  rowsBase = withWallFilters(rowsBase, filters)
+  if (tagCoverIds) {
+    rowsBase = rowsBase.in("id", tagCoverIds)
+  }
+  const rowsQuery = rowsBase
     .order("pinned_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .range(from, to)
 
-  const countBase = supabase
+  let countBase = supabase
     .from("gallery_wall_covers")
     .select("id", { count: "exact", head: true })
-  const countQuery = withWallFilters(countBase, filters)
+  countBase = withWallFilters(countBase, filters)
+  if (tagCoverIds) {
+    countBase = countBase.in("id", tagCoverIds)
+  }
 
   const [rowsResult, countResult, membersResult] = await Promise.all([
     rowsQuery,
-    countQuery,
+    countBase,
     userId
       ? supabase
           .from("user_profiles")
@@ -287,6 +376,15 @@ async function loadGalleryHomeRangeViaView(
 
   const rows = (rowsResult.data ?? []) as WallPageRow[]
   const sequenceRowsById = await loadSequenceRowsById(supabase, rows)
+  const tagLookupIds = Array.from(
+    new Set([
+      ...rows.map((row) => row.id),
+      ...Array.from(sequenceRowsById.values()).flatMap((seqRows) =>
+        seqRows.map((row) => row.id)
+      ),
+    ])
+  )
+  const tagsByImage = await loadTagsByImageIds(supabase, tagLookupIds)
 
   const images: GalleryImage[] = rows.map((row) => {
     const base = toGalleryImageBase(row)
@@ -299,10 +397,11 @@ async function loadGalleryHomeRangeViaView(
       typeof row.my_reaction === "string" && isGalleryReaction(row.my_reaction)
         ? row.my_reaction
         : null
+    base.tags = tagsByImage.get(row.id) ?? []
     return base
   })
 
-  expandSequences(images, sequenceRowsById)
+  expandSequences(images, sequenceRowsById, tagsByImage)
 
   return {
     images,
@@ -322,6 +421,21 @@ async function loadGalleryHomeRangeLegacy(
   supabase: SupabaseClient,
   { from, to, userId, filters }: RangeArgs
 ): Promise<RangeResult> {
+  const tagCoverIds = await resolveTagCoverIds(supabase, filters.tagSlug)
+  if (tagCoverIds === "none") {
+    const members = userId
+      ? buildMembers(
+          ((
+            await supabase
+              .from("user_profiles")
+              .select("id, name")
+              .order("name", { ascending: true })
+          ).data ?? []) as ProfileRow[]
+        )
+      : []
+    return { images: [], members, totalCount: 0 }
+  }
+
   const [profilesResult, imagesResult] = await Promise.all([
     userId
       ? supabase
@@ -330,10 +444,14 @@ async function loadGalleryHomeRangeLegacy(
           .order("name", { ascending: true })
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     (() => {
-      const base = supabase
+      let base = supabase
         .from("gallery_wall_covers")
         .select(COVER_COLUMNS, { count: "exact" })
-      return withWallFilters(base, filters)
+      base = withWallFilters(base, filters)
+      if (tagCoverIds) {
+        base = base.in("id", tagCoverIds)
+      }
+      return base
         .order("pinned_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .range(from, to)
@@ -355,11 +473,20 @@ async function loadGalleryHomeRangeLegacy(
   const sequenceRowsById = await loadSequenceRowsById(supabase, coverRows)
 
   const imageIds = coverRows.map((image) => image.id)
+  const tagLookupIds = Array.from(
+    new Set([
+      ...imageIds,
+      ...Array.from(sequenceRowsById.values()).flatMap((seqRows) =>
+        seqRows.map((row) => row.id)
+      ),
+    ])
+  )
   let countsByImage = new Map<string, typeof EMPTY_REACTION_COUNTS>()
   let namesByImage = new Map<string, typeof EMPTY_REACTION_NAMES>()
   const myReactionByImage = new Map<string, GalleryImage["my_reaction"]>()
   let commentCountByImage = new Map<string, number>()
   let nameById = buildNameById((profilesResult.data ?? []) as ProfileRow[])
+  const tagsByImage = await loadTagsByImageIds(supabase, tagLookupIds)
 
   if (imageIds.length > 0) {
     const [voteResult, commentCountResult] = await Promise.all([
@@ -436,10 +563,11 @@ async function loadGalleryHomeRangeLegacy(
     base.reaction_counts = countsByImage.get(image.id) ?? EMPTY_REACTION_COUNTS
     base.my_reaction = myReactionByImage.get(image.id) ?? null
     base.reaction_names = namesByImage.get(image.id) ?? EMPTY_REACTION_NAMES
+    base.tags = tagsByImage.get(image.id) ?? []
     return base
   })
 
-  expandSequences(images, sequenceRowsById)
+  expandSequences(images, sequenceRowsById, tagsByImage)
 
   return {
     images,
@@ -464,6 +592,7 @@ const DEFAULT_FILTERS: GalleryHomeFilters = {
   media: "all",
   uploadedAfter: null,
   query: null,
+  tagSlug: null,
 }
 
 export async function loadGalleryHomePage(
