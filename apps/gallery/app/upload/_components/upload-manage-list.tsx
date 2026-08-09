@@ -600,6 +600,7 @@ export function UploadManageList({
   tagsAvailable = true,
   albumsAvailable = true,
   pinAvailable = true,
+  sequencesAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
@@ -608,6 +609,7 @@ export function UploadManageList({
   tagsAvailable?: boolean
   albumsAvailable?: boolean
   pinAvailable?: boolean
+  sequencesAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -681,7 +683,7 @@ export function UploadManageList({
 
   const visibleTimeline = useMemo(() => {
     let next = timeline
-    if (incompleteOnly) {
+    if (incompleteOnly && sequencesAvailable) {
       const incompleteIds = new Set(
         filterIncompleteSequences(sequences).map(
           (sequence) => sequence.sequenceId
@@ -709,7 +711,14 @@ export function UploadManageList({
         .filter((entry): entry is (typeof timeline)[number] => entry != null)
     }
     return next
-  }, [incompleteOnly, sequences, timeline, uploadDayOnly, takenAtAvailable])
+  }, [
+    incompleteOnly,
+    sequences,
+    sequencesAvailable,
+    timeline,
+    uploadDayOnly,
+    takenAtAvailable,
+  ])
 
   const selectableItems = useMemo<SelectableItem[]>(
     () =>
@@ -1171,7 +1180,7 @@ export function UploadManageList({
             Shift+click or click a row for ranges · A selects visible
           </span>
         ) : null}
-        {incompleteCount > 0 ? (
+        {sequencesAvailable && incompleteCount > 0 ? (
           <button
             type="button"
             onClick={() => setIncompleteOnly((value) => !value)}

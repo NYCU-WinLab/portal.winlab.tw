@@ -406,7 +406,7 @@ export default async function UploadPage() {
           </div>
           {myImages.length === 0 ? (
             <p className={gallerySectionLeadClass()}>
-              Nothing hung yet ??drop a photo above to claim a spot on the wall.
+              Nothing hung yet — drop a photo above to claim a spot on the wall.
             </p>
           ) : (
             <UploadManageList
@@ -417,6 +417,7 @@ export default async function UploadPage() {
               tagsAvailable={tagsReady}
               albumsAvailable={albumsReady}
               pinAvailable={pinAvailable}
+              sequencesAvailable={sequenceAvailable}
             />
           )}
         </section>
