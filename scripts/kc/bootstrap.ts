@@ -5,7 +5,10 @@
 // requires a credential that can already create clients. Supply a Keycloak
 // admin login once via KEYCLOAK_BOOTSTRAP_USERNAME / _PASSWORD (password
 // grant through the built-in `admin-cli` client), let this run, then delete
-// those two lines. Everything afterwards runs on the service accounts.
+// those two lines — which this command does for you. Everything the *portal*
+// needs afterwards runs on the service accounts; the attribute work here
+// (`--attr`, `--allow-user-edit`) needs `manage-realm` and so needs that admin
+// login restored for the run.
 //
 // Creating clients in a shared realm is outward-facing and not trivially
 // reversible, so the default is a dry run. `--apply` is the deliberate step.
@@ -38,8 +41,13 @@ type ClientSpec = {
 }
 
 // Split by blast radius, per the research record §6. The cli credential is
-// read-only by construction: a leaked laptop secret cannot mutate the realm,
-// and revoking it cannot take the deployed portal down.
+// read-only by construction: a leaked laptop secret cannot mutate the realm.
+// It is also what the deployed portal authenticates as: the same secret,
+// deployed under KEYCLOAK_READ_CLIENT_* rather than the KEYCLOAK_CLI_CLIENT_*
+// name this tool writes locally. So revoking it does take the portal's
+// Keycloak reads down with it — §6.1 of the research record says otherwise and
+// is wrong on that point. Giving prod its own view-users client would separate
+// the two; that is a deliberate deferral, not an oversight.
 const CLIENTS: ClientSpec[] = [
   {
     clientId: "winlab-portal-admin",
@@ -97,6 +105,17 @@ function desiredRepresentation(spec: ClientSpec): ClientRepresentation {
 
 export type BootstrapOptions = {
   apply: boolean
+  /**
+   * Add "user" to --attr's edit permission, so users can change their own
+   * value — in the Account Console and in every other user-facing profile
+   * context (registration, update-profile required actions). This is a
+   * realm-wide permission change, not a per-user grant.
+   *
+   * Opt-in on purpose: widening a permission someone else set is not something
+   * to do as a side effect of provisioning clients. Requires --attr; the CLI
+   * refuses the flag without one.
+   */
+  allowUserEdit: boolean
   attribute?: string
   configPath: string
 }
@@ -181,7 +200,12 @@ export async function bootstrap(
 
   if (options.attribute) {
     report.heading(`User profile attribute: ${options.attribute}`)
-    await provisionAttribute(api, options.attribute, options.apply, report)
+    await provisionAttribute(
+      api,
+      options.attribute,
+      { apply: options.apply, allowUserEdit: options.allowUserEdit },
+      report
+    )
   }
 
   if (options.apply && Object.keys(secrets).length > 0) {
@@ -371,9 +395,11 @@ async function provisionClient(
 async function provisionAttribute(
   api: AdminApi,
   name: string,
-  apply: boolean,
+  options: { apply: boolean; allowUserEdit: boolean },
   report: Report
 ) {
+  const { apply, allowUserEdit } = options
+
   let profile: UserProfileConfig
   try {
     profile = await api.get<UserProfileConfig>("/users/profile")
@@ -386,12 +412,29 @@ async function provisionAttribute(
   if (existing) {
     const view = existing.permissions?.view ?? []
     const edit = existing.permissions?.edit ?? []
-    if (view.includes("admin") || edit.includes("admin")) {
-      report.ok(`Already declared and admin-readable (policy left untouched)`)
-    } else {
+
+    // This gate runs before --allow-user-edit, not after it. An attribute no
+    // admin can see or edit belongs to someone else's configuration, and the
+    // flag means "let its owner edit it too" — not "take it over". Widening
+    // one anyway would also strand it: nothing in this tool could read it
+    // back afterwards to confirm what it did.
+    if (!view.includes("admin") && !edit.includes("admin")) {
       report.warn(
         "Declared but not admin-readable",
         `permissions.view is [${view.join(", ")}]. Not changing an attribute someone else configured — add "admin" by hand if that is intended.`
+      )
+      return
+    }
+
+    if (allowUserEdit) {
+      await widenEditToUser(api, profile, name, apply, report)
+      return
+    }
+
+    report.ok(`Already declared and admin-readable (policy left untouched)`)
+    if (!edit.includes("user")) {
+      report.info(
+        `edit is [${edit.join(", ")}] — its owner cannot change it in the Account Console. Pass --allow-user-edit if they should be able to.`
       )
     }
     return
@@ -405,10 +448,20 @@ async function provisionAttribute(
     }`
   )
 
+  // --allow-user-edit has to apply here too. Declaring the attribute and then
+  // widening it are the same request to Keycloak, so a flag that no-opped on
+  // this path would declare the attribute admin-only while the operator
+  // believed they had made it user-editable.
+  //
+  // "user" goes in both lists: edit without view is a field its owner can
+  // write but cannot read.
+  const permissions = allowUserEdit
+    ? { view: ["admin", "user"], edit: ["admin", "user"] }
+    : { view: ["admin"], edit: ["admin"] }
+  const shape = `view = [${permissions.view.join(", ")}], edit = [${permissions.edit.join(", ")}]`
+
   if (!apply) {
-    report.info(
-      `would declare "${name}" as a managed attribute with view/edit = ["admin"]`
-    )
+    report.info(`would declare "${name}" as a managed attribute with ${shape}`)
     return
   }
 
@@ -419,7 +472,7 @@ async function provisionAttribute(
       {
         name,
         displayName: name,
-        permissions: { view: ["admin"], edit: ["admin"] },
+        permissions,
         annotations: { inputType: "text" },
       },
     ],
@@ -427,10 +480,202 @@ async function provisionAttribute(
 
   try {
     await api.put("/users/profile", next)
-    report.ok(`Declared "${name}" as a managed attribute (admin view + edit)`)
   } catch (err) {
-    report.fail("Could not update the user profile config", describeError(err))
+    reportProfileWriteFailure(err, report)
+    return
   }
+
+  await verifyProfileWrite(
+    api,
+    next,
+    name,
+    permissions.edit,
+    report,
+    (kept) =>
+      `Declared "${name}" as a managed attribute (${shape}) — verified by reading back, ${kept} attribute(s) intact`
+  )
+}
+
+// Add "user" to one attribute's edit permission, leaving every other attribute
+// and every other field of that attribute exactly as found.
+//
+// PUT /users/profile replaces the whole profile config — it is not a patch. A
+// write that rebuilds the document from a partial idea of it silently drops
+// every attribute it forgot: every declared attribute in the realm bar one. So
+// the only safe shape is: take the document Keycloak just gave us, change one
+// array inside it, send it back.
+async function widenEditToUser(
+  api: AdminApi,
+  profile: UserProfileConfig,
+  name: string,
+  apply: boolean,
+  report: Report
+) {
+  // Derived here rather than passed in: two parameters that must agree is one
+  // more way for a caller to be wrong.
+  const edit = findProfileAttribute(profile, name)?.permissions?.edit ?? []
+
+  if (edit.includes("user")) {
+    report.ok(`edit already includes "user" — nothing to do`)
+    return
+  }
+
+  // Appending is the only mutation here, so an attribute admin cannot already
+  // edit would come back as edit = ["user"] — admin's write access removed as
+  // a side effect, reported as success. Refuse rather than quietly grant an
+  // admin permission nobody asked for.
+  if (!edit.includes("admin")) {
+    report.fail(
+      `"${name}" permissions.edit is [${edit.join(", ") || "empty"}] — refusing to widen`,
+      'Appending "user" would leave admin unable to edit it. Add "admin" to the attribute in the console first, then re-run.'
+    )
+    return
+  }
+
+  const nextEdit = [...edit, "user"]
+  if (!apply) {
+    report.info(
+      `would change "${name}" permissions.edit from [${edit.join(", ")}] to [${nextEdit.join(", ")}]`
+    )
+    report.info(
+      `${(profile.attributes ?? []).length} declared attribute(s) would be re-sent unchanged (the PUT is a full replace)`
+    )
+    return
+  }
+
+  const next: UserProfileConfig = {
+    ...profile,
+    attributes: (profile.attributes ?? []).map((attr) =>
+      attr.name === name
+        ? { ...attr, permissions: { ...attr.permissions, edit: nextEdit } }
+        : attr
+    ),
+  }
+
+  try {
+    await api.put("/users/profile", next)
+  } catch (err) {
+    reportProfileWriteFailure(err, report)
+    return
+  }
+
+  await verifyProfileWrite(
+    api,
+    next,
+    name,
+    nextEdit,
+    report,
+    (kept) =>
+      `"${name}" edit is now [${nextEdit.join(", ")}] — verified by reading back, ${kept} attribute(s) intact`
+  )
+}
+
+// A rejected write and a lost response leave the realm in different states,
+// and only one of them can honestly be called "nothing changed". A 4xx is
+// Keycloak refusing; a timeout or a dropped connection may have arrived and
+// been applied before the response went missing.
+function reportProfileWriteFailure(err: unknown, report: Report) {
+  const status = err instanceof KeycloakError ? err.status : 0
+  if (status >= 400 && status < 500) {
+    report.fail(
+      "Keycloak rejected the user profile update — nothing was changed",
+      describeError(err)
+    )
+    return
+  }
+  report.fail(
+    "The user profile update did not complete cleanly — it MAY have been applied",
+    `${describeError(err)}. Re-run to find out: this command is idempotent and reports the current state.`
+  )
+}
+
+// Read the config back and check what landed. Not because this endpoint is
+// known to ignore writes — that is untested here, and the one change we have
+// watched did stick — but because it is a full-document replace, so a PUT that
+// lost a declaration would stay invisible until someone noticed a field had
+// stopped working. Verify names rather than counts: a drop-one/add-one keeps
+// the count identical.
+async function verifyProfileWrite(
+  api: AdminApi,
+  sent: UserProfileConfig,
+  name: string,
+  expectedEdit: string[],
+  report: Report,
+  okMessage: (kept: number) => string
+) {
+  let after: UserProfileConfig | null
+  try {
+    after = await api.get<UserProfileConfig | null>("/users/profile")
+  } catch (err) {
+    report.fail("Could not verify the change", describeError(err))
+    return
+  }
+  if (!after) {
+    report.fail(
+      "Read-back returned an empty body — cannot confirm the change landed",
+      "Check the attribute in the admin console before re-running."
+    )
+    return
+  }
+
+  const stored = after
+  const got = findProfileAttribute(stored, name)?.permissions?.edit ?? []
+  const missing = expectedEdit.filter((role) => !got.includes(role))
+  if (missing.length > 0) {
+    report.fail(
+      `Keycloak accepted the write but "${name}" edit is [${got.join(", ")}] — missing ${missing.join(", ")}`,
+      "The realm may be rejecting the change for this attribute; check it in the admin console."
+    )
+    return
+  }
+
+  const sentNames = (sent.attributes ?? []).map((a) => a.name).sort()
+  const gotNames = (stored.attributes ?? []).map((a) => a.name).sort()
+  const lost = sentNames.filter((n) => !gotNames.includes(n))
+  const gained = gotNames.filter((n) => !sentNames.includes(n))
+  if (lost.length > 0 || gained.length > 0) {
+    report.fail(
+      `Declared attributes changed: sent ${sentNames.length}, stored ${gotNames.length}`,
+      [
+        lost.length ? `lost: ${lost.join(", ")}` : "",
+        gained.length ? `gained: ${gained.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("  ")
+    )
+    return
+  }
+
+  // Reverting this to DISABLED would make every undeclared attribute in the
+  // realm invisible to the Admin API — a realm-wide outage from a one-field
+  // change, and nothing else in this run would mention it.
+  if (stored.unmanagedAttributePolicy !== sent.unmanagedAttributePolicy) {
+    report.fail(
+      `unmanagedAttributePolicy changed: ${sent.unmanagedAttributePolicy ?? "(unset)"} → ${stored.unmanagedAttributePolicy ?? "(unset)"}`,
+      "Every undeclared attribute in the realm just changed visibility to the Admin API."
+    )
+    return
+  }
+
+  // Field-level drift is a warning, not a failure: Keycloak normalises some
+  // config on write, so a difference here is worth reading before trusting the
+  // realm — but it is not by itself proof that anything was lost.
+  const drifted = (sent.attributes ?? [])
+    .filter((a) => a.name !== name)
+    .filter(
+      (a) =>
+        JSON.stringify(a) !==
+        JSON.stringify(findProfileAttribute(stored, a.name))
+    )
+    .map((a) => a.name)
+  if (drifted.length > 0) {
+    report.warn(
+      `Stored differently than sent: ${drifted.join(", ")}`,
+      "Keycloak normalises some fields on write. Compare against the console if any of these carry validations you rely on."
+    )
+  }
+
+  report.ok(okMessage(gotNames.length))
 }
 
 // Merge rather than overwrite: this file is hand-edited (it is how the

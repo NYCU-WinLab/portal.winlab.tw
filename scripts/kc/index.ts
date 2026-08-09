@@ -2,7 +2,7 @@
 // `kc` — Keycloak realm tooling for portal.winlab.tw.
 //
 //   bun run kc doctor [--attr <name>] [--user <email>] [--profile cli|app]
-//   bun run kc bootstrap [--apply] [--attr <name>]
+//   bun run kc bootstrap [--apply] [--attr <name>] [--allow-user-edit]
 //
 // Read-only by default and read-only by credential: the `cli` profile is a
 // service account holding view-users and nothing else. Anything that writes
@@ -30,12 +30,13 @@ kc — Keycloak realm tooling for portal.winlab.tw
 
 Options
   --profile <cli|app>   Which credential to use (default: cli, read-only)
-  --attr <name>         Attribute to check, summarise, or declare
+  --attr <name>         Attribute to check, summarise, declare, or widen
   --user <email>        Read one user as a live end-to-end check (doctor)
   --list                Emit TSV of value/email/username instead of a summary
   --limit <n>           Cap how many users are read (users, default 500)
   --plan <path>         TSV of attribute/username/value (import-attributes)
   --apply               Execute instead of describing (bootstrap, import)
+  --allow-user-edit     Let users edit --attr themselves, realm-wide (bootstrap)
   --config <path>       Credential file (default: ${defaultConfigPath()})
 
 Credentials are read from, in increasing precedence:
@@ -49,6 +50,7 @@ type Args = {
   attribute?: string
   user?: string
   apply: boolean
+  allowUserEdit: boolean
   list: boolean
   limit: number
   plan?: string
@@ -63,6 +65,7 @@ function parseArgs(argv: string[]): Args | null {
     command,
     profile: "cli",
     apply: false,
+    allowUserEdit: false,
     list: false,
     limit: 500,
     configPath: defaultConfigPath(),
@@ -74,6 +77,9 @@ function parseArgs(argv: string[]): Args | null {
     switch (flag) {
       case "--apply":
         args.apply = true
+        break
+      case "--allow-user-edit":
+        args.allowUserEdit = true
         break
       case "--list":
         args.list = true
@@ -117,6 +123,16 @@ function parseArgs(argv: string[]): Args | null {
       default:
         throw new Error(`unknown option: ${flag}`)
     }
+  }
+
+  // Without this the flag is accepted by every command and read by none of
+  // them: `bootstrap --apply --allow-user-edit` with no --attr reconciles the
+  // clients, rewrites the credential file, deletes the one-shot admin login,
+  // and prints "All checks passed" having widened nothing.
+  if (args.allowUserEdit && (command !== "bootstrap" || !args.attribute)) {
+    throw new Error(
+      "--allow-user-edit only applies to `bootstrap --attr <name>`"
+    )
   }
 
   return args
@@ -165,6 +181,7 @@ async function main(): Promise<number> {
     case "bootstrap":
       return bootstrap(config, {
         apply: args.apply,
+        allowUserEdit: args.allowUserEdit,
         attribute: args.attribute,
         configPath: args.configPath,
       })
