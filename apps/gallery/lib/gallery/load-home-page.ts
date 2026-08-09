@@ -10,7 +10,7 @@ import {
   normalizeReactionCounts,
   normalizeReactionNames,
 } from "@/lib/gallery/reactions"
-import type { GalleryTag } from "@/lib/gallery/tags"
+import { isGalleryTagsUnavailable, type GalleryTag } from "@/lib/gallery/tags"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export const GALLERY_PAGE_SIZE = 36
@@ -134,7 +134,6 @@ function buildCommentCountByImage(
   return counts
 }
 
-
 type ImageTagJoinRow = {
   image_id: string
   gallery_tags:
@@ -173,6 +172,8 @@ async function loadTagsByImageIds(
     .select("image_id, gallery_tags(id, name, slug)")
     .in("image_id", imageIds)
   if (error) {
+    // Missing migration / schema cache — keep the wall up without an overlay.
+    if (isGalleryTagsUnavailable(error)) return new Map()
     console.error("[gallery] failed to load tags", error)
     return new Map()
   }
@@ -189,6 +190,8 @@ async function resolveTagCoverIds(
     { p_tag_slug: tagSlug }
   )
   if (tagCoverError) {
+    // No RPC yet → treat as empty filter match (shows "No matches"), not a crash.
+    if (isGalleryTagsUnavailable(tagCoverError)) return "none"
     console.error("[gallery] failed to resolve tag covers", tagCoverError)
     throw new Error(tagCoverError.message || "Failed to filter by tag.")
   }

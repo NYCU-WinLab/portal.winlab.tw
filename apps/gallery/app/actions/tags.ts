@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import {
   GALLERY_TAGS_PER_IMAGE_MAX,
+  isGalleryTagsUnavailable,
   normalizeGalleryTagName,
   normalizeGalleryTagSlug,
   type GalleryTag,
@@ -33,6 +34,9 @@ async function ensureGalleryTag(
     .maybeSingle()
 
   if (existingError) {
+    if (isGalleryTagsUnavailable(existingError)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
     return { ok: false, error: existingError.message }
   }
   if (existing) {
@@ -80,7 +84,7 @@ export async function listPopularGalleryTags(
   })
 
   if (error) {
-    if (/gallery_list_popular_tags/i.test(error.message)) {
+    if (isGalleryTagsUnavailable(error)) {
       return { ok: true, data: [] }
     }
     return { ok: false, error: error.message }
@@ -112,7 +116,12 @@ export async function attachGalleryTag(
     .select("tag_id", { count: "exact", head: true })
     .eq("image_id", imageId)
 
-  if (countError) return { ok: false, error: countError.message }
+  if (countError) {
+    if (isGalleryTagsUnavailable(countError)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
+    return { ok: false, error: countError.message }
+  }
   if ((count ?? 0) >= GALLERY_TAGS_PER_IMAGE_MAX) {
     return {
       ok: false,
@@ -161,7 +170,12 @@ export async function detachGalleryTag(
     .eq("image_id", imageId)
     .eq("tag_id", tagId)
 
-  if (error) return { ok: false, error: error.message }
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
 
   revalidatePath("/")
   return { ok: true }

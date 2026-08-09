@@ -105,6 +105,7 @@ export default async function GalleryHomePage({
       }),
     ])
 
+  // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
   const popularTags: GalleryTagSuggestion[] = popularTagsResult.error
     ? []
     : ((popularTagsResult.data ?? []) as GalleryTagSuggestion[]).map((row) => ({
