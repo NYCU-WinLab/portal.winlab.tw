@@ -69,6 +69,7 @@ export function AlbumSlideshow({
   const [paused, setPaused] = useState(false)
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
   const [videoMuted, setVideoMuted] = useState(true)
+  const [mediaFailed, setMediaFailed] = useState(false)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
   const pausedRef = useRef(paused)
@@ -80,9 +81,14 @@ export function AlbumSlideshow({
     setPaused(false)
     setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
     setVideoMuted(true)
+    setMediaFailed(false)
     touchStartRef.current = null
     suppressClickRef.current = false
   }, [open, startIndex, photos.length])
+
+  useEffect(() => {
+    setMediaFailed(false)
+  }, [index])
 
   const bumpInterval = (delta: number) => {
     setIntervalMs((ms) =>
@@ -430,7 +436,21 @@ export function AlbumSlideshow({
               </button>
             </>
           ) : null}
-          {photo.media_type === "video" ? (
+          {mediaFailed ? (
+            <div
+              className={cn(
+                gallerySans(),
+                "flex max-w-sm flex-col items-center gap-3 px-6 text-center text-sm text-zinc-400"
+              )}
+            >
+              <span>This slide could not be loaded.</span>
+              {photos.length > 1 ? (
+                <span className="text-xs text-zinc-500">
+                  Use ← → to skip to another shot.
+                </span>
+              ) : null}
+            </div>
+          ) : photo.media_type === "video" ? (
             <video
               key={photo.image_id}
               src={getGalleryImageUrl(photo.image_path)}
@@ -444,6 +464,7 @@ export function AlbumSlideshow({
               playsInline
               autoPlay
               muted={videoMuted}
+              onError={() => setMediaFailed(true)}
               onEnded={() => {
                 if (pausedRef.current || photos.length < 2) return
                 setIndex((current) =>
@@ -459,6 +480,7 @@ export function AlbumSlideshow({
               alt={photo.name}
               className="max-h-full max-w-full object-contain"
               draggable={false}
+              onError={() => setMediaFailed(true)}
             />
           )}
         </div>
