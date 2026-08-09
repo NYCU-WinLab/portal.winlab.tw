@@ -6,6 +6,7 @@ import type {
   GalleryAlbumSummary,
 } from "@/lib/gallery/albums"
 import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
+import { isGalleryVideoColumnsUnavailable } from "@/lib/gallery/manage-uploads"
 
 type ListRow = {
   id: string
@@ -104,6 +105,24 @@ export async function loadGalleryAlbumBySlug(
     ])
 
   if (photosError && !isGalleryAlbumsUnavailable(photosError)) {
+    if (isGalleryVideoColumnsUnavailable(photosError)) {
+      const fallbackPhotos = await loadAlbumPhotosWithoutVideoColumns(
+        supabase,
+        album.id
+      )
+      return {
+        id: album.id,
+        title: album.title,
+        slug: album.slug,
+        description: album.description,
+        cover_image_id: album.cover_image_id,
+        created_by: album.created_by,
+        owner_name: owner?.name || "Someone",
+        created_at: album.created_at,
+        updated_at: album.updated_at,
+        photos: fallbackPhotos,
+      }
+    }
     console.error("[gallery] load album photos failed", photosError)
   }
 
@@ -140,6 +159,82 @@ export async function loadGalleryAlbumBySlug(
     updated_at: album.updated_at,
     photos: mappedPhotos,
   }
+}
+
+async function loadAlbumPhotosWithoutVideoColumns(
+  supabase: SupabaseClient,
+  albumId: string
+): Promise<GalleryAlbumPhoto[]> {
+  const { data: links, error: linksError } = await supabase
+    .from("gallery_album_images")
+    .select("image_id, position, added_at")
+    .eq("album_id", albumId)
+    .order("position", { ascending: true })
+
+  if (linksError || !links?.length) {
+    if (linksError && !isGalleryAlbumsUnavailable(linksError)) {
+      console.error("[gallery] load album image links failed", linksError)
+    }
+    return []
+  }
+
+  const ids = links.map((link) => link.image_id as string)
+  const { data: images, error: imagesError } = await supabase
+    .from("gallery_images")
+    .select("id, name, image_path, created_by, created_at")
+    .in("id", ids)
+
+  if (imagesError) {
+    console.error("[gallery] load album images without video cols", imagesError)
+    return []
+  }
+
+  const byId = new Map(
+    ((images ?? []) as Array<Record<string, unknown>>).map((row) => [
+      row.id as string,
+      row,
+    ])
+  )
+  const nameById = new Map<string, string>()
+  const uploaderIds = Array.from(
+    new Set(
+      ((images ?? []) as Array<{ created_by?: string | null }>)
+        .map((row) => row.created_by)
+        .filter((id): id is string => typeof id === "string")
+    )
+  )
+  if (uploaderIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("id, name")
+      .in("id", uploaderIds)
+    for (const profile of profiles ?? []) {
+      nameById.set(profile.id, profile.name?.trim() || "Someone")
+    }
+  }
+
+  return links.flatMap((link) => {
+    const image = byId.get(link.image_id as string)
+    if (!image) return []
+    const createdBy =
+      typeof image.created_by === "string" ? image.created_by : null
+    return [
+      {
+        image_id: link.image_id as string,
+        name: String(image.name ?? "Photo"),
+        image_path: String(image.image_path ?? ""),
+        media_type: "image" as const,
+        poster_path: null,
+        uploader_name: createdBy
+          ? (nameById.get(createdBy) ?? "Someone")
+          : "Someone",
+        created_by: createdBy,
+        created_at: String(image.created_at ?? ""),
+        position: Number(link.position) || 0,
+        added_at: String(link.added_at ?? ""),
+      },
+    ]
+  })
 }
 
 export async function loadMyGalleryAlbums(
