@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -103,7 +103,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/trip`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
@@ -145,6 +145,13 @@ export const config = {
 Because the proxy already gates protected pages, individual pages don't need their own `redirect("/auth/login")`. Server Components can do `const user = (await getCurrentUser())!` and trust the non-null. The exception is `/auth/login` itself, which uses `if (user) redirect("/")` to bounce already-authenticated users away — that's UX, not protection.
 
 ### Auth (Keycloak via Supabase OIDC)
+
+> This section covers **sign-in** only. For the **Keycloak Admin API** — reading
+> or writing user attributes such as `admissionYear`, and diagnosing why one
+> comes back empty — run `bun run kc doctor` and see
+> `docs/keycloak/2026-07-28-keycloak-26.7-admin-api-research.md`. Custom
+> attributes are gated by the realm's user profile, not by roles, and the
+> failure is silent: reads omit them, writes return `204` having saved nothing.
 
 Dashboard checklist (lives entirely in Supabase + Keycloak consoles, never in code):
 
@@ -203,9 +210,52 @@ RLS is the data-layer line of defense. Don't wrap a Supabase call in an API rout
 
 Real examples of each, all under `apps/portal/app/api/`:
 
-- **Cron** (declared in root `vercel.json`'s `crons` array) — `cron/approve-emails`, `cron/receipts-emails`.
+- **Cron** (declared in `apps/portal/vercel.json`'s `crons` array) — `cron/approve-emails`,
+  `cron/receipts-emails`, `cron/rooms-recurring`. It must live in `apps/portal/`, not the repo
+  root: Vercel reads `vercel.json` from the project's configured Root Directory, which is
+  `apps/portal` here (and `apps/gallery` for gallery). A repo-root `vercel.json` is read by
+  neither project and silently does nothing.
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
+
+### Portal ↔ GitLab boundary
+
+The lab runs a GitLab-side automation (`winlab-helper`) alongside this portal.
+The line between them, agreed with its maintainer and written down on both
+sides:
+
+> **Portal doesn't write to GitLab. GitLab doesn't schedule.**
+
+Portal answers _"who presents next"_ — it has the Keycloak groups, the people,
+the calendar. GitLab answers _"what did that meeting leave behind"_ — agenda,
+action items, recording, transcript.
+
+In practice that means Portal never holds a GitLab write credential. Where the
+two must meet, it's one of:
+
+- **GitLab reads Portal.** `api/rooms/bookings` is the shape to copy: bearer
+  token, explicit `from`/`to` window, and cancelled rows stay in the response
+  carrying a status. A row disappearing is never a signal — absence can't
+  distinguish "cancelled" from "finished" from "the endpoint is down", and a
+  consumer forced to guess will eventually guess wrong.
+- **Portal triggers a GitLab pipeline** and the write happens there, with the
+  credential staying on that side.
+
+It will look convenient, when Portal picks next week's presenter, to also open
+the meeting's issue. Don't. GitLab already opens one when the recording
+appears, and two writers producing a record of the same meeting means two
+issues and nobody responsible for merging them. If that ever needs to change,
+it's a choice between the two paths, not an addition.
+
+Today those two paths can't both fire, and the reason is worth stating because
+it's a property of the data rather than a check anyone wrote: lab seminars use
+a standing room booking, so they never come through `/rooms`, and GitLab's
+recording-triggered path ignores any Teams subject carrying a `[prefix]` —
+which is exactly the set that came from a Portal booking.
+
+**That breaks the day a lab seminar is booked through `/rooms`.** Then both
+paths fire on the same meeting. Anyone making that change has to turn off the
+GitLab side first.
 
 ## Coding style (aligned with https://supabase.com/ui)
 
@@ -250,8 +300,8 @@ apps/portal/
 └─ lib/bento/                             # bento types and pure helpers (types.ts, date.ts, menu.ts)
 ```
 
-- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
-- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `trip`). Don't double-mount within one layout tree.
+- **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `rooms`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
+- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `rooms`, `trip`). Don't double-mount within one layout tree.
 - **`AuthProvider` lives in root layout** because user state is shared. Bento hooks consume `@/hooks/use-auth`.
 - **Admin is app-scoped** — `useAdmin()` reads `user_profiles.roles.bento = ["admin"]`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. games, leave, approve, bulletin gate purely via RLS + `has_role()`).
 

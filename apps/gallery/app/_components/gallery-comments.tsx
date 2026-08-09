@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type KeyboardEvent,
+} from "react"
 
 import { IconPin, IconThumbUp } from "@tabler/icons-react"
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
@@ -41,6 +48,7 @@ export function GalleryComments({
   members,
   isAdmin = false,
   highlightCommentId = null,
+  loading = false,
 }: {
   imageId: string
   comments: GalleryComment[]
@@ -51,6 +59,7 @@ export function GalleryComments({
   members: GalleryMember[]
   isAdmin?: boolean
   highlightCommentId?: string | null
+  loading?: boolean
 }) {
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
@@ -58,6 +67,7 @@ export function GalleryComments({
   const [editDraft, setEditDraft] = useState("")
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionHighlight, setMentionHighlight] = useState(0)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -93,6 +103,10 @@ export function GalleryComments({
     return members.filter((m) => (m.name ?? "").toLowerCase().includes(q))
   }, [mentionQuery, members])
 
+  useEffect(() => {
+    setMentionHighlight(0)
+  }, [mentionQuery, filteredMembers.length])
+
   const mentionBrowseAll = mentionQuery === ""
 
   const handleDraftChange = (value: string) => {
@@ -123,6 +137,34 @@ export function GalleryComments({
       const pos = before.length + name.length + 2
       textareaRef.current?.setSelectionRange(pos, pos)
     })
+  }
+
+  const onMentionKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showMentionPicker) return
+    if (event.key === "Escape") {
+      event.preventDefault()
+      setMentionQuery(null)
+      return
+    }
+    if (mentionPickerEmpty) return
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setMentionHighlight((index) =>
+        Math.min(filteredMembers.length - 1, index + 1)
+      )
+      return
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setMentionHighlight((index) => Math.max(0, index - 1))
+      return
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      const member = filteredMembers[mentionHighlight]
+      if (!member) return
+      event.preventDefault()
+      applyMention(member)
+    }
   }
 
   const submit = () => {
@@ -263,7 +305,11 @@ export function GalleryComments({
         ref={listRef}
         className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5"
       >
-        {flattened.length === 0 ? (
+        {loading ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            Loading comments…
+          </p>
+        ) : flattened.length === 0 ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
             No comments yet — say something?
           </p>
@@ -292,7 +338,7 @@ export function GalleryComments({
                       {comment.commenter_name}
                     </span>
                     {comment.pinned_at ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                         <IconPin className="size-3" aria-hidden />
                         Pinned
                       </span>
@@ -388,8 +434,7 @@ export function GalleryComments({
                           disabled={isPending}
                           className={cn(
                             galleryPillClass(),
-                            comment.pinned_at &&
-                              "text-amber-700 dark:text-amber-300"
+                            comment.pinned_at && "text-amber-800"
                           )}
                         >
                           {comment.pinned_at ? "Unpin" : "Pin"}
@@ -459,12 +504,16 @@ export function GalleryComments({
                     : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"}`}
                 </p>
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                  {filteredMembers.map((m) => (
+                  {filteredMembers.map((m, index) => (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => applyMention(m)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                      onMouseEnter={() => setMentionHighlight(index)}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted",
+                        index === mentionHighlight && "bg-muted"
+                      )}
                     >
                       <Avatar className="size-5">
                         <AvatarFallback className="text-[10px]">
@@ -484,6 +533,7 @@ export function GalleryComments({
             ref={textareaRef}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
+            onKeyDown={onMentionKeyDown}
             onSelect={(e) =>
               syncMentionQuery(
                 e.currentTarget.value,

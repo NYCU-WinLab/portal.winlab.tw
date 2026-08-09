@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(8);
+select plan(19);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -95,6 +95,99 @@ select is(
   (select name from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
   'Renamed',
   'user B cannot update user A''s profile (ownership-scoped update policy)'
+);
+
+-- ── rooms_bookings: Portal's own booking-automation audit trail ────────────
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+
+-- 9. a user can insert a rooms_bookings row for themselves
+select lives_ok(
+  $$ insert into public.rooms_bookings (external_reservation_id, room, date, start_time, end_time, requested_by)
+     values ('test-ext-1', '600A', '2026-08-01', '10:00', '10:30', '11111111-1111-1111-1111-111111111111') $$,
+  'a user can insert a rooms_bookings row for themselves'
+);
+
+-- 10. a user cannot insert a rooms_bookings row claiming to be someone else
+select throws_ok(
+  $$ insert into public.rooms_bookings (external_reservation_id, room, date, start_time, end_time, requested_by)
+     values ('test-ext-2', '600A', '2026-08-01', '11:00', '11:30', '22222222-2222-2222-2222-222222222222') $$,
+  '42501',
+  NULL,
+  'a user cannot insert a rooms_bookings row on someone else''s behalf'
+);
+
+-- 11. user B cannot cancel (update) a booking made by user A
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
+  true
+);
+update public.rooms_bookings set status = 'cancelled' where external_reservation_id = 'test-ext-1';
+reset role;
+select is(
+  (select status from public.rooms_bookings where external_reservation_id = 'test-ext-1'),
+  'booked',
+  'user B cannot cancel user A''s rooms_bookings row'
+);
+
+-- ── rooms_meeting_requests: the pipeline's callback credential ─────────────
+-- These four pin the grant, not the policy. The first cut of this table had
+-- RLS with a read-only policy but inherited Supabase's default table grants,
+-- which handed `authenticated` full write and exposed callback_token_hash —
+-- the same shape as #343/#346. A policy test alone would have passed.
+reset role;
+
+select ok(
+  not has_table_privilege('authenticated', 'public.rooms_meeting_requests', 'INSERT'),
+  'authenticated has no INSERT grant on rooms_meeting_requests'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.rooms_meeting_requests', 'UPDATE'),
+  'authenticated has no UPDATE grant on rooms_meeting_requests'
+);
+select ok(
+  not has_table_privilege('anon', 'public.rooms_meeting_requests', 'SELECT'),
+  'anon cannot read rooms_meeting_requests at all'
+);
+-- The token hash is the one column no browser has any use for.
+select ok(
+  not has_column_privilege(
+    'authenticated', 'public.rooms_meeting_requests', 'callback_token_hash', 'SELECT'
+  ),
+  'authenticated cannot read rooms_meeting_requests.callback_token_hash'
+);
+
+-- ── rooms_bookings: cancellation is the only update a person may make ─────
+-- The RLS policy restricts updates to the owner's own rows; these pin which
+-- COLUMNS that update may touch. Without the column grant, a booking's owner
+-- could rewrite meeting_prefix over the REST API and file another group's
+-- Teams recording under their own name — the policy alone allows it.
+select ok(
+  has_column_privilege('authenticated', 'public.rooms_bookings', 'status', 'UPDATE'),
+  'a booking owner can flip status (cancellation)'
+);
+select ok(
+  not has_column_privilege('authenticated', 'public.rooms_bookings', 'meeting_prefix', 'UPDATE'),
+  'a booking owner cannot rewrite meeting_prefix'
+);
+select ok(
+  not has_column_privilege('authenticated', 'public.rooms_bookings', 'invite_sequence', 'UPDATE'),
+  'a booking owner cannot rewrite invite_sequence'
+);
+
+-- An online-only booking has no room and no external reservation; a booking
+-- with one but not the other would be a reservation nobody can cancel.
+select throws_ok(
+  $$ insert into public.rooms_bookings (room, external_reservation_id, date, start_time, end_time, requested_by)
+     values ('600A', null, '2026-08-01', '14:00', '15:00', '11111111-1111-1111-1111-111111111111') $$,
+  '23514',
+  NULL,
+  'a booking cannot have a room without an external reservation id'
 );
 
 select * from finish();

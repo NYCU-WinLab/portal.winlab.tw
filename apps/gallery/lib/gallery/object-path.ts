@@ -1,4 +1,5 @@
 import { ALLOWED_MIME, inferMimeFromFilename } from "@/lib/gallery/mime"
+import { objectNameFromPath } from "@/lib/gallery/upload-path"
 
 const UUID_FILE_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.([a-z0-9]{2,5})$/i
@@ -15,7 +16,7 @@ export function isValidClientObjectPath(
   opts: { imageOnly?: boolean } = {}
 ): boolean {
   if (!path.startsWith(`${userId}/`)) return false
-  const rest = path.slice(userId.length + 1)
+  const rest = objectNameFromPath(path, userId)
   if (!rest || rest.includes("/") || rest.includes("..")) return false
 
   const m = rest.match(UUID_FILE_RE)

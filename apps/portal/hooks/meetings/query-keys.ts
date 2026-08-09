@@ -21,6 +21,9 @@ export const queryKeys = {
   questionPool: {
     all: ["meetings", "question-pool"] as const,
   },
+  presenterPool: {
+    all: ["meetings", "presenter-pool"] as const,
+  },
   questioners: {
     byYear: (year: number) => ["meetings", "questioners", year] as const,
   },

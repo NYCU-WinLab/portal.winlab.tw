@@ -25,16 +25,22 @@ export async function fetchGalleryWallPage(
   const user = await getCurrentUser()
   const filters = parseGalleryHomeFilters(filtersInput)
 
-  const result = await loadGalleryHomePage(supabase, {
-    page: currentPage,
-    userId: user?.id ?? null,
-    filters,
-  })
+  try {
+    const result = await loadGalleryHomePage(supabase, {
+      page: currentPage,
+      userId: user?.id ?? null,
+      filters,
+    })
 
-  return {
-    ok: true,
-    images: result.images,
-    page: result.currentPage,
-    hasMore: result.currentPage < result.totalPages,
+    return {
+      ok: true,
+      images: result.images,
+      page: result.currentPage,
+      hasMore: result.currentPage < result.totalPages,
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load more photos."
+    return { ok: false, error: message }
   }
 }

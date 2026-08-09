@@ -46,6 +46,17 @@ export interface QuestionPoolMember {
   timesAsked: number
 }
 
+export interface PresenterPoolMember {
+  userId: string
+  admissionYear: number
+  sortOrder: number
+  name: string | null
+  email: string | null
+  poolAddedAt: string
+  lastPresentedDate: string | null
+  timesPresented: number
+}
+
 export interface MeetingQuestioner {
   meetingId: string
   userId: string
@@ -98,6 +109,32 @@ export interface DbQuestionPoolMember {
   pool_added_at: string
   last_asked_date: string | null
   times_asked: number
+}
+
+export interface DbPresenterPoolMember {
+  user_id: string
+  admission_year: number
+  sort_order: number
+  name: string | null
+  email: string | null
+  pool_added_at: string
+  last_presented_date: string | null
+  times_presented: number
+}
+
+export function toPresenterPoolMember(
+  row: DbPresenterPoolMember
+): PresenterPoolMember {
+  return {
+    userId: row.user_id,
+    admissionYear: row.admission_year,
+    sortOrder: row.sort_order,
+    name: row.name,
+    email: row.email,
+    poolAddedAt: row.pool_added_at,
+    lastPresentedDate: row.last_presented_date,
+    timesPresented: row.times_presented,
+  }
 }
 
 export function toMeeting(row: DbMeeting): Meeting {

@@ -29,7 +29,7 @@ export function buildGalleryPhotoMetadata(
   const imageUrl = getGalleryThumbUrl(thumbPath, 1200)
   const pageUrl = `${origin}/?photo=${encodeURIComponent(photoId)}`
   const title = `${row.name} — Gallery`
-  const description = "Art from NYCU WinLab."
+  const description = "Lab polaroids on a cool slate paper wall — NYCU WinLab."
 
   return {
     title,
@@ -52,15 +52,15 @@ export function buildGalleryPhotoMetadata(
 
 export const DEFAULT_GALLERY_METADATA: Metadata = {
   title: "Gallery — WinLab",
-  description: "Art from NYCU WinLab.",
+  description: "Lab polaroids on a cool slate paper wall — NYCU WinLab.",
   openGraph: {
     title: "Gallery — WinLab",
-    description: "Art from NYCU WinLab.",
+    description: "Lab polaroids on a cool slate paper wall — NYCU WinLab.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Gallery — WinLab",
-    description: "Art from NYCU WinLab.",
+    description: "Lab polaroids on a cool slate paper wall — NYCU WinLab.",
   },
 }

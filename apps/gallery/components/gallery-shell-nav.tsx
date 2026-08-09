@@ -63,9 +63,13 @@ export function GalleryShellNav({
           <>
             {active !== "manage" ? (
               <GalleryNavLink href="/upload" tone="shell">
-                Manage
+                Hang a photo
               </GalleryNavLink>
-            ) : null}
+            ) : (
+              <GalleryNavLink href="/" tone="shell">
+                Wall
+              </GalleryNavLink>
+            )}
             <SignOutButton className={galleryShellNavLinkClass()} />
           </>
         ) : (
@@ -120,7 +124,7 @@ export function GalleryShellNav({
                   className="flex cursor-pointer items-center gap-2"
                 >
                   <IconPhotoEdit className="size-4 shrink-0" aria-hidden />
-                  Manage
+                  Manage / upload
                 </Link>
               </DropdownMenuItem>
             ) : null}
@@ -131,7 +135,7 @@ export function GalleryShellNav({
                   className="flex cursor-pointer items-center gap-2"
                 >
                   <IconLayoutGrid className="size-4 shrink-0" aria-hidden />
-                  Gallery
+                  Back to wall
                 </Link>
               </DropdownMenuItem>
             ) : null}

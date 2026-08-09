@@ -6,6 +6,19 @@
 
 import type { EditableProfileField, ProfileUpdate } from "@/lib/profile/schema"
 import { EDITABLE_PROFILE_FIELDS } from "@/lib/profile/schema"
+import {
+  adminEnv,
+  adminToken,
+  errorDetail,
+  isRejectedByKeycloak,
+  keycloakAdminConfigured,
+  KeycloakAdminError,
+  type KeycloakAdminEnv,
+} from "@/lib/keycloak/admin"
+
+// Re-exported so existing importers of this module keep working — the
+// plumbing moved to lib/keycloak/admin.ts when /rooms started needing it too.
+export { isRejectedByKeycloak, keycloakAdminConfigured, KeycloakAdminError }
 
 export type KeycloakUserRepresentation = {
   firstName?: string
@@ -18,80 +31,6 @@ const TOP_LEVEL_FIELDS: ReadonlySet<EditableProfileField> = new Set([
   "firstName",
   "lastName",
 ])
-
-type KeycloakAdminEnv = {
-  url: string
-  realm: string
-  clientId: string
-  clientSecret: string
-}
-
-function adminEnv(): KeycloakAdminEnv | null {
-  const url = process.env.KEYCLOAK_URL
-  const realm = process.env.KEYCLOAK_REALM
-  const clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID
-  const clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET
-  if (!url || !realm || !clientId || !clientSecret) return null
-  return { url: url.replace(/\/+$/, ""), realm, clientId, clientSecret }
-}
-
-export function keycloakAdminConfigured(): boolean {
-  return adminEnv() !== null
-}
-
-// Carries which leg of the admin round trip failed. The distinction matters to
-// the caller: a 4xx on the PUT means Keycloak rejected the user's data and
-// retrying changes nothing, while anything else is an infrastructure problem
-// the user can reasonably retry.
-export class KeycloakAdminError extends Error {
-  constructor(
-    readonly operation: "token" | "get" | "put",
-    readonly status: number,
-    readonly detail?: string
-  ) {
-    super(
-      `keycloak ${operation} failed: ${status}${detail ? ` — ${detail}` : ""}`
-    )
-    this.name = "KeycloakAdminError"
-  }
-}
-
-export function isRejectedByKeycloak(err: unknown): boolean {
-  return (
-    err instanceof KeycloakAdminError &&
-    err.operation === "put" &&
-    err.status >= 400 &&
-    err.status < 500
-  )
-}
-
-async function errorDetail(res: Response): Promise<string | undefined> {
-  try {
-    return (await res.text()).slice(0, 500) || undefined
-  } catch {
-    return undefined
-  }
-}
-
-async function adminToken(env: KeycloakAdminEnv): Promise<string> {
-  const res = await fetch(
-    `${env.url}/realms/${encodeURIComponent(env.realm)}/protocol/openid-connect/token`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: env.clientId,
-        client_secret: env.clientSecret,
-      }),
-      cache: "no-store",
-    }
-  )
-  if (!res.ok) throw new KeycloakAdminError("token", res.status)
-  const data = (await res.json()) as { access_token?: string }
-  if (!data.access_token) throw new KeycloakAdminError("token", res.status)
-  return data.access_token
-}
 
 function adminUserUrl(env: KeycloakAdminEnv, sub: string): string {
   return `${env.url}/admin/realms/${encodeURIComponent(env.realm)}/users/${encodeURIComponent(sub)}`
@@ -171,6 +110,44 @@ export async function updateKeycloakProfile(
       putRes.status,
       await errorDetail(putRes)
     )
+}
+
+// Read another user's attributes, by email. Unlike the functions above this
+// is not about the caller editing their own profile — it exists so an admin
+// building the presenter roster can pull someone's 入學學年 from the IdP
+// instead of retyping it. Callers MUST gate on admin themselves; this only
+// knows how to fetch.
+//
+// Never throws, for the same reason getEditableProfile doesn't: a Keycloak
+// blip should degrade to "type it in by hand", not break the page.
+export async function lookupAttributesByEmail(
+  email: string
+): Promise<Record<string, string[]> | null> {
+  const env = adminEnv()
+  if (!env || email.length === 0) return null
+  try {
+    const token = await adminToken(env)
+    const query = new URLSearchParams({ email, exact: "true", max: "2" })
+    const res = await fetch(
+      `${env.url}/admin/realms/${encodeURIComponent(env.realm)}/users?${query}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    )
+    if (!res.ok) {
+      console.error(
+        "[meetings] keycloak lookup failed",
+        new KeycloakAdminError("get", res.status, await errorDetail(res))
+      )
+      return null
+    }
+    const users = (await res.json()) as KeycloakUserRepresentation[]
+    // Two hits means the email is not the unique key we assumed; guessing
+    // which one is right would quietly attach the wrong year to someone.
+    if (users.length !== 1) return null
+    return (users[0]?.attributes as Record<string, string[]>) ?? {}
+  } catch (err) {
+    console.error("[meetings] keycloak lookup failed", err)
+    return null
+  }
 }
 
 export function profileFromRepresentation(

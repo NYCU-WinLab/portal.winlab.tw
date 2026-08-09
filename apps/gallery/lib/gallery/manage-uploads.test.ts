@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeSequenceGaps,
+  findSequenceGaps,
   groupManageUploads,
   swapSequenceOrder,
 } from "@/lib/gallery/manage-uploads"
@@ -13,6 +15,14 @@ describe("resolveWallPhotoId", () => {
       { id: "shot-2", sequence_id: "seq-1", sequence_index: 1 },
     ]
     expect(resolveWallPhotoId(siblings[1]!, siblings)).toBe("cover")
+  })
+
+  test("falls back to lowest index when cover is missing", () => {
+    const siblings = [
+      { id: "shot-2", sequence_id: "seq-1", sequence_index: 2 },
+      { id: "shot-1", sequence_id: "seq-1", sequence_index: 1 },
+    ]
+    expect(resolveWallPhotoId(siblings[0]!, siblings)).toBe("shot-1")
   })
 })
 
@@ -70,5 +80,18 @@ describe("groupManageUploads", () => {
 describe("swapSequenceOrder", () => {
   test("moves an item to a new index", () => {
     expect(swapSequenceOrder(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"])
+  })
+})
+
+describe("findSequenceGaps", () => {
+  test("reports missing middle and cover slots", () => {
+    expect(findSequenceGaps([0, 2]).gaps).toEqual([1])
+    expect(findSequenceGaps([1, 2]).missingCover).toBe(true)
+    expect(findSequenceGaps([1, 2]).gaps).toEqual([0])
+  })
+
+  test("describeSequenceGaps labels cover specially", () => {
+    expect(describeSequenceGaps([0])).toBe("Missing cover (shot 1)")
+    expect(describeSequenceGaps([1, 3])).toBe("Missing shot 2, shot 4")
   })
 })
