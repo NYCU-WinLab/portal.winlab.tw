@@ -24,15 +24,23 @@ export function GalleryServiceWorker() {
 export function cacheGalleryMediaUrls(urls: string[]) {
   if (typeof window === "undefined") return
   if (!("serviceWorker" in navigator)) return
-  const filtered = urls.filter(isGalleryStorageMediaUrl)
-  if (filtered.length === 0) return
-  const message = buildGallerySwCacheMessage(filtered)
-  const controller = navigator.serviceWorker.controller
-  if (controller) {
-    controller.postMessage(message)
-    return
+  try {
+    const filtered = urls.filter(isGalleryStorageMediaUrl)
+    if (filtered.length === 0) return
+    const message = buildGallerySwCacheMessage(filtered)
+    const controller = navigator.serviceWorker.controller
+    if (controller) {
+      controller.postMessage(message)
+      return
+    }
+    void navigator.serviceWorker.ready
+      .then((registration) => {
+        registration.active?.postMessage(message)
+      })
+      .catch(() => {
+        // SW not ready / blocked — offline warm is optional.
+      })
+  } catch {
+    // Private mode / postMessage failures must not break the wall.
   }
-  void navigator.serviceWorker.ready.then((registration) => {
-    registration.active?.postMessage(message)
-  })
 }

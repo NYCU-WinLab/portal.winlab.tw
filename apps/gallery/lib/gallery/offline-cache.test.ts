@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   buildGallerySwCacheMessage,
   GALLERY_SW_CACHE_URLS_TYPE,
+  GALLERY_SW_VERSION,
   isGalleryStorageMediaUrl,
 } from "@/lib/gallery/offline-cache"
 
@@ -24,6 +25,12 @@ describe("isGalleryStorageMediaUrl", () => {
     expect(isGalleryStorageMediaUrl("https://example.com/photo.jpg")).toBe(
       false
     )
+  })
+})
+
+describe("GALLERY_SW_VERSION", () => {
+  test("tracks the active service-worker cache generation", () => {
+    expect(GALLERY_SW_VERSION).toBe("gallery-sw-v5")
   })
 })
 
