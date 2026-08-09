@@ -311,11 +311,19 @@ export function GalleryComments({
         className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5"
       >
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="py-6 text-center text-xs text-muted-foreground"
+          >
             Loading comments…
           </p>
         ) : flattened.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="py-6 text-center text-xs text-muted-foreground"
+          >
             No comments yet — say something?
           </p>
         ) : (
