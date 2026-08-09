@@ -42,6 +42,21 @@ describe("isGalleryMemoriesReady", () => {
     expect(await isGalleryMemoriesReady(client)).toBe(false)
   })
 
+  test("is false when video columns break the memories RPC", async () => {
+    const client = {
+      rpc() {
+        return Promise.resolve({
+          error: {
+            code: "PGRST204",
+            message:
+              "Could not find the 'media_type' column in the schema cache",
+          },
+        })
+      },
+    } as never
+    expect(await isGalleryMemoriesReady(client)).toBe(false)
+  })
+
   test("is true when the RPC succeeds", async () => {
     const client = {
       rpc() {
