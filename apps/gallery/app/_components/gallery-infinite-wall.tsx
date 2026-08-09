@@ -20,6 +20,7 @@ import {
   toggleSelectAllWallIds,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
+import { expandWallSelectionZipItems } from "@/lib/gallery/wall-selection-zip"
 import {
   mergeGalleryWallPage,
   restoreGalleryWallOrder,
@@ -119,18 +120,7 @@ export function GalleryInfiniteWall({
     [selectedIds, wallIds]
   )
   const selectedZipItems = useMemo(
-    () =>
-      orderedSelected.flatMap((id, position) => {
-        const image = images.find((row) => row.id === id)
-        if (!image?.image_path) return []
-        return [
-          {
-            name: image.name,
-            image_path: image.image_path,
-            position,
-          },
-        ]
-      }),
+    () => expandWallSelectionZipItems(orderedSelected, images),
     [images, orderedSelected]
   )
   const allSelected =
