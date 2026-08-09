@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 
 import { IconDownload, IconShare2, IconX } from "@tabler/icons-react"
@@ -26,6 +26,8 @@ export function GalleryInstallPrompt() {
   const [iosHint, setIosHint] = useState(false)
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null)
+  const primaryActionRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (
@@ -89,6 +91,21 @@ export function GalleryInstallPrompt() {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [visible])
 
+  useEffect(() => {
+    if (!visible) return
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    restoreFocusRef.current = previous
+    queueMicrotask(() => primaryActionRef.current?.focus())
+    return () => {
+      const restore = restoreFocusRef.current
+      restoreFocusRef.current = null
+      queueMicrotask(() => restore?.focus())
+    }
+  }, [visible])
+
   const install = async () => {
     if (!deferredPrompt) return
     try {
@@ -144,12 +161,18 @@ export function GalleryInstallPrompt() {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {!iosHint ? (
-            <Button type="button" size="sm" onClick={() => void install()}>
+            <Button
+              ref={primaryActionRef}
+              type="button"
+              size="sm"
+              onClick={() => void install()}
+            >
               <IconDownload className="h-4 w-4" />
               Install
             </Button>
           ) : null}
           <Button
+            ref={iosHint ? primaryActionRef : undefined}
             type="button"
             size="icon-sm"
             variant="ghost"
