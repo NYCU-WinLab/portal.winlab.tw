@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -14,20 +14,33 @@ import {
 import { Input } from "@workspace/ui/components/input"
 
 import { renameGalleryImage } from "@/app/upload/actions"
+import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
 
-export function RenameButton({ id, name }: { id: string; name: string }) {
+export function RenameButton({
+  id,
+  name,
+  onRenamed,
+}: {
+  id: string
+  name: string
+  onRenamed?: (nextName: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(name)
   const [pending, startTransition] = useTransition()
 
-  useEffect(() => {
-    if (open) setDraft(name)
-  }, [open, name])
+  function openEditor(nextOpen: boolean) {
+    if (nextOpen) setDraft(name)
+    setOpen(nextOpen)
+  }
 
   function onSave() {
     startTransition(async () => {
       const result = await renameGalleryImage(id, draft)
       if (result.ok) {
+        const applied =
+          result.names.find((patch) => patch.id === id)?.name ?? draft
+        onRenamed?.(applied)
         toast.success("Name updated")
         setOpen(false)
       } else {
@@ -37,11 +50,11 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={openEditor}>
       <Button
         type="button"
         variant="ghost"
-        onClick={() => setOpen(true)}
+        onClick={() => openEditor(true)}
         className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
       >
         Rename
@@ -62,6 +75,7 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
           <Input
             id="rename-name"
             value={draft}
+            maxLength={ARTWORK_NAME_MAX}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -78,7 +92,7 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => openEditor(false)}
             disabled={pending}
           >
             Cancel

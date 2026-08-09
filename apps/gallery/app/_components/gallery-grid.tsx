@@ -18,6 +18,7 @@ import {
 } from "@/lib/gallery/home-filters"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 
 export function GalleryGrid({
@@ -34,6 +35,7 @@ export function GalleryGrid({
   onLoadMore,
   filters,
   wallEpoch = 0,
+  onArtworkRenamed,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -49,6 +51,7 @@ export function GalleryGrid({
   filters?: GalleryHomeFilters
   /** Bumps when the wall is reshuffled so settle animation replays. */
   wallEpoch?: number
+  onArtworkRenamed?: (imageId: string, patches: ArtworkNamePatch[]) => void
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -260,6 +263,11 @@ export function GalleryGrid({
                 openIndex === index && (index < images.length - 1 || hasMore)
               }
               onWallNavigate={openIndex === index ? navigateWall : undefined}
+              onArtworkRenamed={
+                onArtworkRenamed
+                  ? (patches) => onArtworkRenamed(image.id, patches)
+                  : undefined
+              }
             />
           </GalleryCardBoundary>
         </div>

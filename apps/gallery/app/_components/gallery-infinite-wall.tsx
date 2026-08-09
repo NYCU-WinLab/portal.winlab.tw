@@ -8,6 +8,10 @@ import { GalleryWallToolbar } from "@/app/_components/gallery-wall-toolbar"
 import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
+import {
+  applyArtworkRenamePatches,
+  type ArtworkNamePatch,
+} from "@/lib/gallery/rename-artwork"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 import {
@@ -206,6 +210,15 @@ export function GalleryInfiniteWall({
     toast.success("Wall order restored.")
   }, [])
 
+  const onArtworkRenamed = useCallback(
+    (_imageId: string, patches: ArtworkNamePatch[]) => {
+      setImages((prev) =>
+        prev.map((image) => applyArtworkRenamePatches(image, patches))
+      )
+    },
+    []
+  )
+
   return (
     <>
       {images.length > 0 ? (
@@ -231,6 +244,7 @@ export function GalleryInfiniteWall({
         onLoadMore={loadMore}
         filters={filters}
         wallEpoch={wallEpoch}
+        onArtworkRenamed={onArtworkRenamed}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />

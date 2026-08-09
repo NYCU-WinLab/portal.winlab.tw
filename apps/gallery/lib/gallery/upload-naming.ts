@@ -1,4 +1,4 @@
-const ARTWORK_NAME_MAX = 120
+export const ARTWORK_NAME_MAX = 120
 
 /** Strip control chars / nulls and clamp length for gallery_images.name. */
 export function sanitizeArtworkName(raw: string): string {
