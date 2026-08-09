@@ -735,6 +735,12 @@ export function UploadManageList({
   }
 
   useEffect(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    selectionAnchorIdRef.current = null
+  }, [incompleteOnly, uploadDayOnly])
+
+  useEffect(() => {
     if (!selectionMode) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
