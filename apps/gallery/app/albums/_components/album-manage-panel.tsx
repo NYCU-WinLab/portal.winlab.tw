@@ -329,7 +329,10 @@ export function GalleryAlbumManagePanel({
   }
 
   return (
-    <section className={cn(galleryPanelClass(), "space-y-6")}>
+    <section
+      aria-busy={pending}
+      className={cn(galleryPanelClass(), "space-y-6")}
+    >
       <div className="space-y-1">
         <p
           className={cn(
