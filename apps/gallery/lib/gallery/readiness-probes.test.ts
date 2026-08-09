@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
-import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
+import {
+  isGalleryPinReady,
+  isGalleryVideoReady,
+} from "@/lib/gallery/manage-uploads"
 import { isGalleryTagsReady } from "@/lib/gallery/tags"
 
 function mockClient(error: { code?: string; message?: string } | null) {
@@ -65,6 +68,17 @@ describe("readiness probes", () => {
         mockClient({
           code: "PGRST204",
           message: "Could not find the 'pinned_at' column",
+        })
+      )
+    ).toBe(false)
+  })
+
+  test("isGalleryVideoReady is false when media_type is missing", async () => {
+    expect(
+      await isGalleryVideoReady(
+        mockClient({
+          code: "PGRST204",
+          message: "Could not find the 'media_type' column in the schema cache",
         })
       )
     ).toBe(false)

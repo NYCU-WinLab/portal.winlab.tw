@@ -117,12 +117,14 @@ export function GalleryHomeFiltersBar({
   popularTags = [],
   favoritesAvailable = true,
   tagsAvailable = true,
+  videoAvailable = true,
 }: {
   filters: GalleryHomeFilters
   members: GalleryMember[]
   popularTags?: GalleryTagSuggestion[]
   favoritesAvailable?: boolean
   tagsAvailable?: boolean
+  videoAvailable?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -135,6 +137,10 @@ export function GalleryHomeFiltersBar({
     setPrevQuery(filters.query)
     setSearchDraft(filters.query ?? "")
   }
+
+  const mediaOptions = MEDIA_OPTIONS.filter(
+    (option) => videoAvailable || option.value !== "video"
+  )
 
   const apply = (next: GalleryHomeFilters) => {
     const photo = searchParams.get("photo")
@@ -183,7 +189,7 @@ export function GalleryHomeFiltersBar({
     if (filters.tagSlug) bits.push(`#${filters.tagSlug}`)
     if (filters.media !== "all") {
       bits.push(
-        MEDIA_OPTIONS.find((o) => o.value === filters.media)?.label ?? "Media"
+        mediaOptions.find((o) => o.value === filters.media)?.label ?? "Media"
       )
     }
     if (datePreset !== "all") {
@@ -441,7 +447,7 @@ export function GalleryHomeFiltersBar({
                 <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
                   Media
                 </DropdownMenuLabel>
-                {MEDIA_OPTIONS.map((option) => (
+                {mediaOptions.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
                     className="cursor-pointer text-xs"
@@ -637,7 +643,7 @@ export function GalleryHomeFiltersBar({
 
             <FilterDivider />
 
-            {MEDIA_OPTIONS.map((option) => (
+            {mediaOptions.map((option) => (
               <FilterPill
                 key={option.value}
                 active={filters.media === option.value}

@@ -288,6 +288,18 @@ export function isGalleryVideoColumnsUnavailable(
   )
 }
 
+/** True when gallery video columns are selectable. */
+export async function isGalleryVideoReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_images")
+    .select("media_type")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryVideoColumnsUnavailable(error)
+}
+
 /** True when gallery_images.pinned_at is selectable (pin migration applied). */
 export async function isGalleryPinReady(
   supabase: SupabaseClient

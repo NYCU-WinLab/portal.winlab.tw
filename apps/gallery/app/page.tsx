@@ -14,7 +14,10 @@ import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import { isGalleryCommentsReady } from "@/lib/gallery/comment-edit"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
-import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
+import {
+  isGalleryPinReady,
+  isGalleryVideoReady,
+} from "@/lib/gallery/manage-uploads"
 import { isGalleryReactionsReady } from "@/lib/gallery/reactions"
 import {
   formatMemoriesDayLabel,
@@ -119,6 +122,7 @@ export default async function GalleryHomePage({
     tagsAvailable,
     reactionsAvailable,
     commentsAvailable,
+    videoAvailable,
   ] = await Promise.all([
     loadGalleryHomePages(supabase, {
       throughPage,
@@ -137,6 +141,7 @@ export default async function GalleryHomePage({
     isGalleryTagsReady(supabase),
     isGalleryReactionsReady(supabase),
     isGalleryCommentsReady(supabase),
+    isGalleryVideoReady(supabase),
   ])
   const memoryPhotos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
@@ -176,11 +181,16 @@ export default async function GalleryHomePage({
                 savedOnly: favoritesAvailable ? filters.savedOnly : false,
                 albumSlug: albumsAvailable ? filters.albumSlug : null,
                 tagSlug: tagsAvailable ? filters.tagSlug : null,
+                media:
+                  !videoAvailable && filters.media === "video"
+                    ? "all"
+                    : filters.media,
               }}
               members={members}
               popularTags={tagsAvailable ? popularTags : []}
               favoritesAvailable={favoritesAvailable}
               tagsAvailable={tagsAvailable}
+              videoAvailable={videoAvailable}
             />
           </Suspense>
         ) : filters.tagSlug || filters.albumSlug ? (
