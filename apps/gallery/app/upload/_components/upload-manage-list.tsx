@@ -81,7 +81,6 @@ import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
-import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function toTaipeiDateInput(iso: string | null | undefined): string {
   if (!iso) return ""
