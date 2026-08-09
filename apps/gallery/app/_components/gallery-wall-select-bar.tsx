@@ -500,6 +500,7 @@ export function GalleryWallSelectBar({
                   variant="outline"
                   size="sm"
                   disabled={selectedZipItems.length === 0 || zipBusy}
+                  aria-busy={zipBusy}
                   className={cn(
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"

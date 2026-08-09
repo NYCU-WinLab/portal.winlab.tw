@@ -102,28 +102,17 @@ import {
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
-import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import {
+  fromTaipeiDateInput,
+  toTaipeiDateInput,
+} from "@/lib/gallery/taipei-date-input"
 import {
   buildWallSelectionShareText,
   describeWallSelectionCopy,
 } from "@/lib/gallery/wall-selection-share"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
-
-function toTaipeiDateInput(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ""
-  const day = galleryTaipeiCalendarDay(date)
-  const month = String(day.month).padStart(2, "0")
-  const datePart = String(day.day).padStart(2, "0")
-  return `${day.year}-${month}-${datePart}`
-}
-
-function fromTaipeiDateInput(value: string): string {
-  return `${value.trim()}T12:00:00+08:00`
-}
 
 type SelectableItem = {
   id: string
@@ -1417,6 +1406,7 @@ export function UploadManageList({
                   type="button"
                   onClick={() => void downloadSelectedZip()}
                   disabled={isPending || zipBusy || selectedZipCount === 0}
+                  aria-busy={zipBusy}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
                   {zipBusy
@@ -1545,6 +1535,7 @@ export function UploadManageList({
                   ) : null}
                   <DropdownMenuItem
                     disabled={isPending || zipBusy || selectedZipCount === 0}
+                    aria-busy={zipBusy}
                     onSelect={() => void downloadSelectedZip()}
                   >
                     {selectedZipCount > 0 ? `ZIP (${selectedZipCount})` : "ZIP"}
