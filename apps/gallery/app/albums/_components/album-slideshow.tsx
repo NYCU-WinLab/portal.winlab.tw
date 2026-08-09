@@ -114,6 +114,16 @@ export function AlbumSlideshow({
       if (event.key === "ArrowLeft" || event.key === "k" || event.key === "K") {
         event.preventDefault()
         setIndex((current) => prevSlideshowIndex(current, photos.length))
+        return
+      }
+      if (event.key === "Home") {
+        event.preventDefault()
+        setIndex(0)
+        return
+      }
+      if (event.key === "End") {
+        event.preventDefault()
+        setIndex(Math.max(0, photos.length - 1))
       }
     }
     window.addEventListener("keydown", onKey)
@@ -222,7 +232,8 @@ export function AlbumSlideshow({
             "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
           )}
         >
-          {photo.name} · Space pause · [ ] speed · ← → step · Esc close
+          {photo.name} · Space pause · [ ] speed · ← → step · Home/End · Esc
+          close
         </p>
       </DialogContent>
     </Dialog>

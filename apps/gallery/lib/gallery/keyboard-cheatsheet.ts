@@ -33,6 +33,7 @@ export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["[", "]"], action: "Slower / faster" },
   { keys: ["←", "→"], action: "Previous / next slide" },
   { keys: ["J", "K"], action: "Next / previous (vim)" },
+  { keys: ["Home", "End"], action: "First / last slide" },
   { keys: ["Esc"], action: "Close slideshow" },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]

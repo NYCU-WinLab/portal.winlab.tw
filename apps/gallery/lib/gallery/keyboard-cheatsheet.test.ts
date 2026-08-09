@@ -22,6 +22,8 @@ describe("GALLERY_SLIDESHOW_SHORTCUTS", () => {
     expect(joined).toContain("Space")
     expect(joined).toContain("[")
     expect(joined).toContain("]")
+    expect(joined).toContain("Home")
+    expect(joined).toContain("End")
     expect(joined).toContain("Esc")
   })
 })
