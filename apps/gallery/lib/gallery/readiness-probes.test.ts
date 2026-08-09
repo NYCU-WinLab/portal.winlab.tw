@@ -85,6 +85,10 @@ describe("readiness probes", () => {
     ).toBe(false)
   })
 
+  test("isGalleryVideoReady is true when media_type is selectable", async () => {
+    expect(await isGalleryVideoReady(mockClient(null))).toBe(true)
+  })
+
   test("isGallerySequenceReady is false when sequence_id is missing", async () => {
     expect(
       await isGallerySequenceReady(
@@ -95,6 +99,10 @@ describe("readiness probes", () => {
         })
       )
     ).toBe(false)
+  })
+
+  test("isGallerySequenceReady is true when sequence_id is selectable", async () => {
+    expect(await isGallerySequenceReady(mockClient(null))).toBe(true)
   })
 
   test("readiness stays true for unrelated permission errors", async () => {

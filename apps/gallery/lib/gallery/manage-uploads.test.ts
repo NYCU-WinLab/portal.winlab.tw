@@ -348,6 +348,14 @@ describe("isGallerySequenceUnavailable", () => {
       })
     ).toBe(false)
   })
+
+  test("ignores permission denied on sequence columns", () => {
+    expect(
+      isGallerySequenceUnavailable({
+        message: "permission denied for column sequence_id",
+      })
+    ).toBe(false)
+  })
 })
 
 describe("isGalleryVideoColumnsUnavailable", () => {
@@ -365,6 +373,14 @@ describe("isGalleryVideoColumnsUnavailable", () => {
       isGalleryVideoColumnsUnavailable({
         code: "PGRST204",
         message: "Could not find the 'taken_at' column",
+      })
+    ).toBe(false)
+  })
+
+  test("ignores permission denied on media_type", () => {
+    expect(
+      isGalleryVideoColumnsUnavailable({
+        message: "permission denied for column media_type",
       })
     ).toBe(false)
   })
