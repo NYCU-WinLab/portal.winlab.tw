@@ -21,7 +21,10 @@ import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryImagesPin } from "@/app/actions"
 import { removeImagesFromGalleryAlbumBySlug } from "@/app/actions/albums"
 import { setGalleryFavorites } from "@/app/actions/favorites"
-import { attachGalleryTagToImages } from "@/app/actions/tags"
+import {
+  attachGalleryTagToImages,
+  detachGalleryTagFromImagesBySlug,
+} from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
@@ -42,6 +45,7 @@ export function GalleryWallSelectBar({
   selectedZipItems = [],
   savedFilterActive = false,
   albumFilterSlug = null,
+  tagFilterSlug = null,
   onToggleMode,
   onToggleSelectAll,
   onClear,
@@ -49,6 +53,7 @@ export function GalleryWallSelectBar({
   onUnsaved,
   onPinned,
   onRemovedFromAlbum,
+  onUntagged,
 }: {
   selectionMode: boolean
   selectedCount: number
@@ -66,6 +71,8 @@ export function GalleryWallSelectBar({
   savedFilterActive?: boolean
   /** When viewing ?album=, offer bulk Remove from that album. */
   albumFilterSlug?: string | null
+  /** When viewing ?tag=, offer bulk Untag for that slug. */
+  tagFilterSlug?: string | null
   onToggleMode: () => void
   onToggleSelectAll: () => void
   onClear: () => void
@@ -73,6 +80,7 @@ export function GalleryWallSelectBar({
   onUnsaved?: () => void
   onPinned?: (pinned: boolean) => void
   onRemovedFromAlbum?: () => void
+  onUntagged?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
@@ -141,6 +149,36 @@ export function GalleryWallSelectBar({
       const n = result.data.removed
       toast.success(`Removed ${n} photo${n === 1 ? "" : "s"} from this album.`)
       onRemovedFromAlbum?.()
+      onClear()
+    })
+  }
+
+  const untagSelected = () => {
+    const slug = tagFilterSlug?.trim()
+    if (
+      !slug ||
+      selectedIds.length === 0 ||
+      pending ||
+      saveOpenBusy ||
+      !isSignedIn
+    ) {
+      return
+    }
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await detachGalleryTagFromImagesBySlug(selectedIds, slug)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      const n = result.data.detached
+      toast.success(
+        n === 0
+          ? `None of those photos had “${result.data.tagName}”.`
+          : `Removed “${result.data.tagName}” from ${n} photo${n === 1 ? "" : "s"}.`
+      )
+      onUntagged?.()
       onClear()
     })
   }
@@ -363,6 +401,18 @@ export function GalleryWallSelectBar({
                       onClick={removeSelectedFromAlbum}
                     >
                       Remove
+                    </Button>
+                  ) : null}
+                  {tagFilterSlug ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                      onClick={untagSelected}
+                    >
+                      Untag
                     </Button>
                   ) : null}
                   <form

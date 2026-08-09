@@ -195,6 +195,58 @@ export async function detachGalleryTag(
   return { ok: true }
 }
 
+export async function detachGalleryTagFromImagesBySlug(
+  imageIds: string[],
+  tagSlug: string
+): Promise<TagActionResult<{ detached: number; tagName: string }>> {
+  const ids = Array.from(
+    new Set(imageIds.map((id) => id.trim()).filter(Boolean))
+  ).slice(0, 200)
+  const slug = normalizeGalleryTagSlug(tagSlug)
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
+  }
+  if (!slug) return { ok: false, error: "Missing tag." }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Please sign in first." }
+
+  const { data: tag, error: tagError } = await supabase
+    .from("gallery_tags")
+    .select("id, name, slug")
+    .eq("slug", slug)
+    .maybeSingle()
+
+  if (tagError) {
+    if (isGalleryTagsUnavailable(tagError)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
+    return { ok: false, error: tagError.message }
+  }
+  if (!tag) return { ok: false, error: "Tag not found." }
+
+  const { error, count } = await supabase
+    .from("gallery_image_tags")
+    .delete({ count: "exact" })
+    .eq("tag_id", tag.id)
+    .in("image_id", ids)
+
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath("/")
+  return {
+    ok: true,
+    data: { detached: count ?? 0, tagName: tag.name },
+  }
+}
+
 export async function attachGalleryTagsToImage(
   imageId: string,
   rawNames: string[],
