@@ -15,10 +15,11 @@ describe("parseGalleryHomeFilters", () => {
       uploadedAfter: null,
       query: null,
       tagSlug: null,
+      savedOnly: false,
     })
   })
 
-  test("parses uploader, media, after, query, and tag", () => {
+  test("parses uploader, media, after, query, tag, and saved", () => {
     expect(
       parseGalleryHomeFilters({
         uploader: "user-1",
@@ -26,6 +27,7 @@ describe("parseGalleryHomeFilters", () => {
         after: "2026-01-01T00:00:00.000Z",
         q: "mop",
         tag: "Lab-Trip",
+        saved: "1",
       })
     ).toEqual({
       uploaderId: "user-1",
@@ -33,12 +35,14 @@ describe("parseGalleryHomeFilters", () => {
       uploadedAfter: "2026-01-01T00:00:00.000Z",
       query: "mop",
       tagSlug: "lab-trip",
+      savedOnly: true,
     })
   })
 
   test("ignores invalid media and tag values", () => {
     expect(parseGalleryHomeFilters({ media: "gif" }).media).toBe("all")
     expect(parseGalleryHomeFilters({ tag: "!!!" }).tagSlug).toBeNull()
+    expect(parseGalleryHomeFilters({ saved: "yes" }).savedOnly).toBe(false)
   })
 })
 
@@ -51,6 +55,7 @@ describe("hasActiveGalleryFilters", () => {
         uploadedAfter: null,
         query: null,
         tagSlug: null,
+        savedOnly: false,
       })
     ).toBe(true)
     expect(
@@ -60,6 +65,7 @@ describe("hasActiveGalleryFilters", () => {
         uploadedAfter: null,
         query: null,
         tagSlug: null,
+        savedOnly: false,
       })
     ).toBe(true)
     expect(
@@ -69,6 +75,7 @@ describe("hasActiveGalleryFilters", () => {
         uploadedAfter: null,
         query: "test",
         tagSlug: null,
+        savedOnly: false,
       })
     ).toBe(true)
     expect(
@@ -78,46 +85,68 @@ describe("hasActiveGalleryFilters", () => {
         uploadedAfter: null,
         query: null,
         tagSlug: "lab-trip",
+        savedOnly: false,
       })
     ).toBe(true)
+    expect(
+      hasActiveGalleryFilters({
+        uploaderId: null,
+        media: "all",
+        uploadedAfter: null,
+        query: null,
+        tagSlug: null,
+        savedOnly: true,
+      })
+    ).toBe(true)
+    expect(
+      hasActiveGalleryFilters({
+        uploaderId: null,
+        media: "all",
+        uploadedAfter: null,
+        query: null,
+        tagSlug: null,
+        savedOnly: false,
+      })
+    ).toBe(false)
   })
 })
 
 describe("buildGalleryHomeHref", () => {
-  test("builds filter and deep-link query string", () => {
+  test("omits defaults and encodes filters", () => {
+    expect(buildGalleryHomeHref({})).toBe("/")
     expect(
       buildGalleryHomeHref({
         page: 2,
-        photoId: "photo-1",
-        commentId: "comment-1",
         filters: {
-          uploaderId: "user-1",
-          media: "image",
-          uploadedAfter: "2026-01-01T00:00:00.000Z",
-          query: "mop",
-          tagSlug: "lab-trip",
+          uploaderId: "u1",
+          media: "video",
+          uploadedAfter: "2026-01-01",
+          query: "hello",
+          tagSlug: "lab",
+          savedOnly: true,
         },
+        photoId: "p1",
       })
     ).toBe(
-      "/?page=2&uploader=user-1&media=image&after=2026-01-01T00%3A00%3A00.000Z&q=mop&tag=lab-trip&photo=photo-1&comment=comment-1"
+      "/?page=2&uploader=u1&media=video&after=2026-01-01&q=hello&tag=lab&saved=1&photo=p1"
     )
   })
 })
 
 describe("describeGalleryFilterSummary", () => {
-  test("joins active filter labels", () => {
+  test("lists active chips including Saved", () => {
     expect(
       describeGalleryFilterSummary(
         {
-          uploaderId: "user-1",
-          media: "image",
-          uploadedAfter: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+          uploaderId: null,
+          media: "all",
+          uploadedAfter: null,
           query: "mop",
-          tagSlug: "lab-trip",
+          tagSlug: null,
+          savedOnly: true,
         },
-        [{ id: "user-1", name: "Alice", email: null }],
-        "Lab trip"
+        []
       )
-    ).toEqual(["Lab trip", "Alice", "Photos", "This week", '"mop"'])
+    ).toEqual(["Saved", '"mop"'])
   })
 })

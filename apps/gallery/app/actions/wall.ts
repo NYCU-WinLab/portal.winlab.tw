@@ -12,6 +12,7 @@ export type GalleryWallFiltersInput = {
   after?: string
   q?: string
   tag?: string
+  saved?: string
 }
 
 export async function fetchGalleryWallPage(

@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { GalleryAlbumCard } from "@/app/albums/_components/album-card"
 import { GalleryAlbumCreateForm } from "@/app/albums/_components/album-create-form"
+import { GalleryAlbumsSearch } from "@/app/albums/_components/albums-search"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import {
   GalleryEmptyState,
@@ -24,21 +25,42 @@ export const metadata: Metadata = {
 }
 
 type AlbumsPageProps = {
-  searchParams: Promise<{ mine?: string }>
+  searchParams: Promise<{ mine?: string; q?: string }>
+}
+
+function albumMatchesQuery(
+  album: {
+    title: string
+    slug: string
+    description: string | null
+    owner_name: string
+  },
+  query: string
+): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return (
+    album.title.toLowerCase().includes(needle) ||
+    album.slug.includes(needle) ||
+    (album.description?.toLowerCase().includes(needle) ?? false) ||
+    album.owner_name.toLowerCase().includes(needle)
+  )
 }
 
 export default async function GalleryAlbumsPage({
   searchParams,
 }: AlbumsPageProps) {
-  const { mine } = await searchParams
+  const { mine, q } = await searchParams
   const mineOnly = mine === "1" || mine === "true"
+  const query = q?.trim() || null
   const supabase = await createClient()
   const user = await getCurrentUser()
   const albums = await loadGalleryAlbumSummaries(supabase)
-  const visibleAlbums =
-    mineOnly && user
-      ? albums.filter((album) => album.created_by === user.id)
-      : albums
+  const visibleAlbums = albums.filter((album) => {
+    if (mineOnly && user && album.created_by !== user.id) return false
+    if (query && !albumMatchesQuery(album, query)) return false
+    return true
+  })
 
   return (
     <GalleryThemedShell active="albums" signedIn={Boolean(user)}>
@@ -106,14 +128,22 @@ export default async function GalleryAlbumsPage({
               <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
                 {mineOnly ? (
                   <Link
-                    href="/albums"
+                    href={
+                      query
+                        ? `/albums?q=${encodeURIComponent(query)}`
+                        : "/albums"
+                    }
                     className="underline-offset-2 hover:underline"
                   >
                     Show all albums
                   </Link>
                 ) : (
                   <Link
-                    href="/albums?mine=1"
+                    href={
+                      query
+                        ? `/albums?mine=1&q=${encodeURIComponent(query)}`
+                        : "/albums?mine=1"
+                    }
                     className="underline-offset-2 hover:underline"
                   >
                     My albums only
@@ -122,25 +152,36 @@ export default async function GalleryAlbumsPage({
               </p>
             ) : null}
           </div>
+
+          <GalleryAlbumsSearch initialQuery={query ?? ""} mineOnly={mineOnly} />
+
           {visibleAlbums.length === 0 ? (
             <GalleryEmptyState
-              title={mineOnly ? "You have no albums yet" : "No albums yet"}
+              title={
+                query
+                  ? "No albums match that search"
+                  : mineOnly
+                    ? "You have no albums yet"
+                    : "No albums yet"
+              }
               description={
-                mineOnly
-                  ? "Create one above, or clear the filter to browse everyone else’s collections."
-                  : user
-                    ? "Name a collection above, then add photos from any lightbox on the wall."
-                    : "When lab members curate collections, they will show up here."
+                query
+                  ? "Try another title, slug, owner, or clear the search."
+                  : mineOnly
+                    ? "Create one above, or clear the filter to browse everyone else’s collections."
+                    : user
+                      ? "Name a collection above, then add photos from any lightbox on the wall."
+                      : "When lab members curate collections, they will show up here."
               }
               action={
                 <Link
-                  href={mineOnly ? "/albums" : "/"}
+                  href={query || mineOnly ? "/albums" : "/"}
                   className={cn(
                     gallerySans(),
                     "text-sm text-foreground underline-offset-2 hover:underline"
                   )}
                 >
-                  {mineOnly ? "Show all albums" : "Back to the wall"}
+                  {query || mineOnly ? "Show all albums" : "Back to the wall"}
                 </Link>
               }
             />

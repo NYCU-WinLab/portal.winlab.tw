@@ -56,7 +56,11 @@ describe("downloadAlbumZip", () => {
     ])
     expect(progress[0]).toEqual({ completed: 0, total: 3 })
     expect(progress.at(-1)).toEqual({ completed: 3, total: 3 })
-    expect(result).toEqual({ count: 3, filename: "Lab_trip-album.zip" })
+    expect(result).toEqual({
+      count: 3,
+      failed: 0,
+      filename: "Lab_trip-album.zip",
+    })
     expect(saved.filename).toBe("Lab_trip-album.zip")
     expect(saved.entries.map((e) => e.name)).toEqual([
       "01_first.jpg",
@@ -65,7 +69,53 @@ describe("downloadAlbumZip", () => {
     ])
   })
 
-  test("surfaces HTTP failures", async () => {
+  test("surfaces HTTP failures when continueOnError is false", async () => {
+    const fetchImpl = mock(
+      async () => new Response(null, { status: 404 })
+    ) as unknown as typeof fetch
+
+    await expect(
+      downloadAlbumZip([{ name: "a", image_path: "u/a.jpg", position: 0 }], {
+        fetchImpl,
+        resolveUrl: (path) => path,
+        save: async () => undefined,
+        continueOnError: false,
+      })
+    ).rejects.toThrow("Could not fetch photo 1")
+  })
+
+  test("skips blank paths and failed fetches by default", async () => {
+    const fetchImpl = mock(async (input: RequestInfo | URL) => {
+      if (String(input).includes("bad")) {
+        return new Response(null, { status: 500 })
+      }
+      return new Response(new Blob(["ok"]), { status: 200 })
+    }) as unknown as typeof fetch
+
+    const saved: ZipEntry[] = []
+    const result = await downloadAlbumZip(
+      [
+        { name: "good", image_path: "u/good.jpg", position: 0 },
+        { name: "blank", image_path: "   ", position: 1 },
+        { name: "bad", image_path: "u/bad.jpg", position: 2 },
+      ],
+      {
+        fetchImpl,
+        resolveUrl: (path) => `https://cdn.test/${path}`,
+        concurrency: 1,
+        save: async (_filename, entries) => {
+          saved.push(...entries)
+        },
+        zipName: "partial-album.zip",
+      }
+    )
+
+    expect(result.count).toBe(1)
+    expect(result.failed).toBe(2)
+    expect(saved.map((e) => e.name)).toEqual(["01_good.jpg"])
+  })
+
+  test("rejects when every fetch fails", async () => {
     const fetchImpl = mock(
       async () => new Response(null, { status: 404 })
     ) as unknown as typeof fetch
@@ -76,6 +126,6 @@ describe("downloadAlbumZip", () => {
         resolveUrl: (path) => path,
         save: async () => undefined,
       })
-    ).rejects.toThrow("Could not fetch photo 1")
+    ).rejects.toThrow("Could not download any")
   })
 })

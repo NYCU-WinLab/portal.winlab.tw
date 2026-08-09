@@ -49,10 +49,20 @@ export function DownloadAlbumButton({
           })
         },
       })
-      toast.success(
-        `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
-        { id: toastId }
-      )
+      if (result.failed > 0) {
+        toast.success(
+          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
+          {
+            id: toastId,
+            description: `${result.failed} could not be fetched and were skipped.`,
+          }
+        )
+      } else {
+        toast.success(
+          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
+          { id: toastId }
+        )
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not build the ZIP"

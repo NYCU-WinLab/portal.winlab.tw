@@ -28,6 +28,7 @@ export function UploaderFilterLink({
         uploadedAfter: null,
         query: searchParams.get("q"),
         tagSlug: searchParams.get("tag"),
+        savedOnly: searchParams.get("saved") === "1",
       },
       photoId: searchParams.get("photo"),
       commentId: searchParams.get("comment"),

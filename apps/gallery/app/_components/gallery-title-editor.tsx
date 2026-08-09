@@ -72,6 +72,7 @@ export function GalleryTitleEditor({
   if (!canEdit) {
     return (
       <h2
+        title={name}
         className={cn(
           titleClass(variant),
           variant === "polaroid" && "truncate text-center",
@@ -180,7 +181,7 @@ export function GalleryTitleEditor({
           variant === "polaroid" && "truncate text-center"
         )}
         aria-label={`Edit title: ${name}`}
-        title="Edit title"
+        title={variant === "polaroid" ? name : "Edit title"}
       >
         {name}
       </button>

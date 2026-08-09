@@ -37,6 +37,7 @@ type GalleryHomePageProps = {
     after?: string
     q?: string
     tag?: string
+    saved?: string
   }>
 }
 
@@ -65,9 +66,16 @@ export async function generateMetadata({
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment, uploader, media, after, q, tag } =
+  const { page, photo, comment, uploader, media, after, q, tag, saved } =
     await searchParams
-  const filters = parseGalleryHomeFilters({ uploader, media, after, q, tag })
+  const filters = parseGalleryHomeFilters({
+    uploader,
+    media,
+    after,
+    q,
+    tag,
+    saved,
+  })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -90,20 +98,23 @@ export default async function GalleryHomePage({
   }
 
   const today = galleryTaipeiCalendarDay()
-  const [{ images, members, currentPage, hasMore }, popularTagsResult, memoryPhotos] =
-    await Promise.all([
-      loadGalleryHomePages(supabase, {
-        throughPage,
-        userId: user?.id ?? null,
-        filters,
-      }),
-      supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
-      loadGalleryMemoriesOnThisDay(supabase, {
-        month: today.month,
-        day: today.day,
-        limit: 12,
-      }),
-    ])
+  const [
+    { images, members, currentPage, hasMore },
+    popularTagsResult,
+    memoryPhotos,
+  ] = await Promise.all([
+    loadGalleryHomePages(supabase, {
+      throughPage,
+      userId: user?.id ?? null,
+      filters,
+    }),
+    supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
+    loadGalleryMemoriesOnThisDay(supabase, {
+      month: today.month,
+      day: today.day,
+      limit: 12,
+    }),
+  ])
 
   // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
   const popularTags: GalleryTagSuggestion[] = popularTagsResult.error

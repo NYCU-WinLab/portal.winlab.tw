@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import {
   IconChevronDown,
   IconFilter,
+  IconBookmark,
   IconSearch,
   IconTag,
   IconX,
@@ -171,6 +172,7 @@ export function GalleryHomeFiltersBar({
   const mobileFilterLabel = useMemo(() => {
     if (!active) return "Filters"
     const bits: string[] = []
+    if (filters.savedOnly) bits.push("Saved")
     if (filters.tagSlug) bits.push(`#${filters.tagSlug}`)
     if (filters.media !== "all") {
       bits.push(
@@ -188,6 +190,7 @@ export function GalleryHomeFiltersBar({
     active,
     datePreset,
     filters.media,
+    filters.savedOnly,
     filters.tagSlug,
     filters.uploaderId,
     uploaderLabel,
@@ -221,6 +224,7 @@ export function GalleryHomeFiltersBar({
       uploadedAfter: null,
       query: null,
       tagSlug: null,
+      savedOnly: false,
     })
   }
 
@@ -302,6 +306,18 @@ export function GalleryHomeFiltersBar({
 
           {/* Mobile: one Filters menu (media + when + who) */}
           <div className="flex w-full max-w-md items-center justify-center gap-2 sm:hidden">
+            <FilterPill
+              active={filters.savedOnly}
+              disabled={isPending}
+              onClick={() =>
+                apply({ ...filters, savedOnly: !filters.savedOnly })
+              }
+            >
+              <span className="inline-flex items-center gap-1">
+                <IconBookmark className="size-3 opacity-80" aria-hidden />
+                Saved
+              </span>
+            </FilterPill>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -446,6 +462,21 @@ export function GalleryHomeFiltersBar({
 
           {/* Desktop: expanded pill row */}
           <div className="hidden flex-wrap items-center justify-center gap-1.5 sm:flex">
+            <FilterPill
+              active={filters.savedOnly}
+              disabled={isPending}
+              onClick={() =>
+                apply({ ...filters, savedOnly: !filters.savedOnly })
+              }
+            >
+              <span className="inline-flex items-center gap-1">
+                <IconBookmark className="size-3 opacity-80" aria-hidden />
+                Saved
+              </span>
+            </FilterPill>
+
+            <FilterDivider />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button

@@ -32,6 +32,8 @@ export type GalleryImage = {
   reaction_counts: ReactionCounts
   my_reaction: GalleryReaction | null
   reaction_names: ReactionNames
+  /** True when the signed-in viewer saved this cover (or any sequence sibling). */
+  is_favorited?: boolean
 }
 
 export type GallerySequenceItem = {

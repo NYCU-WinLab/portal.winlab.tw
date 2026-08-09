@@ -1096,6 +1096,39 @@ export type Database = {
           },
         ]
       }
+      gallery_favorites: {
+        Row: {
+          created_at: string
+          image_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          image_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          image_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_favorites_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_scores: {
         Row: {
           created_at: string
@@ -2319,6 +2352,10 @@ export type Database = {
       }
       gallery_wall_cover_ids_for_query: {
         Args: { p_query: string }
+        Returns: string[]
+      }
+      gallery_wall_cover_ids_for_favorites: {
+        Args: Record<string, never>
         Returns: string[]
       }
       gallery_admin_rename_tag: {

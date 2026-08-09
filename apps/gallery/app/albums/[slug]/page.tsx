@@ -36,7 +36,10 @@ export async function generateMetadata({
 
   const headerStore = await headers()
   const origin = resolveGallerySiteOrigin(headerStore.get("host"))
-  const cover = album.photos[0]
+  const cover =
+    (album.cover_image_id
+      ? album.photos.find((photo) => photo.image_id === album.cover_image_id)
+      : null) ?? album.photos[0]
   const coverPath =
     cover?.media_type === "video" && cover.poster_path
       ? cover.poster_path

@@ -56,6 +56,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
         await shareOrCopyAlbumLink({
           slug: result.data.slug,
           title: result.data.title,
+          preferCopy: true,
         })
         toast.success(`Album “${result.data.title}” ready — link copied`, {
           description: shareUrl ?? undefined,

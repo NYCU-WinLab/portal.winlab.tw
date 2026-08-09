@@ -17,6 +17,7 @@ import { DialogClose } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
+import { FavoritePhotoButton } from "@/app/_components/favorite-photo-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
@@ -508,7 +509,13 @@ export function GalleryLightboxSocialAside({
           </div>
         ) : null}
         {isSignedIn ? (
-          <GalleryAddToAlbum imageId={activeItem?.id ?? image.id} />
+          <div className="flex flex-wrap items-center gap-2">
+            <FavoritePhotoButton
+              imageId={image.id}
+              initialFavorited={Boolean(image.is_favorited)}
+            />
+            <GalleryAddToAlbum imageId={activeItem?.id ?? image.id} />
+          </div>
         ) : null}
         <ReactionBar
           counts={counts}
