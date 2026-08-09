@@ -173,6 +173,8 @@ export function GalleryEmptyState({
 }) {
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
         galleryPanelClass(),
         "gallery-empty-state mx-auto flex max-w-md flex-col items-center py-14 text-center"
