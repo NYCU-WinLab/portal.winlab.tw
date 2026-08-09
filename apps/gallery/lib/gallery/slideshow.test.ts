@@ -13,6 +13,7 @@ import {
   slideshowIndexFromProgress,
   wallSelectionToSlideshowPhotos,
   writeStoredSlideshowIntervalMs,
+  shuffleSlideshowPhotos,
 } from "@/lib/gallery/slideshow"
 
 describe("clampSlideshowIntervalMs", () => {
@@ -191,5 +192,39 @@ describe("wallSelectionToSlideshowPhotos", () => {
         poster_path: null,
       },
     ])
+  })
+})
+
+describe("shuffleSlideshowPhotos", () => {
+  test("returns a permutation without mutating input", () => {
+    const photos = [
+      {
+        image_id: "a",
+        name: "A",
+        image_path: "u/a.jpg",
+        media_type: "image" as const,
+        poster_path: null,
+      },
+      {
+        image_id: "b",
+        name: "B",
+        image_path: "u/b.jpg",
+        media_type: "image" as const,
+        poster_path: null,
+      },
+      {
+        image_id: "c",
+        name: "C",
+        image_path: "u/c.jpg",
+        media_type: "image" as const,
+        poster_path: null,
+      },
+    ]
+    const values = [0.9, 0.1, 0.5]
+    let i = 0
+    const shuffled = shuffleSlideshowPhotos(photos, () => values[i++] ?? 0)
+    expect(shuffled.map((p) => p.image_id).sort()).toEqual(["a", "b", "c"])
+    expect(photos.map((p) => p.image_id)).toEqual(["a", "b", "c"])
+    expect(shuffled).not.toBe(photos)
   })
 })

@@ -42,6 +42,7 @@ import { gallerySans } from "@/components/gallery-chrome"
 import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
+import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 import {
   buildWallSelectionShareText,
@@ -110,14 +111,29 @@ export function GalleryWallSelectBar({
   const [tagFormOpen, setTagFormOpen] = useState(false)
   const [albumFormOpen, setAlbumFormOpen] = useState(false)
   const [slideshowOpen, setSlideshowOpen] = useState(false)
+  const [slideshowDeck, setSlideshowDeck] = useState<GallerySlideshowPhoto[]>(
+    []
+  )
+  const [slideshowTitle, setSlideshowTitle] = useState("Wall selection")
 
   useEffect(() => {
     onSlideshowOpenChange?.(slideshowOpen)
   }, [onSlideshowOpenChange, slideshowOpen])
 
-  const hasOverflowActions = isSignedIn
-  const overflowBusy = pending || saveOpenBusy || selectedCount === 0
+  const openSlideshow = (shuffled: boolean) => {
+    if (selectedSlideshowPhotos.length === 0) return
+    setSlideshowDeck(
+      shuffled
+        ? shuffleSlideshowPhotos(selectedSlideshowPhotos)
+        : selectedSlideshowPhotos
+    )
+    setSlideshowTitle(shuffled ? "Wall selection · shuffled" : "Wall selection")
+    setSlideshowOpen(true)
+  }
+
   const canSlideshow = selectedSlideshowPhotos.length > 0
+  const hasOverflowActions = isSignedIn || canSlideshow
+  const overflowBusy = pending || saveOpenBusy || selectedCount === 0
 
   const tagSelected = (event?: FormEvent) => {
     event?.preventDefault()
@@ -449,7 +465,7 @@ export function GalleryWallSelectBar({
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"
                   )}
-                  onClick={() => setSlideshowOpen(true)}
+                  onClick={() => openSlideshow(false)}
                 >
                   <IconPlayerPlay className="size-3.5" aria-hidden />
                   Play
@@ -610,6 +626,14 @@ export function GalleryWallSelectBar({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-44">
+                    {canSlideshow ? (
+                      <DropdownMenuItem
+                        disabled={!canSlideshow}
+                        onSelect={() => openSlideshow(true)}
+                      >
+                        Play shuffled
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem
                       disabled={overflowBusy}
                       onSelect={() => {
@@ -678,8 +702,8 @@ export function GalleryWallSelectBar({
       ) : null}
 
       <AlbumSlideshow
-        photos={selectedSlideshowPhotos}
-        albumTitle="Wall selection"
+        photos={slideshowDeck}
+        albumTitle={slideshowTitle}
         open={slideshowOpen}
         onOpenChange={setSlideshowOpen}
         startIndex={0}
