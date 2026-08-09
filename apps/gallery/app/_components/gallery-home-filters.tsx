@@ -116,11 +116,13 @@ export function GalleryHomeFiltersBar({
   members,
   popularTags = [],
   favoritesAvailable = true,
+  tagsAvailable = true,
 }: {
   filters: GalleryHomeFilters
   members: GalleryMember[]
   popularTags?: GalleryTagSuggestion[]
   favoritesAvailable?: boolean
+  tagsAvailable?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -372,57 +374,68 @@ export function GalleryHomeFiltersBar({
                 <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
                   Tag
                 </DropdownMenuLabel>
-                <DropdownMenuItem
-                  className="cursor-pointer text-xs"
-                  onClick={() => apply({ ...filters, tagSlug: null })}
-                >
-                  Any tag
-                </DropdownMenuItem>
-                {popularTags.map((tag) => (
+                {tagsAvailable ? (
+                  <>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-xs"
+                      onClick={() => apply({ ...filters, tagSlug: null })}
+                    >
+                      Any tag
+                    </DropdownMenuItem>
+                    {popularTags.map((tag) => (
+                      <DropdownMenuItem
+                        key={tag.id}
+                        className="cursor-pointer text-xs"
+                        onClick={() =>
+                          apply({
+                            ...filters,
+                            tagSlug: tag.slug,
+                          })
+                        }
+                      >
+                        <span className="truncate">
+                          #{tag.slug}
+                          {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                        </span>
+                        {filters.tagSlug === tag.slug ? " ·" : ""}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <div
+                      className="flex items-center gap-1 px-2 py-1.5"
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        value={tagDraft}
+                        onChange={(event) => setTagDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault()
+                            applyTagDraft()
+                          }
+                        }}
+                        placeholder="slug…"
+                        className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-foreground"
+                        onClick={applyTagDraft}
+                      >
+                        Go
+                      </button>
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : (
                   <DropdownMenuItem
-                    key={tag.id}
-                    className="cursor-pointer text-xs"
-                    onClick={() =>
-                      apply({
-                        ...filters,
-                        tagSlug: tag.slug,
-                      })
-                    }
+                    className="cursor-default text-xs text-muted-foreground"
+                    disabled
                   >
-                    <span className="truncate">
-                      #{tag.slug}
-                      {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
-                    </span>
-                    {filters.tagSlug === tag.slug ? " ·" : ""}
+                    Tags not available yet
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <div
-                  className="flex items-center gap-1 px-2 py-1.5"
-                  onKeyDown={(event) => event.stopPropagation()}
-                >
-                  <input
-                    type="text"
-                    value={tagDraft}
-                    onChange={(event) => setTagDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault()
-                        applyTagDraft()
-                      }
-                    }}
-                    placeholder="slug…"
-                    className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
-                  />
-                  <button
-                    type="button"
-                    className="text-[11px] font-medium text-foreground"
-                    onClick={applyTagDraft}
-                  >
-                    Go
-                  </button>
-                </div>
-                <DropdownMenuSeparator />
+                )}
                 <DropdownMenuLabel className="text-[10px] tracking-wide uppercase">
                   Media
                 </DropdownMenuLabel>
@@ -547,76 +560,78 @@ export function GalleryHomeFiltersBar({
 
             <FilterDivider />
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  disabled={isPending}
-                  className={cn(
-                    galleryFilterChipClass(filters.tagSlug !== null),
-                    "inline-flex items-center gap-1",
-                    isPending && "opacity-50"
-                  )}
-                >
-                  <IconTag className="size-3 opacity-70" aria-hidden />
-                  <span className="max-w-[10rem] truncate">
-                    {activeTag ? `#${activeTag.slug}` : "Any tag"}
-                  </span>
-                  <IconChevronDown className="size-3 shrink-0 opacity-70" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="center"
-                className={cn(gallerySans(), "max-h-72 w-56 overflow-y-auto")}
-              >
-                <DropdownMenuItem
-                  className="cursor-pointer text-xs"
-                  onClick={() => apply({ ...filters, tagSlug: null })}
-                >
-                  Any tag
-                </DropdownMenuItem>
-                {popularTags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag.id}
-                    className="cursor-pointer text-xs"
-                    onClick={() =>
-                      apply({
-                        ...filters,
-                        tagSlug: tag.slug,
-                      })
-                    }
-                  >
-                    <span className="truncate">
-                      {tag.name}
-                      {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <div className="flex items-center gap-1 px-2 py-1.5">
-                  <input
-                    type="text"
-                    value={tagDraft}
-                    onChange={(event) => setTagDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault()
-                        applyTagDraft()
-                      }
-                    }}
-                    placeholder="slug…"
-                    className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
-                  />
+            {tagsAvailable ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="text-[11px] font-medium text-foreground"
-                    onClick={applyTagDraft}
+                    disabled={isPending}
+                    className={cn(
+                      galleryFilterChipClass(filters.tagSlug !== null),
+                      "inline-flex items-center gap-1",
+                      isPending && "opacity-50"
+                    )}
                   >
-                    Go
+                    <IconTag className="size-3 opacity-70" aria-hidden />
+                    <span className="max-w-[10rem] truncate">
+                      {activeTag ? `#${activeTag.slug}` : "Any tag"}
+                    </span>
+                    <IconChevronDown className="size-3 shrink-0 opacity-70" />
                   </button>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="center"
+                  className={cn(gallerySans(), "max-h-72 w-56 overflow-y-auto")}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer text-xs"
+                    onClick={() => apply({ ...filters, tagSlug: null })}
+                  >
+                    Any tag
+                  </DropdownMenuItem>
+                  {popularTags.map((tag) => (
+                    <DropdownMenuItem
+                      key={tag.id}
+                      className="cursor-pointer text-xs"
+                      onClick={() =>
+                        apply({
+                          ...filters,
+                          tagSlug: tag.slug,
+                        })
+                      }
+                    >
+                      <span className="truncate">
+                        {tag.name}
+                        {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center gap-1 px-2 py-1.5">
+                    <input
+                      type="text"
+                      value={tagDraft}
+                      onChange={(event) => setTagDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault()
+                          applyTagDraft()
+                        }
+                      }}
+                      placeholder="slug…"
+                      className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
+                    />
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-foreground"
+                      onClick={applyTagDraft}
+                    >
+                      Go
+                    </button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
 
             <FilterDivider />
 

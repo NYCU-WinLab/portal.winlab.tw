@@ -174,6 +174,7 @@ export default async function GalleryHomePage({
               members={members}
               popularTags={tagsAvailable ? popularTags : []}
               favoritesAvailable={favoritesAvailable}
+              tagsAvailable={tagsAvailable}
             />
           </Suspense>
         ) : filters.tagSlug || filters.albumSlug ? (
