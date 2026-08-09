@@ -202,8 +202,8 @@ async function resolveTagCoverIds(
     { p_tag_slug: tagSlug }
   )
   if (tagCoverError) {
-    // No RPC yet → treat as empty filter match (shows "No matches"), not a crash.
-    if (isGalleryTagsUnavailable(tagCoverError)) return "none"
+    // No RPC yet → ignore the tag filter so the wall still loads.
+    if (isGalleryTagsUnavailable(tagCoverError)) return null
     console.error("[gallery] failed to resolve tag covers", tagCoverError)
     throw new Error(tagCoverError.message || "Failed to filter by tag.")
   }
@@ -260,7 +260,7 @@ async function resolveFavoriteCoverIds(
     "gallery_wall_cover_ids_for_favorites"
   )
   if (error) {
-    if (isGalleryFavoritesUnavailable(error)) return "none"
+    if (isGalleryFavoritesUnavailable(error)) return null
     console.error("[gallery] failed to resolve favorite covers", error)
     throw new Error(error.message || "Failed to load saved photos.")
   }
@@ -285,7 +285,7 @@ async function resolveAlbumCoverIds(
     { p_slug: albumSlug }
   )
   if (error) {
-    if (isGalleryAlbumsUnavailable(error)) return "none"
+    if (isGalleryAlbumsUnavailable(error)) return null
     console.error("[gallery] failed to resolve album covers", error)
     throw new Error(error.message || "Failed to filter by album.")
   }
