@@ -31,17 +31,18 @@ import {
   ReactionSummary,
   useGalleryCardSocial,
 } from "@/app/_components/gallery-card-social"
+import { GalleryTitleEditor } from "@/app/_components/gallery-title-editor"
 import {
   galleryPillClass,
   galleryPolaroidClass,
   gallerySans,
-  gallerySerif,
 } from "@/components/gallery-chrome"
 import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
 import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
   resolveLightboxNextStep,
@@ -75,6 +76,7 @@ export function GalleryCard({
   hasWallPrev = false,
   hasWallNext = false,
   onWallNavigate,
+  onArtworkRenamed,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -91,7 +93,9 @@ export function GalleryCard({
   hasWallPrev?: boolean
   hasWallNext?: boolean
   onWallNavigate?: (direction: "prev" | "next") => void
+  onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
 }) {
+  const isOwner = Boolean(viewerId && image.created_by === viewerId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const rotation = getRotation(image.id)
@@ -437,18 +441,18 @@ export function GalleryCard({
                       ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
-                    <p
-                      className={cn(
-                        gallerySerif(),
-                        "truncate text-center text-[0.95rem] leading-snug text-foreground/90 sm:text-base"
-                      )}
-                    >
-                      {image.name}
-                    </p>
-                  </div>
                 </button>
               </DialogTrigger>
+              {/* Caption sits outside DialogTrigger so owner edit controls are not nested buttons. */}
+              <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
+                <GalleryTitleEditor
+                  imageId={image.id}
+                  name={image.name}
+                  canEdit={isOwner}
+                  variant="polaroid"
+                  onRenamed={onArtworkRenamed}
+                />
+              </div>
             </div>
             <DialogContent
               showCloseButton={false}
@@ -497,6 +501,7 @@ export function GalleryCard({
                   sequenceMedia={sequenceMedia}
                   isSignedIn={isSignedIn}
                   isAdmin={isAdmin}
+                  isOwner={isOwner}
                   viewerId={viewerId}
                   viewerName={viewerName}
                   members={members}
@@ -512,6 +517,7 @@ export function GalleryCard({
                   onReact={onReact}
                   comments={comments}
                   setComments={setComments}
+                  onArtworkRenamed={onArtworkRenamed}
                 />
               </div>
             </DialogContent>
