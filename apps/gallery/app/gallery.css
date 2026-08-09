@@ -164,6 +164,8 @@ body:not([data-gallery-theme]) {
 
 .gallery-wall-card {
   animation: gallery-polaroid-settle 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  content-visibility: auto;
+  contain-intrinsic-size: 420px 520px;
 }
 
 .gallery-cheatsheet-enter {

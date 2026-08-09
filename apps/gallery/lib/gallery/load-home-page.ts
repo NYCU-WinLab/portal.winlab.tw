@@ -346,6 +346,32 @@ function intersectCoverIdFilters(
   return current
 }
 
+/** Preserve caller order when hydrating rows fetched via `.in("id", …)`. */
+export function orderRowsByIdList<T extends { id: string }>(
+  rows: readonly T[],
+  orderedIds: readonly string[]
+): T[] {
+  if (orderedIds.length === 0) return []
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const ordered: T[] = []
+  for (const id of orderedIds) {
+    const row = byId.get(id)
+    if (row) ordered.push(row)
+  }
+  return ordered
+}
+
+export function sliceCoverIdsForPage(
+  orderedIds: readonly string[],
+  from: number,
+  to: number
+): string[] {
+  if (orderedIds.length === 0) return []
+  const start = Math.max(0, from)
+  const endExclusive = Math.max(start, to + 1)
+  return orderedIds.slice(start, endExclusive)
+}
+
 function toGalleryImageBase(image: CoverRow): GalleryImage {
   return {
     id: image.id,
@@ -475,12 +501,15 @@ async function loadGalleryHomeRangeViaView(
       resolveAlbumCoverIds(supabase, filters.albumSlug),
     ])
   const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
+  // Prefer search-RPC order so title matches page ahead of tag-only hits.
   const coverIdFilter = intersectCoverIdFilters(
-    tagCoverIds,
     queryCoverIds === "legacy" ? null : queryCoverIds,
+    tagCoverIds,
     favoriteCoverIds,
     albumCoverIds
   )
+  const rankedSearchPaging =
+    skipQueryIlike && Array.isArray(coverIdFilter) && coverIdFilter.length > 0
 
   if (coverIdFilter === "none") {
     const members = userId
@@ -496,15 +525,40 @@ async function loadGalleryHomeRangeViaView(
     return { images: [], members, totalCount: 0 }
   }
 
+  const pageCoverIds = rankedSearchPaging
+    ? sliceCoverIdsForPage(coverIdFilter, from, to)
+    : null
+
   let rowsBase = supabase.from("gallery_wall_page").select(WALL_PAGE_COLUMNS)
   rowsBase = withWallFilters(rowsBase, filters, { skipQuery: skipQueryIlike })
-  if (coverIdFilter) {
+  if (pageCoverIds) {
+    if (pageCoverIds.length === 0) {
+      const members = userId
+        ? buildMembers(
+            ((
+              await supabase
+                .from("user_profiles")
+                .select("id, name")
+                .order("name", { ascending: true })
+            ).data ?? []) as ProfileRow[]
+          )
+        : []
+      return {
+        images: [],
+        members,
+        totalCount: coverIdFilter?.length ?? 0,
+      }
+    }
+    rowsBase = rowsBase.in("id", pageCoverIds)
+  } else if (coverIdFilter) {
     rowsBase = rowsBase.in("id", coverIdFilter)
   }
-  const rowsQuery = rowsBase
-    .order("pinned_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .range(from, to)
+  const rowsQuery = pageCoverIds
+    ? rowsBase
+    : rowsBase
+        .order("pinned_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .range(from, to)
 
   let countBase = supabase
     .from("gallery_wall_covers")
@@ -537,7 +591,11 @@ async function loadGalleryHomeRangeViaView(
     console.error("[gallery] failed to load members", membersResult.error)
   }
 
-  const rows = (rowsResult.data ?? []) as WallPageRow[]
+  const rows = orderRowsByIdList(
+    (rowsResult.data ?? []) as WallPageRow[],
+    pageCoverIds ??
+      ((rowsResult.data ?? []) as WallPageRow[]).map((row) => row.id)
+  )
   const sequenceRowsById = await loadSequenceRowsById(supabase, rows)
   const tagLookupIds = Array.from(
     new Set([
@@ -578,7 +636,9 @@ async function loadGalleryHomeRangeViaView(
     members: userId
       ? buildMembers((membersResult.data ?? []) as ProfileRow[])
       : [],
-    totalCount: countResult.count ?? 0,
+    totalCount: rankedSearchPaging
+      ? (coverIdFilter?.length ?? 0)
+      : (countResult.count ?? 0),
   }
 }
 
@@ -600,11 +660,13 @@ async function loadGalleryHomeRangeLegacy(
     ])
   const skipQueryIlike = queryCoverIds !== null && queryCoverIds !== "legacy"
   const coverIdFilter = intersectCoverIdFilters(
-    tagCoverIds,
     queryCoverIds === "legacy" ? null : queryCoverIds,
+    tagCoverIds,
     favoriteCoverIds,
     albumCoverIds
   )
+  const rankedSearchPaging =
+    skipQueryIlike && Array.isArray(coverIdFilter) && coverIdFilter.length > 0
 
   if (coverIdFilter === "none") {
     const members = userId
@@ -620,6 +682,10 @@ async function loadGalleryHomeRangeLegacy(
     return { images: [], members, totalCount: 0 }
   }
 
+  const pageCoverIds = rankedSearchPaging
+    ? sliceCoverIdsForPage(coverIdFilter, from, to)
+    : null
+
   const [profilesResult, imagesResult] = await Promise.all([
     userId
       ? supabase
@@ -632,6 +698,16 @@ async function loadGalleryHomeRangeLegacy(
         .from("gallery_wall_covers")
         .select(COVER_COLUMNS, { count: "exact" })
       base = withWallFilters(base, filters, { skipQuery: skipQueryIlike })
+      if (pageCoverIds) {
+        if (pageCoverIds.length === 0) {
+          return Promise.resolve({
+            data: [] as CoverRow[],
+            error: null,
+            count: coverIdFilter?.length ?? 0,
+          })
+        }
+        return base.in("id", pageCoverIds)
+      }
       if (coverIdFilter) {
         base = base.in("id", coverIdFilter)
       }
@@ -653,7 +729,11 @@ async function loadGalleryHomeRangeLegacy(
     )
   }
 
-  const coverRows = (imagesResult.data ?? []) as CoverRow[]
+  const coverRows = orderRowsByIdList(
+    (imagesResult.data ?? []) as CoverRow[],
+    pageCoverIds ??
+      ((imagesResult.data ?? []) as CoverRow[]).map((row) => row.id)
+  )
   const sequenceRowsById = await loadSequenceRowsById(supabase, coverRows)
 
   const imageIds = coverRows.map((image) => image.id)
@@ -765,7 +845,9 @@ async function loadGalleryHomeRangeLegacy(
     members: userId
       ? buildMembers((profilesResult.data ?? []) as ProfileRow[])
       : [],
-    totalCount: imagesResult.count ?? 0,
+    totalCount: rankedSearchPaging
+      ? (coverIdFilter?.length ?? 0)
+      : (imagesResult.count ?? 0),
   }
 }
 
