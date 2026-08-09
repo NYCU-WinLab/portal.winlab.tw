@@ -280,7 +280,9 @@ export function GalleryHomeFiltersBar({
                 type="search"
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Search titles & tags…"
+                placeholder={
+                  tagsAvailable ? "Search titles & tags…" : "Search titles…"
+                }
                 className={cn(
                   gallerySans(),
                   "gallery-home-filters-search min-h-10 w-full rounded-[2px] border border-zinc-800/18 bg-white/90 py-2.5 pr-9 pl-9 text-xs text-foreground shadow-[inset_0_1px_2px_rgba(24,24,27,0.04)] transition-[border-color,box-shadow] outline-none placeholder:text-zinc-400 focus:border-zinc-800/35 focus:shadow-[0_0_0_3px_rgba(24,24,27,0.06)]"
