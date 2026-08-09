@@ -1,0 +1,97 @@
+export const GALLERY_ALBUM_TITLE_MAX = 80
+export const GALLERY_ALBUM_SLUG_MAX = 80
+export const GALLERY_ALBUM_DESCRIPTION_MAX = 500
+export const GALLERY_ALBUM_PHOTOS_MAX = 200
+
+export type GalleryAlbumSummary = {
+  id: string
+  title: string
+  slug: string
+  description: string | null
+  cover_image_path: string | null
+  cover_media_type: "image" | "video" | null
+  cover_poster_path: string | null
+  photo_count: number
+  created_by: string
+  owner_name: string
+  created_at: string
+  updated_at: string
+}
+
+export type GalleryAlbumPhoto = {
+  image_id: string
+  name: string
+  image_path: string
+  media_type: "image" | "video"
+  poster_path: string | null
+  uploader_name: string
+  created_by: string | null
+  created_at: string
+  position: number
+  added_at: string
+}
+
+export type GalleryAlbumDetail = {
+  id: string
+  title: string
+  slug: string
+  description: string | null
+  cover_image_id: string | null
+  created_by: string
+  owner_name: string
+  created_at: string
+  updated_at: string
+  photos: GalleryAlbumPhoto[]
+}
+
+/**
+ * Normalize a free-form title into a URL-safe slug.
+ * Returns null when nothing usable remains.
+ */
+export function normalizeGalleryAlbumSlug(raw: string): string | null {
+  const slug = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, GALLERY_ALBUM_SLUG_MAX)
+
+  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null
+  return slug
+}
+
+/** Trim + length-check a display title; slug is derived separately. */
+export function normalizeGalleryAlbumTitle(raw: string): string | null {
+  const title = raw.trim().replace(/\s+/g, " ")
+  if (!title || title.length > GALLERY_ALBUM_TITLE_MAX) return null
+  if (!normalizeGalleryAlbumSlug(title)) return null
+  return title
+}
+
+export function normalizeGalleryAlbumDescription(
+  raw: string | null | undefined
+): string | null {
+  if (raw == null) return null
+  const text = raw.trim().replace(/\s+/g, " ")
+  if (!text) return null
+  if (text.length > GALLERY_ALBUM_DESCRIPTION_MAX) return null
+  return text
+}
+
+/** Assign contiguous positions 0..n-1 for a reorder payload. */
+export function normalizeAlbumPositions(
+  imageIds: string[]
+): { image_id: string; position: number }[] {
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  for (const id of imageIds) {
+    const trimmed = id.trim()
+    if (!trimmed || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    ordered.push(trimmed)
+    if (ordered.length >= GALLERY_ALBUM_PHOTOS_MAX) break
+  }
+  return ordered.map((image_id, position) => ({ image_id, position }))
+}
