@@ -1116,6 +1116,29 @@ export function UploadManageList({
     .map((item) => item.name)
     .join(", ")
 
+  let selectionStatusText = "Tap works to select"
+  if (selectedVisibleItems.length > 0) {
+    selectionStatusText = `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected`
+    const extras: string[] = []
+    if (
+      selectedWallLinkCount > 0 &&
+      selectedWallLinkCount !== selectedVisibleItems.length
+    ) {
+      extras.push(
+        `${selectedWallLinkCount} wall link${selectedWallLinkCount === 1 ? "" : "s"}`
+      )
+    }
+    if (
+      selectedZipCount > 0 &&
+      selectedZipCount !== selectedVisibleItems.length
+    ) {
+      extras.push(`${selectedZipCount} in ZIP`)
+    }
+    if (extras.length > 0) {
+      selectionStatusText = `${selectionStatusText} · ${extras.join(" · ")}`
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -1217,12 +1240,7 @@ export function UploadManageList({
             aria-live="polite"
           >
             <p className={cn(gallerySans(), "text-sm text-foreground")}>
-              {selectedVisibleItems.length === 0
-                ? "Tap works to select"
-                : selectedWallLinkCount > 0 &&
-                    selectedWallLinkCount !== selectedVisibleItems.length
-                  ? `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected · ${selectedWallLinkCount} wall link${selectedWallLinkCount === 1 ? "" : "s"}`
-                  : `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected`}
+              {selectionStatusText}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button
