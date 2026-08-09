@@ -13,6 +13,7 @@ import {
 } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumSummaries } from "@/lib/gallery/load-albums"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 import { cn } from "@workspace/ui/lib/utils"
@@ -54,8 +55,11 @@ export default async function GalleryAlbumsPage({
   const mineOnly = mine === "1" || mine === "true"
   const query = q?.trim() || null
   const supabase = await createClient()
-  const user = await getCurrentUser()
-  const albums = await loadGalleryAlbumSummaries(supabase)
+  const [user, albumsReady] = await Promise.all([
+    getCurrentUser(),
+    isGalleryAlbumsReady(supabase),
+  ])
+  const albums = albumsReady ? await loadGalleryAlbumSummaries(supabase) : []
   const visibleAlbums = albums.filter((album) => {
     if (mineOnly && user && album.created_by !== user.id) return false
     if (query && !albumMatchesQuery(album, query)) return false
@@ -70,7 +74,19 @@ export default async function GalleryAlbumsPage({
           lead="Curated collections pulled from the wall — share a slug, keep the story together. Distinct from tags and burst sequences."
         />
 
-        {user ? (
+        {!albumsReady ? (
+          <section className={cn(galleryPanelClass(), "space-y-2")}>
+            <h2
+              className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
+            >
+              Albums not ready yet
+            </h2>
+            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+              Apply the gallery albums migration, then refresh — Manage already
+              soft-hides album tools until then.
+            </p>
+          </section>
+        ) : user ? (
           <section className={cn(galleryPanelClass(), "space-y-5")}>
             <div className="space-y-1">
               <p
@@ -104,103 +120,111 @@ export default async function GalleryAlbumsPage({
           </p>
         )}
 
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="space-y-1">
-              <p
-                className={cn(
-                  gallerySans(),
-                  "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
-                )}
-              >
-                Collections
-              </p>
-              <h2
-                className={cn(
-                  gallerySectionTitleClass(),
-                  "text-2xl sm:text-3xl"
-                )}
-              >
-                On the shelf
-              </h2>
-            </div>
-            {user ? (
-              <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-                {mineOnly ? (
-                  <Link
-                    href={
-                      query
-                        ? `/albums?q=${encodeURIComponent(query)}`
-                        : "/albums"
-                    }
-                    className="underline-offset-2 hover:underline"
-                  >
-                    Show all albums
-                  </Link>
-                ) : (
-                  <Link
-                    href={
-                      query
-                        ? `/albums?mine=1&q=${encodeURIComponent(query)}`
-                        : "/albums?mine=1"
-                    }
-                    className="underline-offset-2 hover:underline"
-                  >
-                    My albums only
-                  </Link>
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <GalleryAlbumsSearch initialQuery={query ?? ""} mineOnly={mineOnly} />
-
-          {visibleAlbums.length === 0 ? (
-            <GalleryEmptyState
-              title={
-                query
-                  ? "No albums match that search"
-                  : mineOnly
-                    ? "You have no albums yet"
-                    : "No albums yet"
-              }
-              description={
-                query
-                  ? "Try another title, slug, owner, or clear the search."
-                  : mineOnly
-                    ? "Create one above, or clear the filter to browse everyone else’s collections."
-                    : user
-                      ? "Name a collection above, then add photos from any lightbox on the wall."
-                      : "When lab members curate collections, they will show up here."
-              }
-              action={
-                <Link
-                  href={query || mineOnly ? "/albums" : "/"}
+        {albumsReady ? (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="space-y-1">
+                <p
                   className={cn(
                     gallerySans(),
-                    "text-sm text-foreground underline-offset-2 hover:underline"
+                    "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
                   )}
                 >
-                  {query || mineOnly ? "Show all albums" : "Back to the wall"}
-                </Link>
-              }
+                  Collections
+                </p>
+                <h2
+                  className={cn(
+                    gallerySectionTitleClass(),
+                    "text-2xl sm:text-3xl"
+                  )}
+                >
+                  On the shelf
+                </h2>
+              </div>
+              {user ? (
+                <p
+                  className={cn(gallerySans(), "text-xs text-muted-foreground")}
+                >
+                  {mineOnly ? (
+                    <Link
+                      href={
+                        query
+                          ? `/albums?q=${encodeURIComponent(query)}`
+                          : "/albums"
+                      }
+                      className="underline-offset-2 hover:underline"
+                    >
+                      Show all albums
+                    </Link>
+                  ) : (
+                    <Link
+                      href={
+                        query
+                          ? `/albums?mine=1&q=${encodeURIComponent(query)}`
+                          : "/albums?mine=1"
+                      }
+                      className="underline-offset-2 hover:underline"
+                    >
+                      My albums only
+                    </Link>
+                  )}
+                </p>
+              ) : null}
+            </div>
+
+            <GalleryAlbumsSearch
+              initialQuery={query ?? ""}
+              mineOnly={mineOnly}
             />
-          ) : (
-            <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
-              {visibleAlbums.map((album) => (
-                <li key={album.id}>
-                  <GalleryAlbumCard
-                    album={album}
-                    showShare={
-                      Boolean(user) &&
-                      (user?.id === album.created_by || Boolean(user?.isAdmin))
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+
+            {visibleAlbums.length === 0 ? (
+              <GalleryEmptyState
+                title={
+                  query
+                    ? "No albums match that search"
+                    : mineOnly
+                      ? "You have no albums yet"
+                      : "No albums yet"
+                }
+                description={
+                  query
+                    ? "Try another title, slug, owner, or clear the search."
+                    : mineOnly
+                      ? "Create one above, or clear the filter to browse everyone else’s collections."
+                      : user
+                        ? "Name a collection above, then add photos from any lightbox on the wall."
+                        : "When lab members curate collections, they will show up here."
+                }
+                action={
+                  <Link
+                    href={query || mineOnly ? "/albums" : "/"}
+                    className={cn(
+                      gallerySans(),
+                      "text-sm text-foreground underline-offset-2 hover:underline"
+                    )}
+                  >
+                    {query || mineOnly ? "Show all albums" : "Back to the wall"}
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
+                {visibleAlbums.map((album) => (
+                  <li key={album.id}>
+                    <GalleryAlbumCard
+                      album={album}
+                      showShare={
+                        Boolean(user) &&
+                        (user?.id === album.created_by ||
+                          Boolean(user?.isAdmin))
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
       </div>
     </GalleryThemedShell>
   )

@@ -11,6 +11,7 @@ import { ShareAlbumButton } from "@/app/_components/share-album-button"
 import { GalleryEmptyState, gallerySans } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumBySlug } from "@/lib/gallery/load-albums"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import {
   DEFAULT_GALLERY_METADATA,
   resolveGallerySiteOrigin,
@@ -76,11 +77,41 @@ export default async function GalleryAlbumDetailPage({
 }: AlbumPageProps) {
   const { slug } = await params
   const supabase = await createClient()
-  const [user, album] = await Promise.all([
+  const [user, albumsReady] = await Promise.all([
     getCurrentUser(),
-    loadGalleryAlbumBySlug(supabase, slug),
+    isGalleryAlbumsReady(supabase),
   ])
 
+  if (!albumsReady) {
+    return (
+      <GalleryThemedShell active="albums" signedIn={Boolean(user)}>
+        <div className="flex flex-col gap-6">
+          <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+            <Link href="/albums" className="underline-offset-2 hover:underline">
+              Albums
+            </Link>
+          </p>
+          <GalleryEmptyState
+            title="Albums not ready yet"
+            description="Apply the gallery albums migration, then refresh this page."
+            action={
+              <Link
+                href="/"
+                className={cn(
+                  gallerySans(),
+                  "text-sm text-foreground underline-offset-2 hover:underline"
+                )}
+              >
+                Back to the wall
+              </Link>
+            }
+          />
+        </div>
+      </GalleryThemedShell>
+    )
+  }
+
+  const album = await loadGalleryAlbumBySlug(supabase, slug)
   if (!album) notFound()
 
   const canManage =
