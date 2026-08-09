@@ -1586,14 +1586,45 @@ export function UploadManageList({
       ) : null}
 
       {visibleTimeline.length === 0 && incompleteOnly && sequencesAvailable ? (
-        <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-          No incomplete sequences right now — every story has contiguous shots.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+            No incomplete sequences right now — every story has contiguous
+            shots.
+          </p>
+          <button
+            type="button"
+            className={cn(
+              gallerySans(),
+              "text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            )}
+            onClick={() => {
+              setIncompleteOnly(false)
+              setUploadDayOnly(false)
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
       ) : null}
       {visibleTimeline.length === 0 && uploadDayOnly && !incompleteOnly ? (
-        <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-          No upload-day capture dates left — Memories already has real days.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+            No upload-day capture dates left — Memories already has real days.
+          </p>
+          <button
+            type="button"
+            className={cn(
+              gallerySans(),
+              "text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            )}
+            onClick={() => {
+              setIncompleteOnly(false)
+              setUploadDayOnly(false)
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
       ) : null}
 
       {visibleTimeline.map((entry) => {

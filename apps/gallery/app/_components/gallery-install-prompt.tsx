@@ -74,8 +74,12 @@ export function GalleryInstallPrompt() {
 
   const install = async () => {
     if (!deferredPrompt) return
-    await deferredPrompt.prompt()
-    await deferredPrompt.userChoice
+    try {
+      await deferredPrompt.prompt()
+      await deferredPrompt.userChoice
+    } catch {
+      // Browser cancelled / blocked the install sheet — still dismiss.
+    }
     dismiss()
   }
 
