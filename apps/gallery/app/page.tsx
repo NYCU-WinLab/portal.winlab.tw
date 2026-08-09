@@ -148,9 +148,11 @@ export default async function GalleryHomePage({
 
   // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
   let popularTags: GalleryTagSuggestion[] = []
+  let popularTagsFailed = false
   if (popularTagsResult.error) {
     if (!isGalleryTagsUnavailable(popularTagsResult.error)) {
       console.error("[gallery] popular tags failed", popularTagsResult.error)
+      popularTagsFailed = true
     }
   } else {
     popularTags = (
@@ -188,6 +190,7 @@ export default async function GalleryHomePage({
               }}
               members={members}
               popularTags={tagsAvailable ? popularTags : []}
+              popularTagsFailed={tagsAvailable && popularTagsFailed}
               favoritesAvailable={favoritesAvailable}
               tagsAvailable={tagsAvailable}
               videoAvailable={videoAvailable}

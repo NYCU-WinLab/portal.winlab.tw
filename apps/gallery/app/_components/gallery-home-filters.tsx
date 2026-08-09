@@ -115,6 +115,7 @@ export function GalleryHomeFiltersBar({
   filters,
   members,
   popularTags = [],
+  popularTagsFailed = false,
   favoritesAvailable = true,
   tagsAvailable = true,
   videoAvailable = true,
@@ -122,6 +123,8 @@ export function GalleryHomeFiltersBar({
   filters: GalleryHomeFilters
   members: GalleryMember[]
   popularTags?: GalleryTagSuggestion[]
+  /** Unexpected RPC failure (not “tags migration missing”). */
+  popularTagsFailed?: boolean
   favoritesAvailable?: boolean
   tagsAvailable?: boolean
   videoAvailable?: boolean
@@ -391,24 +394,35 @@ export function GalleryHomeFiltersBar({
                     >
                       Any tag
                     </DropdownMenuItem>
-                    {popularTags.map((tag) => (
+                    {popularTagsFailed ? (
                       <DropdownMenuItem
-                        key={tag.id}
-                        className="cursor-pointer text-xs"
-                        onClick={() =>
-                          apply({
-                            ...filters,
-                            tagSlug: tag.slug,
-                          })
-                        }
+                        className="cursor-default text-xs text-amber-800"
+                        disabled
                       >
-                        <span className="truncate">
-                          #{tag.slug}
-                          {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                        <span role="status" aria-live="polite">
+                          Couldn&apos;t load popular tags — type a slug below.
                         </span>
-                        {filters.tagSlug === tag.slug ? " ·" : ""}
                       </DropdownMenuItem>
-                    ))}
+                    ) : (
+                      popularTags.map((tag) => (
+                        <DropdownMenuItem
+                          key={tag.id}
+                          className="cursor-pointer text-xs"
+                          onClick={() =>
+                            apply({
+                              ...filters,
+                              tagSlug: tag.slug,
+                            })
+                          }
+                        >
+                          <span className="truncate">
+                            #{tag.slug}
+                            {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                          </span>
+                          {filters.tagSlug === tag.slug ? " ·" : ""}
+                        </DropdownMenuItem>
+                      ))
+                    )}
                     <DropdownMenuSeparator />
                     <div
                       className="flex items-center gap-1 px-2 py-1.5"
@@ -598,23 +612,34 @@ export function GalleryHomeFiltersBar({
                   >
                     Any tag
                   </DropdownMenuItem>
-                  {popularTags.map((tag) => (
+                  {popularTagsFailed ? (
                     <DropdownMenuItem
-                      key={tag.id}
-                      className="cursor-pointer text-xs"
-                      onClick={() =>
-                        apply({
-                          ...filters,
-                          tagSlug: tag.slug,
-                        })
-                      }
+                      className="cursor-default text-xs text-amber-800"
+                      disabled
                     >
-                      <span className="truncate">
-                        {tag.name}
-                        {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                      <span role="status" aria-live="polite">
+                        Couldn&apos;t load popular tags — type a slug below.
                       </span>
                     </DropdownMenuItem>
-                  ))}
+                  ) : (
+                    popularTags.map((tag) => (
+                      <DropdownMenuItem
+                        key={tag.id}
+                        className="cursor-pointer text-xs"
+                        onClick={() =>
+                          apply({
+                            ...filters,
+                            tagSlug: tag.slug,
+                          })
+                        }
+                      >
+                        <span className="truncate">
+                          {tag.name}
+                          {tag.use_count > 0 ? ` · ${tag.use_count}` : ""}
+                        </span>
+                      </DropdownMenuItem>
+                    ))
+                  )}
                   <DropdownMenuSeparator />
                   <div className="flex items-center gap-1 px-2 py-1.5">
                     <input
