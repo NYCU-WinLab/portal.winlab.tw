@@ -55,6 +55,7 @@ export function RenameButton({
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
+        aria-label={`Rename ${name}`}
         className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
       >
         Rename
@@ -68,12 +69,12 @@ export function RenameButton({
         <div className="flex flex-col gap-2">
           <label
             className="text-sm text-muted-foreground"
-            htmlFor="rename-name"
+            htmlFor={`rename-name-${id}`}
           >
             Name
           </label>
           <Input
-            id="rename-name"
+            id={`rename-name-${id}`}
             value={draft}
             maxLength={ARTWORK_NAME_MAX}
             onChange={(e) => setDraft(e.target.value)}

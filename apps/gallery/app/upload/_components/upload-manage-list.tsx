@@ -185,6 +185,7 @@ function UploadListItem({
             id={image.id}
             takenAt={takenAt}
             createdAt={image.created_at}
+            imageName={image.name}
             hintUploadDay={uploadDayHint}
             onUpdated={setTakenAt}
           />

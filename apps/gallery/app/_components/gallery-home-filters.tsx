@@ -103,6 +103,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       className={cn(galleryFilterChipClass(active), disabled && "opacity-50")}
     >
       {children}

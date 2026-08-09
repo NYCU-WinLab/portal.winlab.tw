@@ -37,12 +37,14 @@ export function TakenAtEditor({
   id,
   takenAt,
   createdAt,
+  imageName,
   hintUploadDay = false,
   onUpdated,
 }: {
   id: string
   takenAt: string | null | undefined
   createdAt: string
+  imageName?: string
   hintUploadDay?: boolean
   onUpdated?: (nextTakenAt: string) => void
 }) {
@@ -83,7 +85,11 @@ export function TakenAtEditor({
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
-        aria-label="Edit capture date for this work"
+        aria-label={
+          imageName
+            ? `Edit capture date for ${imageName}`
+            : "Edit capture date for this work"
+        }
         className={cn(
           gallerySans(),
           "!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
