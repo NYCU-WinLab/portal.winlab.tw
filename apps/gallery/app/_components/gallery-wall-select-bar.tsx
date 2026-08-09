@@ -24,20 +24,25 @@ export function GalleryWallSelectBar({
   allSelected,
   isSignedIn,
   selectedIds,
+  savedFilterActive = false,
   onToggleMode,
   onToggleSelectAll,
   onClear,
   onAdded,
+  onUnsaved,
 }: {
   selectionMode: boolean
   selectedCount: number
   allSelected: boolean
   isSignedIn: boolean
   selectedIds: string[]
+  /** When viewing ?saved=1, offer bulk Unsave. */
+  savedFilterActive?: boolean
   onToggleMode: () => void
   onToggleSelectAll: () => void
   onClear: () => void
   onAdded?: () => void
+  onUnsaved?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
@@ -53,6 +58,22 @@ export function GalleryWallSelectBar({
         return
       }
       toast.success(result.message)
+      onClear()
+    })
+  }
+
+  const unsaveSelected = () => {
+    if (selectedIds.length === 0 || pending || saveOpenBusy) return
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await setGalleryFavorites(selectedIds, false)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(result.message)
+      onUnsaved?.()
       onClear()
     })
   }
@@ -138,6 +159,18 @@ export function GalleryWallSelectBar({
                     <IconBookmark className="size-3.5" aria-hidden />
                     {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
                   </Button>
+                  {savedFilterActive ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                      onClick={unsaveSelected}
+                    >
+                      Unsave
+                    </Button>
+                  ) : null}
                   <GalleryAddToAlbum
                     imageIds={selectedIds}
                     triggerLabel={

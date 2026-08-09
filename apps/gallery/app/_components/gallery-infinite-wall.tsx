@@ -283,9 +283,17 @@ export function GalleryInfiniteWall({
               allSelected={allSelected}
               isSignedIn={isSignedIn}
               selectedIds={orderedSelected}
+              savedFilterActive={Boolean(filters.savedOnly)}
               onToggleMode={toggleSelectionMode}
               onToggleSelectAll={toggleSelectAll}
               onClear={clearSelection}
+              onUnsaved={() => {
+                if (!filters.savedOnly) return
+                const remove = new Set(orderedSelected)
+                setImages((prev) =>
+                  prev.filter((image) => !remove.has(image.id))
+                )
+              }}
             />
           }
         />
