@@ -703,6 +703,10 @@ export function UploadManageList({
     () => expandManageSelectionZipItems(orderedSelectedIds, images).length,
     [orderedSelectedIds, images]
   )
+  const selectedWallLinkCount = useMemo(
+    () => resolveManageSelectionWallPhotoIds(orderedSelectedIds, images).length,
+    [orderedSelectedIds, images]
+  )
 
   const toggleSelected = (id: string, options?: { shiftKey?: boolean }) => {
     const anchor = selectionAnchorIdRef.current
@@ -1267,11 +1271,13 @@ export function UploadManageList({
                 <button
                   type="button"
                   onClick={() => void copySelectedLinks()}
-                  disabled={isPending || selectedItems.length === 0}
+                  disabled={isPending || selectedWallLinkCount === 0}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
                   Links
-                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                  {selectedWallLinkCount > 0
+                    ? ` (${selectedWallLinkCount})`
+                    : ""}
                 </button>
                 {tagsAvailable ? (
                   <button
@@ -1387,10 +1393,12 @@ export function UploadManageList({
                     {selectedZipCount > 0 ? `ZIP (${selectedZipCount})` : "ZIP"}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    disabled={isPending || selectedItems.length === 0}
+                    disabled={isPending || selectedWallLinkCount === 0}
                     onSelect={() => void copySelectedLinks()}
                   >
-                    Links
+                    {selectedWallLinkCount > 0
+                      ? `Links (${selectedWallLinkCount})`
+                      : "Links"}
                   </DropdownMenuItem>
                   {tagsAvailable ? (
                     <DropdownMenuItem
