@@ -14,6 +14,7 @@ import {
   isIosDevice,
   isStandaloneDisplayMode,
 } from "@/lib/gallery/pwa"
+import { readStorageItem, writeStorageItem } from "@/lib/gallery/safe-storage"
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -27,7 +28,10 @@ export function GalleryInstallPrompt() {
     useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
-    if (window.localStorage.getItem(GALLERY_PWA_INSTALL_DISMISS_KEY) === "1") {
+    if (
+      readStorageItem(window.localStorage, GALLERY_PWA_INSTALL_DISMISS_KEY) ===
+      "1"
+    ) {
       return
     }
 
@@ -63,7 +67,7 @@ export function GalleryInstallPrompt() {
   }, [])
 
   const dismiss = () => {
-    window.localStorage.setItem(GALLERY_PWA_INSTALL_DISMISS_KEY, "1")
+    writeStorageItem(window.localStorage, GALLERY_PWA_INSTALL_DISMISS_KEY, "1")
     setVisible(false)
     setDeferredPrompt(null)
   }

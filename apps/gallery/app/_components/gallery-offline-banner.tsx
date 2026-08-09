@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { readStorageItem, writeStorageItem } from "@/lib/gallery/safe-storage"
 
 const DISMISS_KEY = "gallery-offline-banner-dismissed"
 
@@ -15,7 +16,7 @@ export function GalleryOfflineBanner() {
   useEffect(() => {
     const sync = () => {
       setOffline(!navigator.onLine)
-      setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1")
+      setDismissed(readStorageItem(window.sessionStorage, DISMISS_KEY) === "1")
     }
     sync()
     window.addEventListener("online", sync)
@@ -61,7 +62,7 @@ export function GalleryOfflineBanner() {
             "shrink-0 text-xs text-muted-foreground underline underline-offset-4"
           )}
           onClick={() => {
-            sessionStorage.setItem(DISMISS_KEY, "1")
+            writeStorageItem(window.sessionStorage, DISMISS_KEY, "1")
             setDismissed(true)
           }}
         >
