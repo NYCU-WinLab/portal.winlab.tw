@@ -3,6 +3,7 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { IconLogout } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -20,10 +21,18 @@ export function SignOutButton({
 
   function onClick() {
     startTransition(async () => {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.replace("/")
-      router.refresh()
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.auth.signOut()
+        if (error) {
+          toast.error(error.message || "Could not sign out.")
+          return
+        }
+        router.replace("/")
+        router.refresh()
+      } catch {
+        toast.error("Could not sign out.")
+      }
     })
   }
 
@@ -32,6 +41,7 @@ export function SignOutButton({
       type="button"
       onClick={onClick}
       disabled={pending}
+      aria-busy={pending}
       aria-label={iconOnly ? "Sign out" : undefined}
       className={cn(
         className,
