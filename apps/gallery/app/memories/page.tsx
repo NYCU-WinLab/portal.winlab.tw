@@ -119,7 +119,12 @@ export default async function MemoriesPage({
             </p>
           </section>
         ) : (
-          <MemoriesYearSections groups={groups} currentYear={day.year} />
+          <MemoriesYearSections
+            groups={groups}
+            currentYear={day.year}
+            slideshowPhotos={slideshowPhotos}
+            slideshowTitle={`Memories · ${label}`}
+          />
         )}
       </div>
     </GalleryThemedShell>
