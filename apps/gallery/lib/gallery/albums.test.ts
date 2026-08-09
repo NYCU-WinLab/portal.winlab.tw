@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  albumMatchesQuery,
   GALLERY_ALBUM_PHOTOS_MAX,
   isGalleryAlbumsUnavailable,
   nextAlbumCoverAfterRemove,
@@ -114,5 +115,29 @@ describe("nextAlbumCoverAfterRemove", () => {
 
   test("clears cover when nothing remains", () => {
     expect(nextAlbumCoverAfterRemove("a", [], ["a"])).toBe(null)
+  })
+})
+
+describe("albumMatchesQuery", () => {
+  const album = {
+    title: "Lab Retreat",
+    slug: "lab-retreat",
+    description: "Photos from Nantou",
+    owner_name: "Alice",
+  }
+
+  test("blank query matches everything", () => {
+    expect(albumMatchesQuery(album, "   ")).toBe(true)
+  })
+
+  test("matches title, slug, description, and owner case-insensitively", () => {
+    expect(albumMatchesQuery(album, "retreat")).toBe(true)
+    expect(albumMatchesQuery(album, "LAB-")).toBe(true)
+    expect(albumMatchesQuery(album, "nantou")).toBe(true)
+    expect(albumMatchesQuery(album, "alice")).toBe(true)
+  })
+
+  test("rejects non-matches", () => {
+    expect(albumMatchesQuery(album, "world-cup")).toBe(false)
   })
 })

@@ -161,3 +161,23 @@ export function nextAlbumCoverAfterRemove(
   if (!removedIds.includes(cover)) return cover
   return remainingImageIds[0] ?? null
 }
+
+/** Case-insensitive match across title, slug, description, and owner. */
+export function albumMatchesQuery(
+  album: {
+    title: string
+    slug: string
+    description: string | null
+    owner_name: string
+  },
+  query: string
+): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return (
+    album.title.toLowerCase().includes(needle) ||
+    album.slug.includes(needle) ||
+    (album.description?.toLowerCase().includes(needle) ?? false) ||
+    album.owner_name.toLowerCase().includes(needle)
+  )
+}
