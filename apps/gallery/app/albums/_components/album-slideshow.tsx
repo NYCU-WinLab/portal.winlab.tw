@@ -347,7 +347,9 @@ export function AlbumSlideshow({
         {photos.length > 1 ? (
           <button
             type="button"
+            role="slider"
             aria-label="Slideshow progress"
+            aria-orientation="horizontal"
             aria-valuemin={1}
             aria-valuemax={photos.length}
             aria-valuenow={index + 1}
