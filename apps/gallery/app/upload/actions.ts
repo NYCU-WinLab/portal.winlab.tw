@@ -209,6 +209,32 @@ export async function registerGalleryImage(
     insertError = retry.error
   }
 
+  // Soft-fail: sequence columns missing — singles still register; bursts abort.
+  if (insertError && isGallerySequenceUnavailable(insertError)) {
+    if (input.sequenceId != null || input.sequenceIndex != null) {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      return {
+        ok: false,
+        error:
+          "Sequences are not available yet — apply the gallery sequence migration.",
+      }
+    }
+    const {
+      sequence_id: _seqId,
+      sequence_index: _seqIndex,
+      ...withoutSequence
+    } = insertPayload
+    void _seqId
+    void _seqIndex
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutSequence)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
+
   if (insertError || !inserted) {
     // Unique slot race: another request won — resolve to that row.
     if (
