@@ -1267,6 +1267,12 @@ export function UploadManageList({
                 visibleSelectableItems[visibleSelectableItems.length - 1]?.id ??
                 null
             }}
+            aria-pressed={allSelected}
+            aria-label={
+              allSelected
+                ? "Clear all selected works"
+                : `Select all ${visibleSelectableItems.length} visible works`
+            }
             className={galleryPillClass()}
           >
             {allSelected
