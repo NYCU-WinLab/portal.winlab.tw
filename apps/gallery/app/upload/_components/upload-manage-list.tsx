@@ -62,6 +62,7 @@ import {
   describeBulkTagAttach,
   describeBulkTagDetach,
 } from "@/lib/gallery/bulk-tag"
+import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   countIncompleteSequences,
@@ -78,6 +79,8 @@ import {
 } from "@/lib/gallery/manage-uploads"
 import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
+import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function toTaipeiDateInput(iso: string | null | undefined): string {
@@ -555,6 +558,7 @@ export function UploadManageList({
   const [bulkTagDraft, setBulkTagDraft] = useState("")
   const [bulkUntagOpen, setBulkUntagOpen] = useState(false)
   const [bulkUntagDraft, setBulkUntagDraft] = useState("")
+  const [zipBusy, setZipBusy] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [uploadDayOnly, setUploadDayOnly] = useState(false)
@@ -780,6 +784,49 @@ export function UploadManageList({
     })
   }
 
+  const downloadSelectedZip = async () => {
+    if (zipBusy || selectedItems.length === 0) return
+    setZipBusy(true)
+    const toastId = toast.loading(
+      `Preparing selection… 0/${selectedItems.length}`
+    )
+    try {
+      const zipItems = selectedItems.map((item, position) => ({
+        name: item.name,
+        image_path: item.imagePath,
+        position,
+      }))
+      const result = await downloadAlbumZip(zipItems, {
+        zipName: buildAlbumZipFilename("manage-selection"),
+        onProgress: ({ completed, total }) => {
+          toast.loading(`Preparing selection… ${completed}/${total}`, {
+            id: toastId,
+          })
+        },
+      })
+      if (result.failed > 0) {
+        toast.success(
+          `Saved ${result.count} work${result.count === 1 ? "" : "s"} as ZIP`,
+          {
+            id: toastId,
+            description: `${result.failed} could not be fetched and were skipped.`,
+          }
+        )
+      } else {
+        toast.success(
+          `Saved ${result.count} work${result.count === 1 ? "" : "s"} as ZIP`,
+          { id: toastId }
+        )
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not build the ZIP"
+      toast.error(message, { id: toastId })
+    } finally {
+      setZipBusy(false)
+    }
+  }
+
   if (images.length === 0) return null
 
   const allSelected =
@@ -926,6 +973,18 @@ export function UploadManageList({
                   setSelectionMode(false)
                 }}
               />
+              <button
+                type="button"
+                onClick={() => void downloadSelectedZip()}
+                disabled={isPending || zipBusy || selectedItems.length === 0}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                {zipBusy
+                  ? "ZIP…"
+                  : selectedItems.length > 0
+                    ? `ZIP (${selectedItems.length})`
+                    : "ZIP"}
+              </button>
               <button
                 type="button"
                 onClick={() => {
