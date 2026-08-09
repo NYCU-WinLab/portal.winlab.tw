@@ -8,6 +8,7 @@ import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
   nextSlideshowIndex,
   prevSlideshowIndex,
+  wallSelectionToSlideshowPhotos,
 } from "@/lib/gallery/slideshow"
 
 describe("clampSlideshowIntervalMs", () => {
@@ -101,6 +102,47 @@ describe("flattenMemoryGroupsForSlideshow", () => {
         image_path: "u/b.jpg",
         media_type: "video",
         poster_path: "u/b-p.jpg",
+      },
+    ])
+  })
+})
+
+describe("wallSelectionToSlideshowPhotos", () => {
+  test("keeps wall order and skips missing paths", () => {
+    expect(
+      wallSelectionToSlideshowPhotos(
+        ["b", "a", "missing"],
+        [
+          {
+            id: "a",
+            name: "A",
+            image_path: "u/a.jpg",
+            media_type: "image",
+            poster_path: null,
+          },
+          {
+            id: "b",
+            name: "B",
+            image_path: "u/b.jpg",
+            media_type: "video",
+            poster_path: "u/b-p.jpg",
+          },
+        ]
+      )
+    ).toEqual([
+      {
+        image_id: "b",
+        name: "B",
+        image_path: "u/b.jpg",
+        media_type: "video",
+        poster_path: "u/b-p.jpg",
+      },
+      {
+        image_id: "a",
+        name: "A",
+        image_path: "u/a.jpg",
+        media_type: "image",
+        poster_path: null,
       },
     ])
   })

@@ -8,6 +8,7 @@ import {
   IconDots,
   IconFileZip,
   IconLink,
+  IconPlayerPlay,
   IconSquare,
   IconTag,
   IconX,
@@ -26,6 +27,7 @@ import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { setGalleryImagesPin } from "@/app/actions"
 import {
   removeImagesFromGalleryAlbumBySlug,
@@ -39,6 +41,7 @@ import {
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
+import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 import {
   buildWallSelectionShareText,
@@ -54,6 +57,7 @@ export function GalleryWallSelectBar({
   isAdmin = false,
   selectedIds,
   selectedZipItems = [],
+  selectedSlideshowPhotos = [],
   savedFilterActive = false,
   albumFilterSlug = null,
   tagFilterSlug = null,
@@ -78,6 +82,8 @@ export function GalleryWallSelectBar({
     image_path: string
     position: number
   }>
+  /** Selected wall covers for slideshow (wall order). */
+  selectedSlideshowPhotos?: GallerySlideshowPhoto[]
   /** When viewing ?saved=1, offer bulk Unsave. */
   savedFilterActive?: boolean
   /** When viewing ?album=, offer bulk Remove from that album. */
@@ -100,9 +106,11 @@ export function GalleryWallSelectBar({
   const [albumDraft, setAlbumDraft] = useState("")
   const [tagFormOpen, setTagFormOpen] = useState(false)
   const [albumFormOpen, setAlbumFormOpen] = useState(false)
+  const [slideshowOpen, setSlideshowOpen] = useState(false)
 
   const hasOverflowActions = isSignedIn
   const overflowBusy = pending || saveOpenBusy || selectedCount === 0
+  const canSlideshow = selectedSlideshowPhotos.length > 0
 
   const tagSelected = (event?: FormEvent) => {
     event?.preventDefault()
@@ -425,6 +433,20 @@ export function GalleryWallSelectBar({
                   <IconLink className="size-3.5" aria-hidden />
                   Links
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canSlideshow}
+                  className={cn(
+                    gallerySans(),
+                    "h-8 gap-1.5 text-[11px] uppercase"
+                  )}
+                  onClick={() => setSlideshowOpen(true)}
+                >
+                  <IconPlayerPlay className="size-3.5" aria-hidden />
+                  Play
+                </Button>
                 {isSignedIn ? (
                   <>
                     <Button
@@ -647,6 +669,14 @@ export function GalleryWallSelectBar({
           </div>
         </div>
       ) : null}
+
+      <AlbumSlideshow
+        photos={selectedSlideshowPhotos}
+        albumTitle="Wall selection"
+        open={slideshowOpen}
+        onOpenChange={setSlideshowOpen}
+        startIndex={0}
+      />
     </>
   )
 }

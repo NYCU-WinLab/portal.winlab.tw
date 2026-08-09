@@ -75,3 +75,30 @@ export function flattenMemoryGroupsForSlideshow(
     }))
   )
 }
+
+/** Map wall multi-select covers to slideshow photos (wall order). */
+export function wallSelectionToSlideshowPhotos(
+  orderedSelectedIds: string[],
+  images: Array<{
+    id: string
+    name: string
+    image_path: string
+    media_type: "image" | "video"
+    poster_path: string | null
+  }>
+): GallerySlideshowPhoto[] {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  const photos: GallerySlideshowPhoto[] = []
+  for (const id of orderedSelectedIds) {
+    const image = byId.get(id)
+    if (!image?.image_path) continue
+    photos.push({
+      image_id: image.id,
+      name: image.name,
+      image_path: image.image_path,
+      media_type: image.media_type,
+      poster_path: image.poster_path,
+    })
+  }
+  return photos
+}
