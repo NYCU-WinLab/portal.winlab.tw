@@ -87,6 +87,21 @@ export function slideshowIndexFromProgress(
   return Math.floor(clamped * length)
 }
 
+/**
+ * Jump helpers for digit keys: 1–9 → ~10%…90%, 0 → last slide.
+ * Returns null when the key is not a digit jump.
+ */
+export function slideshowIndexFromDigitKey(
+  key: string,
+  length: number
+): number | null {
+  if (length <= 0) return null
+  if (key === "0") return length - 1
+  if (!/^[1-9]$/.test(key)) return null
+  const digit = Number(key)
+  return slideshowIndexFromProgress(digit / 10, length)
+}
+
 /** Find a slideshow photo by image id; missing → 0. */
 export function findSlideshowIndexByImageId(
   photos: Array<{ image_id: string }>,

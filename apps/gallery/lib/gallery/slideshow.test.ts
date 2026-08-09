@@ -10,6 +10,7 @@ import {
   nextSlideshowIndex,
   prevSlideshowIndex,
   readStoredSlideshowIntervalMs,
+  slideshowIndexFromDigitKey,
   slideshowIndexFromProgress,
   expandWallSelectionSlideshowPhotos,
   wallSelectionToSlideshowPhotos,
@@ -98,6 +99,15 @@ describe("slideshowIndexFromProgress", () => {
   test("guards empty and non-finite", () => {
     expect(slideshowIndexFromProgress(0.5, 0)).toBe(0)
     expect(slideshowIndexFromProgress(Number.NaN, 3)).toBe(0)
+  })
+})
+
+describe("slideshowIndexFromDigitKey", () => {
+  test("maps 1–9 and 0", () => {
+    expect(slideshowIndexFromDigitKey("1", 10)).toBe(1)
+    expect(slideshowIndexFromDigitKey("5", 10)).toBe(5)
+    expect(slideshowIndexFromDigitKey("0", 10)).toBe(9)
+    expect(slideshowIndexFromDigitKey("a", 10)).toBeNull()
   })
 })
 

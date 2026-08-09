@@ -26,6 +26,7 @@ import {
   nextSlideshowIndex,
   prevSlideshowIndex,
   readStoredSlideshowIntervalMs,
+  slideshowIndexFromDigitKey,
   slideshowIndexFromProgress,
   writeStoredSlideshowIntervalMs,
   type GallerySlideshowPhoto,
@@ -200,6 +201,12 @@ export function AlbumSlideshow({
       if (event.key === "End") {
         event.preventDefault()
         setIndex(Math.max(0, photos.length - 1))
+        return
+      }
+      const digitIndex = slideshowIndexFromDigitKey(event.key, photos.length)
+      if (digitIndex != null) {
+        event.preventDefault()
+        setIndex(digitIndex)
       }
     }
     window.addEventListener("keydown", onKey)
