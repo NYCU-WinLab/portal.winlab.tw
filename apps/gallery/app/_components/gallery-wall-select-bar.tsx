@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, type FormEvent } from "react"
+import { useEffect, useState, useTransition, type FormEvent } from "react"
 import {
   IconAlbum,
   IconBookmark,
@@ -69,6 +69,7 @@ export function GalleryWallSelectBar({
   onPinned,
   onRemovedFromAlbum,
   onUntagged,
+  onSlideshowOpenChange,
 }: {
   selectionMode: boolean
   selectedCount: number
@@ -98,6 +99,8 @@ export function GalleryWallSelectBar({
   onPinned?: (pinned: boolean) => void
   onRemovedFromAlbum?: () => void
   onUntagged?: () => void
+  /** Suspend wall keyboard while the selection slideshow is open. */
+  onSlideshowOpenChange?: (open: boolean) => void
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
@@ -107,6 +110,10 @@ export function GalleryWallSelectBar({
   const [tagFormOpen, setTagFormOpen] = useState(false)
   const [albumFormOpen, setAlbumFormOpen] = useState(false)
   const [slideshowOpen, setSlideshowOpen] = useState(false)
+
+  useEffect(() => {
+    onSlideshowOpenChange?.(slideshowOpen)
+  }, [onSlideshowOpenChange, slideshowOpen])
 
   const hasOverflowActions = isSignedIn
   const overflowBusy = pending || saveOpenBusy || selectedCount === 0

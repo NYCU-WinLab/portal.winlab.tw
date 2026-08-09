@@ -82,6 +82,7 @@ export function GalleryInfiniteWall({
   const [shuffled, setShuffled] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [selectionSlideshowOpen, setSelectionSlideshowOpen] = useState(false)
   const selectionAnchorIdRef = useRef<string | null>(null)
   const loadOrderIdsRef = useRef(initialImages.map((image) => image.id))
   const shuffledRef = useRef(false)
@@ -349,6 +350,7 @@ export function GalleryInfiniteWall({
                   prev.filter((image) => !remove.has(image.id))
                 )
               }}
+              onSlideshowOpenChange={setSelectionSlideshowOpen}
             />
           }
         />
@@ -376,6 +378,7 @@ export function GalleryInfiniteWall({
           setSelectedIds(new Set())
         }}
         onToggleSelectAll={toggleSelectAll}
+        suspendKeyboard={selectionSlideshowOpen}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />

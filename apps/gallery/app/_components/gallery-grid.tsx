@@ -41,6 +41,7 @@ export function GalleryGrid({
   onToggleSelected,
   onExitSelectionMode,
   onToggleSelectAll,
+  suspendKeyboard = false,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -62,6 +63,8 @@ export function GalleryGrid({
   onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
   onExitSelectionMode?: () => void
   onToggleSelectAll?: () => void
+  /** When true, ignore wall/select keyboard (e.g. selection slideshow open). */
+  suspendKeyboard?: boolean
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -148,6 +151,7 @@ export function GalleryGrid({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
+      if (suspendKeyboard) return
       if (openIndex !== null) return
 
       if (selectionMode) {
@@ -230,6 +234,7 @@ export function GalleryGrid({
     onToggleSelectAll,
     openIndex,
     selectionMode,
+    suspendKeyboard,
   ])
 
   if (images.length === 0) {
