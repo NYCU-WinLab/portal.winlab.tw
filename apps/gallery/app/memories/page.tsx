@@ -1,11 +1,9 @@
 import Link from "next/link"
 
-import { cn } from "@workspace/ui/lib/utils"
-
 import { MemoriesDayNavigator } from "@/app/memories/_components/memories-day-navigator"
 import { MemoriesDayView } from "@/app/memories/_components/memories-day-view"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
-import { galleryPanelClass, gallerySans } from "@/components/gallery-chrome"
+import { GalleryEmptyState } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
 import {
@@ -71,71 +69,41 @@ export default async function MemoriesPage({
         </div>
 
         {!memoriesAvailable ? (
-          <section className={cn(galleryPanelClass(), "space-y-3")}>
-            <p
-              className={cn(
-                gallerySans(),
-                "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
-              )}
-            >
-              Not ready yet
-            </p>
-            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-              Memories needs the gallery memories migration (capture dates +
-              on-this-day RPC). Apply it, then refresh — Manage already
-              soft-hides capture-date tools until then.
-            </p>
-            <p
-              className={cn(
-                gallerySans(),
-                "flex flex-wrap gap-x-4 gap-y-2 text-sm"
-              )}
-            >
+          <GalleryEmptyState
+            title="Not ready yet"
+            description="Memories needs the gallery memories migration (capture dates + on-this-day RPC). Apply it, then refresh — Manage already soft-hides capture-date tools until then."
+            action={
               <Link
                 href="/"
                 className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
               >
                 Back to the wall
               </Link>
-            </p>
-          </section>
+            }
+          />
         ) : groups.length === 0 ? (
-          <section className={cn(galleryPanelClass(), "space-y-3")}>
-            <p
-              className={cn(
-                gallerySans(),
-                "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
-              )}
-            >
-              Empty tray
-            </p>
-            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-              Nothing from a past {label} yet. Shots need a capture date (EXIF
-              or upload day) to land here. Hang a polaroid today, and next year
-              it will show up.
-            </p>
-            <p
-              className={cn(
-                gallerySans(),
-                "flex flex-wrap gap-x-4 gap-y-2 text-sm"
-              )}
-            >
-              <Link
-                href="/"
-                className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
-              >
-                Back to the wall
-              </Link>
-              {user ? (
+          <GalleryEmptyState
+            title="Empty tray"
+            description={`Nothing from a past ${label} yet. Shots need a capture date (EXIF or upload day) to land here. Hang a polaroid today, and next year it will show up.`}
+            action={
+              <p className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
                 <Link
-                  href="/upload"
+                  href="/"
                   className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
                 >
-                  Upload a polaroid
+                  Back to the wall
                 </Link>
-              ) : null}
-            </p>
-          </section>
+                {user ? (
+                  <Link
+                    href="/upload"
+                    className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
+                  >
+                    Upload a polaroid
+                  </Link>
+                ) : null}
+              </p>
+            }
+          />
         ) : (
           <MemoriesDayView
             groups={groups}

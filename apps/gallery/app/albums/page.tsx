@@ -75,17 +75,18 @@ export default async function GalleryAlbumsPage({
         />
 
         {!albumsReady ? (
-          <section className={cn(galleryPanelClass(), "space-y-2")}>
-            <h2
-              className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}
-            >
-              Albums not ready yet
-            </h2>
-            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-              Apply the gallery albums migration, then refresh — Manage already
-              soft-hides album tools until then.
-            </p>
-          </section>
+          <GalleryEmptyState
+            title="Albums not ready yet"
+            description="Apply the gallery albums migration, then refresh — Manage already soft-hides album tools until then."
+            action={
+              <Link
+                href="/"
+                className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
+              >
+                Back to the wall
+              </Link>
+            }
+          />
         ) : user ? (
           <section className={cn(galleryPanelClass(), "space-y-5")}>
             <div className="space-y-1">
