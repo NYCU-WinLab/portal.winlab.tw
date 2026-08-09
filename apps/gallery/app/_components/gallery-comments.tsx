@@ -34,6 +34,7 @@ import {
   updateGalleryComment,
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
+import { isCommentEdited } from "@/lib/gallery/comment-edit"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
@@ -644,28 +645,22 @@ export function GalleryComments({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={isPending}
+              aria-busy={isPending || undefined}
               onClick={() => {
-                if (!deleteTargetId) return
+                if (!deleteTargetId || isPending) return
                 removeComment(deleteTargetId)
                 setDeleteTargetId(null)
               }}
             >
-              Delete
+              {isPending ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
-}
-
-function isCommentEdited(comment: GalleryComment): boolean {
-  if (!comment.updated_at) return false
-  return (
-    new Date(comment.updated_at).getTime() >
-    new Date(comment.created_at).getTime()
   )
 }
 

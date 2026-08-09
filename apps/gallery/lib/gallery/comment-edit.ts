@@ -15,6 +15,18 @@ export type GalleryCommentRow = {
   pinned_at?: string | null
 }
 
+/** True when updated_at is strictly after created_at (user edited). */
+export function isCommentEdited(comment: {
+  created_at: string
+  updated_at?: string | null
+}): boolean {
+  if (!comment.updated_at) return false
+  return (
+    new Date(comment.updated_at).getTime() >
+    new Date(comment.created_at).getTime()
+  )
+}
+
 export function isGalleryCommentEditUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {
