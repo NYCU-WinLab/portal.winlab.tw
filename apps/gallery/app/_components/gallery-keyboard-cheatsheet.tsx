@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { IconKeyboard, IconX } from "@tabler/icons-react"
 
 import { cn } from "@workspace/ui/lib/utils"
@@ -70,6 +70,14 @@ export function GalleryKeyboardCheatsheet({
   className?: string
 }) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  const setSheetOpen = (next: boolean) => {
+    setOpen(next)
+    if (!next) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,13 +88,13 @@ export function GalleryKeyboardCheatsheet({
       if (open && event.key === "Escape") {
         event.preventDefault()
         event.stopImmediatePropagation()
-        setOpen(false)
+        setSheetOpen(false)
         return
       }
 
       if (!isCheatSheetToggleKey(event.key, event.shiftKey)) return
       event.preventDefault()
-      setOpen((value) => !value)
+      setSheetOpen(!open)
     }
     window.addEventListener("keydown", onKeyDown, true)
     return () => window.removeEventListener("keydown", onKeyDown, true)
@@ -111,10 +119,11 @@ export function GalleryKeyboardCheatsheet({
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Keyboard shortcuts"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setSheetOpen(!open)}
         className={cn(
           gallerySans(),
           "inline-flex size-8 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition-colors",
@@ -131,6 +140,7 @@ export function GalleryKeyboardCheatsheet({
       {open ? (
         <div
           role="dialog"
+          aria-modal="true"
           aria-label="Keyboard shortcuts"
           className={cn(
             "fixed right-4 bottom-4 z-[95] w-[min(20rem,calc(100vw-2rem))]",
@@ -171,7 +181,7 @@ export function GalleryKeyboardCheatsheet({
                   ? "text-zinc-400 hover:bg-white/10 hover:text-zinc-50"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
-              onClick={() => setOpen(false)}
+              onClick={() => setSheetOpen(false)}
             >
               <IconX className="size-3.5" aria-hidden />
             </button>
