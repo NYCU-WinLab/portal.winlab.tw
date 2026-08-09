@@ -62,6 +62,8 @@ export function AlbumSlideshow({
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
 
   useEffect(() => {
     if (!open) return
@@ -386,6 +388,12 @@ export function AlbumSlideshow({
               playsInline
               autoPlay
               muted
+              onEnded={() => {
+                if (pausedRef.current || photos.length < 2) return
+                setIndex((current) =>
+                  nextSlideshowIndex(current, photos.length)
+                )
+              }}
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
