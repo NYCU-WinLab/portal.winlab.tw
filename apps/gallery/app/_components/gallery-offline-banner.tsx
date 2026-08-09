@@ -13,6 +13,11 @@ export function GalleryOfflineBanner() {
   const [offline, setOffline] = useState(false)
   const [dismissed, setDismissed] = useState(true)
 
+  const dismiss = () => {
+    writeStorageItem(window.sessionStorage, DISMISS_KEY, "1")
+    setDismissed(true)
+  }
+
   useEffect(() => {
     const sync = () => {
       setOffline(!navigator.onLine)
@@ -27,11 +32,27 @@ export function GalleryOfflineBanner() {
     }
   }, [])
 
-  if (!offline || dismissed) return null
+  const visible = offline && !dismissed
+
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      // Leave Esc to modal dialogs / slideshow chrome when they are open.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      event.preventDefault()
+      dismiss()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [visible])
+
+  if (!visible) return null
 
   return (
     <div
       role="status"
+      aria-live="polite"
       className={cn(
         "fixed inset-x-0 bottom-0 z-[60] border-t border-zinc-900/10",
         "bg-[#fafafa]/95 px-4 py-3 backdrop-blur-md",
@@ -61,10 +82,7 @@ export function GalleryOfflineBanner() {
             gallerySans(),
             "shrink-0 text-xs text-muted-foreground underline underline-offset-4"
           )}
-          onClick={() => {
-            writeStorageItem(window.sessionStorage, DISMISS_KEY, "1")
-            setDismissed(true)
-          }}
+          onClick={dismiss}
         >
           Dismiss
         </button>
