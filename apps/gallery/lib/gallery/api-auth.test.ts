@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { NextRequest } from "next/server"
 
-import { isGalleryApiAuthorized } from "@/lib/gallery/api-auth"
+import {
+  GALLERY_API_CORS,
+  isGalleryApiAuthorized,
+} from "@/lib/gallery/api-auth"
 
 function requestWithAuth(authorization: string | null): NextRequest {
   return {
@@ -13,6 +16,21 @@ function requestWithAuth(authorization: string | null): NextRequest {
     },
   } as NextRequest
 }
+
+describe("GALLERY_API_CORS", () => {
+  test("exposes open CORS for GET/POST/OPTIONS with Authorization", () => {
+    expect(GALLERY_API_CORS["Access-Control-Allow-Origin"]).toBe("*")
+    expect(GALLERY_API_CORS["Access-Control-Allow-Methods"]).toContain("GET")
+    expect(GALLERY_API_CORS["Access-Control-Allow-Methods"]).toContain("POST")
+    expect(GALLERY_API_CORS["Access-Control-Allow-Methods"]).toContain(
+      "OPTIONS"
+    )
+    expect(GALLERY_API_CORS["Access-Control-Allow-Headers"]).toContain(
+      "Authorization"
+    )
+    expect(GALLERY_API_CORS["Content-Type"]).toContain("application/json")
+  })
+})
 
 describe("isGalleryApiAuthorized", () => {
   const previous = process.env.GALLERY_API_SECRET
