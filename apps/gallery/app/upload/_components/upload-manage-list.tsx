@@ -173,6 +173,7 @@ function UploadListItem({
         typeof sequenceIndex === "number" ? sequenceIndex : undefined
       }
       aria-selected={selectionMode ? selected : undefined}
+      role={selectionMode ? "option" : undefined}
       onClick={
         selectionMode
           ? (event) => {
@@ -485,7 +486,13 @@ function UploadSequenceGroup({
           </button>
         </div>
       ) : null}
-      <ul ref={listRef} className="flex flex-col gap-3">
+      <ul
+        ref={listRef}
+        className="flex flex-col gap-3"
+        role={selectionMode ? "listbox" : undefined}
+        aria-multiselectable={selectionMode ? true : undefined}
+        aria-label={selectionMode ? "Select works in this sequence" : undefined}
+      >
         {timelineSlots.map((slot) => {
           if (slot.kind === "gap") {
             return (
@@ -1538,7 +1545,13 @@ export function UploadManageList({
         }
 
         return (
-          <ul key={entry.row.id} className="flex flex-col gap-3">
+          <ul
+            key={entry.row.id}
+            className="flex flex-col gap-3"
+            role={selectionMode ? "listbox" : undefined}
+            aria-multiselectable={selectionMode ? true : undefined}
+            aria-label={selectionMode ? "Select works" : undefined}
+          >
             <UploadListItem
               image={entry.row}
               siblings={images}
