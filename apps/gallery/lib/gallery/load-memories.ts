@@ -108,13 +108,14 @@ export async function loadGalleryMemoriesOnThisDay(
     }
   }
 
-  const photos = rows.map((row) => {
+  const photos: GalleryMemoryPhoto[] = rows.map((row) => {
     const createdBy = row.created_by
     return {
       id: row.id,
       name: row.name,
       image_path: row.image_path,
-      media_type: row.media_type === "video" ? "video" : "image",
+      media_type:
+        row.media_type === "video" ? ("video" as const) : ("image" as const),
       poster_path: row.poster_path,
       created_by: createdBy,
       created_at: row.created_at,
