@@ -1,11 +1,20 @@
 "use client"
 
-import { IconAlbum, IconCheckbox, IconSquare, IconX } from "@tabler/icons-react"
+import { useState, useTransition } from "react"
+import {
+  IconAlbum,
+  IconBookmark,
+  IconCheckbox,
+  IconSquare,
+  IconX,
+} from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { setGalleryFavorites } from "@/app/actions/favorites"
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 
@@ -30,6 +39,24 @@ export function GalleryWallSelectBar({
   onClear: () => void
   onAdded?: () => void
 }) {
+  const [pending, startTransition] = useTransition()
+  const [saveOpenBusy, setSaveOpenBusy] = useState(false)
+
+  const saveSelected = () => {
+    if (selectedIds.length === 0 || pending || saveOpenBusy) return
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await setGalleryFavorites(selectedIds, true)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(result.message)
+      onClear()
+    })
+  }
+
   return (
     <>
       <button
@@ -96,18 +123,34 @@ export function GalleryWallSelectBar({
                 Clear
               </Button>
               {isSignedIn ? (
-                <GalleryAddToAlbum
-                  imageIds={selectedIds}
-                  triggerLabel={
-                    selectedCount > 0
-                      ? `Add ${selectedCount} to album`
-                      : "Add to album"
-                  }
-                  onAdded={() => {
-                    onAdded?.()
-                    onClear()
-                  }}
-                />
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedCount === 0 || pending}
+                    className={cn(
+                      gallerySans(),
+                      "h-8 gap-1.5 text-[11px] uppercase"
+                    )}
+                    onClick={saveSelected}
+                  >
+                    <IconBookmark className="size-3.5" aria-hidden />
+                    {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
+                  </Button>
+                  <GalleryAddToAlbum
+                    imageIds={selectedIds}
+                    triggerLabel={
+                      selectedCount > 0
+                        ? `Add ${selectedCount} to album`
+                        : "Add to album"
+                    }
+                    onAdded={() => {
+                      onAdded?.()
+                      onClear()
+                    }}
+                  />
+                </>
               ) : (
                 <Button
                   type="button"
@@ -118,10 +161,10 @@ export function GalleryWallSelectBar({
                     "h-8 gap-1.5 text-[11px] uppercase"
                   )}
                   disabled
-                  title="Sign in to add to an album"
+                  title="Sign in to curate"
                 >
                   <IconAlbum className="size-3.5" aria-hidden />
-                  Sign in to add
+                  Sign in to curate
                 </Button>
               )}
             </div>

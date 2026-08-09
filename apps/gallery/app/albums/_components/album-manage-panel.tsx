@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useCallback, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   IconArrowDown,
   IconArrowUp,
+  IconGripVertical,
   IconTrash,
   IconX,
 } from "@tabler/icons-react"
@@ -42,6 +43,7 @@ import {
   gallerySans,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
+import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import type {
   GalleryAlbumDetail,
   GalleryAlbumPhoto,
@@ -141,6 +143,53 @@ export function GalleryAlbumManagePanel({
       router.refresh()
     })
   }
+
+  const applyReorder = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setPhotos((prev) => {
+        if (
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= prev.length ||
+          toIndex >= prev.length ||
+          fromIndex === toIndex
+        ) {
+          return prev
+        }
+        const next = [...prev]
+        const [item] = next.splice(fromIndex, 1)
+        if (!item) return prev
+        next.splice(toIndex, 0, item)
+        const previous = prev
+        startTransition(async () => {
+          const result = await reorderGalleryAlbumImages(
+            album.id,
+            next.map((p) => p.image_id)
+          )
+          if (!result.ok) {
+            toast.error(result.error)
+            setPhotos(previous)
+            return
+          }
+          router.refresh()
+        })
+        return next
+      })
+    },
+    [album.id, router]
+  )
+
+  const {
+    listRef,
+    onHandlePointerDown,
+    onHandlePointerMove,
+    onHandlePointerUp,
+    onHandlePointerCancel,
+  } = useSequencePointerReorder({
+    itemCount: photos.length,
+    disabled: pending,
+    onReorder: applyReorder,
+  })
 
   const removePhoto = (imageId: string) => {
     startTransition(async () => {
@@ -389,17 +438,36 @@ export function GalleryAlbumManagePanel({
             Add photos from the wall lightbox — pick &ldquo;Add to album&rdquo;.
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul ref={listRef} className="space-y-2">
             {photos.map((photo, index) => {
               const isSelected = selected.has(photo.image_id)
               return (
                 <li
                   key={photo.image_id}
+                  data-sequence-index={index}
                   className={cn(
                     "flex items-center gap-3 rounded-md border border-border/60 bg-background/70 p-2",
+                    "data-[sequence-drop-target=true]:border-foreground/35 data-[sequence-drop-target=true]:bg-foreground/[0.04]",
                     isSelected && "border-zinc-900/25 bg-zinc-900/[0.03]"
                   )}
                 >
+                  <button
+                    type="button"
+                    aria-label={`Drag to reorder ${photo.name}`}
+                    disabled={pending}
+                    className={cn(
+                      "inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground",
+                      "hover:bg-muted/60 hover:text-foreground active:cursor-grabbing",
+                      "disabled:pointer-events-none disabled:opacity-40",
+                      "touch-none select-none"
+                    )}
+                    onPointerDown={(event) => onHandlePointerDown(index, event)}
+                    onPointerMove={onHandlePointerMove}
+                    onPointerUp={onHandlePointerUp}
+                    onPointerCancel={onHandlePointerCancel}
+                  >
+                    <IconGripVertical className="size-4" aria-hidden />
+                  </button>
                   <Checkbox
                     checked={isSelected}
                     disabled={pending}

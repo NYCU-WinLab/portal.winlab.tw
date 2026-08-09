@@ -48,7 +48,10 @@ import {
   resolveLightboxNextStep,
   resolveLightboxPrevStep,
 } from "@/lib/gallery/lightbox-nav"
+import { resolveLightboxShortcut } from "@/lib/gallery/lightbox-shortcuts"
+import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
 import { getRotation } from "@/lib/gallery/rotation"
+import { toggleGalleryFavorite } from "@/app/actions/favorites"
 import type {
   GalleryImage,
   GalleryMember,
@@ -261,6 +264,12 @@ export function GalleryCard({
     onSwipeDown: () => setMobileDetailsOpen(false),
   })
 
+  const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
+
+  useEffect(() => {
+    setFavorited(Boolean(image.is_favorited))
+  }, [image.id, image.is_favorited])
+
   const copyShareLink = useCallback(async () => {
     const href = buildGalleryPhotoHref({
       photoId: image.id,
@@ -286,36 +295,88 @@ export function GalleryCard({
     }
   }, [activeItem?.name, highlightCommentId, image.id, image.name])
 
+  const toggleFavoriteFromKeyboard = useCallback(async () => {
+    if (!isSignedIn) {
+      toast.error("Sign in to save favorites.")
+      return
+    }
+    const next = !favorited
+    setFavorited(next)
+    const result = await toggleGalleryFavorite(image.id, next)
+    if (!result.ok) {
+      setFavorited(!next)
+      toast.error(result.error)
+      return
+    }
+    toast.success(
+      result.favorited ? "Saved to favorites" : "Removed from favorites"
+    )
+  }, [favorited, image.id, isSignedIn])
+
+  const downloadOriginalFromKeyboard = useCallback(async () => {
+    const path = activeItem?.image_path ?? image.image_path
+    const name = activeItem?.name ?? image.name
+    if (!path) {
+      toast.error("Nothing to download.")
+      return
+    }
+    try {
+      await downloadGalleryOriginal({ displayName: name, imagePath: path })
+      toast.success("Saved original")
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not download"
+      toast.error(message)
+    }
+  }, [activeItem?.image_path, activeItem?.name, image.image_path, image.name])
+
   useEffect(() => {
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      if (event.key === "ArrowLeft") {
-        event.preventDefault()
+      const action = resolveLightboxShortcut(event.key, {
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+      })
+      if (!action) return
+      event.preventDefault()
+      if (action === "prev") {
         goLightboxPrev()
         return
       }
-      if (event.key === "ArrowRight") {
-        event.preventDefault()
+      if (action === "next") {
         goLightboxNext()
         return
       }
-      if (event.key === "i" || event.key === "I") {
-        event.preventDefault()
+      if (action === "toggle-details") {
         setMobileDetailsOpen((open) => !open)
         return
       }
-      if (event.key === "s" || event.key === "S") {
-        event.preventDefault()
+      if (action === "share") {
         void copyShareLink()
+        return
+      }
+      if (action === "favorite") {
+        void toggleFavoriteFromKeyboard()
+        return
+      }
+      if (action === "download") {
+        void downloadOriginalFromKeyboard()
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [copyShareLink, goLightboxNext, goLightboxPrev, isDialogOpen])
+  }, [
+    copyShareLink,
+    downloadOriginalFromKeyboard,
+    goLightboxNext,
+    goLightboxPrev,
+    isDialogOpen,
+    toggleFavoriteFromKeyboard,
+  ])
 
   // Prefetch adjacent sequence full-res for snappier story browsing.
   useEffect(() => {
@@ -602,6 +663,8 @@ export function GalleryCard({
                   comments={comments}
                   setComments={setComments}
                   onArtworkRenamed={onArtworkRenamed}
+                  favorited={favorited}
+                  onFavoritedChange={setFavorited}
                 />
               </div>
             </DialogContent>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect } from "react"
 import { IconBookmark, IconBookmarkFilled } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -24,6 +24,10 @@ export function FavoritePhotoButton({
 }: FavoritePhotoButtonProps) {
   const [favorited, setFavorited] = useState(initialFavorited)
   const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setFavorited(initialFavorited)
+  }, [imageId, initialFavorited])
 
   const toggle = () => {
     if (pending) return

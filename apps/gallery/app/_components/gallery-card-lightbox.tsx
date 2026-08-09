@@ -281,6 +281,8 @@ export function GalleryLightboxSocialAside({
   comments,
   setComments,
   onArtworkRenamed,
+  favorited,
+  onFavoritedChange,
 }: {
   image: GalleryImage
   activeItem: GallerySequenceItem | undefined
@@ -308,6 +310,8 @@ export function GalleryLightboxSocialAside({
   comments: GalleryComment[]
   setComments: Dispatch<SetStateAction<GalleryComment[]>>
   onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
+  favorited?: boolean
+  onFavoritedChange?: (favorited: boolean) => void
 }) {
   const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
   const reactionPeek = formatReactionSummary(counts)
@@ -503,7 +507,8 @@ export function GalleryLightboxSocialAside({
           <div className="flex flex-wrap items-center gap-2">
             <FavoritePhotoButton
               imageId={image.id}
-              initialFavorited={Boolean(image.is_favorited)}
+              initialFavorited={favorited ?? Boolean(image.is_favorited)}
+              onChanged={onFavoritedChange}
             />
             <GalleryAddToAlbum imageIds={[activeItem?.id ?? image.id]} />
           </div>
