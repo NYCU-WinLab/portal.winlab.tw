@@ -1,7 +1,7 @@
 "use client"
 
 import type { Dispatch, SetStateAction } from "react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 import {
   IconChevronLeft,
@@ -45,6 +45,42 @@ import type {
   GalleryMember,
   GallerySequenceItem,
 } from "@/lib/gallery/types"
+
+function SequenceStripThumb({ item }: { item: GallerySequenceItem }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <span
+        aria-hidden
+        className="flex h-full w-full items-center justify-center bg-zinc-800/80"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/mark.png"
+          alt=""
+          width={16}
+          height={16}
+          className="size-4 object-contain opacity-40 grayscale"
+          draggable={false}
+        />
+      </span>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={thumbUrlFromItem(item)}
+      alt=""
+      className="h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  )
+}
 
 /** Lightbox media plane: image/video, chrome buttons, sequence dots. */
 export function GalleryLightboxMediaPane({
@@ -224,16 +260,7 @@ export function GalleryLightboxMediaPane({
                     : "border-white/35 opacity-75 hover:opacity-100"
                 )}
               >
-                {/* Tiny strip thumbs — next/image is overkill in lightbox chrome */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbUrlFromItem(item)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                  draggable={false}
-                />
+                <SequenceStripThumb item={item} />
               </button>
             ))}
           </div>
