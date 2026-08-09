@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   clampSlideshowIntervalMs,
+  clampSlideshowStartIndex,
   flattenMemoryGroupsForSlideshow,
   GALLERY_SLIDESHOW_DEFAULT_MS,
   nextSlideshowIndex,
@@ -35,6 +36,18 @@ describe("slideshow index wrap", () => {
   test("empty stays zero", () => {
     expect(nextSlideshowIndex(5, 0)).toBe(0)
     expect(prevSlideshowIndex(5, 0)).toBe(0)
+  })
+})
+
+describe("clampSlideshowStartIndex", () => {
+  test("clamps into range", () => {
+    expect(clampSlideshowStartIndex(-1, 4)).toBe(0)
+    expect(clampSlideshowStartIndex(99, 4)).toBe(3)
+    expect(clampSlideshowStartIndex(2.9, 4)).toBe(2)
+  })
+
+  test("empty list stays zero", () => {
+    expect(clampSlideshowStartIndex(5, 0)).toBe(0)
   })
 })
 

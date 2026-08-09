@@ -14,6 +14,7 @@ import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
+  clampSlideshowStartIndex,
   nextSlideshowIndex,
   prevSlideshowIndex,
   type GallerySlideshowPhoto,
@@ -29,26 +30,29 @@ function mediaUrl(photo: GallerySlideshowPhoto): string {
   return getGalleryImageUrl(photo.image_path)
 }
 
-export function AlbumSlideshowButton({
+export function AlbumSlideshow({
   photos,
   albumTitle,
-  className,
-  triggerLabel = "Slideshow",
+  open,
+  onOpenChange,
+  startIndex = 0,
 }: {
   photos: GallerySlideshowPhoto[]
   albumTitle: string
-  className?: string
-  triggerLabel?: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  startIndex?: number
 }) {
-  const [open, setOpen] = useState(false)
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(() =>
+    clampSlideshowStartIndex(startIndex, photos.length)
+  )
   const [paused, setPaused] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setIndex(0)
+    setIndex(clampSlideshowStartIndex(startIndex, photos.length))
     setPaused(false)
-  }, [open])
+  }, [open, startIndex, photos.length])
 
   useEffect(() => {
     if (!open || photos.length < 2) return
@@ -101,111 +105,136 @@ export function AlbumSlideshowButton({
   if (!photo) return null
 
   return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "fixed inset-0 z-50 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-zinc-950 p-0 text-zinc-50 shadow-none",
+          "data-[state=closed]:animate-none data-[state=open]:animate-none"
+        )}
+      >
+        <DialogTitle className="sr-only">Slideshow · {albumTitle}</DialogTitle>
+
+        <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="min-w-0">
+            <p
+              className={cn(
+                gallerySerif(),
+                "truncate text-lg text-zinc-50 sm:text-xl"
+              )}
+            >
+              {albumTitle}
+            </p>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-[11px] tracking-wide text-zinc-400 uppercase"
+              )}
+            >
+              {index + 1} / {photos.length}
+              {paused ? " · paused" : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPaused((value) => !value)}
+              className={cn(
+                gallerySans(),
+                "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
+              )}
+              aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
+            >
+              {paused ? (
+                <IconPlayerPlay className="size-5" aria-hidden />
+              ) : (
+                <IconPlayerPause className="size-5" aria-hidden />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className={cn(
+                gallerySans(),
+                "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
+              )}
+              aria-label="Close slideshow"
+            >
+              <IconX className="size-5" aria-hidden />
+            </button>
+          </div>
+        </header>
+
+        <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-8 sm:px-10">
+          {photo.media_type === "video" ? (
+            <video
+              key={photo.image_id}
+              src={getGalleryImageUrl(photo.image_path)}
+              poster={
+                photo.poster_path
+                  ? getGalleryThumbUrl(photo.poster_path, 1600)
+                  : undefined
+              }
+              className="max-h-full max-w-full object-contain"
+              controls
+              playsInline
+              autoPlay
+              muted
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.image_id}
+              src={mediaUrl(photo)}
+              alt={photo.name}
+              className="max-h-full max-w-full object-contain"
+              draggable={false}
+            />
+          )}
+        </div>
+
+        <p
+          className={cn(
+            gallerySans(),
+            "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
+          )}
+        >
+          {photo.name} · Space pause · ← → step · Esc close
+        </p>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function AlbumSlideshowButton({
+  photos,
+  albumTitle,
+  className,
+  triggerLabel = "Slideshow",
+  startIndex = 0,
+}: {
+  photos: GallerySlideshowPhoto[]
+  albumTitle: string
+  className?: string
+  triggerLabel?: string
+  startIndex?: number
+}) {
+  const [open, setOpen] = useState(false)
+
+  if (photos.length === 0) return null
+
+  return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>
         {triggerLabel}
       </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          showCloseButton={false}
-          className={cn(
-            "fixed inset-0 z-50 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-zinc-950 p-0 text-zinc-50 shadow-none",
-            "data-[state=closed]:animate-none data-[state=open]:animate-none"
-          )}
-        >
-          <DialogTitle className="sr-only">
-            Slideshow · {albumTitle}
-          </DialogTitle>
-
-          <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <div className="min-w-0">
-              <p
-                className={cn(
-                  gallerySerif(),
-                  "truncate text-lg text-zinc-50 sm:text-xl"
-                )}
-              >
-                {albumTitle}
-              </p>
-              <p
-                className={cn(
-                  gallerySans(),
-                  "text-[11px] tracking-wide text-zinc-400 uppercase"
-                )}
-              >
-                {index + 1} / {photos.length}
-                {paused ? " · paused" : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setPaused((value) => !value)}
-                className={cn(
-                  gallerySans(),
-                  "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
-                )}
-                aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
-              >
-                {paused ? (
-                  <IconPlayerPlay className="size-5" aria-hidden />
-                ) : (
-                  <IconPlayerPause className="size-5" aria-hidden />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className={cn(
-                  gallerySans(),
-                  "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
-                )}
-                aria-label="Close slideshow"
-              >
-                <IconX className="size-5" aria-hidden />
-              </button>
-            </div>
-          </header>
-
-          <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-8 sm:px-10">
-            {photo.media_type === "video" ? (
-              <video
-                key={photo.image_id}
-                src={getGalleryImageUrl(photo.image_path)}
-                poster={
-                  photo.poster_path
-                    ? getGalleryThumbUrl(photo.poster_path, 1600)
-                    : undefined
-                }
-                className="max-h-full max-w-full object-contain"
-                controls
-                playsInline
-                autoPlay
-                muted
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={photo.image_id}
-                src={mediaUrl(photo)}
-                alt={photo.name}
-                className="max-h-full max-w-full object-contain"
-                draggable={false}
-              />
-            )}
-          </div>
-
-          <p
-            className={cn(
-              gallerySans(),
-              "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
-            )}
-          >
-            {photo.name} · Space pause · ← → step · Esc close
-          </p>
-        </DialogContent>
-      </Dialog>
+      <AlbumSlideshow
+        photos={photos}
+        albumTitle={albumTitle}
+        open={open}
+        onOpenChange={setOpen}
+        startIndex={startIndex}
+      />
     </>
   )
 }

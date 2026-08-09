@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import {
   galleryPolaroidClass,
   gallerySans,
@@ -82,11 +83,33 @@ function AlbumThumb({
 
 export function GalleryAlbumPhotoGrid({
   photos,
+  albumTitle,
 }: {
   photos: GalleryAlbumPhoto[]
+  albumTitle: string
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const [slideshowOpen, setSlideshowOpen] = useState(false)
+  const [slideshowStart, setSlideshowStart] = useState(0)
   const active = photos.find((p) => p.image_id === openId) ?? null
+  const slideshowPhotos = useMemo(
+    () =>
+      photos.map((photo) => ({
+        image_id: photo.image_id,
+        name: photo.name,
+        image_path: photo.image_path,
+        media_type: photo.media_type,
+        poster_path: photo.poster_path,
+      })),
+    [photos]
+  )
+
+  const startSlideshowAt = (imageId: string) => {
+    const index = photos.findIndex((photo) => photo.image_id === imageId)
+    setSlideshowStart(index >= 0 ? index : 0)
+    setOpenId(null)
+    setSlideshowOpen(true)
+  }
 
   return (
     <>
@@ -149,7 +172,7 @@ export function GalleryAlbumPhotoGrid({
                   className="max-h-[75dvh] w-full object-contain"
                 />
               )}
-              <div className="space-y-1 px-5 py-4">
+              <div className="space-y-2 px-5 py-4">
                 <p className={cn(gallerySerif(), "text-xl text-foreground")}>
                   {active.name}
                 </p>
@@ -169,11 +192,29 @@ export function GalleryAlbumPhotoGrid({
                     </>
                   ) : null}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => startSlideshowAt(active.image_id)}
+                  className={cn(
+                    gallerySans(),
+                    "text-xs text-foreground underline-offset-2 hover:underline"
+                  )}
+                >
+                  Slideshow from here
+                </button>
               </div>
             </div>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AlbumSlideshow
+        photos={slideshowPhotos}
+        albumTitle={albumTitle}
+        open={slideshowOpen}
+        onOpenChange={setSlideshowOpen}
+        startIndex={slideshowStart}
+      />
     </>
   )
 }

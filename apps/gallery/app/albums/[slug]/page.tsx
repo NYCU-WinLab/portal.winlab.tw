@@ -191,7 +191,10 @@ export default async function GalleryAlbumDetailPage({
             }
           />
         ) : (
-          <GalleryAlbumPhotoGrid photos={album.photos} />
+          <GalleryAlbumPhotoGrid
+            photos={album.photos}
+            albumTitle={album.title}
+          />
         )}
 
         {canManage ? <GalleryAlbumManagePanel album={album} /> : null}

@@ -34,6 +34,16 @@ export function prevSlideshowIndex(current: number, length: number): number {
   return (safe - 1 + length) % length
 }
 
+/** Clamp a slideshow start index into [0, length). */
+export function clampSlideshowStartIndex(
+  startIndex: number,
+  length: number
+): number {
+  if (length <= 0) return 0
+  if (!Number.isFinite(startIndex)) return 0
+  return Math.min(Math.max(0, Math.trunc(startIndex)), length - 1)
+}
+
 /** Flatten year groups into slideshow order (newest year first). */
 export function flattenMemoryGroupsForSlideshow(
   groups: Array<{
