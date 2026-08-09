@@ -38,6 +38,12 @@ create index if not exists gallery_image_tags_image_idx
 alter table public.gallery_tags enable row level security;
 alter table public.gallery_image_tags enable row level security;
 
+grant select on public.gallery_tags to anon, authenticated, service_role;
+grant insert on public.gallery_tags to authenticated, service_role;
+
+grant select on public.gallery_image_tags to anon, authenticated, service_role;
+grant insert, delete on public.gallery_image_tags to authenticated, service_role;
+
 create policy "gallery_tags_select"
 on public.gallery_tags for select
 using (true);
