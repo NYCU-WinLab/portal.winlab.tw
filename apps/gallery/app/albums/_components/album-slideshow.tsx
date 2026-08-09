@@ -310,6 +310,7 @@ export function AlbumSlideshow({
                   gallerySans(),
                   "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
                 )}
+                aria-pressed={videoMuted}
                 aria-label={videoMuted ? "Unmute video" : "Mute video"}
               >
                 {videoMuted ? (
@@ -327,6 +328,7 @@ export function AlbumSlideshow({
                 gallerySans(),
                 "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
               )}
+              aria-pressed={paused}
               aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
             >
               {paused ? (
