@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated, anon;
 
-select plan(10);
+select plan(9);
 
 insert into auth.users (id) values
   ('a1a1a1a1-1111-1111-1111-111111111111'),
