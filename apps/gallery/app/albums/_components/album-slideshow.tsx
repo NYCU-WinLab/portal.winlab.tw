@@ -49,6 +49,14 @@ export function AlbumSlideshowButton({
   }, [open])
 
   useEffect(() => {
+    if (!open || photos.length < 2) return
+    const next = photos[nextSlideshowIndex(index, photos.length)]
+    if (!next) return
+    const img = new window.Image()
+    img.src = mediaUrl(next)
+  }, [index, open, photos])
+
+  useEffect(() => {
     if (!open || paused || photos.length < 2) return
     const id = window.setInterval(() => {
       setIndex((current) => nextSlideshowIndex(current, photos.length))
