@@ -2,9 +2,14 @@
  * Precaches the app shell; runtime-caches Supabase gallery media after first view.
  * No offline write queue.
  */
-const VERSION = "gallery-sw-v3"
+const VERSION = "gallery-sw-v4"
 const SHELL_CACHE = `${VERSION}-shell`
 const MEDIA_CACHE = `${VERSION}-media`
+
+// Cap the runtime media cache so a heavy scroller doesn't fill device storage.
+// Cache API keys come back in insertion order, so trimming from the front is a
+// simple FIFO eviction of the least-recently-added media.
+const MEDIA_CACHE_MAX_ENTRIES = 220
 
 const SHELL_URLS = [
   "/",
@@ -88,6 +93,7 @@ async function cacheFirst(request, cacheName) {
     const response = await fetch(request)
     if (response.ok) {
       await cache.put(request, response.clone())
+      await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
     }
     return response
   } catch (error) {
@@ -95,6 +101,13 @@ async function cacheFirst(request, cacheName) {
     if (fallback) return fallback
     throw error
   }
+}
+
+async function trimCache(cache, maxEntries) {
+  const keys = await cache.keys()
+  if (keys.length <= maxEntries) return
+  const overflow = keys.slice(0, keys.length - maxEntries)
+  await Promise.all(overflow.map((key) => cache.delete(key)))
 }
 
 async function networkFirstNavigation(request) {
@@ -135,4 +148,5 @@ async function cacheMediaUrls(urls) {
       }
     })
   )
+  await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
 }

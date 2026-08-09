@@ -1,6 +1,6 @@
 /** Cache names + helpers for gallery PWA Phase 2 (read-only offline shell). */
 
-export const GALLERY_SW_VERSION = "gallery-sw-v3"
+export const GALLERY_SW_VERSION = "gallery-sw-v4"
 export const GALLERY_SHELL_CACHE = `${GALLERY_SW_VERSION}-shell`
 export const GALLERY_MEDIA_CACHE = `${GALLERY_SW_VERSION}-media`
 
