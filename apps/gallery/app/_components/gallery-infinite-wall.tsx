@@ -442,7 +442,11 @@ export function GalleryInfiniteWall({
       ) : null}
       {loadError ? (
         <div className="flex flex-col items-center gap-3 py-8">
-          <p className="text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="text-center text-xs text-muted-foreground"
+          >
             Couldn&apos;t load more photos.
           </p>
           <button
