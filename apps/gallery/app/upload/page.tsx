@@ -46,7 +46,8 @@ export default async function UploadPage() {
     ]
   )
 
-  let imageRows = imagesWithTakenAt.data
+  let imageRows: ManageUploadRow[] | null =
+    (imagesWithTakenAt.data as ManageUploadRow[] | null) ?? null
   if (
     imagesWithTakenAt.error &&
     isGalleryTakenAtUnavailable(imagesWithTakenAt.error)
@@ -56,13 +57,13 @@ export default async function UploadPage() {
       .select(MANAGE_SELECT_BASE)
       .eq("created_by", user.id)
       .order("created_at", { ascending: false })
-    imageRows = fallback.data
+    imageRows = (fallback.data as ManageUploadRow[] | null) ?? null
   }
 
   const myImages = (imageRows ?? []).map((row) => ({
-    ...(row as ManageUploadRow),
-    pinned_at: (row as ManageUploadRow).pinned_at ?? null,
-    taken_at: (row as ManageUploadRow).taken_at ?? null,
+    ...row,
+    pinned_at: row.pinned_at ?? null,
+    taken_at: row.taken_at ?? null,
   }))
 
   return (
