@@ -14,6 +14,7 @@ import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
 import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
 import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
+import { isGalleryReactionsReady } from "@/lib/gallery/reactions"
 import {
   formatMemoriesDayLabel,
   galleryTaipeiCalendarDay,
@@ -115,6 +116,7 @@ export default async function GalleryHomePage({
     favoritesAvailable,
     albumsAvailable,
     tagsAvailable,
+    reactionsAvailable,
   ] = await Promise.all([
     loadGalleryHomePages(supabase, {
       throughPage,
@@ -131,6 +133,7 @@ export default async function GalleryHomePage({
     isGalleryFavoritesReady(supabase),
     isGalleryAlbumsReady(supabase),
     isGalleryTagsReady(supabase),
+    isGalleryReactionsReady(supabase),
   ])
   const memoryPhotos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
@@ -211,6 +214,7 @@ export default async function GalleryHomePage({
               favoritesAvailable={favoritesAvailable}
               albumsAvailable={albumsAvailable}
               tagsAvailable={tagsAvailable}
+              reactionsAvailable={reactionsAvailable}
             />
           }
         >
@@ -238,6 +242,7 @@ export default async function GalleryHomePage({
             favoritesAvailable={favoritesAvailable}
             albumsAvailable={albumsAvailable}
             tagsAvailable={tagsAvailable}
+            reactionsAvailable={reactionsAvailable}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />

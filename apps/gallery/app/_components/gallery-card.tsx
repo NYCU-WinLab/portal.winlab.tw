@@ -74,6 +74,7 @@ export function GalleryCard({
   favoritesAvailable = true,
   albumsAvailable = true,
   tagsAvailable = true,
+  reactionsAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
@@ -98,6 +99,7 @@ export function GalleryCard({
   favoritesAvailable?: boolean
   albumsAvailable?: boolean
   tagsAvailable?: boolean
+  reactionsAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
@@ -177,7 +179,7 @@ export function GalleryCard({
     onReact,
     commentPinAvailable,
     commentLikesAvailable,
-    reactionsAvailable,
+    reactionsAvailable: lightboxReactionsAvailable,
   } = useGalleryCardSocial({
     image,
     viewerId,
@@ -693,7 +695,7 @@ export function GalleryCard({
                   onFavoritedChange={setFavorited}
                   commentPinAvailable={commentPinAvailable}
                   commentLikesAvailable={commentLikesAvailable}
-                  reactionsAvailable={reactionsAvailable}
+                  reactionsAvailable={lightboxReactionsAvailable}
                 />
               </div>
             </DialogContent>
@@ -704,14 +706,18 @@ export function GalleryCard({
         <div
           className={cn(
             "flex flex-wrap items-center gap-2",
-            reactionTotal > 0 ? "justify-between" : "justify-end"
+            reactionsAvailable && reactionTotal > 0
+              ? "justify-between"
+              : "justify-end"
           )}
         >
-          <ReactionSummary
-            total={reactionTotal}
-            counts={counts}
-            namesByReaction={namesByReaction}
-          />
+          {reactionsAvailable ? (
+            <ReactionSummary
+              total={reactionTotal}
+              counts={counts}
+              namesByReaction={namesByReaction}
+            />
+          ) : null}
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
