@@ -29,8 +29,9 @@ insert into public.gallery_image_tags (image_id, tag_id, created_by) values
 
 select is(
   (
-    select array_agg(cover_id::text)
-    from public.gallery_wall_cover_ids_for_query('BBQ') as cover_id
+    select array_agg(cover_id::text ORDER BY ordinality)
+    from public.gallery_wall_cover_ids_for_query('BBQ')
+      with ordinality as t(cover_id, ordinality)
   ),
   array[
     'a7a7a7a7-7777-7777-7777-777777777777',
