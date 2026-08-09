@@ -15,6 +15,7 @@ import {
   expandManageSelectionZipItems,
   resolveManageSelectionWallPhotoIds,
   pruneManageSelectionIds,
+  isGalleryPinnedAtUnavailable,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -304,5 +305,25 @@ describe("pruneManageSelectionIds", () => {
     const prev = new Set(["a"])
     const next = pruneManageSelectionIds(prev, new Set(["a"]))
     expect(next).toBe(prev)
+  })
+})
+
+describe("isGalleryPinnedAtUnavailable", () => {
+  test("detects missing pinned_at column", () => {
+    expect(
+      isGalleryPinnedAtUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'pinned_at' column",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores unrelated errors", () => {
+    expect(
+      isGalleryPinnedAtUnavailable({
+        code: "42501",
+        message: "permission denied",
+      })
+    ).toBe(false)
   })
 })

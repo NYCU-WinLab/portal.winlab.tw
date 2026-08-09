@@ -14,7 +14,10 @@ import {
 } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import type { ManageUploadRow } from "@/lib/gallery/manage-uploads"
-import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
+import {
+  isGalleryPinnedAtUnavailable,
+  isGalleryTakenAtUnavailable,
+} from "@/lib/gallery/manage-uploads"
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import { isGalleryTagsReady } from "@/lib/gallery/tags"
@@ -28,9 +31,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 export const dynamic = "force-dynamic"
 
-const MANAGE_SELECT_BASE =
-  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index, pinned_at"
-const MANAGE_SELECT_WITH_TAKEN_AT = `${MANAGE_SELECT_BASE}, taken_at`
+const MANAGE_SELECT_CORE =
+  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index"
+const MANAGE_SELECT_WITH_PIN = `${MANAGE_SELECT_CORE}, pinned_at`
+const MANAGE_SELECT_FULL = `${MANAGE_SELECT_WITH_PIN}, taken_at`
 
 export default async function UploadPage() {
   const user = await getCurrentUser()
@@ -38,7 +42,7 @@ export default async function UploadPage() {
 
   const supabase = await createClient()
   const [
-    imagesWithTakenAt,
+    imagesFull,
     seasonalThemeId,
     settingsReady,
     favoritesReady,
@@ -47,7 +51,7 @@ export default async function UploadPage() {
   ] = await Promise.all([
     supabase
       .from("gallery_images")
-      .select(MANAGE_SELECT_WITH_TAKEN_AT)
+      .select(MANAGE_SELECT_FULL)
       .eq("created_by", user.id)
       .order("created_at", { ascending: false }),
     getGallerySeasonalThemeId(supabase),
@@ -58,17 +62,54 @@ export default async function UploadPage() {
   ])
 
   let imageRows: ManageUploadRow[] | null =
-    (imagesWithTakenAt.data as ManageUploadRow[] | null) ?? null
+    (imagesFull.data as ManageUploadRow[] | null) ?? null
   let takenAtAvailable = true
-  if (imagesWithTakenAt.error) {
-    if (isGalleryTakenAtUnavailable(imagesWithTakenAt.error)) {
+  let pinAvailable = true
+
+  if (imagesFull.error) {
+    if (isGalleryTakenAtUnavailable(imagesFull.error)) {
       takenAtAvailable = false
-      const fallback = await supabase
+      const withPin = await supabase
         .from("gallery_images")
-        .select(MANAGE_SELECT_BASE)
+        .select(MANAGE_SELECT_WITH_PIN)
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
-      imageRows = (fallback.data as ManageUploadRow[] | null) ?? null
+
+      if (withPin.error && isGalleryPinnedAtUnavailable(withPin.error)) {
+        pinAvailable = false
+        const core = await supabase
+          .from("gallery_images")
+          .select(MANAGE_SELECT_CORE)
+          .eq("created_by", user.id)
+          .order("created_at", { ascending: false })
+        imageRows = (core.data as ManageUploadRow[] | null) ?? null
+      } else if (withPin.error) {
+        imageRows = null
+      } else {
+        imageRows = (withPin.data as ManageUploadRow[] | null) ?? null
+      }
+    } else if (isGalleryPinnedAtUnavailable(imagesFull.error)) {
+      pinAvailable = false
+      const withTaken = await supabase
+        .from("gallery_images")
+        .select(`${MANAGE_SELECT_CORE}, taken_at`)
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+
+      if (withTaken.error && isGalleryTakenAtUnavailable(withTaken.error)) {
+        takenAtAvailable = false
+        const core = await supabase
+          .from("gallery_images")
+          .select(MANAGE_SELECT_CORE)
+          .eq("created_by", user.id)
+          .order("created_at", { ascending: false })
+        imageRows = (core.data as ManageUploadRow[] | null) ?? null
+      } else if (withTaken.error) {
+        imageRows = null
+      } else {
+        imageRows =
+          (withTaken.data as unknown as ManageUploadRow[] | null) ?? null
+      }
     } else {
       imageRows = null
     }
@@ -76,7 +117,7 @@ export default async function UploadPage() {
 
   const myImages = (imageRows ?? []).map((row) => ({
     ...row,
-    pinned_at: row.pinned_at ?? null,
+    pinned_at: pinAvailable ? (row.pinned_at ?? null) : null,
     taken_at: takenAtAvailable ? (row.taken_at ?? null) : null,
   }))
 
@@ -133,6 +174,7 @@ export default async function UploadPage() {
               favoritesAvailable={favoritesReady}
               tagsAvailable={tagsReady}
               albumsAvailable={albumsReady}
+              pinAvailable={pinAvailable}
             />
           )}
         </section>

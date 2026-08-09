@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
+import { isGalleryPinReady } from "@/lib/gallery/manage-uploads"
 import { isGalleryTagsReady } from "@/lib/gallery/tags"
 
 function mockClient(error: { code?: string; message?: string } | null) {
@@ -53,6 +54,17 @@ describe("readiness probes", () => {
         mockClient({
           code: "PGRST205",
           message: "Could not find the table 'public.gallery_albums'",
+        })
+      )
+    ).toBe(false)
+  })
+
+  test("isGalleryPinReady is false when pinned_at is missing", async () => {
+    expect(
+      await isGalleryPinReady(
+        mockClient({
+          code: "PGRST204",
+          message: "Could not find the 'pinned_at' column",
         })
       )
     ).toBe(false)

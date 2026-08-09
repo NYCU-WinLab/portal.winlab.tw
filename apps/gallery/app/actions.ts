@@ -11,6 +11,7 @@ import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
 } from "@/lib/gallery/bulk-pin"
+import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
@@ -419,7 +420,10 @@ export async function setGalleryImagesPin(
     })
 
     if (error) {
-      if (/gallery_admin_set_image_pin/i.test(error.message)) {
+      if (
+        /gallery_admin_set_image_pin/i.test(error.message) ||
+        isGalleryPinnedAtUnavailable(error)
+      ) {
         return {
           ok: false,
           error:

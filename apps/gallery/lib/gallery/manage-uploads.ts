@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 import {
   resolveWallPhotoId,
   type WallPhotoSource,
@@ -225,12 +227,43 @@ export function isGalleryTakenAtUnavailable(
   if (!error) return false
   const message = error.message ?? ""
   const code = error.code ?? ""
+  if (!/taken_at/i.test(message)) return false
   return (
     code === "PGRST204" ||
     code === "42703" ||
-    /taken_at/i.test(message) ||
-    /schema cache/i.test(message)
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find/i.test(message)
   )
+}
+
+/** True when gallery_images.pinned_at is missing from the schema cache. */
+export function isGalleryPinnedAtUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  if (!/pinned_at/i.test(message)) return false
+  return (
+    code === "PGRST204" ||
+    code === "42703" ||
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find/i.test(message)
+  )
+}
+
+/** True when gallery_images.pinned_at is selectable (pin migration applied). */
+export async function isGalleryPinReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_images")
+    .select("pinned_at")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryPinnedAtUnavailable(error)
 }
 
 export type ManageUploadSequence = {

@@ -328,6 +328,7 @@ function UploadSequenceGroup({
   isAdmin = false,
   takenAtAvailable = true,
   tagsAvailable = true,
+  pinAvailable = true,
 }: {
   sequenceId: string
   items: ManageUploadRow[]
@@ -338,6 +339,7 @@ function UploadSequenceGroup({
   isAdmin?: boolean
   takenAtAvailable?: boolean
   tagsAvailable?: boolean
+  pinAvailable?: boolean
 }) {
   const [items, setItems] = useState(initialItems)
   const [isPending, startTransition] = useTransition()
@@ -517,7 +519,7 @@ function UploadSequenceGroup({
               }
               selectionMode={selectionMode}
               isAdmin={isAdmin}
-              showWallPin={image.sequence_index === 0}
+              showWallPin={pinAvailable && image.sequence_index === 0}
               takenAtAvailable={takenAtAvailable}
               tagsAvailable={tagsAvailable}
               sequenceIndex={index}
@@ -597,6 +599,7 @@ export function UploadManageList({
   favoritesAvailable = true,
   tagsAvailable = true,
   albumsAvailable = true,
+  pinAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
@@ -604,6 +607,7 @@ export function UploadManageList({
   favoritesAvailable?: boolean
   tagsAvailable?: boolean
   albumsAvailable?: boolean
+  pinAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -1020,7 +1024,8 @@ export function UploadManageList({
   }
 
   const pinSelected = (pinned: boolean) => {
-    if (!isAdmin || selectedItems.length === 0 || isPending) return
+    if (!isAdmin || !pinAvailable || selectedItems.length === 0 || isPending)
+      return
     startTransition(async () => {
       const result = await setGalleryImagesPin(
         selectedItems.map((item) => item.id),
@@ -1403,7 +1408,7 @@ export function UploadManageList({
                     </button>
                   </>
                 ) : null}
-                {isAdmin ? (
+                {isAdmin && pinAvailable ? (
                   <>
                     <button
                       type="button"
@@ -1515,7 +1520,7 @@ export function UploadManageList({
                       </DropdownMenuItem>
                     </>
                   ) : null}
-                  {isAdmin ? (
+                  {isAdmin && pinAvailable ? (
                     <>
                       <DropdownMenuItem
                         disabled={isPending || selectedItems.length === 0}
@@ -1563,6 +1568,7 @@ export function UploadManageList({
               isAdmin={isAdmin}
               takenAtAvailable={takenAtAvailable}
               tagsAvailable={tagsAvailable}
+              pinAvailable={pinAvailable}
             />
           )
         }
@@ -1584,7 +1590,7 @@ export function UploadManageList({
               }
               selectionMode={selectionMode}
               isAdmin={isAdmin}
-              showWallPin
+              showWallPin={pinAvailable}
               takenAtAvailable={takenAtAvailable}
               tagsAvailable={tagsAvailable}
             />
