@@ -83,7 +83,10 @@ export function GalleryMemoriesTeaser({
                   key={photo.id}
                   src={getGalleryThumbUrl(path, 96)}
                   alt=""
-                  className="size-12 rounded-sm object-cover ring-2 ring-[#f7f7f5] sm:size-14"
+                  className="size-12 rounded-sm bg-zinc-200/80 object-cover ring-2 ring-[#f7f7f5] sm:size-14"
+                  onError={(event) => {
+                    event.currentTarget.style.visibility = "hidden"
+                  }}
                 />
               )
             })}
