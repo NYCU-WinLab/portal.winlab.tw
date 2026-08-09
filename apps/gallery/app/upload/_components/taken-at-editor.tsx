@@ -83,6 +83,7 @@ export function TakenAtEditor({
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
+        aria-label="Edit capture date for this work"
         className={cn(
           gallerySans(),
           "!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
@@ -99,12 +100,12 @@ export function TakenAtEditor({
         <div className="flex flex-col gap-2">
           <label
             className={cn(gallerySans(), "text-sm text-muted-foreground")}
-            htmlFor="taken-at-date"
+            htmlFor={`taken-at-date-${id}`}
           >
             When was this shot taken? (Asia/Taipei day for Memories)
           </label>
           <Input
-            id="taken-at-date"
+            id={`taken-at-date-${id}`}
             type="date"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

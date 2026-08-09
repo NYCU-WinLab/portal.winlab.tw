@@ -508,3 +508,56 @@ export async function updateGalleryImageTakenAt(
   revalidatePath("/memories")
   return { ok: true, takenAt }
 }
+
+export type UpdateGalleryImagesTakenAtResult =
+  | { ok: true; takenAt: string; updated: number }
+  | { ok: false; error: string }
+
+/** Set one capture date across many Manage rows (Memories repair). */
+export async function updateGalleryImagesTakenAt(
+  ids: string[],
+  rawTakenAt: string
+): Promise<UpdateGalleryImagesTakenAtResult> {
+  const takenAt = sanitizeClientTakenAt(rawTakenAt)
+  if (!takenAt) {
+    return { ok: false, error: "That capture date does not look valid." }
+  }
+
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))]
+  if (uniqueIds.length === 0) {
+    return { ok: false, error: "Select at least one work." }
+  }
+  if (uniqueIds.length > 100) {
+    return { ok: false, error: "Select at most 100 works at a time." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const { error, count } = await supabase
+    .from("gallery_images")
+    .update({ taken_at: takenAt }, { count: "exact" })
+    .in("id", uniqueIds)
+    .eq("created_by", userId)
+
+  if (error) {
+    if (isGalleryTakenAtUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Capture dates need the gallery Memories migration. Ask an admin to apply it.",
+      }
+    }
+    return {
+      ok: false,
+      error: `Could not update capture dates: ${error.message}`,
+    }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  revalidatePath("/memories")
+  return { ok: true, takenAt, updated: count ?? uniqueIds.length }
+}

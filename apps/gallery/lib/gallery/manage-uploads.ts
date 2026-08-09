@@ -25,6 +25,21 @@ export function looksLikeUploadDayTakenAt(
   return Math.abs(taken - created) <= toleranceMs
 }
 
+/** Rows that still need a real capture date for Memories. */
+export function rowNeedsCaptureDate(row: ManageUploadRow): boolean {
+  return looksLikeUploadDayTakenAt(row.taken_at, row.created_at)
+}
+
+export function countUploadDayRows(rows: ManageUploadRow[]): number {
+  return rows.filter(rowNeedsCaptureDate).length
+}
+
+export function filterUploadDayRows(
+  rows: ManageUploadRow[]
+): ManageUploadRow[] {
+  return rows.filter(rowNeedsCaptureDate)
+}
+
 export function isGalleryTakenAtUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {

@@ -48,22 +48,25 @@ export default async function UploadPage() {
 
   let imageRows: ManageUploadRow[] | null =
     (imagesWithTakenAt.data as ManageUploadRow[] | null) ?? null
-  if (
-    imagesWithTakenAt.error &&
-    isGalleryTakenAtUnavailable(imagesWithTakenAt.error)
-  ) {
-    const fallback = await supabase
-      .from("gallery_images")
-      .select(MANAGE_SELECT_BASE)
-      .eq("created_by", user.id)
-      .order("created_at", { ascending: false })
-    imageRows = (fallback.data as ManageUploadRow[] | null) ?? null
+  let takenAtAvailable = true
+  if (imagesWithTakenAt.error) {
+    if (isGalleryTakenAtUnavailable(imagesWithTakenAt.error)) {
+      takenAtAvailable = false
+      const fallback = await supabase
+        .from("gallery_images")
+        .select(MANAGE_SELECT_BASE)
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+      imageRows = (fallback.data as ManageUploadRow[] | null) ?? null
+    } else {
+      imageRows = null
+    }
   }
 
   const myImages = (imageRows ?? []).map((row) => ({
     ...row,
     pinned_at: row.pinned_at ?? null,
-    taken_at: row.taken_at ?? null,
+    taken_at: takenAtAvailable ? (row.taken_at ?? null) : null,
   }))
 
   return (
@@ -112,7 +115,11 @@ export default async function UploadPage() {
               Nothing hung yet — drop a photo above to claim a spot on the wall.
             </p>
           ) : (
-            <UploadManageList images={myImages} isAdmin={user.isAdmin} />
+            <UploadManageList
+              images={myImages}
+              isAdmin={user.isAdmin}
+              takenAtAvailable={takenAtAvailable}
+            />
           )}
         </section>
       </div>

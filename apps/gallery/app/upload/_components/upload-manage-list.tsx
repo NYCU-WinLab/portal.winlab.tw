@@ -14,12 +14,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog"
+import { Button } from "@workspace/ui/components/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import {
   deleteGalleryImages,
+  updateGalleryImagesTakenAt,
   updateGallerySequenceOrder,
 } from "@/app/upload/actions"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
@@ -38,16 +48,33 @@ import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
 import {
   countIncompleteSequences,
+  countUploadDayRows,
   describeSequenceGaps,
   filterIncompleteSequences,
   findSequenceGaps,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
+  rowNeedsCaptureDate,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
+import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+
+function toTaipeiDateInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  const day = galleryTaipeiCalendarDay(date)
+  const month = String(day.month).padStart(2, "0")
+  const datePart = String(day.day).padStart(2, "0")
+  return `${day.year}-${month}-${datePart}`
+}
+
+function fromTaipeiDateInput(value: string): string {
+  return `${value.trim()}T12:00:00+08:00`
+}
 
 type SelectableItem = {
   id: string
@@ -65,6 +92,7 @@ function UploadListItem({
   selectionMode,
   isAdmin = false,
   showWallPin = false,
+  takenAtAvailable = true,
   sequenceIndex,
   reorderHandle,
 }: {
@@ -76,6 +104,7 @@ function UploadListItem({
   selectionMode: boolean
   isAdmin?: boolean
   showWallPin?: boolean
+  takenAtAvailable?: boolean
   sequenceIndex?: number
   reorderHandle?: ReactNode
 }) {
@@ -84,7 +113,8 @@ function UploadListItem({
     isVideo && image.poster_path ? image.poster_path : image.image_path
   const wallPhotoId = resolveWallPhotoId(image, siblings)
   const [takenAt, setTakenAt] = useState(image.taken_at ?? null)
-  const uploadDayHint = looksLikeUploadDayTakenAt(takenAt, image.created_at)
+  const uploadDayHint =
+    takenAtAvailable && looksLikeUploadDayTakenAt(takenAt, image.created_at)
 
   return (
     <li
@@ -123,7 +153,9 @@ function UploadListItem({
         </p>
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
           {formatUploadedDate(image.created_at)}
-          {takenAt ? ` · captured ${formatUploadedDate(takenAt)}` : ""}
+          {takenAtAvailable && takenAt
+            ? ` · captured ${formatUploadedDate(takenAt)}`
+            : ""}
           {uploadDayHint ? " · upload day?" : ""}
           {isVideo && image.duration_seconds
             ? ` · ${image.duration_seconds}s video`
@@ -147,13 +179,15 @@ function UploadListItem({
           />
         ) : null}
         <ViewOnWallLink photoId={wallPhotoId} />
-        <TakenAtEditor
-          id={image.id}
-          takenAt={takenAt}
-          createdAt={image.created_at}
-          hintUploadDay={uploadDayHint}
-          onUpdated={setTakenAt}
-        />
+        {takenAtAvailable ? (
+          <TakenAtEditor
+            id={image.id}
+            takenAt={takenAt}
+            createdAt={image.created_at}
+            hintUploadDay={uploadDayHint}
+            onUpdated={setTakenAt}
+          />
+        ) : null}
         <RenameButton id={image.id} name={image.name} />
         <DeleteButton
           id={image.id}
@@ -198,6 +232,7 @@ function UploadSequenceGroup({
   selectedIds,
   onToggleSelected,
   isAdmin = false,
+  takenAtAvailable = true,
 }: {
   sequenceId: string
   items: ManageUploadRow[]
@@ -206,6 +241,7 @@ function UploadSequenceGroup({
   selectedIds: Set<string>
   onToggleSelected: (id: string) => void
   isAdmin?: boolean
+  takenAtAvailable?: boolean
 }) {
   const [items, setItems] = useState(initialItems)
   const [isPending, startTransition] = useTransition()
@@ -376,6 +412,7 @@ function UploadSequenceGroup({
               selectionMode={selectionMode}
               isAdmin={isAdmin}
               showWallPin={image.sequence_index === 0}
+              takenAtAvailable={takenAtAvailable}
               sequenceIndex={index}
               reorderHandle={
                 <button
@@ -442,9 +479,11 @@ function UploadSequenceGroup({
 export function UploadManageList({
   images,
   isAdmin = false,
+  takenAtAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
+  takenAtAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -490,26 +529,51 @@ export function UploadManageList({
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkDateOpen, setBulkDateOpen] = useState(false)
+  const [bulkDateDraft, setBulkDateDraft] = useState("")
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
+  const [uploadDayOnly, setUploadDayOnly] = useState(false)
   const incompleteCount = useMemo(
     () => countIncompleteSequences(sequences),
     [sequences]
   )
+  const uploadDayCount = useMemo(
+    () => (takenAtAvailable ? countUploadDayRows(images) : 0),
+    [images, takenAtAvailable]
+  )
 
   const visibleTimeline = useMemo(() => {
-    if (!incompleteOnly) return timeline
-    const incompleteIds = new Set(
-      filterIncompleteSequences(sequences).map(
-        (sequence) => sequence.sequenceId
+    let next = timeline
+    if (incompleteOnly) {
+      const incompleteIds = new Set(
+        filterIncompleteSequences(sequences).map(
+          (sequence) => sequence.sequenceId
+        )
       )
-    )
-    return timeline.filter(
-      (entry) =>
-        entry.kind === "sequence" &&
-        incompleteIds.has(entry.sequence.sequenceId)
-    )
-  }, [incompleteOnly, sequences, timeline])
+      next = next.filter(
+        (entry) =>
+          entry.kind === "sequence" &&
+          incompleteIds.has(entry.sequence.sequenceId)
+      )
+    }
+    if (uploadDayOnly && takenAtAvailable) {
+      next = next
+        .map((entry) => {
+          if (entry.kind === "single") {
+            return rowNeedsCaptureDate(entry.row) ? entry : null
+          }
+          const items = entry.sequence.items.filter(rowNeedsCaptureDate)
+          if (items.length === 0) return null
+          return {
+            ...entry,
+            sequence: { ...entry.sequence, items },
+          }
+        })
+        .filter((entry): entry is (typeof timeline)[number] => entry != null)
+    }
+    return next
+  }, [incompleteOnly, sequences, timeline, uploadDayOnly, takenAtAvailable])
 
   const selectableItems = useMemo<SelectableItem[]>(
     () =>
@@ -552,6 +616,37 @@ export function UploadManageList({
         setSelectedIds(new Set())
         setSelectionMode(false)
         setConfirmOpen(false)
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  const openBulkDate = () => {
+    const first = images.find((image) => selectedIds.has(image.id))
+    setBulkDateDraft(
+      toTaipeiDateInput(first?.taken_at ?? first?.created_at ?? null)
+    )
+    setBulkDateOpen(true)
+  }
+
+  const confirmBulkDate = () => {
+    if (!bulkDateDraft.trim()) {
+      toast.error("Pick a capture date.")
+      return
+    }
+    startTransition(async () => {
+      const result = await updateGalleryImagesTakenAt(
+        selectedItems.map((item) => item.id),
+        fromTaipeiDateInput(bulkDateDraft)
+      )
+      if (result.ok) {
+        toast.success(
+          `Set capture date on ${result.updated} work${result.updated === 1 ? "" : "s"}.`
+        )
+        setBulkDateOpen(false)
+        setSelectedIds(new Set())
+        setSelectionMode(false)
       } else {
         toast.error(result.error)
       }
@@ -603,6 +698,21 @@ export function UploadManageList({
             {incompleteOnly
               ? `Incomplete only (${incompleteCount})`
               : `Incomplete (${incompleteCount})`}
+          </button>
+        ) : null}
+        {uploadDayCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setUploadDayOnly((value) => !value)}
+            className={cn(
+              galleryPillClass(),
+              uploadDayOnly && "border-foreground/25 bg-foreground/[0.06]"
+            )}
+            aria-pressed={uploadDayOnly}
+          >
+            {uploadDayOnly
+              ? `Upload day only (${uploadDayCount})`
+              : `Upload day? (${uploadDayCount})`}
           </button>
         ) : null}
         {selectionMode ? (
@@ -659,6 +769,17 @@ export function UploadManageList({
               >
                 {allSelected ? "Clear" : "Select all"}
               </button>
+              {takenAtAvailable ? (
+                <button
+                  type="button"
+                  onClick={openBulkDate}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Set date
+                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
@@ -681,6 +802,11 @@ export function UploadManageList({
           No incomplete sequences right now — every story has contiguous shots.
         </p>
       ) : null}
+      {visibleTimeline.length === 0 && uploadDayOnly && !incompleteOnly ? (
+        <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+          No upload-day capture dates left — Memories already has real days.
+        </p>
+      ) : null}
 
       {visibleTimeline.map((entry) => {
         if (entry.kind === "sequence") {
@@ -694,6 +820,7 @@ export function UploadManageList({
               selectedIds={selectedIds}
               onToggleSelected={toggleSelected}
               isAdmin={isAdmin}
+              takenAtAvailable={takenAtAvailable}
             />
           )
         }
@@ -708,10 +835,55 @@ export function UploadManageList({
               selectionMode={selectionMode}
               isAdmin={isAdmin}
               showWallPin
+              takenAtAvailable={takenAtAvailable}
             />
           </ul>
         )
       })}
+
+      <Dialog open={bulkDateOpen} onOpenChange={setBulkDateOpen}>
+        <DialogContent className="gap-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl italic">
+              Set capture date
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label
+              className={cn(gallerySans(), "text-sm text-muted-foreground")}
+              htmlFor="bulk-taken-at-date"
+            >
+              Apply one Asia/Taipei day to {selectedItems.length} selected work
+              {selectedItems.length === 1 ? "" : "s"} (for Memories).
+            </label>
+            <Input
+              id="bulk-taken-at-date"
+              type="date"
+              value={bulkDateDraft}
+              onChange={(e) => setBulkDateDraft(e.target.value)}
+              disabled={isPending}
+              className="text-base"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBulkDateOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmBulkDate}
+              disabled={isPending}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>

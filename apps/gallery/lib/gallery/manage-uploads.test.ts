@@ -7,6 +7,8 @@ import {
   findSequenceGaps,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
+  countUploadDayRows,
+  filterUploadDayRows,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -117,6 +119,41 @@ describe("looksLikeUploadDayTakenAt", () => {
         "2026-01-01T12:00:00.000Z"
       )
     ).toBe(false)
+  })
+})
+
+describe("countUploadDayRows", () => {
+  test("counts rows that still need a real capture date", () => {
+    const rows: ManageUploadRow[] = [
+      {
+        id: "a",
+        name: "A",
+        image_path: "u/a.jpg",
+        media_type: "image",
+        poster_path: null,
+        duration_seconds: null,
+        created_at: "2026-01-01T12:00:00.000Z",
+        pinned_at: null,
+        taken_at: null,
+        sequence_id: null,
+        sequence_index: null,
+      },
+      {
+        id: "b",
+        name: "B",
+        image_path: "u/b.jpg",
+        media_type: "image",
+        poster_path: null,
+        duration_seconds: null,
+        created_at: "2026-01-01T12:00:00.000Z",
+        pinned_at: null,
+        taken_at: "2024-08-10T03:00:00.000Z",
+        sequence_id: null,
+        sequence_index: null,
+      },
+    ]
+    expect(countUploadDayRows(rows)).toBe(1)
+    expect(filterUploadDayRows(rows).map((row) => row.id)).toEqual(["a"])
   })
 })
 
