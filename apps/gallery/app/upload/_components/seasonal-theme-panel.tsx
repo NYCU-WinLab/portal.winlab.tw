@@ -96,10 +96,11 @@ export function SeasonalThemePanel({
               type="button"
               role="radio"
               aria-checked={checked}
-              disabled={isPending}
+              disabled={isPending || !settingsReady}
               onClick={() => onSelect(option.value)}
               className={cn(
                 "min-w-[8.5rem] flex-1 rounded-xl border px-4 py-3 text-left transition-colors",
+                "disabled:cursor-not-allowed disabled:opacity-50",
                 checked
                   ? isDefault
                     ? "border-zinc-800/35 bg-zinc-900/[0.09] text-foreground ring-1 ring-zinc-900/10"
