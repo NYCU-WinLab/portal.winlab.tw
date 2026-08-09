@@ -242,7 +242,7 @@ export function GalleryAddToAlbum({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-busy={pending || undefined}>
         <DialogHeader>
           <DialogTitle className={gallerySans()}>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
@@ -260,6 +260,7 @@ export function GalleryAddToAlbum({
                   <button
                     type="button"
                     disabled={pending || count === 0}
+                    aria-busy={pending || undefined}
                     onClick={() => addTo(album)}
                     className={cn(
                       gallerySans(),
@@ -300,6 +301,7 @@ export function GalleryAddToAlbum({
               type="button"
               size="icon"
               disabled={pending || count === 0}
+              aria-busy={pending || undefined}
               aria-label="Create album and add photos"
               onClick={createAndAdd}
             >
