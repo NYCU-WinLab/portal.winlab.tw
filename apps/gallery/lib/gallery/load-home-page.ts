@@ -1,6 +1,7 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 
 import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
+import { isGalleryCommentsUnavailable } from "@/lib/gallery/comment-edit"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import {
@@ -828,10 +829,12 @@ async function loadGalleryHomeRangeLegacy(
       }
     }
     if (commentCountResult.error) {
-      console.error(
-        "[gallery] failed to load comment counts",
-        commentCountResult.error
-      )
+      if (!isGalleryCommentsUnavailable(commentCountResult.error)) {
+        console.error(
+          "[gallery] failed to load comment counts",
+          commentCountResult.error
+        )
+      }
     }
 
     const voteRows = voteResult.error ? [] : (voteResult.data ?? [])
