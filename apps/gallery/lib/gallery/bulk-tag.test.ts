@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
+import {
+  describeBulkTagAttach,
+  describeBulkTagDetach,
+} from "@/lib/gallery/bulk-tag"
 
 describe("describeBulkTagAttach", () => {
   test("all attached", () => {
@@ -31,5 +34,19 @@ describe("describeBulkTagAttach", () => {
         selected: 2,
       })
     ).toMatch(/already on those photos/)
+  })
+})
+
+describe("describeBulkTagDetach", () => {
+  test("none", () => {
+    expect(describeBulkTagDetach({ tagName: "lab-day", detached: 0 })).toMatch(
+      /None of those photos/
+    )
+  })
+
+  test("some", () => {
+    expect(describeBulkTagDetach({ tagName: "lab-day", detached: 2 })).toBe(
+      "Removed “lab-day” from 2 photos."
+    )
   })
 })

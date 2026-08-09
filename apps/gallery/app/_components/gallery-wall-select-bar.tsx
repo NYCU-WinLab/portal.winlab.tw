@@ -39,7 +39,10 @@ import {
   detachGalleryTagFromImagesBySlug,
 } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
-import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
+import {
+  describeBulkTagAttach,
+  describeBulkTagDetach,
+} from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
@@ -237,9 +240,10 @@ export function GalleryWallSelectBar({
       }
       const n = result.data.detached
       toast.success(
-        n === 0
-          ? `None of those photos had “${result.data.tagName}”.`
-          : `Removed “${result.data.tagName}” from ${n} photo${n === 1 ? "" : "s"}.`
+        describeBulkTagDetach({
+          tagName: result.data.tagName,
+          detached: n,
+        })
       )
       onUntagged?.()
       onClear()

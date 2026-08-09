@@ -38,7 +38,10 @@ import {
   updateGalleryImagesTakenAt,
   updateGallerySequenceOrder,
 } from "@/app/upload/actions"
-import { attachGalleryTagToImages } from "@/app/actions/tags"
+import {
+  attachGalleryTagToImages,
+  detachGalleryTagFromImagesBySlug,
+} from "@/app/actions/tags"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { ManageTagsEditor } from "@/app/upload/_components/manage-tags-editor"
 import { RenameButton } from "@/app/upload/_components/rename-button"
@@ -54,7 +57,10 @@ import {
 } from "@/components/gallery-chrome"
 import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
-import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
+import {
+  describeBulkTagAttach,
+  describeBulkTagDetach,
+} from "@/lib/gallery/bulk-tag"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   countIncompleteSequences,
@@ -545,6 +551,8 @@ export function UploadManageList({
   const [bulkDateDraft, setBulkDateDraft] = useState("")
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkTagDraft, setBulkTagDraft] = useState("")
+  const [bulkUntagOpen, setBulkUntagOpen] = useState(false)
+  const [bulkUntagDraft, setBulkUntagDraft] = useState("")
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [uploadDayOnly, setUploadDayOnly] = useState(false)
@@ -625,14 +633,14 @@ export function UploadManageList({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       if (isTypingTarget(event.target)) return
-      if (confirmOpen || bulkDateOpen || bulkTagOpen) return
+      if (confirmOpen || bulkDateOpen || bulkTagOpen || bulkUntagOpen) return
       event.preventDefault()
       setSelectedIds(new Set())
       setSelectionMode(false)
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selectionMode, confirmOpen, bulkDateOpen, bulkTagOpen])
+  }, [selectionMode, confirmOpen, bulkDateOpen, bulkTagOpen, bulkUntagOpen])
 
   const confirmBatchDelete = () => {
     startTransition(async () => {
@@ -705,6 +713,34 @@ export function UploadManageList({
       )
       setBulkTagOpen(false)
       setBulkTagDraft("")
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    })
+  }
+
+  const confirmBulkUntag = () => {
+    const slug = bulkUntagDraft.trim()
+    if (!slug) {
+      toast.error("Enter a tag slug to remove.")
+      return
+    }
+    startTransition(async () => {
+      const result = await detachGalleryTagFromImagesBySlug(
+        selectedItems.map((item) => item.id),
+        slug
+      )
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(
+        describeBulkTagDetach({
+          tagName: result.data.tagName,
+          detached: result.data.detached,
+        })
+      )
+      setBulkUntagOpen(false)
+      setBulkUntagDraft("")
       setSelectedIds(new Set())
       setSelectionMode(false)
     })
@@ -847,6 +883,18 @@ export function UploadManageList({
                 className={cn(galleryPillClass(), "disabled:opacity-40")}
               >
                 Tag
+                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkUntagDraft("")
+                  setBulkUntagOpen(true)
+                }}
+                disabled={isPending || selectedItems.length === 0}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                Untag
                 {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
               </button>
               <button
@@ -996,6 +1044,57 @@ export function UploadManageList({
             </Button>
             <Button type="button" onClick={confirmBulkTag} disabled={isPending}>
               Tag
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkUntagOpen} onOpenChange={setBulkUntagOpen}>
+        <DialogContent className="gap-6">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl italic">
+              Untag selected
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <label
+              className={cn(gallerySans(), "text-sm text-muted-foreground")}
+              htmlFor="bulk-manage-untag"
+            >
+              Remove this tag slug from {selectedItems.length} selected work
+              {selectedItems.length === 1 ? "" : "s"}.
+            </label>
+            <Input
+              id="bulk-manage-untag"
+              value={bulkUntagDraft}
+              onChange={(e) => setBulkUntagDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  confirmBulkUntag()
+                }
+              }}
+              disabled={isPending}
+              placeholder="slug…"
+              className="text-base"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBulkUntagOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmBulkUntag}
+              disabled={isPending}
+            >
+              Untag
             </Button>
           </DialogFooter>
         </DialogContent>
