@@ -42,6 +42,7 @@ export function TagAdminPanel() {
   const [pending, startTransition] = useTransition()
   const [tags, setTags] = useState<GalleryTagSuggestion[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [renameId, setRenameId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState("")
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null)
@@ -51,9 +52,13 @@ export function TagAdminPanel() {
     startTransition(async () => {
       const result = await listPopularGalleryTags(100)
       if (!result.ok) {
+        setLoadError(result.error)
+        setLoaded(true)
+        setTags([])
         toast.error(result.error)
         return
       }
+      setLoadError(null)
       setTags(result.data)
       setLoaded(true)
     })
@@ -131,7 +136,10 @@ export function TagAdminPanel() {
   }
 
   return (
-    <section className={cn(galleryPanelClass(), "space-y-5")}>
+    <section
+      className={cn(galleryPanelClass(), "space-y-5")}
+      aria-busy={pending || undefined}
+    >
       <div className="space-y-1">
         <p
           className={cn(
@@ -154,6 +162,26 @@ export function TagAdminPanel() {
         <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
           Loading tags…
         </p>
+      ) : loadError ? (
+        <div className="space-y-3">
+          <p
+            role="status"
+            aria-live="polite"
+            className={cn(gallerySans(), "text-sm text-amber-800")}
+          >
+            Could not load the tag catalog — {loadError}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={refresh}
+            className={gallerySans()}
+          >
+            Retry
+          </Button>
+        </div>
       ) : tags.length === 0 ? (
         <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
           No tags yet — hang a few photos and label them first.
