@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import {
   deleteGalleryImages,
   updateGallerySequenceOrder,
@@ -305,11 +306,24 @@ function UploadSequenceGroup({
 
   return (
     <div className="space-y-3">
-      <p
-        className={cn(gallerySans(), "text-xs text-muted-foreground uppercase")}
-      >
-        Sequence story · {items.length} shots · drag handle to reorder
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p
+          className={cn(
+            gallerySans(),
+            "text-xs text-muted-foreground uppercase"
+          )}
+        >
+          Sequence story · {items.length} shots · drag handle to reorder
+        </p>
+        {items.length > 1 ? (
+          <DownloadSequenceButton
+            variant="pill"
+            items={items}
+            coverName={items[0]?.name}
+            className={galleryPillClass()}
+          />
+        ) : null}
+      </div>
       {gapLabel ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className={cn(gallerySans(), "text-xs text-amber-800")}>

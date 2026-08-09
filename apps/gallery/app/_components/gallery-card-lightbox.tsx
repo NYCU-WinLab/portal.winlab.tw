@@ -16,6 +16,7 @@ import {
 import { DialogClose } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
@@ -105,7 +106,9 @@ export function GalleryLightboxMediaPane({
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
           isSignedIn
-            ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
+            ? isSequence
+              ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+9rem)]"
+              : "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
             : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
           "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
@@ -115,6 +118,14 @@ export function GalleryLightboxMediaPane({
       >
         <IconLink className="h-5 w-5" />
       </button>
+      {isSignedIn && isSequence ? (
+        <DownloadSequenceButton
+          variant="icon"
+          items={sequenceMedia}
+          coverName={image.name}
+          className="absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)] z-20"
+        />
+      ) : null}
       {isSignedIn ? (
         <a
           href={mediaUrl}
@@ -256,6 +267,7 @@ export function GalleryLightboxSocialAside({
   isSequence,
   activeIndex,
   sequenceLength,
+  sequenceMedia,
   isSignedIn,
   isAdmin,
   viewerId,
@@ -280,6 +292,7 @@ export function GalleryLightboxSocialAside({
   isSequence: boolean
   activeIndex: number
   sequenceLength: number
+  sequenceMedia: GallerySequenceItem[]
   isSignedIn: boolean
   isAdmin: boolean
   viewerId: string | null
@@ -452,14 +465,24 @@ export function GalleryLightboxSocialAside({
             ) : null}
           </p>
           {isSequence ? (
-            <p
-              className={cn(
-                gallerySans(),
-                "text-[11px] text-muted-foreground/70"
-              )}
-            >
-              Shot {activeIndex + 1} of {sequenceLength}
-            </p>
+            <div className="space-y-1">
+              <p
+                className={cn(
+                  gallerySans(),
+                  "text-[11px] text-muted-foreground/70"
+                )}
+              >
+                Shot {activeIndex + 1} of {sequenceLength}
+              </p>
+              {isSignedIn ? (
+                <DownloadSequenceButton
+                  variant="text"
+                  items={sequenceMedia}
+                  coverName={image.name}
+                  className={gallerySans()}
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
         <GalleryImageTags
