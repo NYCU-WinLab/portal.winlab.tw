@@ -6,6 +6,7 @@ import {
   IconBookmark,
   IconCheckbox,
   IconFileZip,
+  IconLink,
   IconSquare,
   IconTag,
   IconX,
@@ -24,6 +25,10 @@ import { gallerySans } from "@/components/gallery-chrome"
 import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
+import {
+  buildWallSelectionShareText,
+  describeWallSelectionCopy,
+} from "@/lib/gallery/wall-selection-share"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 
 export function GalleryWallSelectBar({
@@ -177,6 +182,22 @@ export function GalleryWallSelectBar({
     }
   }
 
+  const copySelectedLinks = async () => {
+    if (selectedIds.length === 0) return
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    if (!origin) {
+      toast.error("Could not copy links in this context.")
+      return
+    }
+    const text = buildWallSelectionShareText(selectedIds, origin)
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(describeWallSelectionCopy(selectedIds.length))
+    } catch {
+      toast.error("Could not copy to the clipboard.")
+    }
+  }
+
   return (
     <>
       <button
@@ -257,6 +278,20 @@ export function GalleryWallSelectBar({
                 {selectedZipItems.length > 0
                   ? `ZIP ${selectedZipItems.length}`
                   : "ZIP"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedCount === 0}
+                className={cn(
+                  gallerySans(),
+                  "h-8 gap-1.5 text-[11px] uppercase"
+                )}
+                onClick={() => void copySelectedLinks()}
+              >
+                <IconLink className="size-3.5" aria-hidden />
+                Links
               </Button>
               {isSignedIn ? (
                 <>
