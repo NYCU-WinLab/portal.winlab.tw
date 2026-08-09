@@ -1,0 +1,121 @@
+import Image from "next/image"
+import Link from "next/link"
+
+import { cn } from "@workspace/ui/lib/utils"
+
+import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
+import {
+  memoriesYearsAgoLabel,
+  type GalleryMemoryPhoto,
+} from "@/lib/gallery/memories"
+import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
+import { getGalleryThumbUrl } from "@/lib/gallery/url"
+
+export function MemoriesPhotoCard({
+  photo,
+  currentYear,
+}: {
+  photo: GalleryMemoryPhoto
+  currentYear: number
+}) {
+  const frame = getPolaroidFrame(photo.id)
+  const tape = getPolaroidTape(photo.id)
+  const thumbPath =
+    photo.media_type === "video" && photo.poster_path
+      ? photo.poster_path
+      : photo.image_path
+
+  return (
+    <article
+      className={cn(
+        "gallery-wall-card group relative mx-auto w-full",
+        frame.maxWidthClass
+      )}
+    >
+      <Link
+        href={`/?photo=${encodeURIComponent(photo.id)}`}
+        className="block focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none"
+      >
+        <div
+          className={cn(
+            "relative overflow-hidden bg-[#f7f7f5] p-3 pb-10 shadow-[0_18px_40px_-28px_rgba(24,24,27,0.55)] ring-1 ring-zinc-900/8 transition duration-300",
+            "group-hover:-translate-y-0.5 group-hover:shadow-[0_22px_44px_-24px_rgba(24,24,27,0.6)]"
+          )}
+        >
+          {tape === "tl" || tape === "tr" ? (
+            <span
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute top-2 z-10 h-3 w-10 -rotate-6 bg-amber-100/90 shadow-sm ring-1 ring-amber-900/10",
+                tape === "tl" ? "left-3" : "right-3 rotate-6"
+              )}
+            />
+          ) : null}
+          {tape === "clip" ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute top-1 left-1/2 z-10 h-4 w-3 -translate-x-1/2 rounded-[1px] bg-zinc-400/80 shadow-sm ring-1 ring-zinc-700/20"
+            />
+          ) : null}
+
+          <div
+            className={cn(
+              "relative overflow-hidden bg-zinc-200",
+              frame.aspectClass
+            )}
+          >
+            <Image
+              src={getGalleryThumbUrl(thumbPath)}
+              alt={photo.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 70vw, 240px"
+              unoptimized
+            />
+            {photo.media_type === "video" ? (
+              <div
+                aria-hidden
+                className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/25 via-transparent to-transparent"
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-white/85 text-foreground shadow">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="absolute inset-x-3 bottom-2.5 space-y-0.5">
+            <p
+              className={cn(
+                gallerySerif(),
+                "truncate text-[15px] leading-tight text-foreground"
+              )}
+            >
+              {photo.name}
+            </p>
+            <p
+              className={cn(
+                gallerySans(),
+                "truncate text-[10px] tracking-wide text-muted-foreground uppercase"
+              )}
+            >
+              {memoriesYearsAgoLabel(photo.memory_year, currentYear)}
+              {" · "}
+              {formatUploadedDate(photo.taken_at)}
+              {" · "}
+              {photo.uploader_name}
+            </p>
+          </div>
+        </div>
+      </Link>
+    </article>
+  )
+}
