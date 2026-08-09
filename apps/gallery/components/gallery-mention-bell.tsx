@@ -281,10 +281,13 @@ export function GalleryMentionBell({
               : "Notifications"
           }
           disabled={isPending}
+          aria-busy={isPending || undefined}
         >
           <IconBell className="size-4" aria-hidden />
           {unreadCount > 0 ? (
             <span
+              role="status"
+              aria-live="polite"
               className={cn(
                 gallerySans(),
                 "absolute -top-0.5 -right-0.5 flex min-w-[1rem] items-center justify-center rounded-full bg-foreground px-1 py-0.5 text-[9px] leading-none font-medium text-background"
@@ -307,6 +310,7 @@ export function GalleryMentionBell({
               className="text-[10px] tracking-wide text-muted-foreground uppercase transition-colors hover:text-foreground"
               onClick={markAllRead}
               disabled={isPending}
+              aria-busy={isPending || undefined}
             >
               Mark all read
             </button>
