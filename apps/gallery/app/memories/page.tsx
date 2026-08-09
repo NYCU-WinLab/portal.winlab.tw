@@ -40,10 +40,12 @@ export default async function MemoriesPage({
 
   const supabase = await createClient()
   const user = await getCurrentUser()
-  const photos = await loadGalleryMemoriesOnThisDay(supabase, {
+  const memoriesResult = await loadGalleryMemoriesOnThisDay(supabase, {
     month: day.month,
     day: day.day,
   })
+  const photos = memoriesResult.photos
+  const memoriesAvailable = memoriesResult.available
   const groups = groupMemoriesByYear(photos)
   const slideshowPhotos = flattenMemoryGroupsForSlideshow(groups)
 
@@ -68,7 +70,36 @@ export default async function MemoriesPage({
           <MemoriesDayNavigator day={day} />
         </div>
 
-        {groups.length === 0 ? (
+        {!memoriesAvailable ? (
+          <section className={cn(galleryPanelClass(), "space-y-3")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
+              )}
+            >
+              Not ready yet
+            </p>
+            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+              Memories needs the gallery memories migration (capture dates +
+              on-this-day RPC). Apply it, then refresh — Manage already
+              soft-hides capture-date tools until then.
+            </p>
+            <p
+              className={cn(
+                gallerySans(),
+                "flex flex-wrap gap-x-4 gap-y-2 text-sm"
+              )}
+            >
+              <Link
+                href="/"
+                className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
+              >
+                Back to the wall
+              </Link>
+            </p>
+          </section>
+        ) : groups.length === 0 ? (
           <section className={cn(galleryPanelClass(), "space-y-3")}>
             <p
               className={cn(

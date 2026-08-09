@@ -36,6 +36,26 @@ function displayName(row: ProfileRow | undefined, fallbackId: string | null) {
   return fallbackId ? "Unknown" : "Unknown"
 }
 
+export function isGalleryMemoriesUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const code = error.code ?? ""
+  const message = error.message ?? ""
+  return (
+    code === "PGRST202" ||
+    code === "PGRST205" ||
+    code === "42P01" ||
+    /gallery_memories_on_this_day/i.test(message) ||
+    /could not find|does not exist|schema cache/i.test(message)
+  )
+}
+
+export type GalleryMemoriesLoadResult = {
+  photos: GalleryMemoryPhoto[]
+  available: boolean
+}
+
 export async function loadGalleryMemoriesOnThisDay(
   supabase: SupabaseClient,
   {
@@ -47,7 +67,7 @@ export async function loadGalleryMemoriesOnThisDay(
     day: number
     limit?: number
   }
-): Promise<GalleryMemoryPhoto[]> {
+): Promise<GalleryMemoriesLoadResult> {
   const capped = clampGalleryMemoriesLimit(limit)
 
   const { data, error } = await supabase.rpc("gallery_memories_on_this_day", {
@@ -58,15 +78,15 @@ export async function loadGalleryMemoriesOnThisDay(
 
   if (error) {
     // Soft-fail when the migration hasn't landed yet (local/preview lag).
-    if (/could not find|does not exist|PGRST202/i.test(error.message)) {
-      return []
+    if (isGalleryMemoriesUnavailable(error)) {
+      return { photos: [], available: false }
     }
     console.error("[gallery] memories rpc failed", error)
-    return []
+    return { photos: [], available: true }
   }
 
   const rows = (data ?? []) as MemoryRpcRow[]
-  if (rows.length === 0) return []
+  if (rows.length === 0) return { photos: [], available: true }
 
   const uploaderIds = Array.from(
     new Set(
@@ -82,12 +102,13 @@ export async function loadGalleryMemoriesOnThisDay(
       .from("user_profiles")
       .select("id, name")
       .in("id", uploaderIds)
+
     for (const profile of (profiles ?? []) as ProfileRow[]) {
       profilesById.set(profile.id, profile)
     }
   }
 
-  return rows.map((row) => {
+  const photos = rows.map((row) => {
     const createdBy = row.created_by
     return {
       id: row.id,
@@ -107,4 +128,6 @@ export async function loadGalleryMemoriesOnThisDay(
       ),
     }
   })
+
+  return { photos, available: true }
 }
