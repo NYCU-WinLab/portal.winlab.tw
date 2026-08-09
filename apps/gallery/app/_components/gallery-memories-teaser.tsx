@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -19,6 +19,15 @@ export function GalleryMemoriesTeaser({
   dayLabel: string
 }) {
   const [slideshowOpen, setSlideshowOpen] = useState(false)
+  const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+
+  const onSlideshowOpenChange = (open: boolean) => {
+    setSlideshowOpen(open)
+    if (!open) {
+      // Dialog stole focus — put keyboard users back on the trigger.
+      queueMicrotask(() => slideshowButtonRef.current?.focus())
+    }
+  }
 
   if (photos.length === 0) return null
 
@@ -91,6 +100,7 @@ export function GalleryMemoriesTeaser({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
             <button
+              ref={slideshowButtonRef}
               type="button"
               onClick={() => setSlideshowOpen(true)}
               className={cn(
@@ -118,7 +128,7 @@ export function GalleryMemoriesTeaser({
         photos={slideshowPhotos}
         albumTitle={`Memories · ${dayLabel}`}
         open={slideshowOpen}
-        onOpenChange={setSlideshowOpen}
+        onOpenChange={onSlideshowOpenChange}
       />
     </aside>
   )
