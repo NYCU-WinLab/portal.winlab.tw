@@ -32,6 +32,7 @@ export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["Space"], action: "Pause / resume" },
   { keys: ["[", "]"], action: "Slower / faster" },
   { keys: ["←", "→"], action: "Previous / next slide" },
+  { keys: ["swipe"], action: "Previous / next (touch)" },
   { keys: ["J", "K"], action: "Next / previous (vim)" },
   { keys: ["Home", "End"], action: "First / last slide" },
   { keys: ["Esc"], action: "Close slideshow" },

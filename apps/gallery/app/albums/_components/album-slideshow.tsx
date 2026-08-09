@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState, type TouchEvent } from "react"
 import { IconPlayerPause, IconPlayerPlay, IconX } from "@tabler/icons-react"
 
 import {
@@ -10,9 +10,10 @@ import {
 } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
+import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
   clampSlideshowStartIndex,
@@ -51,18 +52,45 @@ export function AlbumSlideshow({
   )
   const [paused, setPaused] = useState(false)
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (!open) return
     setIndex(clampSlideshowStartIndex(startIndex, photos.length))
     setPaused(false)
     setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
+    touchStartRef.current = null
   }, [open, startIndex, photos.length])
 
   const bumpInterval = (delta: number) => {
     setIntervalMs((ms) =>
       writeStoredSlideshowIntervalMs(ms + delta, window.localStorage)
     )
+  }
+
+  const onTouchStart = (event: TouchEvent) => {
+    const touch = event.touches[0]
+    if (!touch) return
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const onTouchEnd = (event: TouchEvent) => {
+    const start = touchStartRef.current
+    touchStartRef.current = null
+    if (!start || photos.length < 2) return
+    const touch = event.changedTouches[0]
+    if (!touch) return
+    const swipe = resolveLightboxSwipe(
+      touch.clientX - start.x,
+      touch.clientY - start.y
+    )
+    if (swipe === "next") {
+      setIndex((current) => nextSlideshowIndex(current, photos.length))
+      return
+    }
+    if (swipe === "prev") {
+      setIndex((current) => prevSlideshowIndex(current, photos.length))
+    }
   }
 
   useEffect(() => {
@@ -198,7 +226,11 @@ export function AlbumSlideshow({
           </div>
         </header>
 
-        <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-8 sm:px-10">
+        <div
+          className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-4 pb-8 sm:px-10"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           {photo.media_type === "video" ? (
             <video
               key={photo.image_id}
@@ -232,7 +264,7 @@ export function AlbumSlideshow({
             "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
           )}
         >
-          {photo.name} · Space pause · [ ] speed · ← → step · Home/End · Esc
+          {photo.name} · Space pause · [ ] speed · ← → / swipe · Home/End · Esc
           close
         </p>
       </DialogContent>
