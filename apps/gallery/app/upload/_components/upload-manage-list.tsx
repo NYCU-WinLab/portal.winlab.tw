@@ -1,6 +1,12 @@
 "use client"
 
-import { useMemo, useState, useTransition, type ReactNode } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react"
 import { IconGripVertical } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -49,6 +55,7 @@ import {
 import { useSequencePointerReorder } from "@/hooks/use-sequence-pointer-reorder"
 import { formatUploadedDate } from "@/lib/gallery/format-uploaded-at"
 import { describeBulkTagAttach } from "@/lib/gallery/bulk-tag"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   countIncompleteSequences,
   countUploadDayRows,
@@ -612,6 +619,20 @@ export function UploadManageList({
       return !mode
     })
   }
+
+  useEffect(() => {
+    if (!selectionMode) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      if (isTypingTarget(event.target)) return
+      if (confirmOpen || bulkDateOpen || bulkTagOpen) return
+      event.preventDefault()
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [selectionMode, confirmOpen, bulkDateOpen, bulkTagOpen])
 
   const confirmBatchDelete = () => {
     startTransition(async () => {

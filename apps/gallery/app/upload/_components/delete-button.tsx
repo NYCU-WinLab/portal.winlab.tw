@@ -48,6 +48,7 @@ export function DeleteButton({
         <Button
           variant="ghost"
           disabled={pending}
+          aria-label={`Delete ${name}`}
           className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
         >
           Delete
