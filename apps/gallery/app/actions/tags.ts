@@ -364,3 +364,39 @@ export async function adminMergeGalleryTags(
     },
   }
 }
+
+/** Tags attached to one image (Manage / lightbox loaders). */
+export async function listGalleryImageTags(
+  imageId: string
+): Promise<TagActionResult<GalleryTag[]>> {
+  const id = imageId.trim()
+  if (!id) return { ok: false, error: "Missing image." }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("gallery_image_tags")
+    .select("gallery_tags(id, name, slug)")
+    .eq("image_id", id)
+
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: "Tags are not available yet." }
+    }
+    return { ok: false, error: error.message }
+  }
+
+  const tags: GalleryTag[] = []
+  for (const row of data ?? []) {
+    const tagValue = row.gallery_tags as
+      | GalleryTag
+      | GalleryTag[]
+      | null
+      | undefined
+    const tag = Array.isArray(tagValue) ? tagValue[0] : tagValue
+    if (!tag?.id || !tag.name || !tag.slug) continue
+    tags.push({ id: tag.id, name: tag.name, slug: tag.slug })
+  }
+
+  tags.sort((a, b) => a.name.localeCompare(b.name))
+  return { ok: true, data: tags }
+}

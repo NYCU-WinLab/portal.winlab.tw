@@ -33,6 +33,7 @@ import {
   updateGallerySequenceOrder,
 } from "@/app/upload/actions"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
+import { ManageTagsEditor } from "@/app/upload/_components/manage-tags-editor"
 import { RenameButton } from "@/app/upload/_components/rename-button"
 import { TakenAtEditor } from "@/app/upload/_components/taken-at-editor"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
@@ -188,6 +189,7 @@ function UploadListItem({
             onUpdated={setTakenAt}
           />
         ) : null}
+        <ManageTagsEditor imageId={image.id} imageName={image.name} />
         <RenameButton id={image.id} name={image.name} />
         <DeleteButton
           id={image.id}
