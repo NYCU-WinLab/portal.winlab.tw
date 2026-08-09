@@ -17,6 +17,7 @@ import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { setGalleryImagesPin } from "@/app/actions"
 import { setGalleryFavorites } from "@/app/actions/favorites"
 import { attachGalleryTagToImages } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
@@ -30,6 +31,7 @@ export function GalleryWallSelectBar({
   selectedCount,
   allSelected,
   isSignedIn,
+  isAdmin = false,
   selectedIds,
   selectedZipItems = [],
   savedFilterActive = false,
@@ -38,11 +40,13 @@ export function GalleryWallSelectBar({
   onClear,
   onAdded,
   onUnsaved,
+  onPinned,
 }: {
   selectionMode: boolean
   selectedCount: number
   allSelected: boolean
   isSignedIn: boolean
+  isAdmin?: boolean
   selectedIds: string[]
   /** Ordered covers for ZIP download (name + storage path). */
   selectedZipItems?: Array<{
@@ -57,6 +61,7 @@ export function GalleryWallSelectBar({
   onClear: () => void
   onAdded?: () => void
   onUnsaved?: () => void
+  onPinned?: (pinned: boolean) => void
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
@@ -83,6 +88,22 @@ export function GalleryWallSelectBar({
         })
       )
       setTagDraft("")
+      onClear()
+    })
+  }
+
+  const pinSelected = (pinned: boolean) => {
+    if (selectedIds.length === 0 || pending || saveOpenBusy || !isAdmin) return
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await setGalleryImagesPin(selectedIds, pinned)
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(result.data.message)
+      onPinned?.(pinned)
       onClear()
     })
   }
@@ -296,6 +317,36 @@ export function GalleryWallSelectBar({
                       Tag
                     </Button>
                   </form>
+                  {isAdmin ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={selectedCount === 0 || pending}
+                        className={cn(
+                          gallerySans(),
+                          "h-8 text-[11px] uppercase"
+                        )}
+                        onClick={() => pinSelected(true)}
+                      >
+                        Pin
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={selectedCount === 0 || pending}
+                        className={cn(
+                          gallerySans(),
+                          "h-8 text-[11px] uppercase"
+                        )}
+                        onClick={() => pinSelected(false)}
+                      >
+                        Unpin
+                      </Button>
+                    </>
+                  ) : null}
                   <GalleryAddToAlbum
                     imageIds={selectedIds}
                     triggerLabel={

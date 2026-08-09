@@ -8,6 +8,10 @@ import {
 } from "@/lib/gallery/reactions"
 import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
 import {
+  describeBulkPinResult,
+  normalizeGalleryPinImageIds,
+} from "@/lib/gallery/bulk-pin"
+import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
@@ -359,7 +363,32 @@ export async function setGalleryImagePin(
   imageId: string,
   pinned: boolean
 ): Promise<CommentActionResult<{ pinned_at: string | null }>> {
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  const result = await setGalleryImagesPin([imageId], pinned)
+  if (!result.ok) return result
+  if (result.data.ok === 0) {
+    return {
+      ok: false,
+      error: result.data.failed
+        ? "Pin failed for that photo."
+        : "Missing image id.",
+    }
+  }
+  return {
+    ok: true,
+    data: { pinned_at: pinned ? new Date().toISOString() : null },
+  }
+}
+
+export async function setGalleryImagesPin(
+  imageIds: string[],
+  pinned: boolean
+): Promise<
+  CommentActionResult<{ ok: number; failed: number; message: string }>
+> {
+  const ids = normalizeGalleryPinImageIds(imageIds)
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
+  }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
@@ -379,26 +408,48 @@ export async function setGalleryImagePin(
     return { ok: false, error: "Only super admins can pin items on the wall." }
   }
 
-  const { error } = await supabase.rpc("gallery_admin_set_image_pin", {
-    p_image_id: imageId,
-    p_pinned: pinned,
-  })
+  let okCount = 0
+  let failed = 0
+  let firstError: string | null = null
 
-  if (error) {
-    if (/gallery_admin_set_image_pin/i.test(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Pin is not available yet — apply the gallery image pin migration.",
+  for (const imageId of ids) {
+    const { error } = await supabase.rpc("gallery_admin_set_image_pin", {
+      p_image_id: imageId,
+      p_pinned: pinned,
+    })
+
+    if (error) {
+      if (/gallery_admin_set_image_pin/i.test(error.message)) {
+        return {
+          ok: false,
+          error:
+            "Pin is not available yet — apply the gallery image pin migration.",
+        }
       }
+      failed += 1
+      firstError ??= error.message
+      continue
     }
-    return { ok: false, error: `Pin failed: ${error.message}` }
+    okCount += 1
   }
 
-  const pinnedAt = pinned ? new Date().toISOString() : null
+  if (okCount === 0) {
+    return {
+      ok: false,
+      error: firstError ? `Pin failed: ${firstError}` : "Pin failed.",
+    }
+  }
+
   revalidatePath("/", "layout")
   revalidatePath("/upload")
-  return { ok: true, data: { pinned_at: pinnedAt } }
+  return {
+    ok: true,
+    data: {
+      ok: okCount,
+      failed,
+      message: describeBulkPinResult({ pinned, ok: okCount, failed }),
+    },
+  }
 }
 
 export async function markGalleryActivityNotificationsRead(

@@ -287,6 +287,7 @@ export function GalleryInfiniteWall({
               selectedCount={orderedSelected.length}
               allSelected={allSelected}
               isSignedIn={isSignedIn}
+              isAdmin={isAdmin}
               selectedIds={orderedSelected}
               selectedZipItems={selectedZipItems}
               savedFilterActive={Boolean(filters.savedOnly)}
@@ -298,6 +299,17 @@ export function GalleryInfiniteWall({
                 const remove = new Set(orderedSelected)
                 setImages((prev) =>
                   prev.filter((image) => !remove.has(image.id))
+                )
+              }}
+              onPinned={(pinned) => {
+                const ids = new Set(orderedSelected)
+                const pinnedAt = pinned ? new Date().toISOString() : null
+                setImages((prev) =>
+                  prev.map((image) =>
+                    ids.has(image.id)
+                      ? { ...image, pinned_at: pinnedAt }
+                      : image
+                  )
                 )
               }}
             />
