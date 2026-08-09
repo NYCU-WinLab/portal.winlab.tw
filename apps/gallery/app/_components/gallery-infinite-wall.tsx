@@ -264,16 +264,11 @@ export function GalleryInfiniteWall({
 
   const toggleSelected = useCallback(
     (imageId: string, options?: { shiftKey?: boolean }) => {
+      const anchor = selectionAnchorIdRef.current
       setSelectedIds((prev) => {
-        if (options?.shiftKey && selectionAnchorIdRef.current) {
-          return selectWallIdRange(
-            prev,
-            wallIds,
-            selectionAnchorIdRef.current,
-            imageId
-          )
+        if (options?.shiftKey && anchor) {
+          return selectWallIdRange(prev, wallIds, anchor, imageId)
         }
-        selectionAnchorIdRef.current = imageId
         return toggleWallSelection(prev, imageId)
       })
       if (!options?.shiftKey) {
@@ -298,7 +293,7 @@ export function GalleryInfiniteWall({
           lightboxOpen={lightboxOpen}
           statusText={
             selectionMode
-              ? "Select mode · tap polaroids, then add them to an album"
+              ? "Select mode · Shift+click for ranges · bulk tools below"
               : undefined
           }
           leadingActions={
