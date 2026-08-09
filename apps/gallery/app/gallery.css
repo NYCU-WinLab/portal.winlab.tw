@@ -89,6 +89,22 @@ body:not([data-gallery-theme]) {
   }
 }
 
+@keyframes gallery-slideshow-segment-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.gallery-slideshow-segment-fill {
+  transform-origin: left center;
+  animation-name: gallery-slideshow-segment-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 .gallery-home-hero-mark,
 .gallery-home-hero-title {
   animation: gallery-hero-enter 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;

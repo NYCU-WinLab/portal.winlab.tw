@@ -211,6 +211,9 @@ export function AlbumSlideshow({
   const photo = photos[index] ?? photos[0]
   if (!photo) return null
 
+  const autoAdvanceActive =
+    open && !paused && photos.length > 1 && photo.media_type !== "video"
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -295,9 +298,26 @@ export function AlbumSlideshow({
             />
             <span
               aria-hidden
-              className="absolute top-1/2 left-0 h-0.5 -translate-y-1/2 rounded-full bg-white/70 transition group-hover:h-1"
+              className="absolute top-1/2 left-0 h-0.5 -translate-y-1/2 rounded-full bg-white/45 transition group-hover:h-1"
               style={{
-                width: `${((index + 1) / photos.length) * 100}%`,
+                width: `${(index / photos.length) * 100}%`,
+              }}
+            />
+            <span
+              aria-hidden
+              key={`${index}-${intervalMs}-${autoAdvanceActive ? "go" : "stop"}`}
+              className={cn(
+                "absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-white/85 transition group-hover:h-1",
+                autoAdvanceActive && "gallery-slideshow-segment-fill"
+              )}
+              style={{
+                left: `${(index / photos.length) * 100}%`,
+                width: `${(1 / photos.length) * 100}%`,
+                transform: autoAdvanceActive ? undefined : "scaleX(1)",
+                transformOrigin: "left center",
+                animationDuration: autoAdvanceActive
+                  ? `${intervalMs}ms`
+                  : undefined,
               }}
             />
           </button>
