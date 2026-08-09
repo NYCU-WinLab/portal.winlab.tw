@@ -820,6 +820,39 @@ export function UploadManageList({
   }, [images])
 
   useEffect(() => {
+    if (selectionMode) return
+    if (!incompleteOnly && !uploadDayOnly) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (
+        confirmOpen ||
+        bulkDateOpen ||
+        bulkTagOpen ||
+        bulkUntagOpen ||
+        bulkAlbumOpen ||
+        slideshowOpen
+      )
+        return
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      setIncompleteOnly(false)
+      setUploadDayOnly(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [
+    selectionMode,
+    incompleteOnly,
+    uploadDayOnly,
+    confirmOpen,
+    bulkDateOpen,
+    bulkTagOpen,
+    bulkUntagOpen,
+    bulkAlbumOpen,
+    slideshowOpen,
+  ])
+
+  useEffect(() => {
     if (!selectionMode) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return

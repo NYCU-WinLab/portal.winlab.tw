@@ -17,6 +17,7 @@ import {
   pruneManageSelectionIds,
   isGalleryPinnedAtUnavailable,
   isGallerySequenceUnavailable,
+  isGalleryTakenAtUnavailable,
   isGalleryVideoColumnsUnavailable,
   swapSequenceOrder,
   type ManageUploadRow,
@@ -307,6 +308,26 @@ describe("pruneManageSelectionIds", () => {
     const prev = new Set(["a"])
     const next = pruneManageSelectionIds(prev, new Set(["a"]))
     expect(next).toBe(prev)
+  })
+})
+
+describe("isGalleryTakenAtUnavailable", () => {
+  test("detects missing taken_at column", () => {
+    expect(
+      isGalleryTakenAtUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'taken_at' column in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores unrelated errors", () => {
+    expect(
+      isGalleryTakenAtUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'pinned_at' column",
+      })
+    ).toBe(false)
   })
 })
 
