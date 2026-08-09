@@ -60,6 +60,7 @@ export function AlbumSlideshow({
   const [paused, setPaused] = useState(false)
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const suppressClickRef = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -67,6 +68,7 @@ export function AlbumSlideshow({
     setPaused(false)
     setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
     touchStartRef.current = null
+    suppressClickRef.current = false
   }, [open, startIndex, photos.length])
 
   const bumpInterval = (delta: number) => {
@@ -92,21 +94,28 @@ export function AlbumSlideshow({
       touch.clientY - start.y
     )
     if (swipe === "next" && photos.length > 1) {
+      suppressClickRef.current = true
       setIndex((current) => nextSlideshowIndex(current, photos.length))
       return
     }
     if (swipe === "prev" && photos.length > 1) {
+      suppressClickRef.current = true
       setIndex((current) => prevSlideshowIndex(current, photos.length))
       return
     }
     if (swipe == null) {
       const current = photos[index]
       if (current?.media_type === "video") return
+      suppressClickRef.current = true
       setPaused((value) => !value)
     }
   }
 
   const togglePauseFromPointer = (event: { target: EventTarget | null }) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
     const target = event.target
     if (!(target instanceof Element)) return
     if (target.closest("button, video, a")) return
