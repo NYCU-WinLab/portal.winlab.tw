@@ -1552,7 +1552,7 @@ export function UploadManageList({
         </div>
       ) : null}
 
-      {visibleTimeline.length === 0 && incompleteOnly ? (
+      {visibleTimeline.length === 0 && incompleteOnly && sequencesAvailable ? (
         <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
           No incomplete sequences right now — every story has contiguous shots.
         </p>

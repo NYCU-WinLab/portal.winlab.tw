@@ -478,7 +478,9 @@ export function UploadForm({
         {pending || status.kind === "working"
           ? "Developing…"
           : selectedFiles.length > 1
-            ? `Hang sequence (${selectedFiles.length})`
+            ? sequencesAvailable
+              ? `Hang sequence (${selectedFiles.length})`
+              : `Hang ${selectedFiles.length} shots`
             : "Hang on the wall"}
       </Button>
     </form>
