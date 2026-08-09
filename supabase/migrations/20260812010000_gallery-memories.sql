@@ -24,6 +24,7 @@ create index if not exists gallery_images_taken_at_idx
   on public.gallery_images (taken_at desc);
 
 -- Keep the wall-covers view in sync so clients that select * still see taken_at.
+-- Append taken_at at the end: CREATE OR REPLACE cannot rename/reorder columns.
 create or replace view public.gallery_wall_covers
 with (security_invoker = true) as
 select distinct on (coalesce(sequence_id, id))
@@ -35,10 +36,10 @@ select distinct on (coalesce(sequence_id, id))
   duration_seconds,
   created_by,
   created_at,
-  taken_at,
   pinned_at,
   sequence_id,
-  sequence_index
+  sequence_index,
+  taken_at
 from public.gallery_images
 order by
   coalesce(sequence_id, id),
