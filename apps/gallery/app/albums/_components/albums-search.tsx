@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, type FormEvent } from "react"
+import { useEffect, useState, useTransition, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { IconSearch, IconX } from "@tabler/icons-react"
 
@@ -18,6 +18,10 @@ export function GalleryAlbumsSearch({
   const router = useRouter()
   const [draft, setDraft] = useState(initialQuery)
   const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setDraft(initialQuery)
+  }, [initialQuery])
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -58,6 +62,7 @@ export function GalleryAlbumsSearch({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Search title, slug, owner…"
+          aria-label="Search albums by title, slug, or owner"
           className={cn(
             gallerySans(),
             "min-h-10 w-full rounded-md border border-input bg-background py-2 pr-9 pl-9 text-sm shadow-xs outline-none",
