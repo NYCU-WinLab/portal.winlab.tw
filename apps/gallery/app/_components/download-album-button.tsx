@@ -11,6 +11,7 @@ import {
   buildAlbumZipFilename,
   type AlbumZipSource,
 } from "@/lib/gallery/zip-names"
+import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 
 type DownloadAlbumButtonProps = {
   items: AlbumZipSource[]
@@ -49,19 +50,18 @@ export function DownloadAlbumButton({
           })
         },
       })
-      if (result.failed > 0) {
-        toast.success(
-          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
-          {
-            id: toastId,
-            description: `${result.failed} could not be fetched and were skipped.`,
-          }
-        )
+      const copy = describeZipDownloadResult({
+        count: result.count,
+        failed: result.failed,
+        noun: "photo",
+      })
+      if (copy.severity === "warning") {
+        toast.warning(copy.title, {
+          id: toastId,
+          description: copy.description,
+        })
       } else {
-        toast.success(
-          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
-          { id: toastId }
-        )
+        toast.success(copy.title, { id: toastId })
       }
     } catch (error) {
       const message =

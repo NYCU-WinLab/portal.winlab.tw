@@ -113,6 +113,7 @@ import {
   describeWallSelectionCopy,
 } from "@/lib/gallery/wall-selection-share"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
+import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 
 type SelectableItem = {
   id: string
@@ -897,12 +898,16 @@ export function UploadManageList({
   ])
 
   const confirmBatchDelete = () => {
+    if (isPending) return
     startTransition(async () => {
       const result = await deleteGalleryImages(selectedItems)
       if (result.ok) {
-        toast.success(
-          `Deleted ${selectedItems.length} work${selectedItems.length === 1 ? "" : "s"}.`
-        )
+        const message = `Deleted ${selectedItems.length} work${selectedItems.length === 1 ? "" : "s"}.`
+        if (result.warning) {
+          toast.warning(message, { description: result.warning })
+        } else {
+          toast.success(message)
+        }
         endSelectionMode()
         setConfirmOpen(false)
       } else {
@@ -1011,19 +1016,18 @@ export function UploadManageList({
           })
         },
       })
-      if (result.failed > 0) {
-        toast.success(
-          `Saved ${result.count} work${result.count === 1 ? "" : "s"} as ZIP`,
-          {
-            id: toastId,
-            description: `${result.failed} could not be fetched and were skipped.`,
-          }
-        )
+      const copy = describeZipDownloadResult({
+        count: result.count,
+        failed: result.failed,
+        noun: "work",
+      })
+      if (copy.severity === "warning") {
+        toast.warning(copy.title, {
+          id: toastId,
+          description: copy.description,
+        })
       } else {
-        toast.success(
-          `Saved ${result.count} work${result.count === 1 ? "" : "s"} as ZIP`,
-          { id: toastId }
-        )
+        toast.success(copy.title, { id: toastId })
       }
     } catch (error) {
       const message =
@@ -1910,12 +1914,16 @@ export function UploadManageList({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>
+              Keep them
+            </AlertDialogCancel>
             <AlertDialogAction
+              disabled={isPending}
+              aria-busy={isPending || undefined}
               onClick={confirmBatchDelete}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Delete forever
+              {isPending ? "Deleting…" : "Delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
