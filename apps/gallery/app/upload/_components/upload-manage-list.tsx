@@ -631,16 +631,40 @@ export function UploadManageList({
   useEffect(() => {
     if (!selectionMode) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return
       if (isTypingTarget(event.target)) return
       if (confirmOpen || bulkDateOpen || bulkTagOpen || bulkUntagOpen) return
-      event.preventDefault()
-      setSelectedIds(new Set())
-      setSelectionMode(false)
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setSelectedIds(new Set())
+        setSelectionMode(false)
+        return
+      }
+      if (
+        (event.key === "a" || event.key === "A") &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault()
+        setSelectedIds((current) => {
+          const allSelected =
+            selectableItems.length > 0 &&
+            selectableItems.every((item) => current.has(item.id))
+          if (allSelected) return new Set()
+          return new Set(selectableItems.map((item) => item.id))
+        })
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selectionMode, confirmOpen, bulkDateOpen, bulkTagOpen, bulkUntagOpen])
+  }, [
+    selectionMode,
+    confirmOpen,
+    bulkDateOpen,
+    bulkTagOpen,
+    bulkUntagOpen,
+    selectableItems,
+  ])
 
   const confirmBatchDelete = () => {
     startTransition(async () => {
