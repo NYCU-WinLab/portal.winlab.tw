@@ -332,6 +332,7 @@ export type Database = {
           google_map_link: string | null
           id: string
           is_active: boolean
+          is_pinned: boolean
           kind: string
           menu_image_url: string | null
           name: string
@@ -344,6 +345,7 @@ export type Database = {
           google_map_link?: string | null
           id?: string
           is_active?: boolean
+          is_pinned?: boolean
           kind?: string
           menu_image_url?: string | null
           name: string
@@ -356,6 +358,7 @@ export type Database = {
           google_map_link?: string | null
           id?: string
           is_active?: boolean
+          is_pinned?: boolean
           kind?: string
           menu_image_url?: string | null
           name?: string
