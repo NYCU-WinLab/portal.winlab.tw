@@ -14,6 +14,9 @@ import {
 } from "@/lib/gallery/upload-naming"
 import {
   describeUploadFailure,
+  formatFailurePreview,
+  isAbortError,
+  stageFromRegisterError,
   UploadFailureError,
   userMessageForStage,
 } from "@/lib/gallery/upload-errors"
@@ -150,6 +153,38 @@ describe("describeUploadFailure", () => {
     for (const stage of stages) {
       expect(userMessageForStage(stage, "detail").length).toBeGreaterThan(5)
     }
+  })
+
+  test("isAbortError detects AbortError names and cancel copy", () => {
+    expect(isAbortError(new DOMException("Aborted", "AbortError"))).toBe(true)
+    expect(isAbortError(new Error("Upload cancelled by user"))).toBe(true)
+    expect(isAbortError(new Error("boom"))).toBe(false)
+  })
+
+  test("stageFromRegisterError classifies register strings", () => {
+    expect(stageFromRegisterError("Database insert failed: x")).toBe(
+      "db-insert"
+    )
+    expect(stageFromRegisterError("verify upload timed out")).toBe(
+      "storage-verify"
+    )
+    expect(stageFromRegisterError("Invalid media type")).toBe("type")
+    expect(stageFromRegisterError("Failed to fetch")).toBe("network")
+    expect(stageFromRegisterError("Not signed in")).toBe("unknown")
+  })
+
+  test("formatFailurePreview includes name stage and message", () => {
+    const preview = formatFailurePreview({
+      file: new File(["x"], "clip.mp4"),
+      detail: "raw",
+      userMessage: "Could not process",
+      stage: "video-processing",
+      sequenceId: null,
+      sequenceIndex: null,
+    })
+    expect(preview).toContain("clip.mp4")
+    expect(preview).toContain("video-processing")
+    expect(preview).toContain("Could not process")
   })
 })
 
