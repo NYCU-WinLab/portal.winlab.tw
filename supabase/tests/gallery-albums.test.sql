@@ -84,13 +84,16 @@ select throws_ok(
   'non-owner cannot add photos to someone else''s album'
 );
 
-select throws_ok(
-  $$ update public.gallery_albums
-     set title = 'Hijacked'
-     where id = 'b8b8b8b8-8888-8888-8888-888888888888' $$,
-  '42501',
-  null,
-  'non-owner cannot rename someone else''s album'
+-- RLS UPDATE is a silent no-op (0 rows), not a privilege error.
+update public.gallery_albums
+set title = 'Hijacked'
+where id = 'b8b8b8b8-8888-8888-8888-888888888888';
+
+select is(
+  (select title from public.gallery_albums
+   where id = 'b8b8b8b8-8888-8888-8888-888888888888'),
+  'Lab Trip',
+  'non-owner rename is a no-op under RLS'
 );
 
 select lives_ok(
