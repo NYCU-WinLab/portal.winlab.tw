@@ -11,6 +11,7 @@ import {
   isGalleryCommentEditUnavailable,
   isGalleryCommentsUnavailable,
 } from "@/lib/gallery/comment-edit"
+import { isGalleryCommentLikesUnavailable } from "@/lib/gallery/comment-social"
 import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
@@ -73,6 +74,13 @@ export async function setGalleryReaction(
       .eq("user_id", userId)
 
     if (deleteError) {
+      if (isGalleryReactionsUnavailable(deleteError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${deleteError.message}` }
     }
   } else if (existing) {
@@ -83,6 +91,13 @@ export async function setGalleryReaction(
       .eq("user_id", userId)
 
     if (updateError) {
+      if (isGalleryReactionsUnavailable(updateError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${updateError.message}` }
     }
   } else {
@@ -91,6 +106,13 @@ export async function setGalleryReaction(
       .insert({ image_id: imageId, user_id: userId, reaction })
 
     if (insertError) {
+      if (isGalleryReactionsUnavailable(insertError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${insertError.message}` }
     }
   }
@@ -315,10 +337,7 @@ export async function toggleGalleryCommentLike(
     .maybeSingle()
 
   if (fetchError) {
-    if (
-      fetchError.code === "42P01" ||
-      /gallery_comment_likes/i.test(fetchError.message)
-    ) {
+    if (isGalleryCommentLikesUnavailable(fetchError)) {
       return {
         ok: false,
         error:
@@ -337,6 +356,13 @@ export async function toggleGalleryCommentLike(
       .eq("user_id", userId)
 
     if (deleteError) {
+      if (isGalleryCommentLikesUnavailable(deleteError)) {
+        return {
+          ok: false,
+          error:
+            "Comment likes are not available yet — apply the gallery comment likes migration.",
+        }
+      }
       return { ok: false, error: `Like failed: ${deleteError.message}` }
     }
   } else {
@@ -345,6 +371,13 @@ export async function toggleGalleryCommentLike(
       .insert({ comment_id: commentId, user_id: userId })
 
     if (insertError) {
+      if (isGalleryCommentLikesUnavailable(insertError)) {
+        return {
+          ok: false,
+          error:
+            "Comment likes are not available yet — apply the gallery comment likes migration.",
+        }
+      }
       return { ok: false, error: `Like failed: ${insertError.message}` }
     }
   }
@@ -355,6 +388,13 @@ export async function toggleGalleryCommentLike(
     .eq("comment_id", commentId)
 
   if (countError) {
+    if (isGalleryCommentLikesUnavailable(countError)) {
+      return {
+        ok: false,
+        error:
+          "Comment likes are not available yet — apply the gallery comment likes migration.",
+      }
+    }
     return { ok: false, error: `Like failed: ${countError.message}` }
   }
 

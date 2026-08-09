@@ -1,6 +1,30 @@
 import { describe, expect, test } from "bun:test"
 
-import { loadGalleryCommentRowsWithSocial } from "@/lib/gallery/comment-social"
+import {
+  isGalleryCommentLikesUnavailable,
+  loadGalleryCommentRowsWithSocial,
+} from "@/lib/gallery/comment-social"
+
+describe("isGalleryCommentLikesUnavailable", () => {
+  test("detects missing likes table", () => {
+    expect(
+      isGalleryCommentLikesUnavailable({
+        code: "PGRST205",
+        message:
+          "Could not find the table 'public.gallery_comment_likes' in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores unrelated errors", () => {
+    expect(
+      isGalleryCommentLikesUnavailable({
+        code: "42501",
+        message: "permission denied",
+      })
+    ).toBe(false)
+  })
+})
 
 type MockError = { code?: string; message?: string } | null
 

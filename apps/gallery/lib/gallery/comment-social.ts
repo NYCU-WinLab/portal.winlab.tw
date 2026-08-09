@@ -185,6 +185,22 @@ export async function loadGalleryCommentRowsWithSocial(
   }
 }
 
+export function isGalleryCommentLikesUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_comment_likes/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
 async function loadCommentLikes(
   supabase: SupabaseClient,
   commentIds: string[]
@@ -202,11 +218,7 @@ async function loadCommentLikes(
     .in("comment_id", commentIds)
 
   if (error) {
-    if (
-      error.code === "42P01" ||
-      error.code === "PGRST205" ||
-      /gallery_comment_likes/i.test(error.message)
-    ) {
+    if (isGalleryCommentLikesUnavailable(error)) {
       return { data: [], error: null, available: false }
     }
     return {
