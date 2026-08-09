@@ -63,6 +63,41 @@ function thumbFor(photo: GalleryAlbumPhoto): string {
   return getGalleryThumbUrl(photo.image_path)
 }
 
+function ManageAlbumThumb({ photo }: { photo: GalleryAlbumPhoto }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <span
+        aria-hidden
+        className="flex size-12 shrink-0 items-center justify-center rounded-[1px] bg-zinc-200/80"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/mark.png"
+          alt=""
+          width={20}
+          height={20}
+          className="size-5 object-contain opacity-40 grayscale"
+          draggable={false}
+        />
+      </span>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={thumbFor(photo)}
+      alt=""
+      className="size-12 shrink-0 rounded-[1px] object-cover"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 export function GalleryAlbumManagePanel({
   album,
 }: {
@@ -74,7 +109,11 @@ export function GalleryAlbumManagePanel({
   const [photos, setPhotos] = useState(album.photos)
   const [coverImageId, setCoverImageId] = useState(album.cover_image_id)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirmRemovePhoto = photos.find(
+    (photo) => photo.image_id === confirmRemoveId
+  )
 
   const photoIds = useMemo(() => photos.map((p) => p.image_id), [photos])
   const selectedCount = selected.size
@@ -193,6 +232,7 @@ export function GalleryAlbumManagePanel({
   })
 
   const removePhoto = (imageId: string) => {
+    setConfirmRemoveId(null)
     const previousPhotos = photos
     const previousCover = coverImageId
     const remaining = photos.filter((p) => p.image_id !== imageId)
@@ -499,14 +539,7 @@ export function GalleryAlbumManagePanel({
                     }
                     aria-label={`Select ${photo.name}`}
                   />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={thumbFor(photo)}
-                    alt=""
-                    className="size-12 shrink-0 rounded-[1px] object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <ManageAlbumThumb photo={photo} />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
@@ -566,7 +599,7 @@ export function GalleryAlbumManagePanel({
                       variant="ghost"
                       disabled={pending}
                       aria-label="Remove from album"
-                      onClick={() => removePhoto(photo.image_id)}
+                      onClick={() => setConfirmRemoveId(photo.image_id)}
                     >
                       <IconX className="size-4" />
                     </Button>
@@ -577,6 +610,40 @@ export function GalleryAlbumManagePanel({
           </ul>
         )}
       </div>
+
+      <AlertDialog
+        open={confirmRemoveId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmRemoveId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove{" "}
+              {confirmRemovePhoto?.name
+                ? `“${confirmRemovePhoto.name}”`
+                : "this photo"}{" "}
+              from the album?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The photo stays on the wall. Only this album membership is
+              removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pending || !confirmRemoveId}
+              onClick={() => {
+                if (confirmRemoveId) removePhoto(confirmRemoveId)
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }
