@@ -4,6 +4,7 @@ import {
   GALLERY_ALBUM_PHOTOS_MAX,
   normalizeAlbumPositions,
   normalizeGalleryAlbumDescription,
+  normalizeGalleryAlbumImageIds,
   normalizeGalleryAlbumSlug,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
@@ -61,5 +62,13 @@ describe("normalizeAlbumPositions", () => {
       String(i)
     )
     expect(normalizeAlbumPositions(ids)).toHaveLength(GALLERY_ALBUM_PHOTOS_MAX)
+  })
+})
+
+describe("normalizeGalleryAlbumImageIds", () => {
+  test("trims, dedupes, and preserves order", () => {
+    expect(
+      normalizeGalleryAlbumImageIds([" a ", "b", "a", "", "c", "b"])
+    ).toEqual(["a", "b", "c"])
   })
 })

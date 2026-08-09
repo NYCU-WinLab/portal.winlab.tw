@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog"
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -30,6 +31,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import {
   deleteGalleryAlbum,
   removeImageFromGalleryAlbum,
+  removeImagesFromGalleryAlbum,
   reorderGalleryAlbumImages,
   updateGalleryAlbum,
 } from "@/app/actions/albums"
@@ -68,9 +70,30 @@ export function GalleryAlbumManagePanel({
   const [description, setDescription] = useState(album.description ?? "")
   const [photos, setPhotos] = useState(album.photos)
   const [coverImageId, setCoverImageId] = useState(album.cover_image_id)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [pending, startTransition] = useTransition()
 
   const photoIds = useMemo(() => photos.map((p) => p.image_id), [photos])
+  const selectedCount = selected.size
+  const allSelected =
+    photos.length > 0 && photos.every((photo) => selected.has(photo.image_id))
+
+  const toggleSelected = (imageId: string, next: boolean) => {
+    setSelected((prev) => {
+      const copy = new Set(prev)
+      if (next) copy.add(imageId)
+      else copy.delete(imageId)
+      return copy
+    })
+  }
+
+  const toggleSelectAll = (next: boolean) => {
+    if (!next) {
+      setSelected(new Set())
+      return
+    }
+    setSelected(new Set(photoIds))
+  }
 
   const saveMeta = () => {
     const normalized = normalizeGalleryAlbumTitle(title)
@@ -127,7 +150,37 @@ export function GalleryAlbumManagePanel({
         return
       }
       setPhotos((prev) => prev.filter((p) => p.image_id !== imageId))
+      setSelected((prev) => {
+        if (!prev.has(imageId)) return prev
+        const copy = new Set(prev)
+        copy.delete(imageId)
+        return copy
+      })
       toast.success("Removed from album")
+      router.refresh()
+    })
+  }
+
+  const removeSelected = () => {
+    const ids = Array.from(selected)
+    if (ids.length === 0) return
+    const previous = photos
+    setPhotos((prev) => prev.filter((p) => !selected.has(p.image_id)))
+    setSelected(new Set())
+    startTransition(async () => {
+      const result = await removeImagesFromGalleryAlbum(album.id, ids)
+      if (!result.ok) {
+        setPhotos(previous)
+        setSelected(new Set(ids))
+        toast.error(result.error)
+        return
+      }
+      const removed = result.data.removed
+      toast.success(
+        removed === 1
+          ? "Removed 1 photo from album"
+          : `Removed ${removed} photos from album`
+      )
       router.refresh()
     })
   }
@@ -274,94 +327,162 @@ export function GalleryAlbumManagePanel({
       </div>
 
       <div className="space-y-3 border-t border-border/50 pt-5">
-        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-          Order ({photoIds.length} photo{photoIds.length === 1 ? "" : "s"})
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+            Order ({photoIds.length} photo{photoIds.length === 1 ? "" : "s"})
+          </p>
+          {photos.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                className={cn(
+                  gallerySans(),
+                  "inline-flex items-center gap-2 text-xs text-muted-foreground"
+                )}
+              >
+                <Checkbox
+                  checked={allSelected}
+                  disabled={pending}
+                  onCheckedChange={(value) => toggleSelectAll(value === true)}
+                  aria-label="Select all photos"
+                />
+                Select all
+              </label>
+              {selectedCount > 0 ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={pending}
+                      className={cn(gallerySans(), "h-8")}
+                    >
+                      Remove selected ({selectedCount})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Remove {selectedCount} photo
+                        {selectedCount === 1 ? "" : "s"}?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Photos stay on the wall — only this album membership is
+                        cleared. If the cover is included, the next remaining
+                        shot becomes the cover.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={removeSelected}>
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         {photos.length === 0 ? (
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
             Add photos from the wall lightbox — pick &ldquo;Add to album&rdquo;.
           </p>
         ) : (
           <ul className="space-y-2">
-            {photos.map((photo, index) => (
-              <li
-                key={photo.image_id}
-                className="flex items-center gap-3 rounded-md border border-border/60 bg-background/70 p-2"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbFor(photo)}
-                  alt=""
-                  className="size-12 shrink-0 rounded-[1px] object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      gallerySans(),
-                      "truncate text-sm text-foreground"
-                    )}
-                  >
-                    {photo.name}
-                  </p>
-                  <p
-                    className={cn(
-                      gallerySans(),
-                      "truncate text-[11px] text-muted-foreground"
-                    )}
-                  >
-                    {photo.uploader_name}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={pending || coverImageId === photo.image_id}
-                    className={cn(
-                      gallerySans(),
-                      "h-8 px-2 text-[11px]",
-                      coverImageId === photo.image_id && "text-foreground"
-                    )}
-                    onClick={() => setCover(photo.image_id)}
-                  >
-                    {coverImageId === photo.image_id ? "Cover" : "Set cover"}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={pending || index === 0}
-                    aria-label="Move up"
-                    onClick={() => movePhoto(index, -1)}
-                  >
-                    <IconArrowUp className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={pending || index === photos.length - 1}
-                    aria-label="Move down"
-                    onClick={() => movePhoto(index, 1)}
-                  >
-                    <IconArrowDown className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
+            {photos.map((photo, index) => {
+              const isSelected = selected.has(photo.image_id)
+              return (
+                <li
+                  key={photo.image_id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md border border-border/60 bg-background/70 p-2",
+                    isSelected && "border-zinc-900/25 bg-zinc-900/[0.03]"
+                  )}
+                >
+                  <Checkbox
+                    checked={isSelected}
                     disabled={pending}
-                    aria-label="Remove from album"
-                    onClick={() => removePhoto(photo.image_id)}
-                  >
-                    <IconX className="size-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
+                    onCheckedChange={(value) =>
+                      toggleSelected(photo.image_id, value === true)
+                    }
+                    aria-label={`Select ${photo.name}`}
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumbFor(photo)}
+                    alt=""
+                    className="size-12 shrink-0 rounded-[1px] object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        gallerySans(),
+                        "truncate text-sm text-foreground"
+                      )}
+                    >
+                      {photo.name}
+                    </p>
+                    <p
+                      className={cn(
+                        gallerySans(),
+                        "truncate text-[11px] text-muted-foreground"
+                      )}
+                    >
+                      {photo.uploader_name}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending || coverImageId === photo.image_id}
+                      className={cn(
+                        gallerySans(),
+                        "h-8 px-2 text-[11px]",
+                        coverImageId === photo.image_id && "text-foreground"
+                      )}
+                      onClick={() => setCover(photo.image_id)}
+                    >
+                      {coverImageId === photo.image_id ? "Cover" : "Set cover"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={pending || index === 0}
+                      aria-label="Move up"
+                      onClick={() => movePhoto(index, -1)}
+                    >
+                      <IconArrowUp className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={pending || index === photos.length - 1}
+                      aria-label="Move down"
+                      onClick={() => movePhoto(index, 1)}
+                    >
+                      <IconArrowDown className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={pending}
+                      aria-label="Remove from album"
+                      onClick={() => removePhoto(photo.image_id)}
+                    >
+                      <IconX className="size-4" />
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

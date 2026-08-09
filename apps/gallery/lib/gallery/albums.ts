@@ -80,10 +80,8 @@ export function normalizeGalleryAlbumDescription(
   return text
 }
 
-/** Assign contiguous positions 0..n-1 for a reorder payload. */
-export function normalizeAlbumPositions(
-  imageIds: string[]
-): { image_id: string; position: number }[] {
+/** Dedupe + cap image ids for bulk album membership mutations. */
+export function normalizeGalleryAlbumImageIds(imageIds: string[]): string[] {
   const seen = new Set<string>()
   const ordered: string[] = []
   for (const id of imageIds) {
@@ -93,5 +91,15 @@ export function normalizeAlbumPositions(
     ordered.push(trimmed)
     if (ordered.length >= GALLERY_ALBUM_PHOTOS_MAX) break
   }
-  return ordered.map((image_id, position) => ({ image_id, position }))
+  return ordered
+}
+
+/** Assign contiguous positions 0..n-1 for a reorder payload. */
+export function normalizeAlbumPositions(
+  imageIds: string[]
+): { image_id: string; position: number }[] {
+  return normalizeGalleryAlbumImageIds(imageIds).map((image_id, position) => ({
+    image_id,
+    position,
+  }))
 }

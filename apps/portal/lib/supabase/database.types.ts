@@ -2358,6 +2358,25 @@ export type Database = {
         Args: Record<string, never>
         Returns: string[]
       }
+      gallery_album_remove_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
+      gallery_album_photos: {
+        Args: { p_slug: string }
+        Returns: {
+          image_id: string
+          name: string
+          image_path: string
+          media_type: string
+          poster_path: string | null
+          uploader_name: string
+          created_by: string | null
+          created_at: string
+          sort_position: number
+          added_at: string
+        }[]
+      }
       gallery_admin_rename_tag: {
         Args: { p_tag_id: string; p_new_name: string }
         Returns: {

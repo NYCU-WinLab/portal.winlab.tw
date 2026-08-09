@@ -5,9 +5,12 @@ import {
   formatMemoriesDayLabel,
   galleryTaipeiCalendarDay,
   groupMemoriesByYear,
+  isMemoriesViewingToday,
   isValidGalleryCalendarDay,
+  memoriesDayHref,
   memoriesYearsAgoLabel,
   resolveMemoriesCalendarDay,
+  shiftGalleryCalendarDay,
   type GalleryMemoryPhoto,
 } from "./memories"
 
@@ -105,5 +108,28 @@ describe("memoriesYearsAgoLabel", () => {
   test("pluralises", () => {
     expect(memoriesYearsAgoLabel(2025, 2026)).toBe("1 year ago")
     expect(memoriesYearsAgoLabel(2023, 2026)).toBe("3 years ago")
+  })
+})
+
+describe("shiftGalleryCalendarDay", () => {
+  test("steps across month boundaries", () => {
+    expect(shiftGalleryCalendarDay(8, 10, -1)).toEqual({ month: 8, day: 9 })
+    expect(shiftGalleryCalendarDay(3, 1, -1)).toEqual({ month: 2, day: 29 })
+    expect(shiftGalleryCalendarDay(12, 31, 1)).toEqual({ month: 1, day: 1 })
+  })
+})
+
+describe("memoriesDayHref", () => {
+  test("builds query links", () => {
+    expect(memoriesDayHref(8, 10)).toBe("/memories?month=8&day=10")
+    expect(memoriesDayHref(0, 10)).toBe("/memories")
+  })
+})
+
+describe("isMemoriesViewingToday", () => {
+  test("matches Taipei today", () => {
+    const now = new Date("2026-08-09T16:00:00.000Z")
+    expect(isMemoriesViewingToday({ month: 8, day: 10 }, now)).toBe(true)
+    expect(isMemoriesViewingToday({ month: 8, day: 9 }, now)).toBe(false)
   })
 })

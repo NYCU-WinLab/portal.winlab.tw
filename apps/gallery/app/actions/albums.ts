@@ -6,6 +6,7 @@ import {
   GALLERY_ALBUM_PHOTOS_MAX,
   normalizeAlbumPositions,
   normalizeGalleryAlbumDescription,
+  normalizeGalleryAlbumImageIds,
   normalizeGalleryAlbumSlug,
   normalizeGalleryAlbumTitle,
   type GalleryAlbumSummary,
@@ -291,8 +292,18 @@ export async function removeImageFromGalleryAlbum(
   albumId: string,
   imageId: string
 ): Promise<AlbumActionResult> {
-  if (!albumId || !imageId) {
-    return { ok: false, error: "Missing album or image id." }
+  return removeImagesFromGalleryAlbum(albumId, [imageId])
+}
+
+export async function removeImagesFromGalleryAlbum(
+  albumId: string,
+  imageIds: string[]
+): Promise<AlbumActionResult<{ removed: number }>> {
+  if (!albumId) return { ok: false, error: "Missing album id." }
+
+  const ids = normalizeGalleryAlbumImageIds(imageIds)
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
   }
 
   const auth = await requireSignedIn()
@@ -307,15 +318,36 @@ export async function removeImageFromGalleryAlbum(
   if (albumError) return { ok: false, error: albumError.message }
   if (!album) return { ok: false, error: "Album not found." }
 
+  const { data: removedCount, error: rpcError } = await auth.supabase.rpc(
+    "gallery_album_remove_images",
+    {
+      p_album_id: albumId,
+      p_image_ids: ids,
+    }
+  )
+
+  if (!rpcError) {
+    revalidateAlbumPaths(album.slug)
+    return { ok: true, data: { removed: Number(removedCount) || 0 } }
+  }
+
+  // Soft-fall back when migration 20260814010000 is not applied yet.
+  if (!/gallery_album_remove_images/i.test(rpcError.message)) {
+    return { ok: false, error: rpcError.message }
+  }
+
   const { error } = await auth.supabase
     .from("gallery_album_images")
     .delete()
     .eq("album_id", albumId)
-    .eq("image_id", imageId)
+    .in("image_id", ids)
 
   if (error) return { ok: false, error: error.message }
 
-  if (album.cover_image_id === imageId) {
+  const coverWasRemoved =
+    album.cover_image_id != null && ids.includes(album.cover_image_id)
+
+  if (coverWasRemoved) {
     const { data: nextCover } = await auth.supabase
       .from("gallery_album_images")
       .select("image_id")
@@ -334,7 +366,7 @@ export async function removeImageFromGalleryAlbum(
   }
 
   revalidateAlbumPaths(album.slug)
-  return { ok: true }
+  return { ok: true, data: { removed: ids.length } }
 }
 
 export async function reorderGalleryAlbumImages(

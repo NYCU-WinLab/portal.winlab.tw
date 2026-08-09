@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { MemoriesDayNavigator } from "@/app/memories/_components/memories-day-navigator"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { GalleryPageHero } from "@/app/_components/gallery-page-hero"
 import { galleryPanelClass, gallerySans } from "@/components/gallery-chrome"
@@ -10,6 +11,7 @@ import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
 import {
   formatMemoriesDayLabel,
   groupMemoriesByYear,
+  isMemoriesViewingToday,
   resolveMemoriesCalendarDay,
 } from "@/lib/gallery/memories"
 import { createClient } from "@/lib/supabase/server"
@@ -33,6 +35,7 @@ export default async function MemoriesPage({
     day: params.day,
   })
   const label = formatMemoriesDayLabel(day.month, day.day)
+  const viewingToday = isMemoriesViewingToday(day)
 
   const supabase = await createClient()
   const user = await getCurrentUser()
@@ -49,15 +52,19 @@ export default async function MemoriesPage({
       containerClassName="max-w-5xl"
     >
       <div className="flex flex-col gap-10 sm:gap-12">
-        <GalleryPageHero
-          title="Memories"
-          lead={
-            <>
-              On this day — {label}. Prior-year shots from the lab paper wall,
-              matched by capture time when the camera wrote it down.
-            </>
-          }
-        />
+        <div className="space-y-5">
+          <GalleryPageHero
+            title="Memories"
+            lead={
+              <>
+                {viewingToday ? "On this day" : "Looking back"} — {label}.
+                Prior-year shots from the lab paper wall, matched by capture
+                time when the camera wrote it down.
+              </>
+            }
+          />
+          <MemoriesDayNavigator day={day} />
+        </div>
 
         {groups.length === 0 ? (
           <section className={cn(galleryPanelClass(), "space-y-3")}>

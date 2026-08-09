@@ -136,3 +136,38 @@ export function memoriesYearsAgoLabel(
   if (delta === 1) return "1 year ago"
   return `${delta} years ago`
 }
+
+/**
+ * Shift a calendar MM-DD by N days using a leap-year probe so Feb 29 stays
+ * addressable. Month/day only — year is resolved separately by the route.
+ */
+export function shiftGalleryCalendarDay(
+  month: number,
+  day: number,
+  deltaDays: number
+): { month: number; day: number } {
+  if (!isValidGalleryCalendarDay(month, day) || !Number.isFinite(deltaDays)) {
+    return { month, day }
+  }
+  const step = Math.trunc(deltaDays)
+  // Fixed leap year so Feb 29 is a real calendar day while shifting.
+  const probe = new Date(Date.UTC(2024, month - 1, day))
+  probe.setUTCDate(probe.getUTCDate() + step)
+  return {
+    month: probe.getUTCMonth() + 1,
+    day: probe.getUTCDate(),
+  }
+}
+
+export function memoriesDayHref(month: number, day: number): string {
+  if (!isValidGalleryCalendarDay(month, day)) return "/memories"
+  return `/memories?month=${month}&day=${day}`
+}
+
+export function isMemoriesViewingToday(
+  viewed: Pick<GalleryCalendarDay, "month" | "day">,
+  now: Date = new Date()
+): boolean {
+  const today = galleryTaipeiCalendarDay(now)
+  return today.month === viewed.month && today.day === viewed.day
+}
