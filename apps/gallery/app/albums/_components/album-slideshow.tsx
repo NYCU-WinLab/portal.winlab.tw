@@ -359,6 +359,34 @@ export function AlbumSlideshow({
             onPointerUp={onProgressPointerUp}
             onPointerCancel={onProgressPointerUp}
             onKeyDown={(event) => {
+              if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+                event.preventDefault()
+                event.stopPropagation()
+                setIndex((current) =>
+                  nextSlideshowIndex(current, photos.length)
+                )
+                return
+              }
+              if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+                event.preventDefault()
+                event.stopPropagation()
+                setIndex((current) =>
+                  prevSlideshowIndex(current, photos.length)
+                )
+                return
+              }
+              if (event.key === "Home") {
+                event.preventDefault()
+                event.stopPropagation()
+                setIndex(0)
+                return
+              }
+              if (event.key === "End") {
+                event.preventDefault()
+                event.stopPropagation()
+                setIndex(Math.max(0, photos.length - 1))
+                return
+              }
               if (event.key !== "Enter" && event.key !== " ") return
               event.preventDefault()
               const rect = event.currentTarget.getBoundingClientRect()
