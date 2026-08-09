@@ -101,7 +101,10 @@ export function GalleryImageTags({
   if (!canEdit && tags.length === 0) return null
 
   return (
-    <div className={cn(gallerySans(), "space-y-2")}>
+    <div
+      aria-busy={isPending || undefined}
+      className={cn(gallerySans(), "space-y-2")}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => (
           <span
@@ -125,6 +128,7 @@ export function GalleryImageTags({
                 type="button"
                 aria-label={`Remove tag ${tag.name}`}
                 disabled={isPending}
+                aria-busy={isPending || undefined}
                 onClick={() => onRemove(tag)}
                 className="mr-1 inline-flex size-5 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-900/10 hover:text-foreground disabled:opacity-50"
               >
@@ -135,7 +139,11 @@ export function GalleryImageTags({
         ))}
       </div>
       {canEdit ? (
-        <form onSubmit={onAdd} className="flex items-center gap-1.5">
+        <form
+          onSubmit={onAdd}
+          aria-busy={isPending || undefined}
+          className="flex items-center gap-1.5"
+        >
           <input
             type="text"
             value={draft}
@@ -153,6 +161,7 @@ export function GalleryImageTags({
               !draft.trim() ||
               tags.length >= GALLERY_TAGS_PER_IMAGE_MAX
             }
+            aria-busy={isPending || undefined}
             className={cn(
               galleryFilterChipClass(false),
               "inline-flex items-center gap-1 disabled:opacity-50"
