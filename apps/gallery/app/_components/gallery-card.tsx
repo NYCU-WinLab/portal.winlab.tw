@@ -494,6 +494,7 @@ export function GalleryCard({
                   isSequence={isSequence}
                   activeIndex={activeIndex}
                   sequenceLength={sequenceMedia.length}
+                  sequenceMedia={sequenceMedia}
                   isSignedIn={isSignedIn}
                   isAdmin={isAdmin}
                   viewerId={viewerId}
