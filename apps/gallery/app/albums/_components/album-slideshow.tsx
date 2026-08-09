@@ -60,11 +60,13 @@ export function AlbumSlideshowButton({
 
   useEffect(() => {
     if (!open || paused || photos.length < 2) return
+    const current = photos[index]
+    if (current?.media_type === "video") return
     const id = window.setInterval(() => {
       setIndex((current) => nextSlideshowIndex(current, photos.length))
     }, GALLERY_SLIDESHOW_DEFAULT_MS)
     return () => window.clearInterval(id)
-  }, [open, paused, photos.length])
+  }, [open, paused, photos, index])
 
   useEffect(() => {
     if (!open) return
@@ -167,14 +169,31 @@ export function AlbumSlideshowButton({
           </header>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-8 sm:px-10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              key={photo.image_id}
-              src={mediaUrl(photo)}
-              alt={photo.name}
-              className="max-h-full max-w-full object-contain"
-              draggable={false}
-            />
+            {photo.media_type === "video" ? (
+              <video
+                key={photo.image_id}
+                src={getGalleryImageUrl(photo.image_path)}
+                poster={
+                  photo.poster_path
+                    ? getGalleryThumbUrl(photo.poster_path, 1600)
+                    : undefined
+                }
+                className="max-h-full max-w-full object-contain"
+                controls
+                playsInline
+                autoPlay
+                muted
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={photo.image_id}
+                src={mediaUrl(photo)}
+                alt={photo.name}
+                className="max-h-full max-w-full object-contain"
+                draggable={false}
+              />
+            )}
           </div>
 
           <p
