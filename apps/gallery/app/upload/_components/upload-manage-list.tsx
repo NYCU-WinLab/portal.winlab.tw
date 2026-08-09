@@ -1079,6 +1079,26 @@ export function UploadManageList({
                   Untag
                   {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
                 </button>
+                {isAdmin ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => pinSelected(true)}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
+                    >
+                      Pin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pinSelected(false)}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
+                    >
+                      Unpin
+                    </button>
+                  </>
+                ) : null}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1126,6 +1146,22 @@ export function UploadManageList({
                   >
                     Untag
                   </DropdownMenuItem>
+                  {isAdmin ? (
+                    <>
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => pinSelected(true)}
+                      >
+                        Pin
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => pinSelected(false)}
+                      >
+                        Unpin
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
