@@ -1212,6 +1212,7 @@ export function UploadManageList({
         <button
           type="button"
           onClick={toggleSelectionMode}
+          aria-pressed={selectionMode}
           className={galleryPillClass()}
         >
           {selectionMode ? "Cancel selection" : "Select"}
