@@ -121,8 +121,11 @@ export function GalleryShell({
         {seasonalThemeId === "world-cup" ? <GalleryHeaderPitchline /> : null}
       </header>
       <main
+        id="gallery-main"
+        tabIndex={-1}
         className={cn(
           "gallery-shell-main relative z-10 mx-auto w-full max-w-6xl overflow-x-clip px-4 pb-10 sm:px-6",
+          "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
           containerClassName
         )}
       >

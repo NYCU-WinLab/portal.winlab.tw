@@ -44,6 +44,10 @@ export function GalleryJumpToTop() {
       "(prefers-reduced-motion: reduce)"
     ).matches
     window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })
+    // Put keyboard users back at the page landmark after the scroll.
+    queueMicrotask(() => {
+      document.getElementById("gallery-main")?.focus({ preventScroll: true })
+    })
   }
 
   return (
