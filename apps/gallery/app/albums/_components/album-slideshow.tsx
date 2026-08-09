@@ -274,6 +274,11 @@ export function AlbumSlideshow({
         )}
       >
         <DialogTitle className="sr-only">Slideshow · {albumTitle}</DialogTitle>
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {photo?.name ?? albumTitle}
+          {photos.length > 0 ? ` · slide ${index + 1} of ${photos.length}` : ""}
+          {paused ? " · paused" : ""}
+        </p>
 
         <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0">
