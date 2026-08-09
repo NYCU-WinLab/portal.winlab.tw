@@ -65,6 +65,8 @@ export function PinWallButton({
       type="button"
       onClick={toggle}
       disabled={isPending}
+      aria-pressed={Boolean(pinnedAt)}
+      aria-busy={isPending || undefined}
       className={cn(
         galleryPillClass(),
         pinnedAt && "text-amber-800",
