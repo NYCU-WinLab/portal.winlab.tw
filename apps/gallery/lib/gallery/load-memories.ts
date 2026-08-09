@@ -4,6 +4,7 @@ import {
   clampGalleryMemoriesLimit,
   type GalleryMemoryPhoto,
 } from "@/lib/gallery/memories"
+import { isGalleryVideoColumnsUnavailable } from "@/lib/gallery/manage-uploads"
 
 type ProfileRow = {
   id: string
@@ -69,6 +70,7 @@ export async function isGalleryMemoriesReady(
     p_limit: 1,
   })
   if (!error) return true
+  if (isGalleryVideoColumnsUnavailable(error)) return false
   return !isGalleryMemoriesUnavailable(error)
 }
 
@@ -100,6 +102,9 @@ export async function loadGalleryMemoriesOnThisDay(
   if (error) {
     // Soft-fail when the migration hasn't landed yet (local/preview lag).
     if (isGalleryMemoriesUnavailable(error)) {
+      return { photos: [], available: false }
+    }
+    if (isGalleryVideoColumnsUnavailable(error)) {
       return { photos: [], available: false }
     }
     console.error("[gallery] memories rpc failed", error)
