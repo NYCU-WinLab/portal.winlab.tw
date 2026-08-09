@@ -147,7 +147,7 @@ export function MediaHealthPanel() {
   }
 
   return (
-    <section className={galleryPanelClass()}>
+    <section className={galleryPanelClass()} aria-busy={isPending || undefined}>
       <div className="space-y-1">
         <h2 className={cn(gallerySectionTitleClass(), "text-2xl sm:text-3xl")}>
           Media health
@@ -165,6 +165,7 @@ export function MediaHealthPanel() {
           variant="outline"
           size="sm"
           disabled={isPending}
+          aria-busy={isPending || undefined}
           onClick={runScan}
           className={cn(gallerySans(), "gap-1.5")}
         >
@@ -215,6 +216,8 @@ export function MediaHealthPanel() {
 
       {progress ? (
         <p
+          role="status"
+          aria-live="polite"
           className={cn(
             gallerySans(),
             "mt-3 text-xs text-muted-foreground tabular-nums"
