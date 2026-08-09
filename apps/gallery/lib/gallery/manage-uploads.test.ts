@@ -6,6 +6,7 @@ import {
   filterIncompleteSequences,
   findSequenceGaps,
   groupManageUploads,
+  looksLikeUploadDayTakenAt,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -96,6 +97,26 @@ describe("findSequenceGaps", () => {
   test("describeSequenceGaps labels cover specially", () => {
     expect(describeSequenceGaps([0])).toBe("Missing cover (shot 1)")
     expect(describeSequenceGaps([1, 3])).toBe("Missing shot 2, shot 4")
+  })
+})
+
+describe("looksLikeUploadDayTakenAt", () => {
+  test("treats missing or near-created as upload day", () => {
+    expect(looksLikeUploadDayTakenAt(null, "2026-01-01T12:00:00.000Z")).toBe(
+      true
+    )
+    expect(
+      looksLikeUploadDayTakenAt(
+        "2026-01-01T12:00:30.000Z",
+        "2026-01-01T12:00:00.000Z"
+      )
+    ).toBe(true)
+    expect(
+      looksLikeUploadDayTakenAt(
+        "2024-08-10T03:00:00.000Z",
+        "2026-01-01T12:00:00.000Z"
+      )
+    ).toBe(false)
   })
 })
 

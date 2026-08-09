@@ -14,6 +14,7 @@ import {
 } from "@/components/gallery-chrome"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import type { ManageUploadRow } from "@/lib/gallery/manage-uploads"
+import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
   getGallerySeasonalThemeId,
   isGallerySettingsReady,
@@ -24,26 +25,44 @@ import { cn } from "@workspace/ui/lib/utils"
 
 export const dynamic = "force-dynamic"
 
+const MANAGE_SELECT_BASE =
+  "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index, pinned_at"
+const MANAGE_SELECT_WITH_TAKEN_AT = `${MANAGE_SELECT_BASE}, taken_at`
+
 export default async function UploadPage() {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login?next=/upload")
 
   const supabase = await createClient()
-  const [imagesResult, seasonalThemeId, settingsReady] = await Promise.all([
-    supabase
-      .from("gallery_images")
-      .select(
-        "id, name, image_path, media_type, poster_path, duration_seconds, created_by, created_at, sequence_id, sequence_index, pinned_at"
-      )
-      .eq("created_by", user.id)
-      .order("created_at", { ascending: false }),
-    getGallerySeasonalThemeId(supabase),
-    isGallerySettingsReady(supabase),
-  ])
+  const [imagesWithTakenAt, seasonalThemeId, settingsReady] = await Promise.all(
+    [
+      supabase
+        .from("gallery_images")
+        .select(MANAGE_SELECT_WITH_TAKEN_AT)
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false }),
+      getGallerySeasonalThemeId(supabase),
+      isGallerySettingsReady(supabase),
+    ]
+  )
 
-  const myImages = (imagesResult.data ?? []).map((row) => ({
+  let imageRows = imagesWithTakenAt.data
+  if (
+    imagesWithTakenAt.error &&
+    isGalleryTakenAtUnavailable(imagesWithTakenAt.error)
+  ) {
+    const fallback = await supabase
+      .from("gallery_images")
+      .select(MANAGE_SELECT_BASE)
+      .eq("created_by", user.id)
+      .order("created_at", { ascending: false })
+    imageRows = fallback.data
+  }
+
+  const myImages = (imageRows ?? []).map((row) => ({
     ...(row as ManageUploadRow),
     pinned_at: (row as ManageUploadRow).pinned_at ?? null,
+    taken_at: (row as ManageUploadRow).taken_at ?? null,
   }))
 
   return (

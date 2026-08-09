@@ -8,6 +8,35 @@ export type ManageUploadRow = WallPhotoSource & {
   duration_seconds: number | null
   created_at: string
   pinned_at: string | null
+  /** Capture time for Memories; may be null/absent before migration. */
+  taken_at?: string | null
+}
+
+/** True when taken_at looks like the upload timestamp (no real EXIF). */
+export function looksLikeUploadDayTakenAt(
+  takenAt: string | null | undefined,
+  createdAt: string,
+  toleranceMs = 120_000
+): boolean {
+  if (!takenAt) return true
+  const taken = new Date(takenAt).getTime()
+  const created = new Date(createdAt).getTime()
+  if (!Number.isFinite(taken) || !Number.isFinite(created)) return true
+  return Math.abs(taken - created) <= toleranceMs
+}
+
+export function isGalleryTakenAtUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST204" ||
+    code === "42703" ||
+    /taken_at/i.test(message) ||
+    /schema cache/i.test(message)
+  )
 }
 
 export type ManageUploadSequence = {

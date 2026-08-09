@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
+import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import {
   buildSequenceRenamePatches,
@@ -444,4 +445,48 @@ export async function renameGalleryImage(
   revalidatePath("/")
   revalidatePath("/upload")
   return { ok: true, names: [{ id, name: nextName }] }
+}
+
+export type UpdateGalleryImageTakenAtResult =
+  | { ok: true; takenAt: string }
+  | { ok: false; error: string }
+
+export async function updateGalleryImageTakenAt(
+  id: string,
+  rawTakenAt: string
+): Promise<UpdateGalleryImageTakenAtResult> {
+  const takenAt = sanitizeClientTakenAt(rawTakenAt)
+  if (!takenAt) {
+    return { ok: false, error: "That capture date does not look valid." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const { error } = await supabase
+    .from("gallery_images")
+    .update({ taken_at: takenAt })
+    .eq("id", id)
+    .eq("created_by", userId)
+
+  if (error) {
+    if (isGalleryTakenAtUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Capture dates need the gallery Memories migration. Ask an admin to apply it.",
+      }
+    }
+    return {
+      ok: false,
+      error: `Could not update capture date: ${error.message}`,
+    }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  revalidatePath("/memories")
+  return { ok: true, takenAt }
 }

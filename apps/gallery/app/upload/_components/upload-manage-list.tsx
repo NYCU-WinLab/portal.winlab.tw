@@ -24,6 +24,7 @@ import {
 } from "@/app/upload/actions"
 import { DeleteButton } from "@/app/upload/_components/delete-button"
 import { RenameButton } from "@/app/upload/_components/rename-button"
+import { TakenAtEditor } from "@/app/upload/_components/taken-at-editor"
 import { UploadListThumb } from "@/app/upload/_components/upload-list-thumb"
 import { ViewOnWallLink } from "@/app/upload/_components/view-on-wall-link"
 import { PinWallButton } from "@/app/_components/pin-wall-button"
@@ -41,6 +42,7 @@ import {
   filterIncompleteSequences,
   findSequenceGaps,
   groupManageUploads,
+  looksLikeUploadDayTakenAt,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -81,6 +83,8 @@ function UploadListItem({
   const thumbPath =
     isVideo && image.poster_path ? image.poster_path : image.image_path
   const wallPhotoId = resolveWallPhotoId(image, siblings)
+  const [takenAt, setTakenAt] = useState(image.taken_at ?? null)
+  const uploadDayHint = looksLikeUploadDayTakenAt(takenAt, image.created_at)
 
   return (
     <li
@@ -119,6 +123,8 @@ function UploadListItem({
         </p>
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
           {formatUploadedDate(image.created_at)}
+          {takenAt ? ` · captured ${formatUploadedDate(takenAt)}` : ""}
+          {uploadDayHint ? " · upload day?" : ""}
           {isVideo && image.duration_seconds
             ? ` · ${image.duration_seconds}s video`
             : ""}
@@ -141,6 +147,13 @@ function UploadListItem({
           />
         ) : null}
         <ViewOnWallLink photoId={wallPhotoId} />
+        <TakenAtEditor
+          id={image.id}
+          takenAt={takenAt}
+          createdAt={image.created_at}
+          hintUploadDay={uploadDayHint}
+          onUpdated={setTakenAt}
+        />
         <RenameButton id={image.id} name={image.name} />
         <DeleteButton
           id={image.id}
