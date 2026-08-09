@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { IconBell, IconThumbUp } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -228,7 +229,9 @@ export function GalleryMentionBell({
     }
   }, [viewerId])
 
-  const markRead = async (items: GalleryNotification[]) => {
+  const markRead = async (
+    items: GalleryNotification[]
+  ): Promise<string | null> => {
     const mentionIds = items
       .map((item) => item.mention_comment_id)
       .filter((id): id is string => Boolean(id))
@@ -245,13 +248,18 @@ export function GalleryMentionBell({
         : Promise.resolve({ ok: true as const }),
     ])
 
-    return mentionResult.ok && activityResult.ok
+    if (!mentionResult.ok) return mentionResult.error
+    if (!activityResult.ok) return activityResult.error
+    return null
   }
 
   const openNotification = (notification: GalleryNotification) => {
     startTransition(async () => {
-      const ok = await markRead([notification])
-      if (!ok) return
+      const error = await markRead([notification])
+      if (error) {
+        toast.error(error)
+        return
+      }
       setNotifications((current) =>
         current.filter((item) => item.key !== notification.key)
       )
@@ -267,8 +275,11 @@ export function GalleryMentionBell({
   const markAllRead = () => {
     if (notifications.length === 0) return
     startTransition(async () => {
-      const ok = await markRead(notifications)
-      if (!ok) return
+      const error = await markRead(notifications)
+      if (error) {
+        toast.error(error)
+        return
+      }
       setNotifications([])
     })
   }
