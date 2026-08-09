@@ -381,7 +381,10 @@ export default async function UploadPage() {
 
         <section className={cn(galleryPanelClass(), "overflow-hidden !p-0")}>
           <div className="p-5 sm:p-7">
-            <UploadForm videoAvailable={videoAvailable} />
+            <UploadForm
+              videoAvailable={videoAvailable}
+              sequencesAvailable={sequenceAvailable}
+            />
           </div>
         </section>
 

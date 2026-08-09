@@ -320,6 +320,8 @@ export type RunUploadOptions = {
   setStatus: (s: UploadStatus) => void
   signal: AbortSignal
   tagNames?: string[]
+  /** When false, multi-file uploads stay independent singles. */
+  sequencesAvailable?: boolean
   /** When retrying, preserve prior sequence metadata per file. */
   sequenceMeta?: Array<{
     sequenceId: string | null
@@ -333,6 +335,7 @@ export async function runGalleryUpload({
   setStatus,
   signal,
   tagNames,
+  sequencesAvailable = true,
   sequenceMeta,
 }: RunUploadOptions): Promise<UploadRunResult> {
   const supabase = createClient()
@@ -349,7 +352,9 @@ export async function runGalleryUpload({
   let cancelled = false
 
   const sharedSequenceId =
-    !sequenceMeta && files.length > 1 ? crypto.randomUUID() : null
+    sequencesAvailable && !sequenceMeta && files.length > 1
+      ? crypto.randomUUID()
+      : null
 
   for (let i = 0; i < files.length; i++) {
     if (signal.aborted) {

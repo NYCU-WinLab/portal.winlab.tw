@@ -18,7 +18,11 @@ type RunOptions = {
   onAllSucceeded?: () => void
 }
 
-export function useGalleryUpload() {
+export function useGalleryUpload({
+  sequencesAvailable = true,
+}: {
+  sequencesAvailable?: boolean
+} = {}) {
   const router = useRouter()
   const abortRef = useRef<AbortController | null>(null)
   const [pending, startTransition] = useTransition()
@@ -114,6 +118,7 @@ export function useGalleryUpload() {
           setStatus,
           signal: controller.signal,
           tagNames: opts?.tagNames,
+          sequencesAvailable,
         })
 
         if (abortRef.current === controller) abortRef.current = null
@@ -166,6 +171,7 @@ export function useGalleryUpload() {
           baseName,
           setStatus,
           signal: controller.signal,
+          sequencesAvailable,
           sequenceMeta: failures.map((f) => ({
             sequenceId: f.sequenceId,
             sequenceIndex: f.sequenceIndex,
