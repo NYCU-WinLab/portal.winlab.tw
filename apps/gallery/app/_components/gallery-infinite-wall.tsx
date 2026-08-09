@@ -118,6 +118,21 @@ export function GalleryInfiniteWall({
     () => orderedSelectedWallIds(wallIds, selectedIds),
     [selectedIds, wallIds]
   )
+  const selectedZipItems = useMemo(
+    () =>
+      orderedSelected.flatMap((id, position) => {
+        const image = images.find((row) => row.id === id)
+        if (!image?.image_path) return []
+        return [
+          {
+            name: image.name,
+            image_path: image.image_path,
+            position,
+          },
+        ]
+      }),
+    [images, orderedSelected]
+  )
   const allSelected =
     wallIds.length > 0 && wallIds.every((id) => selectedIds.has(id))
 
@@ -283,6 +298,7 @@ export function GalleryInfiniteWall({
               allSelected={allSelected}
               isSignedIn={isSignedIn}
               selectedIds={orderedSelected}
+              selectedZipItems={selectedZipItems}
               savedFilterActive={Boolean(filters.savedOnly)}
               onToggleMode={toggleSelectionMode}
               onToggleSelectAll={toggleSelectAll}

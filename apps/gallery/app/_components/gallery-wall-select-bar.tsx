@@ -5,6 +5,7 @@ import {
   IconAlbum,
   IconBookmark,
   IconCheckbox,
+  IconFileZip,
   IconSquare,
   IconX,
 } from "@tabler/icons-react"
@@ -16,7 +17,9 @@ import { cn } from "@workspace/ui/lib/utils"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryFavorites } from "@/app/actions/favorites"
 import { gallerySans } from "@/components/gallery-chrome"
+import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
+import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -24,6 +27,7 @@ export function GalleryWallSelectBar({
   allSelected,
   isSignedIn,
   selectedIds,
+  selectedZipItems = [],
   savedFilterActive = false,
   onToggleMode,
   onToggleSelectAll,
@@ -36,6 +40,12 @@ export function GalleryWallSelectBar({
   allSelected: boolean
   isSignedIn: boolean
   selectedIds: string[]
+  /** Ordered covers for ZIP download (name + storage path). */
+  selectedZipItems?: Array<{
+    name: string
+    image_path: string
+    position: number
+  }>
   /** When viewing ?saved=1, offer bulk Unsave. */
   savedFilterActive?: boolean
   onToggleMode: () => void
@@ -46,6 +56,7 @@ export function GalleryWallSelectBar({
 }) {
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
+  const [zipBusy, setZipBusy] = useState(false)
 
   const saveSelected = () => {
     if (selectedIds.length === 0 || pending || saveOpenBusy) return
@@ -76,6 +87,44 @@ export function GalleryWallSelectBar({
       onUnsaved?.()
       onClear()
     })
+  }
+
+  const downloadSelectedZip = async () => {
+    if (zipBusy || selectedZipItems.length === 0) return
+    setZipBusy(true)
+    const toastId = toast.loading(
+      `Preparing selection… 0/${selectedZipItems.length}`
+    )
+    try {
+      const result = await downloadAlbumZip(selectedZipItems, {
+        zipName: buildAlbumZipFilename("wall-selection"),
+        onProgress: ({ completed, total }) => {
+          toast.loading(`Preparing selection… ${completed}/${total}`, {
+            id: toastId,
+          })
+        },
+      })
+      if (result.failed > 0) {
+        toast.success(
+          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
+          {
+            id: toastId,
+            description: `${result.failed} could not be fetched and were skipped.`,
+          }
+        )
+      } else {
+        toast.success(
+          `Saved ${result.count} photo${result.count === 1 ? "" : "s"} as ZIP`,
+          { id: toastId }
+        )
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not build the ZIP"
+      toast.error(message, { id: toastId })
+    } finally {
+      setZipBusy(false)
+    }
   }
 
   return (
@@ -142,6 +191,22 @@ export function GalleryWallSelectBar({
                 disabled={selectedCount === 0}
               >
                 Clear
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedZipItems.length === 0 || zipBusy}
+                className={cn(
+                  gallerySans(),
+                  "h-8 gap-1.5 text-[11px] uppercase"
+                )}
+                onClick={() => void downloadSelectedZip()}
+              >
+                <IconFileZip className="size-3.5" aria-hidden />
+                {selectedZipItems.length > 0
+                  ? `ZIP ${selectedZipItems.length}`
+                  : "ZIP"}
               </Button>
               {isSignedIn ? (
                 <>
