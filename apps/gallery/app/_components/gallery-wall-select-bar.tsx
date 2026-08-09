@@ -5,6 +5,7 @@ import {
   IconAlbum,
   IconBookmark,
   IconCheckbox,
+  IconDots,
   IconFileZip,
   IconLink,
   IconSquare,
@@ -14,6 +15,13 @@ import {
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -90,7 +98,11 @@ export function GalleryWallSelectBar({
   const [zipBusy, setZipBusy] = useState(false)
   const [tagDraft, setTagDraft] = useState("")
   const [albumDraft, setAlbumDraft] = useState("")
+  const [tagFormOpen, setTagFormOpen] = useState(false)
   const [albumFormOpen, setAlbumFormOpen] = useState(false)
+
+  const hasOverflowActions = isSignedIn
+  const overflowBusy = pending || saveOpenBusy || selectedCount === 0
 
   const tagSelected = (event?: FormEvent) => {
     event?.preventDefault()
@@ -112,6 +124,7 @@ export function GalleryWallSelectBar({
         })
       )
       setTagDraft("")
+      setTagFormOpen(false)
       onClear()
     })
   }
@@ -355,256 +368,281 @@ export function GalleryWallSelectBar({
         >
           <div
             className={cn(
-              "flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-900/15 bg-card/95 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.45)] backdrop-blur-md"
+              "flex w-full flex-wrap items-center gap-3 rounded-xl border border-zinc-900/15 bg-card/95 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.45)] backdrop-blur-md"
             )}
             role="status"
             aria-live="polite"
           >
-            <p className={cn(gallerySans(), "text-sm text-foreground")}>
+            <p
+              className={cn(gallerySans(), "shrink-0 text-sm text-foreground")}
+            >
               {describeWallSelectionCount(selectedCount)}
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
-                onClick={onClear}
-                disabled={selectedCount === 0}
-              >
-                Clear
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={selectedZipItems.length === 0 || zipBusy}
-                className={cn(
-                  gallerySans(),
-                  "h-8 gap-1.5 text-[11px] uppercase"
-                )}
-                onClick={() => void downloadSelectedZip()}
-              >
-                <IconFileZip className="size-3.5" aria-hidden />
-                {selectedZipItems.length > 0
-                  ? `ZIP ${selectedZipItems.length}`
-                  : "ZIP"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={selectedCount === 0}
-                className={cn(
-                  gallerySans(),
-                  "h-8 gap-1.5 text-[11px] uppercase"
-                )}
-                onClick={() => void copySelectedLinks()}
-              >
-                <IconLink className="size-3.5" aria-hidden />
-                Links
-              </Button>
-              {isSignedIn ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={selectedCount === 0 || pending}
-                    className={cn(
-                      gallerySans(),
-                      "h-8 gap-1.5 text-[11px] uppercase"
-                    )}
-                    onClick={saveSelected}
-                  >
-                    <IconBookmark className="size-3.5" aria-hidden />
-                    {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
-                  </Button>
-                  {savedFilterActive ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
-                      onClick={unsaveSelected}
-                    >
-                      Unsave
-                    </Button>
-                  ) : null}
-                  {albumFilterSlug ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
-                      onClick={removeSelectedFromAlbum}
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
-                  {tagFilterSlug ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
-                      onClick={untagSelected}
-                    >
-                      Untag
-                    </Button>
-                  ) : null}
-                  <form
-                    onSubmit={tagSelected}
-                    className="flex items-center gap-1.5"
-                  >
-                    <Input
-                      value={tagDraft}
-                      onChange={(e) => setTagDraft(e.target.value)}
-                      placeholder="Tag…"
-                      aria-label="Tag to apply to selection"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(
-                        gallerySans(),
-                        "h-8 w-[7.5rem] text-[11px] sm:w-28"
-                      )}
-                    />
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="sm"
-                      disabled={
-                        selectedCount === 0 || pending || !tagDraft.trim()
-                      }
-                      className={cn(
-                        gallerySans(),
-                        "h-8 gap-1.5 text-[11px] uppercase"
-                      )}
-                    >
-                      <IconTag className="size-3.5" aria-hidden />
-                      Tag
-                    </Button>
-                  </form>
-                  {isAdmin ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={selectedCount === 0 || pending}
-                        className={cn(
-                          gallerySans(),
-                          "h-8 text-[11px] uppercase"
-                        )}
-                        onClick={() => pinSelected(true)}
-                      >
-                        Pin
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={selectedCount === 0 || pending}
-                        className={cn(
-                          gallerySans(),
-                          "h-8 text-[11px] uppercase"
-                        )}
-                        onClick={() => pinSelected(false)}
-                      >
-                        Unpin
-                      </Button>
-                    </>
-                  ) : null}
-                  {albumFormOpen ? (
-                    <form
-                      onSubmit={createAlbumFromSelection}
-                      className="flex items-center gap-1.5"
-                    >
-                      <Input
-                        value={albumDraft}
-                        onChange={(e) => setAlbumDraft(e.target.value)}
-                        placeholder="Album title…"
-                        aria-label="New album title"
-                        disabled={selectedCount === 0 || pending}
-                        autoFocus
-                        className={cn(
-                          gallerySans(),
-                          "h-8 w-[8.5rem] text-[11px] sm:w-36"
-                        )}
-                      />
-                      <Button
-                        type="submit"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          selectedCount === 0 || pending || !albumDraft.trim()
-                        }
-                        className={cn(
-                          gallerySans(),
-                          "h-8 text-[11px] uppercase"
-                        )}
-                      >
-                        Create
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          gallerySans(),
-                          "h-8 text-[11px] uppercase"
-                        )}
-                        onClick={() => {
-                          setAlbumFormOpen(false)
-                          setAlbumDraft("")
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </form>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={selectedCount === 0 || pending}
-                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
-                      onClick={() => setAlbumFormOpen(true)}
-                    >
-                      New album
-                    </Button>
-                  )}
-                  <GalleryAddToAlbum
-                    imageIds={selectedIds}
-                    triggerLabel={
-                      selectedCount > 0
-                        ? `Add ${selectedCount} to album`
-                        : "Add to album"
-                    }
-                    onAdded={() => {
-                      onAdded?.()
-                      onClear()
-                    }}
-                  />
-                </>
-              ) : (
+            <div
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+                "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              )}
+            >
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                  onClick={onClear}
+                  disabled={selectedCount === 0}
+                >
+                  Clear
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={selectedZipItems.length === 0 || zipBusy}
                   className={cn(
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"
                   )}
-                  disabled
-                  title="Sign in to curate"
+                  onClick={() => void downloadSelectedZip()}
                 >
-                  <IconAlbum className="size-3.5" aria-hidden />
-                  Sign in to curate
+                  <IconFileZip className="size-3.5" aria-hidden />
+                  {selectedZipItems.length > 0
+                    ? `ZIP ${selectedZipItems.length}`
+                    : "ZIP"}
                 </Button>
-              )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedCount === 0}
+                  className={cn(
+                    gallerySans(),
+                    "h-8 gap-1.5 text-[11px] uppercase"
+                  )}
+                  onClick={() => void copySelectedLinks()}
+                >
+                  <IconLink className="size-3.5" aria-hidden />
+                  Links
+                </Button>
+                {isSignedIn ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(
+                        gallerySans(),
+                        "h-8 gap-1.5 text-[11px] uppercase"
+                      )}
+                      onClick={saveSelected}
+                    >
+                      <IconBookmark className="size-3.5" aria-hidden />
+                      {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
+                    </Button>
+                    <GalleryAddToAlbum
+                      imageIds={selectedIds}
+                      triggerLabel={
+                        selectedCount > 0
+                          ? `Add ${selectedCount}`
+                          : "Add to album"
+                      }
+                      onAdded={() => {
+                        onAdded?.()
+                        onClear()
+                      }}
+                    />
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      gallerySans(),
+                      "h-8 gap-1.5 text-[11px] uppercase"
+                    )}
+                    disabled
+                    title="Sign in to curate"
+                  >
+                    <IconAlbum className="size-3.5" aria-hidden />
+                    Sign in to curate
+                  </Button>
+                )}
+              </div>
+
+              {tagFormOpen ? (
+                <form
+                  onSubmit={tagSelected}
+                  className="flex shrink-0 items-center gap-1.5"
+                >
+                  <Input
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    placeholder="Tag…"
+                    aria-label="Tag to apply to selection"
+                    disabled={selectedCount === 0 || pending}
+                    autoFocus
+                    className={cn(
+                      gallerySans(),
+                      "h-8 w-[7.5rem] text-[11px] sm:w-28"
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      selectedCount === 0 || pending || !tagDraft.trim()
+                    }
+                    className={cn(
+                      gallerySans(),
+                      "h-8 gap-1.5 text-[11px] uppercase"
+                    )}
+                  >
+                    <IconTag className="size-3.5" aria-hidden />
+                    Tag
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                    onClick={() => {
+                      setTagFormOpen(false)
+                      setTagDraft("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              ) : null}
+
+              {albumFormOpen ? (
+                <form
+                  onSubmit={createAlbumFromSelection}
+                  className="flex shrink-0 items-center gap-1.5"
+                >
+                  <Input
+                    value={albumDraft}
+                    onChange={(e) => setAlbumDraft(e.target.value)}
+                    placeholder="Album title…"
+                    aria-label="New album title"
+                    disabled={selectedCount === 0 || pending}
+                    autoFocus
+                    className={cn(
+                      gallerySans(),
+                      "h-8 w-[8.5rem] text-[11px] sm:w-36"
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      selectedCount === 0 || pending || !albumDraft.trim()
+                    }
+                    className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                  >
+                    Create
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                    onClick={() => {
+                      setAlbumFormOpen(false)
+                      setAlbumDraft("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              ) : null}
+
+              {hasOverflowActions && !tagFormOpen && !albumFormOpen ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedCount === 0}
+                      className={cn(
+                        gallerySans(),
+                        "h-8 shrink-0 gap-1.5 text-[11px] uppercase"
+                      )}
+                      aria-label="More selection actions"
+                    >
+                      <IconDots className="size-3.5" aria-hidden />
+                      More
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-44">
+                    <DropdownMenuItem
+                      disabled={overflowBusy}
+                      onSelect={() => {
+                        setAlbumFormOpen(false)
+                        setTagFormOpen(true)
+                      }}
+                    >
+                      Tag…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={overflowBusy}
+                      onSelect={() => {
+                        setTagFormOpen(false)
+                        setAlbumFormOpen(true)
+                      }}
+                    >
+                      New album…
+                    </DropdownMenuItem>
+                    {savedFilterActive ? (
+                      <DropdownMenuItem
+                        disabled={overflowBusy}
+                        onSelect={() => unsaveSelected()}
+                      >
+                        Unsave
+                      </DropdownMenuItem>
+                    ) : null}
+                    {albumFilterSlug ? (
+                      <DropdownMenuItem
+                        disabled={overflowBusy}
+                        onSelect={() => removeSelectedFromAlbum()}
+                      >
+                        Remove from album
+                      </DropdownMenuItem>
+                    ) : null}
+                    {tagFilterSlug ? (
+                      <DropdownMenuItem
+                        disabled={overflowBusy}
+                        onSelect={() => untagSelected()}
+                      >
+                        Untag
+                      </DropdownMenuItem>
+                    ) : null}
+                    {isAdmin ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={overflowBusy}
+                          onSelect={() => pinSelected(true)}
+                        >
+                          Pin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={overflowBusy}
+                          onSelect={() => pinSelected(false)}
+                        >
+                          Unpin
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
             </div>
           </div>
         </div>
