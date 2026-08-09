@@ -27,6 +27,7 @@ import {
   GALLERY_ALBUM_TITLE_MAX,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
+import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
 
 type MyAlbumOption = {
   id: string
@@ -67,7 +68,30 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
           <Link href={`/albums/${album.slug}`} className="underline">
             {album.title}
           </Link>
-        </span>
+        </span>,
+        {
+          action: {
+            label: "Copy link",
+            onClick: () => {
+              void shareOrCopyAlbumLink({
+                slug: album.slug,
+                title: album.title,
+              })
+                .then((mode) => {
+                  if (mode === "copied") toast.success("Share link copied")
+                })
+                .catch((error) => {
+                  if (
+                    error instanceof DOMException &&
+                    error.name === "AbortError"
+                  ) {
+                    return
+                  }
+                  toast.error("Could not copy album link")
+                })
+            },
+          },
+        }
       )
       setAlbums((prev) =>
         (prev ?? []).map((item) =>
@@ -113,7 +137,30 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
           <Link href={`/albums/${created.data.slug}`} className="underline">
             {created.data.title}
           </Link>
-        </span>
+        </span>,
+        {
+          action: {
+            label: "Copy link",
+            onClick: () => {
+              void shareOrCopyAlbumLink({
+                slug: created.data.slug,
+                title: created.data.title,
+              })
+                .then((mode) => {
+                  if (mode === "copied") toast.success("Share link copied")
+                })
+                .catch((error) => {
+                  if (
+                    error instanceof DOMException &&
+                    error.name === "AbortError"
+                  ) {
+                    return
+                  }
+                  toast.error("Could not copy album link")
+                })
+            },
+          },
+        }
       )
       setOpen(false)
     })
