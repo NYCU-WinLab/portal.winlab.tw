@@ -24,6 +24,7 @@ export type GalleryImage = {
   sequence_index: number | null
   sequence_count: number
   sequence_items: GallerySequenceItem[]
+  sequence_missing_indexes: number[]
   comments: GalleryComment[]
   comment_count: number
   reaction_counts: ReactionCounts
@@ -38,6 +39,7 @@ export type GallerySequenceItem = {
   media_type: MediaKind
   poster_path: string | null
   created_at: string
+  sequence_index: number | null
 }
 
 export type GalleryComment = {

@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 
 import { GalleryInfiniteWall } from "@/app/_components/gallery-infinite-wall"
 import { GalleryHomeFiltersBar } from "@/app/_components/gallery-home-filters"
+import { GalleryHomeHero } from "@/app/_components/gallery-home-hero"
 import { GalleryGrid } from "@/app/_components/gallery-grid"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
@@ -68,7 +69,7 @@ export default async function GalleryHomePage({
   const user = await getCurrentUser()
 
   let openPhotoId = photoId
-  let openCommentId = commentId
+  const openCommentId = commentId
   let throughPage = requestedPage
 
   if (photoId) {
@@ -91,6 +92,7 @@ export default async function GalleryHomePage({
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
+        <GalleryHomeHero />
         {user ? (
           <Suspense fallback={null}>
             <GalleryHomeFiltersBar filters={filters} members={members} />
@@ -109,6 +111,13 @@ export default async function GalleryHomePage({
           }
         >
           <GalleryInfiniteWall
+            key={[
+              filters.uploaderId ?? "",
+              filters.media,
+              filters.uploadedAfter ?? "",
+              filters.query ?? "",
+              String(currentPage),
+            ].join("|")}
             initialImages={images}
             initialPage={currentPage}
             initialHasMore={hasMore}

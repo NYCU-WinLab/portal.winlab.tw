@@ -1,23 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
-import { GalleryEmptyState } from "@/components/gallery-chrome"
+import { GalleryCardBoundary } from "@/app/_components/gallery-card-boundary"
+import {
+  GalleryEmptyState,
+  galleryNavLinkClass,
+} from "@/components/gallery-chrome"
+import {
+  buildGalleryHomeHref,
+  describeGalleryFilterSummary,
+  hasActiveGalleryFilters,
+  type GalleryHomeFilters,
+} from "@/lib/gallery/home-filters"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    target.isContentEditable
-  )
-}
 
 export function GalleryGrid({
   images,
@@ -31,6 +32,8 @@ export function GalleryGrid({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
+  filters,
+  wallEpoch = 0,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -43,6 +46,9 @@ export function GalleryGrid({
   hasMore?: boolean
   loadingMore?: boolean
   onLoadMore?: () => void | Promise<void>
+  filters?: GalleryHomeFilters
+  /** Bumps when the wall is reshuffled so settle animation replays. */
+  wallEpoch?: number
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -56,15 +62,42 @@ export function GalleryGrid({
     const index = images.findIndex((image) => image.id === openPhotoId)
     return index >= 0 ? index : null
   })
+  const pendingAdvanceNextRef = useRef(false)
 
   useEffect(() => {
     if (!openPhotoId) return
     const index = images.findIndex((image) => image.id === openPhotoId)
-    if (index >= 0) {
+    if (index < 0) return
+    const timer = window.setTimeout(() => {
       setFocusIndex(index)
       setOpenIndex(index)
-    }
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [images, openPhotoId])
+
+  useEffect(() => {
+    if (!pendingAdvanceNextRef.current || openIndex === null) return
+    const nextIndex = openIndex + 1
+    if (nextIndex >= images.length) {
+      if (!hasMore && !loadingMore) pendingAdvanceNextRef.current = false
+      return
+    }
+    const nextImage = images[nextIndex]
+    if (!nextImage) return
+    pendingAdvanceNextRef.current = false
+    const timer = window.setTimeout(() => {
+      setOpenIndex(nextIndex)
+      setFocusIndex(nextIndex)
+      router.replace(
+        buildGalleryPhotoHref({
+          photoId: nextImage.id,
+          commentId: null,
+        }),
+        { scroll: false }
+      )
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [hasMore, images, loadingMore, openIndex, router])
 
   const navigateWall = (direction: "prev" | "next") => {
     if (openIndex === null) return
@@ -72,6 +105,7 @@ export function GalleryGrid({
     if (nextIndex < 0) return
     if (nextIndex >= images.length) {
       if (direction === "next" && hasMore && onLoadMore && !loadingMore) {
+        pendingAdvanceNextRef.current = true
         void onLoadMore()
       }
       return
@@ -132,55 +166,102 @@ export function GalleryGrid({
   }, [focusIndex, hasMore, images.length, loadingMore, onLoadMore, openIndex])
 
   if (images.length === 0) {
+    const filtersActive = filters ? hasActiveGalleryFilters(filters) : false
+    if (filtersActive && filters) {
+      const summary = describeGalleryFilterSummary(filters, members).join(" · ")
+      return (
+        <GalleryEmptyState
+          title="No matches"
+          description={
+            summary
+              ? `Nothing matches ${summary}.`
+              : "Nothing matches these filters."
+          }
+          action={
+            <button
+              type="button"
+              className={galleryNavLinkClass()}
+              onClick={() => router.replace(buildGalleryHomeHref({}))}
+            >
+              Clear filters
+            </button>
+          }
+        />
+      )
+    }
     return (
       <GalleryEmptyState
         title="Nothing on the wall yet"
-        description="Be the first to hang something — sign in and head to Manage."
+        description="Hang the first polaroid — the lab wall is waiting."
+        action={
+          isSignedIn ? (
+            <Link href="/upload" className={galleryNavLinkClass(true)}>
+              Upload a photo
+            </Link>
+          ) : (
+            <Link
+              href="/auth/login?next=/upload"
+              className={galleryNavLinkClass(true)}
+            >
+              Sign in to upload
+            </Link>
+          )
+        }
       />
     )
   }
 
   return (
     <div
-      className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-11 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12"
+      key={wallEpoch}
+      className="grid grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:grid-cols-3 lg:gap-x-9 lg:gap-y-14"
       aria-label="Gallery wall"
     >
       {images.map((image, index) => (
-        <div key={image.id} className="w-full max-w-full">
-          <GalleryCard
-            image={image}
-            isSignedIn={isSignedIn}
-            viewerId={viewerId}
-            viewerName={viewerName}
-            members={members}
-            isAdmin={isAdmin}
-            priorityLcp={index === 0}
-            initialOpen={false}
-            highlightCommentId={openPhotoId === image.id ? openCommentId : null}
-            open={openIndex === index}
-            onOpenChange={(open) => {
-              if (open) {
-                setOpenIndex(index)
-                router.replace(
-                  buildGalleryPhotoHref({
-                    photoId: image.id,
-                    commentId: openPhotoId === image.id ? openCommentId : null,
-                  }),
-                  { scroll: false }
-                )
-              } else {
-                closeLightbox()
+        <div
+          key={image.id}
+          className="gallery-wall-card w-full max-w-full"
+          style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}
+        >
+          <GalleryCardBoundary>
+            <GalleryCard
+              image={image}
+              isSignedIn={isSignedIn}
+              viewerId={viewerId}
+              viewerName={viewerName}
+              members={members}
+              isAdmin={isAdmin}
+              priorityLcp={index === 0}
+              initialOpen={false}
+              highlightCommentId={
+                openPhotoId === image.id ? openCommentId : null
               }
-            }}
-            gridFocused={
-              keyboardNavActive && focusIndex === index && openIndex === null
-            }
-            hasWallPrev={openIndex === index && index > 0}
-            hasWallNext={
-              openIndex === index && (index < images.length - 1 || hasMore)
-            }
-            onWallNavigate={openIndex === index ? navigateWall : undefined}
-          />
+              open={openIndex === index}
+              onOpenChange={(open) => {
+                if (open) {
+                  setOpenIndex(index)
+                  router.replace(
+                    buildGalleryPhotoHref({
+                      photoId: image.id,
+                      commentId:
+                        openPhotoId === image.id ? openCommentId : null,
+                    }),
+                    { scroll: false }
+                  )
+                } else {
+                  closeLightbox()
+                }
+              }}
+              gridFocused={
+                keyboardNavActive && focusIndex === index && openIndex === null
+              }
+              hasWallPrev={openIndex === index && index > 0}
+              hasWallNext={
+                openIndex === index && (index < images.length - 1 || hasMore)
+              }
+              onWallNavigate={openIndex === index ? navigateWall : undefined}
+            />
+          </GalleryCardBoundary>
         </div>
       ))}
     </div>
