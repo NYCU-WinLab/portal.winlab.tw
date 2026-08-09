@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   buildGalleryAlbumHref,
   buildGalleryAlbumShareUrl,
+  shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
 
 describe("buildGalleryAlbumHref", () => {
@@ -34,5 +35,34 @@ describe("buildGalleryAlbumShareUrl", () => {
   test("returns null without a usable origin in non-browser context", () => {
     expect(buildGalleryAlbumShareUrl("lab-trip", null)).toBeNull()
     expect(buildGalleryAlbumShareUrl("lab-trip", "")).toBeNull()
+  })
+})
+
+describe("shareOrCopyAlbumLink", () => {
+  test("soft-fails on invalid slug without throwing", async () => {
+    const result = await shareOrCopyAlbumLink({
+      slug: "!!!",
+      title: "Nope",
+      preferCopy: true,
+      origin: "https://gallery.winlab.tw",
+    })
+    expect(result).toEqual({
+      ok: false,
+      reason: "invalid",
+      message: "Invalid album link",
+    })
+  })
+
+  test("soft-fails when clipboard is unavailable", async () => {
+    const result = await shareOrCopyAlbumLink({
+      slug: "lab-trip",
+      title: "Lab trip",
+      preferCopy: true,
+      origin: "https://gallery.winlab.tw",
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.reason).toBe("clipboard")
+    }
   })
 })

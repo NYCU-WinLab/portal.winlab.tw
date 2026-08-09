@@ -22,10 +22,22 @@ export function buildGalleryAlbumShareUrl(
   return `${base}${href}`
 }
 
+export type AlbumShareResult =
+  | { ok: true; mode: "shared" | "copied" }
+  | {
+      ok: false
+      reason: "invalid" | "aborted" | "clipboard" | "unknown"
+      message: string
+    }
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError"
+}
+
 /**
  * Prefer Web Share when available; otherwise copy to clipboard.
  * Pass `preferCopy: true` after create flows so mobile does not pop the sheet.
- * Returns which path succeeded so callers can toast accordingly.
+ * Never throws — callers toast from the result.
  */
 export async function shareOrCopyAlbumLink(input: {
   slug: string
@@ -33,9 +45,15 @@ export async function shareOrCopyAlbumLink(input: {
   text?: string | null
   origin?: string | null
   preferCopy?: boolean
-}): Promise<"shared" | "copied"> {
+}): Promise<AlbumShareResult> {
   const url = buildGalleryAlbumShareUrl(input.slug, input.origin)
-  if (!url) throw new Error("Invalid album link")
+  if (!url) {
+    return {
+      ok: false,
+      reason: "invalid",
+      message: "Invalid album link",
+    }
+  }
 
   if (!input.preferCopy) {
     try {
@@ -48,19 +66,37 @@ export async function shareOrCopyAlbumLink(input: {
           text: input.text?.trim() || undefined,
           url,
         })
-        return "shared"
+        return { ok: true, mode: "shared" }
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw error
+      if (isAbortError(error)) {
+        return { ok: false, reason: "aborted", message: "Share cancelled" }
       }
       // Fall through to clipboard for share failures (unsupported target, etc.)
     }
   }
 
   if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-    throw new Error("Clipboard unavailable")
+    return {
+      ok: false,
+      reason: "clipboard",
+      message:
+        "Clipboard is unavailable here — open the album and copy the URL from the address bar.",
+    }
   }
-  await navigator.clipboard.writeText(url)
-  return "copied"
+
+  try {
+    await navigator.clipboard.writeText(url)
+    return { ok: true, mode: "copied" }
+  } catch (error) {
+    if (isAbortError(error)) {
+      return { ok: false, reason: "aborted", message: "Share cancelled" }
+    }
+    return {
+      ok: false,
+      reason: "clipboard",
+      message:
+        "Could not copy the share link — try again or copy from the address bar.",
+    }
+  }
 }

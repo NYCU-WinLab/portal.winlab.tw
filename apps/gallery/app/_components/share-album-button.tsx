@@ -36,15 +36,15 @@ export function ShareAlbumButton({
     if (busy || disabled) return
     setBusy(true)
     try {
-      const mode = await shareOrCopyAlbumLink({ slug, title })
-      if (mode === "copied") {
+      const result = await shareOrCopyAlbumLink({ slug, title })
+      if (!result.ok) {
+        if (result.reason === "aborted") return
+        toast.error(result.message)
+        return
+      }
+      if (result.mode === "copied") {
         toast.success("Share link copied")
       }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return
-      toast.error(
-        error instanceof Error ? error.message : "Could not share album link"
-      )
     } finally {
       setBusy(false)
     }

@@ -40,16 +40,14 @@ function copyLinkAction(album: { slug: string; title: string }) {
   return {
     label: "Copy link",
     onClick: () => {
-      void shareOrCopyAlbumLink(album)
-        .then((mode) => {
-          if (mode === "copied") toast.success("Share link copied")
-        })
-        .catch((error) => {
-          if (error instanceof DOMException && error.name === "AbortError") {
-            return
-          }
-          toast.error("Could not copy album link")
-        })
+      void shareOrCopyAlbumLink(album).then((result) => {
+        if (!result.ok) {
+          if (result.reason === "aborted") return
+          toast.error(result.message)
+          return
+        }
+        if (result.mode === "copied") toast.success("Share link copied")
+      })
     },
   }
 }
