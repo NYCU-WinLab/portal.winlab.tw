@@ -439,6 +439,8 @@ export function GalleryComments({
                           type="button"
                           onClick={() => togglePin(comment)}
                           disabled={isPending}
+                          aria-pressed={Boolean(comment.pinned_at)}
+                          aria-busy={isPending || undefined}
                           className={cn(
                             galleryPillClass(),
                             comment.pinned_at && "text-amber-800"
