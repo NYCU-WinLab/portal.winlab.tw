@@ -115,10 +115,12 @@ export function GalleryHomeFiltersBar({
   filters,
   members,
   popularTags = [],
+  favoritesAvailable = true,
 }: {
   filters: GalleryHomeFilters
   members: GalleryMember[]
   popularTags?: GalleryTagSuggestion[]
+  favoritesAvailable?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -311,18 +313,20 @@ export function GalleryHomeFiltersBar({
 
           {/* Mobile: one Filters menu (media + when + who) */}
           <div className="flex w-full max-w-md items-center justify-center gap-2 sm:hidden">
-            <FilterPill
-              active={filters.savedOnly}
-              disabled={isPending}
-              onClick={() =>
-                apply({ ...filters, savedOnly: !filters.savedOnly })
-              }
-            >
-              <span className="inline-flex items-center gap-1">
-                <IconBookmark className="size-3 opacity-80" aria-hidden />
-                Saved
-              </span>
-            </FilterPill>
+            {favoritesAvailable ? (
+              <FilterPill
+                active={filters.savedOnly}
+                disabled={isPending}
+                onClick={() =>
+                  apply({ ...filters, savedOnly: !filters.savedOnly })
+                }
+              >
+                <span className="inline-flex items-center gap-1">
+                  <IconBookmark className="size-3 opacity-80" aria-hidden />
+                  Saved
+                </span>
+              </FilterPill>
+            ) : null}
             {filters.albumSlug ? (
               <FilterPill
                 active
@@ -509,18 +513,20 @@ export function GalleryHomeFiltersBar({
 
           {/* Desktop: expanded pill row */}
           <div className="hidden flex-wrap items-center justify-center gap-1.5 sm:flex">
-            <FilterPill
-              active={filters.savedOnly}
-              disabled={isPending}
-              onClick={() =>
-                apply({ ...filters, savedOnly: !filters.savedOnly })
-              }
-            >
-              <span className="inline-flex items-center gap-1">
-                <IconBookmark className="size-3 opacity-80" aria-hidden />
-                Saved
-              </span>
-            </FilterPill>
+            {favoritesAvailable ? (
+              <FilterPill
+                active={filters.savedOnly}
+                disabled={isPending}
+                onClick={() =>
+                  apply({ ...filters, savedOnly: !filters.savedOnly })
+                }
+              >
+                <span className="inline-flex items-center gap-1">
+                  <IconBookmark className="size-3 opacity-80" aria-hidden />
+                  Saved
+                </span>
+              </FilterPill>
+            ) : null}
 
             {filters.albumSlug ? (
               <FilterPill

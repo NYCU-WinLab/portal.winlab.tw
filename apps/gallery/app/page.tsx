@@ -165,9 +165,12 @@ export default async function GalleryHomePage({
         {user ? (
           <Suspense fallback={null}>
             <GalleryHomeFiltersBar
-              filters={filters}
+              filters={
+                favoritesAvailable ? filters : { ...filters, savedOnly: false }
+              }
               members={members}
               popularTags={popularTags}
+              favoritesAvailable={favoritesAvailable}
             />
           </Suspense>
         ) : filters.tagSlug || filters.albumSlug ? (
