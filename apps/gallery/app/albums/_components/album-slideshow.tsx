@@ -491,19 +491,32 @@ export function AlbumSlideshowButton({
   startIndex?: number
 }) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
+  }
 
   if (photos.length === 0) return null
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        className={className}
+      >
         {triggerLabel}
       </button>
       <AlbumSlideshow
         photos={photos}
         albumTitle={albumTitle}
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={onOpenChange}
         startIndex={startIndex}
       />
     </>
