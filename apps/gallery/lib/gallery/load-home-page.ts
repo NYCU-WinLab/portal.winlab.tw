@@ -12,6 +12,7 @@ import {
   EMPTY_REACTION_NAMES,
   aggregateReactions,
   isGalleryReaction,
+  isGalleryReactionsUnavailable,
   normalizeReactionCounts,
   normalizeReactionNames,
 } from "@/lib/gallery/reactions"
@@ -822,7 +823,9 @@ async function loadGalleryHomeRangeLegacy(
     ])
 
     if (voteResult.error) {
-      console.error("[gallery] failed to load reactions", voteResult.error)
+      if (!isGalleryReactionsUnavailable(voteResult.error)) {
+        console.error("[gallery] failed to load reactions", voteResult.error)
+      }
     }
     if (commentCountResult.error) {
       console.error(
@@ -831,7 +834,7 @@ async function loadGalleryHomeRangeLegacy(
       )
     }
 
-    const voteRows = voteResult.data ?? []
+    const voteRows = voteResult.error ? [] : (voteResult.data ?? [])
     commentCountByImage = buildCommentCountByImage(
       (commentCountResult.data ?? []) as { image_id: string }[]
     )

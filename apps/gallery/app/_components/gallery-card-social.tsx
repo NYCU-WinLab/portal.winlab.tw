@@ -162,6 +162,7 @@ export function useGalleryCardSocial({
   const [commentsLoaded, setCommentsLoaded] = useState(false)
   const [commentPinAvailable, setCommentPinAvailable] = useState(true)
   const [commentLikesAvailable, setCommentLikesAvailable] = useState(true)
+  const [reactionsAvailable, setReactionsAvailable] = useState(true)
   const viewerIdRef = useRef(viewerId)
   const isDialogOpenRef = useRef(isDialogOpen)
   const commentIdsRef = useRef<Set<string>>(new Set())
@@ -209,6 +210,7 @@ export function useGalleryCardSocial({
       setCommentsLoaded(true)
       setCommentPinAvailable(social.commentPinAvailable)
       setCommentLikesAvailable(social.commentLikesAvailable)
+      setReactionsAvailable(social.reactionsAvailable)
       setCounts(social.reaction_counts)
       setNamesByReaction(social.reaction_names)
       setMyReaction(social.my_reaction)
@@ -247,6 +249,7 @@ export function useGalleryCardSocial({
     setCommentsLoaded(false)
     setCommentPinAvailable(true)
     setCommentLikesAvailable(true)
+    setReactionsAvailable(true)
     setCounts(image.reaction_counts)
     setMyReaction(image.my_reaction)
     setNamesByReaction(image.reaction_names)
@@ -360,5 +363,6 @@ export function useGalleryCardSocial({
     onReact,
     commentPinAvailable,
     commentLikesAvailable,
+    reactionsAvailable,
   }
 }

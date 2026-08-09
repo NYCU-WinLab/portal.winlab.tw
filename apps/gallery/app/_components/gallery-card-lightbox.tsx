@@ -289,6 +289,7 @@ export function GalleryLightboxSocialAside({
   onFavoritedChange,
   commentPinAvailable = true,
   commentLikesAvailable = true,
+  reactionsAvailable = true,
 }: {
   image: GalleryImage
   activeItem: GallerySequenceItem | undefined
@@ -324,6 +325,7 @@ export function GalleryLightboxSocialAside({
   onFavoritedChange?: (favorited: boolean) => void
   commentPinAvailable?: boolean
   commentLikesAvailable?: boolean
+  reactionsAvailable?: boolean
 }) {
   const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
   const reactionPeek = formatReactionSummary(counts)
@@ -531,12 +533,14 @@ export function GalleryLightboxSocialAside({
             ) : null}
           </div>
         ) : null}
-        <ReactionBar
-          counts={counts}
-          myReaction={myReaction}
-          canReact={canReact}
-          onReact={onReact}
-        />
+        {reactionsAvailable ? (
+          <ReactionBar
+            counts={counts}
+            myReaction={myReaction}
+            canReact={canReact}
+            onReact={onReact}
+          />
+        ) : null}
       </div>
       <div className="gallery-lightbox-aside-comments flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
         <GalleryComments

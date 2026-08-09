@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import {
   type GalleryReaction,
   isGalleryReaction,
+  isGalleryReactionsUnavailable,
 } from "@/lib/gallery/reactions"
 import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
 import {
@@ -46,6 +47,13 @@ export async function setGalleryReaction(
     .maybeSingle()
 
   if (fetchError) {
+    if (isGalleryReactionsUnavailable(fetchError)) {
+      return {
+        ok: false,
+        error:
+          "Reactions are not available yet — apply the gallery reactions migration.",
+      }
+    }
     return { ok: false, error: `Reaction failed: ${fetchError.message}` }
   }
 

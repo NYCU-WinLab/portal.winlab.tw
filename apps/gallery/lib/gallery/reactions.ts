@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 /** Facebook-style reactions + WinLab point (👉👈) + cheers (🍻). One per user per work. */
 
 export const GALLERY_REACTIONS = [
@@ -130,4 +132,31 @@ export function aggregateReactions(
   }
 
   return { countsByImage, namesByImage }
+}
+
+export function isGalleryReactionsUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_image_votes/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
+export async function isGalleryReactionsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_image_votes")
+    .select("image_id")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryReactionsUnavailable(error)
 }

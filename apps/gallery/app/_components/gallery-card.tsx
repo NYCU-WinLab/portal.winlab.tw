@@ -177,6 +177,7 @@ export function GalleryCard({
     onReact,
     commentPinAvailable,
     commentLikesAvailable,
+    reactionsAvailable,
   } = useGalleryCardSocial({
     image,
     viewerId,
@@ -692,6 +693,7 @@ export function GalleryCard({
                   onFavoritedChange={setFavorited}
                   commentPinAvailable={commentPinAvailable}
                   commentLikesAvailable={commentLikesAvailable}
+                  reactionsAvailable={reactionsAvailable}
                 />
               </div>
             </DialogContent>
