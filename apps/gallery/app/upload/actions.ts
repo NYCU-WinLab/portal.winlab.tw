@@ -182,11 +182,29 @@ export async function registerGalleryImage(
     }
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  let { data: inserted, error: insertError } = await supabase
     .from("gallery_images")
     .insert(insertPayload)
     .select("id")
     .single()
+
+  // Soft-fail: Memories migration not applied yet — register without taken_at.
+  if (
+    insertError &&
+    takenAt &&
+    "taken_at" in insertPayload &&
+    isGalleryTakenAtUnavailable(insertError)
+  ) {
+    const { taken_at: _dropped, ...withoutTakenAt } = insertPayload
+    void _dropped
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutTakenAt)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
 
   if (insertError || !inserted) {
     // Unique slot race: another request won — resolve to that row.
