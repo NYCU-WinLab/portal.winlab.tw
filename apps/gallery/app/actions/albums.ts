@@ -103,6 +103,45 @@ export async function createGalleryAlbum(input: {
   return { ok: true, data: { id: data.id, slug: data.slug, title: data.title } }
 }
 
+/** Create an album and immediately attach the given covers. */
+export async function createGalleryAlbumWithImages(input: {
+  title: string
+  description?: string | null
+  imageIds: string[]
+}): Promise<
+  AlbumActionResult<{
+    id: string
+    slug: string
+    title: string
+    added: number
+  }>
+> {
+  const created = await createGalleryAlbum({
+    title: input.title,
+    description: input.description,
+  })
+  if (!created.ok) return created
+
+  const added = await addImagesToGalleryAlbum(created.data.id, input.imageIds)
+  if (!added.ok) {
+    return {
+      ok: true,
+      data: {
+        ...created.data,
+        added: 0,
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      ...created.data,
+      added: added.data.added,
+    },
+  }
+}
+
 export async function updateGalleryAlbum(input: {
   albumId: string
   title?: string

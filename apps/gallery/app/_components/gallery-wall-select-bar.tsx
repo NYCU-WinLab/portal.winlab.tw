@@ -19,7 +19,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryImagesPin } from "@/app/actions"
-import { removeImagesFromGalleryAlbumBySlug } from "@/app/actions/albums"
+import {
+  removeImagesFromGalleryAlbumBySlug,
+  createGalleryAlbumWithImages,
+} from "@/app/actions/albums"
 import { setGalleryFavorites } from "@/app/actions/favorites"
 import {
   attachGalleryTagToImages,
@@ -86,6 +89,8 @@ export function GalleryWallSelectBar({
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
   const [zipBusy, setZipBusy] = useState(false)
   const [tagDraft, setTagDraft] = useState("")
+  const [albumDraft, setAlbumDraft] = useState("")
+  const [albumFormOpen, setAlbumFormOpen] = useState(false)
 
   const tagSelected = (event?: FormEvent) => {
     event?.preventDefault()
@@ -179,6 +184,42 @@ export function GalleryWallSelectBar({
           : `Removed “${result.data.tagName}” from ${n} photo${n === 1 ? "" : "s"}.`
       )
       onUntagged?.()
+      onClear()
+    })
+  }
+
+  const createAlbumFromSelection = (event?: FormEvent) => {
+    event?.preventDefault()
+    const title = albumDraft.trim()
+    if (!title || selectedIds.length === 0 || pending || saveOpenBusy) return
+    setSaveOpenBusy(true)
+    startTransition(async () => {
+      const result = await createGalleryAlbumWithImages({
+        title,
+        imageIds: selectedIds,
+      })
+      setSaveOpenBusy(false)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      const { title: albumTitle, slug, added } = result.data
+      toast.success(
+        added > 0
+          ? `Album “${albumTitle}” with ${added} photo${added === 1 ? "" : "s"}`
+          : `Album “${albumTitle}” created`,
+        {
+          description: `/albums/${slug}`,
+          action: {
+            label: "Open",
+            onClick: () => {
+              window.location.href = `/albums/${slug}`
+            },
+          },
+        }
+      )
+      setAlbumDraft("")
+      setAlbumFormOpen(false)
       onClear()
     })
   }
@@ -476,6 +517,65 @@ export function GalleryWallSelectBar({
                       </Button>
                     </>
                   ) : null}
+                  {albumFormOpen ? (
+                    <form
+                      onSubmit={createAlbumFromSelection}
+                      className="flex items-center gap-1.5"
+                    >
+                      <Input
+                        value={albumDraft}
+                        onChange={(e) => setAlbumDraft(e.target.value)}
+                        placeholder="Album title…"
+                        aria-label="New album title"
+                        disabled={selectedCount === 0 || pending}
+                        autoFocus
+                        className={cn(
+                          gallerySans(),
+                          "h-8 w-[8.5rem] text-[11px] sm:w-36"
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          selectedCount === 0 || pending || !albumDraft.trim()
+                        }
+                        className={cn(
+                          gallerySans(),
+                          "h-8 text-[11px] uppercase"
+                        )}
+                      >
+                        Create
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          gallerySans(),
+                          "h-8 text-[11px] uppercase"
+                        )}
+                        onClick={() => {
+                          setAlbumFormOpen(false)
+                          setAlbumDraft("")
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedCount === 0 || pending}
+                      className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
+                      onClick={() => setAlbumFormOpen(true)}
+                    >
+                      New album
+                    </Button>
+                  )}
                   <GalleryAddToAlbum
                     imageIds={selectedIds}
                     triggerLabel={
