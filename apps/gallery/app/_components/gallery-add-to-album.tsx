@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { IconAlbum, IconPlus } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -87,6 +87,7 @@ export function GalleryAddToAlbum({
   const [albums, setAlbums] = useState<MyAlbumOption[] | null>(null)
   const [draftTitle, setDraftTitle] = useState("")
   const [pending, startTransition] = useTransition()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const ids = imageIds.filter(Boolean)
   const count = ids.length
@@ -230,12 +231,19 @@ export function GalleryAddToAlbum({
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (next) ensureAlbums()
+        if (next) {
+          ensureAlbums()
+          return
+        }
+        if (controlledOpen === undefined) {
+          queueMicrotask(() => triggerRef.current?.focus())
+        }
       }}
     >
       {controlledOpen === undefined ? (
         <DialogTrigger asChild>
           <Button
+            ref={triggerRef}
             type="button"
             variant="outline"
             size="sm"

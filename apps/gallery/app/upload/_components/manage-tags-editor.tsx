@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -28,6 +28,7 @@ export function ManageTagsEditor({
   const [tags, setTags] = useState<GalleryTag[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   function loadTags() {
     setTags(null)
@@ -48,6 +49,7 @@ export function ManageTagsEditor({
     setOpen(nextOpen)
     if (!nextOpen) {
       setLoadError(null)
+      queueMicrotask(() => triggerRef.current?.focus())
       return
     }
     loadTags()
@@ -56,6 +58,7 @@ export function ManageTagsEditor({
   return (
     <Dialog open={open} onOpenChange={openEditor}>
       <Button
+        ref={triggerRef}
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
