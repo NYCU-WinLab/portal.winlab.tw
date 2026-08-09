@@ -207,11 +207,11 @@ async function resolveTagCoverIds(
     { p_tag_slug: tagSlug }
   )
   if (tagCoverError) {
-    // No RPC yet / transient PostgREST failure → ignore tag filter.
+    // No RPC yet / transient failure → empty tag result (not the full wall).
     if (!isGalleryTagsUnavailable(tagCoverError)) {
       console.error("[gallery] failed to resolve tag covers", tagCoverError)
     }
-    return null
+    return "none"
   }
   const tagCoverIds = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (tagCoverIds.length === 0) return "none"
@@ -253,7 +253,7 @@ async function resolveQueryCoverIds(
 /**
  * Viewer's saved favorites as wall cover ids.
  * - null: filter not requested
- * - "none": no favorites / unsigned / migration missing
+ * - "none": no favorites / unsigned / RPC failure
  * - string[]: cover ids
  */
 async function resolveFavoriteCoverIds(
@@ -270,8 +270,8 @@ async function resolveFavoriteCoverIds(
     if (!isGalleryFavoritesUnavailable(error)) {
       console.error("[gallery] failed to resolve favorite covers", error)
     }
-    // Ignore the Saved filter so the wall still loads.
-    return null
+    // Saved was requested — show empty rather than the unfiltered wall.
+    return "none"
   }
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"
@@ -281,7 +281,7 @@ async function resolveFavoriteCoverIds(
 /**
  * Album membership as wall cover ids (sequence → cover).
  * - null: filter not requested
- * - "none": empty album / missing migration / unknown slug
+ * - "none": empty album / RPC failure / unknown slug
  * - string[]: cover ids
  */
 async function resolveAlbumCoverIds(
@@ -297,8 +297,8 @@ async function resolveAlbumCoverIds(
     if (!isGalleryAlbumsUnavailable(error)) {
       console.error("[gallery] failed to resolve album covers", error)
     }
-    // Ignore the album filter so the wall still loads.
-    return null
+    // Album filter was requested — show empty rather than the unfiltered wall.
+    return "none"
   }
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"

@@ -28,14 +28,9 @@ export async function loadLightboxSocial(
   ])
 
   const commentRows = commentLoad.error ? [] : commentLoad.rows
-  const voteRows =
-    voteResult.error && isGalleryReactionsUnavailable(voteResult.error)
-      ? []
-      : (voteResult.data ?? [])
-  const reactionsAvailable = !(
-    voteResult.error && isGalleryReactionsUnavailable(voteResult.error)
-  )
-  if (voteResult.error && reactionsAvailable) {
+  const reactionsAvailable = !voteResult.error
+  const voteRows = voteResult.error ? [] : (voteResult.data ?? [])
+  if (voteResult.error && !isGalleryReactionsUnavailable(voteResult.error)) {
     console.error(
       "[gallery] failed to load lightbox reactions",
       voteResult.error
