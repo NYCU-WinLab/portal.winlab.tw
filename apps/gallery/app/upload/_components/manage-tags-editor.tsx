@@ -26,21 +26,31 @@ export function ManageTagsEditor({
 }) {
   const [open, setOpen] = useState(false)
   const [tags, setTags] = useState<GalleryTag[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  function openEditor(nextOpen: boolean) {
-    setOpen(nextOpen)
-    if (!nextOpen) return
+  function loadTags() {
     setTags(null)
+    setLoadError(null)
     startTransition(async () => {
       const result = await listGalleryImageTags(imageId)
       if (!result.ok) {
+        setLoadError(result.error)
         toast.error(result.error)
-        setOpen(false)
         return
       }
+      setLoadError(null)
       setTags(result.data)
     })
+  }
+
+  function openEditor(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      setLoadError(null)
+      return
+    }
+    loadTags()
   }
 
   return (
@@ -57,17 +67,37 @@ export function ManageTagsEditor({
       >
         Tags
       </Button>
-      <DialogContent className="gap-6">
+      <DialogContent className="gap-6" aria-busy={pending || undefined}>
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl italic">Tags</DialogTitle>
         </DialogHeader>
-        {pending || tags == null ? (
+        {pending && tags == null && !loadError ? (
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
             Loading tags…
           </p>
-        ) : (
+        ) : loadError ? (
+          <div className="space-y-3">
+            <p
+              role="status"
+              aria-live="polite"
+              className={cn(gallerySans(), "text-sm text-amber-800")}
+            >
+              Could not load tags — {loadError}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={loadTags}
+              className={gallerySans()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : tags ? (
           <GalleryImageTags imageId={imageId} tags={tags} canEdit />
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   )
