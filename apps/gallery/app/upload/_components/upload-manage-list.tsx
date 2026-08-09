@@ -460,9 +460,11 @@ function UploadSequenceGroup({
             "text-xs text-muted-foreground uppercase"
           )}
         >
-          Sequence story · {items.length} shots · drag handle to reorder
+          {selectionMode
+            ? `Sequence story · ${items.length} shots`
+            : `Sequence story · ${items.length} shots · drag handle to reorder`}
         </p>
-        {items.length > 1 ? (
+        {!selectionMode && items.length > 1 ? (
           <DownloadSequenceButton
             variant="pill"
             items={items}
