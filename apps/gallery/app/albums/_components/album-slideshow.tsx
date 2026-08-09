@@ -84,20 +84,35 @@ export function AlbumSlideshow({
   const onTouchEnd = (event: TouchEvent) => {
     const start = touchStartRef.current
     touchStartRef.current = null
-    if (!start || photos.length < 2) return
+    if (!start) return
     const touch = event.changedTouches[0]
     if (!touch) return
     const swipe = resolveLightboxSwipe(
       touch.clientX - start.x,
       touch.clientY - start.y
     )
-    if (swipe === "next") {
+    if (swipe === "next" && photos.length > 1) {
       setIndex((current) => nextSlideshowIndex(current, photos.length))
       return
     }
-    if (swipe === "prev") {
+    if (swipe === "prev" && photos.length > 1) {
       setIndex((current) => prevSlideshowIndex(current, photos.length))
+      return
     }
+    if (swipe == null) {
+      const current = photos[index]
+      if (current?.media_type === "video") return
+      setPaused((value) => !value)
+    }
+  }
+
+  const togglePauseFromPointer = (event: { target: EventTarget | null }) => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.closest("button, video, a")) return
+    const current = photos[index]
+    if (current?.media_type === "video") return
+    setPaused((value) => !value)
   }
 
   const seekFromClientX = (
@@ -280,6 +295,7 @@ export function AlbumSlideshow({
           className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-4 pb-8 sm:px-10"
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
+          onClick={togglePauseFromPointer}
         >
           {photos.length > 1 ? (
             <>
@@ -350,8 +366,8 @@ export function AlbumSlideshow({
             "px-4 pb-4 text-center text-[11px] text-zinc-500 sm:px-6"
           )}
         >
-          {photo.name} · Space pause · [ ] speed · ← → / swipe · Home/End · Esc
-          close
+          {photo.name} · click/Space pause · [ ] speed · ← → / swipe · Home/End
+          · Esc close
         </p>
       </DialogContent>
     </Dialog>
