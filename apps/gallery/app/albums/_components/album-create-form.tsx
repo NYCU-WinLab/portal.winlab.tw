@@ -80,6 +80,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
       onSubmit={onSubmit}
       className={cn("space-y-4", className)}
       aria-label="Create album"
+      aria-busy={pending || undefined}
     >
       <div className="space-y-2">
         <Label htmlFor="album-title" className={gallerySans()}>
@@ -124,7 +125,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
           )}
         </p>
       </div>
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending} aria-busy={pending || undefined}>
         {pending ? "Creating…" : "Create album"}
       </Button>
     </form>
