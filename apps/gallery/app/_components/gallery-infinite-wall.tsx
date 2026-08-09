@@ -334,6 +334,10 @@ export function GalleryInfiniteWall({
         selectionMode={selectionMode}
         selectedIds={selectedIds}
         onToggleSelected={toggleSelected}
+        onExitSelectionMode={() => {
+          setSelectionMode(false)
+          setSelectedIds(new Set())
+        }}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />
