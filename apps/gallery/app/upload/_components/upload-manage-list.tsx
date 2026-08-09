@@ -41,6 +41,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
 import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { setGalleryImagesPin } from "@/app/actions"
+import { setGalleryFavorites } from "@/app/actions/favorites"
 import {
   deleteGalleryImages,
   updateGalleryImagesTakenAt,
@@ -873,6 +874,23 @@ export function UploadManageList({
     })
   }
 
+  const setSelectedFavorites = (saved: boolean) => {
+    if (selectedItems.length === 0 || isPending) return
+    startTransition(async () => {
+      const result = await setGalleryFavorites(
+        selectedItems.map((item) => item.id),
+        saved
+      )
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(result.message)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    })
+  }
+
   if (images.length === 0) return null
 
   const allSelected =
@@ -1079,6 +1097,22 @@ export function UploadManageList({
                   Untag
                   {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFavorites(true)}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFavorites(false)}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Unsave
+                </button>
                 {isAdmin ? (
                   <>
                     <button
@@ -1145,6 +1179,18 @@ export function UploadManageList({
                     }}
                   >
                     Untag
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={isPending || selectedItems.length === 0}
+                    onSelect={() => setSelectedFavorites(true)}
+                  >
+                    Save
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={isPending || selectedItems.length === 0}
+                    onSelect={() => setSelectedFavorites(false)}
+                  >
+                    Unsave
                   </DropdownMenuItem>
                   {isAdmin ? (
                     <>
