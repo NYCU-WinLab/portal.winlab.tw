@@ -140,6 +140,7 @@ function UploadListItem({
   isAdmin = false,
   showWallPin = false,
   takenAtAvailable = true,
+  tagsAvailable = true,
   sequenceIndex,
   reorderHandle,
 }: {
@@ -152,6 +153,7 @@ function UploadListItem({
   isAdmin?: boolean
   showWallPin?: boolean
   takenAtAvailable?: boolean
+  tagsAvailable?: boolean
   sequenceIndex?: number
   reorderHandle?: ReactNode
 }) {
@@ -241,7 +243,9 @@ function UploadListItem({
             onUpdated={setTakenAt}
           />
         ) : null}
-        <ManageTagsEditor imageId={image.id} imageName={image.name} />
+        {tagsAvailable ? (
+          <ManageTagsEditor imageId={image.id} imageName={image.name} />
+        ) : null}
         <RenameButton id={image.id} name={image.name} />
         <DeleteButton
           id={image.id}
@@ -287,6 +291,7 @@ function UploadSequenceGroup({
   onToggleSelected,
   isAdmin = false,
   takenAtAvailable = true,
+  tagsAvailable = true,
 }: {
   sequenceId: string
   items: ManageUploadRow[]
@@ -296,6 +301,7 @@ function UploadSequenceGroup({
   onToggleSelected: (id: string, options?: { shiftKey?: boolean }) => void
   isAdmin?: boolean
   takenAtAvailable?: boolean
+  tagsAvailable?: boolean
 }) {
   const [items, setItems] = useState(initialItems)
   const [isPending, startTransition] = useTransition()
@@ -469,6 +475,7 @@ function UploadSequenceGroup({
               isAdmin={isAdmin}
               showWallPin={image.sequence_index === 0}
               takenAtAvailable={takenAtAvailable}
+              tagsAvailable={tagsAvailable}
               sequenceIndex={index}
               reorderHandle={
                 <button
@@ -537,11 +544,13 @@ export function UploadManageList({
   isAdmin = false,
   takenAtAvailable = true,
   favoritesAvailable = true,
+  tagsAvailable = true,
 }: {
   images: ManageUploadRow[]
   isAdmin?: boolean
   takenAtAvailable?: boolean
   favoritesAvailable?: boolean
+  tagsAvailable?: boolean
 }) {
   const { singles, sequences } = useMemo(
     () => groupManageUploads(images),
@@ -1178,18 +1187,20 @@ export function UploadManageList({
                 Play
                 {canSlideshow ? ` (${selectedSlideshowPhotos.length})` : ""}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkTagDraft("")
-                  setBulkTagOpen(true)
-                }}
-                disabled={isPending || selectedItems.length === 0}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                Tag
-                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-              </button>
+              {tagsAvailable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkTagDraft("")
+                    setBulkTagOpen(true)
+                  }}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Tag
+                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
@@ -1237,18 +1248,22 @@ export function UploadManageList({
                   Links
                   {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBulkUntagDraft("")
-                    setBulkUntagOpen(true)
-                  }}
-                  disabled={isPending || selectedItems.length === 0}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
-                >
-                  Untag
-                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-                </button>
+                {tagsAvailable ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkUntagDraft("")
+                      setBulkUntagOpen(true)
+                    }}
+                    disabled={isPending || selectedItems.length === 0}
+                    className={cn(galleryPillClass(), "disabled:opacity-40")}
+                  >
+                    Untag
+                    {selectedItems.length > 0
+                      ? ` (${selectedItems.length})`
+                      : ""}
+                  </button>
+                ) : null}
                 {favoritesAvailable ? (
                   <>
                     <button
@@ -1350,15 +1365,17 @@ export function UploadManageList({
                   >
                     Links
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={isPending || selectedItems.length === 0}
-                    onSelect={() => {
-                      setBulkUntagDraft("")
-                      setBulkUntagOpen(true)
-                    }}
-                  >
-                    Untag
-                  </DropdownMenuItem>
+                  {tagsAvailable ? (
+                    <DropdownMenuItem
+                      disabled={isPending || selectedItems.length === 0}
+                      onSelect={() => {
+                        setBulkUntagDraft("")
+                        setBulkUntagOpen(true)
+                      }}
+                    >
+                      Untag
+                    </DropdownMenuItem>
+                  ) : null}
                   {favoritesAvailable ? (
                     <>
                       <DropdownMenuItem
@@ -1422,6 +1439,7 @@ export function UploadManageList({
               onToggleSelected={toggleSelected}
               isAdmin={isAdmin}
               takenAtAvailable={takenAtAvailable}
+              tagsAvailable={tagsAvailable}
             />
           )
         }
@@ -1439,6 +1457,7 @@ export function UploadManageList({
               isAdmin={isAdmin}
               showWallPin
               takenAtAvailable={takenAtAvailable}
+              tagsAvailable={tagsAvailable}
             />
           </ul>
         )

@@ -16,6 +16,7 @@ import { GalleryThemedShell } from "@/components/gallery-shell"
 import type { ManageUploadRow } from "@/lib/gallery/manage-uploads"
 import { isGalleryTakenAtUnavailable } from "@/lib/gallery/manage-uploads"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
+import { isGalleryTagsReady } from "@/lib/gallery/tags"
 import {
   getGallerySeasonalThemeId,
   isGallerySettingsReady,
@@ -35,17 +36,23 @@ export default async function UploadPage() {
   if (!user) redirect("/auth/login?next=/upload")
 
   const supabase = await createClient()
-  const [imagesWithTakenAt, seasonalThemeId, settingsReady, favoritesReady] =
-    await Promise.all([
-      supabase
-        .from("gallery_images")
-        .select(MANAGE_SELECT_WITH_TAKEN_AT)
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false }),
-      getGallerySeasonalThemeId(supabase),
-      isGallerySettingsReady(supabase),
-      isGalleryFavoritesReady(supabase),
-    ])
+  const [
+    imagesWithTakenAt,
+    seasonalThemeId,
+    settingsReady,
+    favoritesReady,
+    tagsReady,
+  ] = await Promise.all([
+    supabase
+      .from("gallery_images")
+      .select(MANAGE_SELECT_WITH_TAKEN_AT)
+      .eq("created_by", user.id)
+      .order("created_at", { ascending: false }),
+    getGallerySeasonalThemeId(supabase),
+    isGallerySettingsReady(supabase),
+    isGalleryFavoritesReady(supabase),
+    isGalleryTagsReady(supabase),
+  ])
 
   let imageRows: ManageUploadRow[] | null =
     (imagesWithTakenAt.data as ManageUploadRow[] | null) ?? null
@@ -121,6 +128,7 @@ export default async function UploadPage() {
               isAdmin={user.isAdmin}
               takenAtAvailable={takenAtAvailable}
               favoritesAvailable={favoritesReady}
+              tagsAvailable={tagsReady}
             />
           )}
         </section>

@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 export const GALLERY_TAG_NAME_MAX = 40
 export const GALLERY_TAGS_PER_IMAGE_MAX = 10
 
@@ -35,6 +37,15 @@ export function isGalleryTagsUnavailable(
     /does not exist/i.test(message) ||
     /could not find/i.test(message)
   )
+}
+
+/** True when gallery_tags is queryable (migration applied). */
+export async function isGalleryTagsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase.from("gallery_tags").select("id").limit(1)
+  if (!error) return true
+  return !isGalleryTagsUnavailable(error)
 }
 
 /**
