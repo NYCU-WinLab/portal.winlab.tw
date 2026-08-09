@@ -7,7 +7,10 @@ import {
   isGalleryReaction,
   isGalleryReactionsUnavailable,
 } from "@/lib/gallery/reactions"
-import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
+import {
+  isGalleryCommentEditUnavailable,
+  isGalleryCommentsUnavailable,
+} from "@/lib/gallery/comment-edit"
 import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
@@ -129,6 +132,13 @@ export async function addGalleryComment(
       .eq("id", parentId)
       .maybeSingle()
     if (parentError) {
+      if (isGalleryCommentsUnavailable(parentError)) {
+        return {
+          ok: false,
+          error:
+            "Comments are not available yet — apply the gallery comments migration.",
+        }
+      }
       return { ok: false, error: `Comment failed: ${parentError.message}` }
     }
     if (!parent || parent.image_id !== imageId) {
@@ -149,6 +159,13 @@ export async function addGalleryComment(
     .single()
 
   if (error || !data) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return {
       ok: false,
       error: `Comment failed: ${error?.message ?? "Unknown error."}`,
@@ -209,6 +226,13 @@ export async function updateGalleryComment(
       .maybeSingle()
 
     if (fallback.error || !fallback.data) {
+      if (isGalleryCommentsUnavailable(fallback.error)) {
+        return {
+          ok: false,
+          error:
+            "Comments are not available yet — apply the gallery comments migration.",
+        }
+      }
       return {
         ok: false,
         error: `Update failed: ${fallback.error?.message ?? "Comment edit is not available yet — apply the gallery comments update migration."}`,
@@ -220,6 +244,13 @@ export async function updateGalleryComment(
   }
 
   if (error || !data) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return {
       ok: false,
       error: `Update failed: ${error?.message ?? "Comment not found."}`,
@@ -248,6 +279,13 @@ export async function deleteGalleryComment(
     .eq("created_by", userId)
 
   if (error) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return { ok: false, error: `Delete failed: ${error.message}` }
   }
 
