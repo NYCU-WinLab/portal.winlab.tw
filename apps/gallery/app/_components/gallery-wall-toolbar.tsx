@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { IconArrowsShuffle, IconList } from "@tabler/icons-react"
 
 import { cn } from "@workspace/ui/lib/utils"
@@ -13,12 +14,16 @@ export function GalleryWallToolbar({
   onShuffle,
   onRestoreOrder,
   lightboxOpen = false,
+  leadingActions,
+  statusText,
 }: {
   canShuffle: boolean
   shuffled?: boolean
   onShuffle: () => void
   onRestoreOrder?: () => void
   lightboxOpen?: boolean
+  leadingActions?: ReactNode
+  statusText?: string
 }) {
   return (
     <div
@@ -34,11 +39,14 @@ export function GalleryWallToolbar({
         )}
         aria-live="polite"
       >
-        {shuffled
-          ? "Shuffled view · Restore order to pin chronology back"
-          : "Chronological wall · Shuffle for a fresh scatter"}
+        {statusText
+          ? statusText
+          : shuffled
+            ? "Shuffled view · Restore order to pin chronology back"
+            : "Chronological wall · Shuffle for a fresh scatter"}
       </p>
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {leadingActions}
         {shuffled && onRestoreOrder ? (
           <button
             type="button"

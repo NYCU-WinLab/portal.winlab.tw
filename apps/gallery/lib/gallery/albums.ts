@@ -121,7 +121,7 @@ export function isGalleryAlbumsUnavailable(
     return true
   }
   if (
-    /gallery_wall_cover_ids_for_album|gallery_album_add_images|gallery_album_remove_images/i.test(
+    /gallery_wall_cover_ids_for_album|gallery_album_add_images|gallery_album_remove_images|gallery_album_reorder_images/i.test(
       message
     )
   ) {

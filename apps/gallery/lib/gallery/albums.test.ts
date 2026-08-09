@@ -86,6 +86,11 @@ describe("isGalleryAlbumsUnavailable", () => {
         message: "Could not find the function gallery_wall_cover_ids_for_album",
       })
     ).toBe(true)
+    expect(
+      isGalleryAlbumsUnavailable({
+        message: "Could not find the function gallery_album_reorder_images",
+      })
+    ).toBe(true)
     expect(isGalleryAlbumsUnavailable({ message: "permission denied" })).toBe(
       false
     )

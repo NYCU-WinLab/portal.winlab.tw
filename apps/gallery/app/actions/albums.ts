@@ -413,7 +413,7 @@ export async function removeImagesFromGalleryAlbum(
 export async function reorderGalleryAlbumImages(
   albumId: string,
   imageIds: string[]
-): Promise<AlbumActionResult> {
+): Promise<AlbumActionResult<{ updated: number }>> {
   if (!albumId) return { ok: false, error: "Missing album id." }
 
   const auth = await requireSignedIn()
@@ -429,6 +429,29 @@ export async function reorderGalleryAlbumImages(
   if (!album) return { ok: false, error: "Album not found." }
 
   const positions = normalizeAlbumPositions(imageIds)
+  const orderedIds = positions.map((item) => item.image_id)
+  if (orderedIds.length === 0) {
+    return { ok: false, error: "Select at least one photo." }
+  }
+
+  const { data: updatedCount, error: rpcError } = await auth.supabase.rpc(
+    "gallery_album_reorder_images",
+    {
+      p_album_id: albumId,
+      p_image_ids: orderedIds,
+    }
+  )
+
+  if (!rpcError) {
+    revalidateAlbumPaths(album.slug)
+    return { ok: true, data: { updated: Number(updatedCount) || 0 } }
+  }
+
+  // Soft-fall back when migration 20260815010000 is not applied yet.
+  if (!isGalleryAlbumsUnavailable(rpcError)) {
+    return { ok: false, error: rpcError.message }
+  }
+
   for (const item of positions) {
     const { error } = await auth.supabase
       .from("gallery_album_images")
@@ -444,5 +467,5 @@ export async function reorderGalleryAlbumImages(
     .eq("id", albumId)
 
   revalidateAlbumPaths(album.slug)
-  return { ok: true }
+  return { ok: true, data: { updated: positions.length } }
 }

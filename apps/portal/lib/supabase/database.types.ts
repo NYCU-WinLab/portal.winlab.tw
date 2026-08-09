@@ -2370,6 +2370,10 @@ export type Database = {
         Args: { p_album_id: string; p_image_ids: string[] }
         Returns: number
       }
+      gallery_album_reorder_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
       gallery_album_photos: {
         Args: { p_slug: string }
         Returns: {

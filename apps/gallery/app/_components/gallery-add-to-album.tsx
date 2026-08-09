@@ -18,7 +18,7 @@ import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
 import {
-  addImageToGalleryAlbum,
+  addImagesToGalleryAlbum,
   createGalleryAlbum,
   listMyGalleryAlbums,
 } from "@/app/actions/albums"
@@ -36,11 +36,68 @@ type MyAlbumOption = {
   photo_count: number
 }
 
-export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
-  const [open, setOpen] = useState(false)
+function copyLinkAction(album: { slug: string; title: string }) {
+  return {
+    label: "Copy link",
+    onClick: () => {
+      void shareOrCopyAlbumLink(album)
+        .then((mode) => {
+          if (mode === "copied") toast.success("Share link copied")
+        })
+        .catch((error) => {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return
+          }
+          toast.error("Could not copy album link")
+        })
+    },
+  }
+}
+
+/**
+ * Add one or many wall covers to an album (lightbox single-shot or wall
+ * multi-select). Uses `addImagesToGalleryAlbum` so bulk stays one RPC.
+ */
+export function GalleryAddToAlbum({
+  imageIds,
+  triggerLabel,
+  title,
+  description,
+  onAdded,
+  triggerClassName,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  imageIds: string[]
+  triggerLabel?: string
+  title?: string
+  description?: string
+  onAdded?: (payload: {
+    albumId: string
+    slug: string
+    title: string
+    added: number
+  }) => void
+  triggerClassName?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = onOpenChange ?? setUncontrolledOpen
   const [albums, setAlbums] = useState<MyAlbumOption[] | null>(null)
   const [draftTitle, setDraftTitle] = useState("")
   const [pending, startTransition] = useTransition()
+
+  const ids = imageIds.filter(Boolean)
+  const count = ids.length
+  const dialogTitle =
+    title ?? (count > 1 ? `Add ${count} photos to album` : "Add to album")
+  const dialogDescription =
+    description ??
+    (count > 1
+      ? "Curate the selected wall covers into one of your collections."
+      : "Curate this shot into one of your collections. Share links live at /albums/<slug>.")
 
   const ensureAlbums = () => {
     if (albums !== null) return
@@ -56,77 +113,75 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
   }
 
   const addTo = (album: MyAlbumOption) => {
+    if (ids.length === 0) {
+      toast.error("Select at least one photo.")
+      return
+    }
     startTransition(async () => {
-      const result = await addImageToGalleryAlbum(album.id, imageId)
+      const result = await addImagesToGalleryAlbum(album.id, ids)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
-      toast.success(
-        <span>
-          Added to{" "}
-          <Link href={`/albums/${album.slug}`} className="underline">
-            {album.title}
-          </Link>
-        </span>,
-        {
-          action: {
-            label: "Copy link",
-            onClick: () => {
-              void shareOrCopyAlbumLink({
-                slug: album.slug,
-                title: album.title,
-              })
-                .then((mode) => {
-                  if (mode === "copied") toast.success("Share link copied")
-                })
-                .catch((error) => {
-                  if (
-                    error instanceof DOMException &&
-                    error.name === "AbortError"
-                  ) {
-                    return
-                  }
-                  toast.error("Could not copy album link")
-                })
-            },
-          },
-        }
-      )
+      const added = result.data.added
+      if (added === 0) {
+        toast.message("Already in that album (or nothing new to add).")
+      } else {
+        toast.success(
+          <span>
+            Added {added} to{" "}
+            <Link href={`/albums/${album.slug}`} className="underline">
+              {album.title}
+            </Link>
+          </span>,
+          { action: copyLinkAction(album) }
+        )
+      }
       setAlbums((prev) =>
         (prev ?? []).map((item) =>
           item.id === album.id
-            ? { ...item, photo_count: item.photo_count + 1 }
+            ? { ...item, photo_count: item.photo_count + added }
             : item
         )
       )
+      onAdded?.({
+        albumId: album.id,
+        slug: album.slug,
+        title: album.title,
+        added,
+      })
       setOpen(false)
     })
   }
 
   const createAndAdd = () => {
-    const title = normalizeGalleryAlbumTitle(draftTitle)
-    if (!title) {
+    const normalized = normalizeGalleryAlbumTitle(draftTitle)
+    if (!normalized) {
       toast.error("Give the album a name with letters or numbers.")
       return
     }
+    if (ids.length === 0) {
+      toast.error("Select at least one photo.")
+      return
+    }
     startTransition(async () => {
-      const created = await createGalleryAlbum({ title })
+      const created = await createGalleryAlbum({ title: normalized })
       if (!created.ok) {
         toast.error(created.error)
         return
       }
-      const added = await addImageToGalleryAlbum(created.data.id, imageId)
-      if (!added.ok) {
-        toast.error(added.error)
+      const addedResult = await addImagesToGalleryAlbum(created.data.id, ids)
+      if (!addedResult.ok) {
+        toast.error(addedResult.error)
         return
       }
+      const added = addedResult.data.added
       setAlbums((prev) => [
         {
           id: created.data.id,
           title: created.data.title,
           slug: created.data.slug,
-          photo_count: 1,
+          photo_count: added,
         },
         ...(prev ?? []),
       ])
@@ -137,31 +192,16 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
           <Link href={`/albums/${created.data.slug}`} className="underline">
             {created.data.title}
           </Link>
+          {added > 1 ? ` with ${added} photos` : ""}
         </span>,
-        {
-          action: {
-            label: "Copy link",
-            onClick: () => {
-              void shareOrCopyAlbumLink({
-                slug: created.data.slug,
-                title: created.data.title,
-              })
-                .then((mode) => {
-                  if (mode === "copied") toast.success("Share link copied")
-                })
-                .catch((error) => {
-                  if (
-                    error instanceof DOMException &&
-                    error.name === "AbortError"
-                  ) {
-                    return
-                  }
-                  toast.error("Could not copy album link")
-                })
-            },
-          },
-        }
+        { action: copyLinkAction(created.data) }
       )
+      onAdded?.({
+        albumId: created.data.id,
+        slug: created.data.slug,
+        title: created.data.title,
+        added,
+      })
       setOpen(false)
     })
   }
@@ -174,24 +214,29 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
         if (next) ensureAlbums()
       }}
     >
-      <DialogTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn(gallerySans(), "h-8 gap-1.5 text-[11px] uppercase")}
-        >
-          <IconAlbum className="size-3.5" aria-hidden />
-          Add to album
-        </Button>
-      </DialogTrigger>
+      {controlledOpen === undefined ? (
+        <DialogTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={count === 0}
+            className={cn(
+              gallerySans(),
+              "h-8 gap-1.5 text-[11px] uppercase",
+              triggerClassName
+            )}
+          >
+            <IconAlbum className="size-3.5" aria-hidden />
+            {triggerLabel ??
+              (count > 1 ? `Add ${count} to album` : "Add to album")}
+          </Button>
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className={gallerySans()}>Add to album</DialogTitle>
-          <DialogDescription>
-            Curate this shot into one of your collections. Share links live at{" "}
-            <span className="text-foreground">/albums/&lt;slug&gt;</span>.
-          </DialogDescription>
+          <DialogTitle className={gallerySans()}>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -205,7 +250,7 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
                 <li key={album.id}>
                   <button
                     type="button"
-                    disabled={pending}
+                    disabled={pending || count === 0}
                     onClick={() => addTo(album)}
                     className={cn(
                       gallerySans(),
@@ -234,7 +279,7 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
               onChange={(event) => setDraftTitle(event.target.value)}
               maxLength={GALLERY_ALBUM_TITLE_MAX}
               placeholder="New album title"
-              disabled={pending}
+              disabled={pending || count === 0}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault()
@@ -245,8 +290,8 @@ export function GalleryAddToAlbum({ imageId }: { imageId: string }) {
             <Button
               type="button"
               size="icon"
-              disabled={pending}
-              aria-label="Create album and add photo"
+              disabled={pending || count === 0}
+              aria-label="Create album and add photos"
               onClick={createAndAdd}
             >
               <IconPlus className="size-4" />

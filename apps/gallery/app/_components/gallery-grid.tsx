@@ -36,6 +36,9 @@ export function GalleryGrid({
   filters,
   wallEpoch = 0,
   onArtworkRenamed,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelected,
 }: {
   images: GalleryImage[]
   isSignedIn: boolean
@@ -52,6 +55,9 @@ export function GalleryGrid({
   /** Bumps when the wall is reshuffled so settle animation replays. */
   wallEpoch?: number
   onArtworkRenamed?: (imageId: string, patches: ArtworkNamePatch[]) => void
+  selectionMode?: boolean
+  selectedIds?: ReadonlySet<string>
+  onToggleSelected?: (imageId: string) => void
 }) {
   const router = useRouter()
   const [focusIndex, setFocusIndex] = useState(() => {
@@ -139,6 +145,7 @@ export function GalleryGrid({
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
       if (openIndex !== null) return
+      if (selectionMode) return
 
       if (event.key === "j" || event.key === "ArrowRight") {
         event.preventDefault()
@@ -166,7 +173,15 @@ export function GalleryGrid({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [focusIndex, hasMore, images.length, loadingMore, onLoadMore, openIndex])
+  }, [
+    focusIndex,
+    hasMore,
+    images.length,
+    loadingMore,
+    onLoadMore,
+    openIndex,
+    selectionMode,
+  ])
 
   if (images.length === 0) {
     const filtersActive = filters ? hasActiveGalleryFilters(filters) : false
@@ -239,8 +254,9 @@ export function GalleryGrid({
               highlightCommentId={
                 openPhotoId === image.id ? openCommentId : null
               }
-              open={openIndex === index}
+              open={selectionMode ? false : openIndex === index}
               onOpenChange={(open) => {
+                if (selectionMode) return
                 if (open) {
                   setOpenIndex(index)
                   router.replace(
@@ -256,7 +272,10 @@ export function GalleryGrid({
                 }
               }}
               gridFocused={
-                keyboardNavActive && focusIndex === index && openIndex === null
+                !selectionMode &&
+                keyboardNavActive &&
+                focusIndex === index &&
+                openIndex === null
               }
               hasWallPrev={openIndex === index && index > 0}
               hasWallNext={
@@ -268,6 +287,9 @@ export function GalleryGrid({
                   ? (patches) => onArtworkRenamed(image.id, patches)
                   : undefined
               }
+              selectionMode={selectionMode}
+              selected={selectedIds?.has(image.id) ?? false}
+              onToggleSelected={onToggleSelected}
             />
           </GalleryCardBoundary>
         </div>

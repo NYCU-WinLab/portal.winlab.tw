@@ -77,6 +77,9 @@ export function GalleryCard({
   hasWallNext = false,
   onWallNavigate,
   onArtworkRenamed,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -94,6 +97,9 @@ export function GalleryCard({
   hasWallNext?: boolean
   onWallNavigate?: (direction: "prev" | "next") => void
   onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelected?: (imageId: string) => void
 }) {
   const isOwner = Boolean(viewerId && image.created_by === viewerId)
   const router = useRouter()
@@ -340,7 +346,10 @@ export function GalleryCard({
         "mx-auto w-full sm:max-w-none",
         frame.maxWidthClass,
         gridFocused &&
-          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background"
+          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background",
+        selectionMode &&
+          selected &&
+          "rounded-sm ring-2 ring-foreground/40 ring-offset-2 ring-offset-background"
       )}
     >
       <div className="flex justify-center px-3 py-3 sm:px-4 sm:py-4">
@@ -357,7 +366,10 @@ export function GalleryCard({
             } as React.CSSProperties
           }
         >
-          <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
+          <Dialog
+            open={selectionMode ? false : isDialogOpen}
+            onOpenChange={selectionMode ? undefined : handleDialogOpenChange}
+          >
             <div
               className={cn(
                 galleryPolaroidClass(),
@@ -365,13 +377,21 @@ export function GalleryCard({
                   "gallery-polaroid-tape gallery-polaroid-tape--tl",
                 tape === "tr" &&
                   "gallery-polaroid-tape gallery-polaroid-tape--tr",
-                tape === "clip" && "gallery-polaroid-clip"
+                tape === "clip" && "gallery-polaroid-clip",
+                selectionMode && selected && "ring-2 ring-foreground/30"
               )}
             >
-              <DialogTrigger asChild>
+              {selectionMode ? (
                 <button
                   type="button"
-                  className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-pressed={selected}
+                  aria-label={
+                    selected
+                      ? `Deselect ${activeItem?.name ?? image.name}`
+                      : `Select ${activeItem?.name ?? image.name}`
+                  }
+                  onClick={() => onToggleSelected?.(image.id)}
+                  className="relative block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {thumbFailed ? (
                     <div
@@ -416,39 +436,103 @@ export function GalleryCard({
                         onError={() => setThumbFailed(true)}
                       />
                       {activeIsVideo ? <PlayBadge /> : null}
-                      {pinnedAt ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
-                          )}
-                        >
-                          <IconPin className="size-3" aria-hidden />
-                          Pinned
-                        </div>
-                      ) : null}
-                      {showSequenceBadge ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
-                          )}
-                        >
-                          {sequenceGapLabel
-                            ? `Incomplete · ${image.sequence_count}`
-                            : `${image.sequence_count} shots`}
-                        </div>
-                      ) : null}
                     </div>
                   )}
+                  <span
+                    className={cn(
+                      "absolute top-4 left-4 flex size-6 items-center justify-center rounded-md border text-[11px] shadow-sm backdrop-blur-sm",
+                      selected
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border/80 bg-background/85 text-muted-foreground"
+                    )}
+                    aria-hidden
+                  >
+                    {selected ? "✓" : ""}
+                  </span>
                 </button>
-              </DialogTrigger>
+              ) : (
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {thumbFailed ? (
+                      <div
+                        className={cn(
+                          "mx-2.5 mt-2.5 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-4 text-center shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src="/icons/mark.png"
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="size-9 object-contain opacity-40 grayscale"
+                          draggable={false}
+                          unoptimized
+                        />
+                        <span
+                          className={cn(
+                            gallerySans(),
+                            "text-[11px] tracking-wide text-zinc-500/90"
+                          )}
+                        >
+                          Preview unavailable
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "relative mx-2.5 mt-2.5 overflow-hidden bg-neutral-200/80 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src={thumbUrl}
+                          alt={activeItem?.name ?? image.name}
+                          fill
+                          priority={priorityLcp}
+                          sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 28vw"
+                          className="object-cover"
+                          decoding="async"
+                          onError={() => setThumbFailed(true)}
+                        />
+                        {activeIsVideo ? <PlayBadge /> : null}
+                        {pinnedAt ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
+                            )}
+                          >
+                            <IconPin className="size-3" aria-hidden />
+                            Pinned
+                          </div>
+                        ) : null}
+                        {showSequenceBadge ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                            )}
+                          >
+                            {sequenceGapLabel
+                              ? `Incomplete · ${image.sequence_count}`
+                              : `${image.sequence_count} shots`}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </button>
+                </DialogTrigger>
+              )}
               {/* Caption sits outside DialogTrigger so owner edit controls are not nested buttons. */}
               <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
                 <GalleryTitleEditor
                   imageId={image.id}
                   name={image.name}
-                  canEdit={isOwner}
+                  canEdit={isOwner && !selectionMode}
                   variant="polaroid"
                   onRenamed={onArtworkRenamed}
                 />

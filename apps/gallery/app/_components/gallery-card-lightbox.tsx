@@ -505,7 +505,7 @@ export function GalleryLightboxSocialAside({
               imageId={image.id}
               initialFavorited={Boolean(image.is_favorited)}
             />
-            <GalleryAddToAlbum imageId={activeItem?.id ?? image.id} />
+            <GalleryAddToAlbum imageIds={[activeItem?.id ?? image.id]} />
           </div>
         ) : null}
         <ReactionBar

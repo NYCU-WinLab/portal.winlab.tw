@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryWallSelectBar } from "@/app/_components/gallery-wall-select-bar"
 import { GalleryWallToolbar } from "@/app/_components/gallery-wall-toolbar"
 import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
 import { fetchGalleryWallPage } from "@/app/actions/wall"
@@ -14,6 +15,11 @@ import {
 } from "@/lib/gallery/rename-artwork"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import {
+  orderedSelectedWallIds,
+  toggleSelectAllWallIds,
+  toggleWallSelection,
+} from "@/lib/gallery/wall-selection"
 import {
   mergeGalleryWallPage,
   restoreGalleryWallOrder,
@@ -71,12 +77,14 @@ export function GalleryInfiniteWall({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [wallEpoch, setWallEpoch] = useState(0)
   const [shuffled, setShuffled] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const loadOrderIdsRef = useRef(initialImages.map((image) => image.id))
   const shuffledRef = useRef(false)
   const prefetchingRef = useRef(false)
   const prefetchedRef = useRef<PrefetchedPage | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const lightboxOpen = Boolean(openPhotoId)
+  const lightboxOpen = Boolean(openPhotoId) && !selectionMode
 
   useEffect(() => {
     shuffledRef.current = shuffled
@@ -98,6 +106,14 @@ export function GalleryInfiniteWall({
   useEffect(() => {
     warmThumbUrls(images)
   }, [images])
+
+  const wallIds = useMemo(() => images.map((image) => image.id), [images])
+  const orderedSelected = useMemo(
+    () => orderedSelectedWallIds(wallIds, selectedIds),
+    [selectedIds, wallIds]
+  )
+  const allSelected =
+    wallIds.length > 0 && wallIds.every((id) => selectedIds.has(id))
 
   const applyPage = useCallback(
     (incoming: GalleryImage[], nextPage: number, nextHasMore: boolean) => {
@@ -221,15 +237,51 @@ export function GalleryInfiniteWall({
     []
   )
 
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((mode) => {
+      if (mode) setSelectedIds(new Set())
+      return !mode
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+  }, [])
+
+  const toggleSelected = useCallback((imageId: string) => {
+    setSelectedIds((prev) => toggleWallSelection(prev, imageId))
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => toggleSelectAllWallIds(prev, wallIds))
+  }, [wallIds])
+
   return (
     <>
       {images.length > 0 ? (
         <GalleryWallToolbar
-          canShuffle={images.length > 1 && !lightboxOpen}
+          canShuffle={images.length > 1 && !lightboxOpen && !selectionMode}
           shuffled={shuffled}
           onShuffle={onShuffle}
           onRestoreOrder={onRestoreOrder}
           lightboxOpen={lightboxOpen}
+          statusText={
+            selectionMode
+              ? "Select mode · tap polaroids, then add them to an album"
+              : undefined
+          }
+          leadingActions={
+            <GalleryWallSelectBar
+              selectionMode={selectionMode}
+              selectedCount={orderedSelected.length}
+              allSelected={allSelected}
+              isSignedIn={isSignedIn}
+              selectedIds={orderedSelected}
+              onToggleMode={toggleSelectionMode}
+              onToggleSelectAll={toggleSelectAll}
+              onClear={clearSelection}
+            />
+          }
         />
       ) : null}
       <GalleryGrid
@@ -239,14 +291,17 @@ export function GalleryInfiniteWall({
         viewerName={viewerName}
         members={members}
         isAdmin={isAdmin}
-        openPhotoId={openPhotoId}
-        openCommentId={openCommentId}
+        openPhotoId={selectionMode ? null : openPhotoId}
+        openCommentId={selectionMode ? null : openCommentId}
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={loadMore}
         filters={filters}
         wallEpoch={wallEpoch}
         onArtworkRenamed={onArtworkRenamed}
+        selectionMode={selectionMode}
+        selectedIds={selectedIds}
+        onToggleSelected={toggleSelected}
       />
       {hasMore && !loadError ? (
         <div ref={sentinelRef} className="h-10" aria-hidden />
