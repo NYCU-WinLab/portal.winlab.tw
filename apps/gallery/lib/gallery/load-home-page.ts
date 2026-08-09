@@ -207,10 +207,11 @@ async function resolveTagCoverIds(
     { p_tag_slug: tagSlug }
   )
   if (tagCoverError) {
-    // No RPC yet → ignore the tag filter so the wall still loads.
-    if (isGalleryTagsUnavailable(tagCoverError)) return null
-    console.error("[gallery] failed to resolve tag covers", tagCoverError)
-    throw new Error(tagCoverError.message || "Failed to filter by tag.")
+    // No RPC yet / transient PostgREST failure → ignore tag filter.
+    if (!isGalleryTagsUnavailable(tagCoverError)) {
+      console.error("[gallery] failed to resolve tag covers", tagCoverError)
+    }
+    return null
   }
   const tagCoverIds = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (tagCoverIds.length === 0) return "none"
@@ -240,8 +241,9 @@ async function resolveQueryCoverIds(
     ) {
       return "legacy"
     }
+    // Keep the wall up with name ILIKE fallback on unexpected RPC errors.
     console.error("[gallery] failed to resolve search covers", error)
-    throw new Error(error.message || "Failed to search the wall.")
+    return "legacy"
   }
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"
@@ -265,9 +267,11 @@ async function resolveFavoriteCoverIds(
     "gallery_wall_cover_ids_for_favorites"
   )
   if (error) {
-    if (isGalleryFavoritesUnavailable(error)) return null
-    console.error("[gallery] failed to resolve favorite covers", error)
-    throw new Error(error.message || "Failed to load saved photos.")
+    if (!isGalleryFavoritesUnavailable(error)) {
+      console.error("[gallery] failed to resolve favorite covers", error)
+    }
+    // Ignore the Saved filter so the wall still loads.
+    return null
   }
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"
@@ -290,9 +294,11 @@ async function resolveAlbumCoverIds(
     { p_slug: albumSlug }
   )
   if (error) {
-    if (isGalleryAlbumsUnavailable(error)) return null
-    console.error("[gallery] failed to resolve album covers", error)
-    throw new Error(error.message || "Failed to filter by album.")
+    if (!isGalleryAlbumsUnavailable(error)) {
+      console.error("[gallery] failed to resolve album covers", error)
+    }
+    // Ignore the album filter so the wall still loads.
+    return null
   }
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"
@@ -643,7 +649,8 @@ async function loadGalleryHomeRangeViaView(
     if (isGalleryVideoColumnsUnavailable(rowsResult.error)) return null
     if (isGallerySequenceUnavailable(rowsResult.error)) return null
     console.error("[gallery] failed to load wall page", rowsResult.error)
-    throw new Error(rowsResult.error.message || "Failed to load gallery.")
+    // Fall back to the legacy cover query instead of crashing the wall.
+    return null
   }
   if (countResult.error) {
     console.error("[gallery] failed to count wall covers", countResult.error)
@@ -874,7 +881,13 @@ async function loadGalleryHomeRangeLegacy(
 
   if (imagesResult.error) {
     console.error("[gallery] failed to load images", imagesResult.error)
-    throw new Error(imagesResult.error.message || "Failed to load gallery.")
+    return {
+      images: [],
+      members: userId
+        ? buildMembers((profilesResult.data ?? []) as ProfileRow[])
+        : [],
+      totalCount: 0,
+    }
   }
   if (profilesResult.error) {
     console.error(

@@ -3,9 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GalleryReaction } from "@/lib/gallery/reactions"
 import {
   fetchGalleryMentionNotification,
+  isGalleryMentionsTableUnavailable,
   loadUnreadGalleryMentions,
   type GalleryMentionNotification,
 } from "@/lib/gallery/mention-notifications"
+
+export { isGalleryMentionsTableUnavailable } from "@/lib/gallery/mention-notifications"
 
 export type GalleryNotificationKind =
   | "mention"
@@ -136,21 +139,6 @@ export function isActivityNotificationsUnavailable(
     error.code === "PGRST205" ||
     error.code === "42P01" ||
     (/gallery_activity_notifications/i.test(message) &&
-      (/schema cache/i.test(message) ||
-        /does not exist/i.test(message) ||
-        /could not find/i.test(message)))
-  )
-}
-
-export function isGalleryMentionsTableUnavailable(
-  error: { code?: string; message?: string } | null
-): boolean {
-  if (!error) return false
-  const message = error.message ?? ""
-  return (
-    error.code === "PGRST205" ||
-    error.code === "42P01" ||
-    (/gallery_comment_mentions/i.test(message) &&
       (/schema cache/i.test(message) ||
         /does not exist/i.test(message) ||
         /could not find/i.test(message)))
