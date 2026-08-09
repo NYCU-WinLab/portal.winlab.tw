@@ -93,6 +93,7 @@ import {
   manageSelectionToSlideshowPhotos,
   expandManageSelectionSlideshowPhotos,
   expandManageSelectionZipItems,
+  resolveManageSelectionWallPhotoIds,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
   rowNeedsCaptureDate,
@@ -905,19 +906,21 @@ export function UploadManageList({
   }
 
   const copySelectedLinks = async () => {
-    if (selectedItems.length === 0) return
+    if (orderedSelectedIds.length === 0) return
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
       toast.error("Could not copy links in this context.")
       return
     }
-    const text = buildWallSelectionShareText(
-      selectedItems.map((item) => item.id),
-      origin
+    const photoIds = resolveManageSelectionWallPhotoIds(
+      orderedSelectedIds,
+      images
     )
+    if (photoIds.length === 0) return
+    const text = buildWallSelectionShareText(photoIds, origin)
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(describeWallSelectionCopy(selectedItems.length))
+      toast.success(describeWallSelectionCopy(photoIds.length))
     } catch {
       toast.error("Could not copy to the clipboard.")
     }

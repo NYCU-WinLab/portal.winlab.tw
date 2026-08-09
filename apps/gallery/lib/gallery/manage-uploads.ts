@@ -1,4 +1,7 @@
-import type { WallPhotoSource } from "@/lib/gallery/wall-photo-id"
+import {
+  resolveWallPhotoId,
+  type WallPhotoSource,
+} from "@/lib/gallery/wall-photo-id"
 
 export type ManageUploadRow = WallPhotoSource & {
   name: string
@@ -172,6 +175,28 @@ export function expandManageSelectionZipItems(
       position,
     })
   )
+}
+
+/**
+ * Wall deep-link ids for a Manage selection — sequence shots collapse to the
+ * cover representative and duplicates are dropped.
+ */
+export function resolveManageSelectionWallPhotoIds(
+  orderedSelectedIds: readonly string[],
+  images: readonly ManageUploadRow[]
+): string[] {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const id of orderedSelectedIds) {
+    const row = byId.get(id)
+    if (!row) continue
+    const wallId = resolveWallPhotoId(row, images)
+    if (seen.has(wallId)) continue
+    seen.add(wallId)
+    ids.push(wallId)
+  }
+  return ids
 }
 
 export function isGalleryTakenAtUnavailable(

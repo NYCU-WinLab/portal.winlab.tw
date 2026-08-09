@@ -13,6 +13,7 @@ import {
   manageSelectionToSlideshowPhotos,
   expandManageSelectionSlideshowPhotos,
   expandManageSelectionZipItems,
+  resolveManageSelectionWallPhotoIds,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -278,6 +279,13 @@ describe("manageSelectionToSlideshowPhotos", () => {
       { name: "C", image_path: "u/c.jpg", position: 0 },
       { name: "B", image_path: "u/b.jpg", position: 1 },
       { name: "A", image_path: "u/a.jpg", position: 2 },
+    ])
+  })
+
+  test("collapses sequence shots to wall cover ids for Links", () => {
+    expect(resolveManageSelectionWallPhotoIds(["b", "a"], rows)).toEqual([
+      "c",
+      "a",
     ])
   })
 })
