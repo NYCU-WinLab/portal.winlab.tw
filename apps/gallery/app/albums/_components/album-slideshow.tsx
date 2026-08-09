@@ -6,6 +6,8 @@ import {
   IconChevronRight,
   IconPlayerPause,
   IconPlayerPlay,
+  IconVolume,
+  IconVolumeOff,
   IconX,
 } from "@tabler/icons-react"
 
@@ -60,6 +62,7 @@ export function AlbumSlideshow({
   )
   const [paused, setPaused] = useState(false)
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
+  const [videoMuted, setVideoMuted] = useState(true)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
   const pausedRef = useRef(paused)
@@ -70,6 +73,7 @@ export function AlbumSlideshow({
     setIndex(clampSlideshowStartIndex(startIndex, photos.length))
     setPaused(false)
     setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
+    setVideoMuted(true)
     touchStartRef.current = null
     suppressClickRef.current = false
   }, [open, startIndex, photos.length])
@@ -171,6 +175,13 @@ export function AlbumSlideshow({
         setPaused((value) => !value)
         return
       }
+      if (event.key === "m" || event.key === "M") {
+        const current = photos[index]
+        if (current?.media_type !== "video") return
+        event.preventDefault()
+        setVideoMuted((value) => !value)
+        return
+      }
       if (event.key === "[" || event.key === "-") {
         event.preventDefault()
         bumpInterval(-500)
@@ -213,7 +224,7 @@ export function AlbumSlideshow({
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [open, photos.length])
+  }, [open, photos, index])
 
   if (photos.length === 0) return null
 
@@ -256,6 +267,23 @@ export function AlbumSlideshow({
             </p>
           </div>
           <div className="flex items-center gap-1">
+            {photo.media_type === "video" ? (
+              <button
+                type="button"
+                onClick={() => setVideoMuted((value) => !value)}
+                className={cn(
+                  gallerySans(),
+                  "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
+                )}
+                aria-label={videoMuted ? "Unmute video" : "Mute video"}
+              >
+                {videoMuted ? (
+                  <IconVolumeOff className="size-5" aria-hidden />
+                ) : (
+                  <IconVolume className="size-5" aria-hidden />
+                )}
+              </button>
+            ) : null}
             <GalleryKeyboardCheatsheet slideshowOpen dark />
             <button
               type="button"
@@ -387,7 +415,7 @@ export function AlbumSlideshow({
               controls
               playsInline
               autoPlay
-              muted
+              muted={videoMuted}
               onEnded={() => {
                 if (pausedRef.current || photos.length < 2) return
                 setIndex((current) =>

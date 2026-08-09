@@ -31,6 +31,7 @@ export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
 export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["Space"], action: "Pause / resume" },
   { keys: ["click"], action: "Pause / resume (photo)" },
+  { keys: ["M"], action: "Mute / unmute (video)" },
   { keys: ["[", "]"], action: "Slower / faster" },
   { keys: ["←", "→"], action: "Previous / next slide" },
   { keys: ["swipe"], action: "Previous / next (touch)" },
