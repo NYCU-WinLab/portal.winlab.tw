@@ -33,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
+import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import {
   deleteGalleryImages,
   updateGalleryImagesTakenAt,
@@ -908,6 +909,23 @@ export function UploadManageList({
                   {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
                 </button>
               ) : null}
+              <GalleryAddToAlbum
+                imageIds={selectedItems.map((item) => item.id)}
+                triggerLabel={
+                  selectedItems.length > 0
+                    ? `Album (${selectedItems.length})`
+                    : "Album"
+                }
+                triggerClassName={cn(
+                  galleryPillClass(),
+                  "h-auto gap-0 !text-xs normal-case",
+                  (isPending || selectedItems.length === 0) && "opacity-40"
+                )}
+                onAdded={() => {
+                  setSelectedIds(new Set())
+                  setSelectionMode(false)
+                }}
+              />
               <button
                 type="button"
                 onClick={() => {
