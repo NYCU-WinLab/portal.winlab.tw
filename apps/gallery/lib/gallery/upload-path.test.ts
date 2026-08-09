@@ -119,6 +119,16 @@ describe("describeUploadFailure", () => {
     expect(described.stage).toBe("network")
   })
 
+  test("classifies encoder CDN failures as video-processing", () => {
+    const described = describeUploadFailure(
+      new Error(
+        "Could not load the browser encoder (CDN blocked or offline) — allow unpkg"
+      )
+    )
+    expect(described.stage).toBe("video-processing")
+    expect(described.userMessage.toLowerCase()).toContain("compress")
+  })
+
   test("preserves UploadFailureError stage", () => {
     const described = describeUploadFailure(
       new UploadFailureError("video-processing", "memory access out of bounds")
