@@ -55,8 +55,21 @@ export function isGalleryMemoriesUnavailable(
   }
   return (
     /could not find the function/i.test(message) ||
-    /schema cache/i.test(message)
+    (/schema cache/i.test(message) && /gallery_memories/i.test(message))
   )
+}
+
+/** True when gallery_memories_on_this_day is callable (migration applied). */
+export async function isGalleryMemoriesReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase.rpc("gallery_memories_on_this_day", {
+    p_month: 1,
+    p_day: 1,
+    p_limit: 1,
+  })
+  if (!error) return true
+  return !isGalleryMemoriesUnavailable(error)
 }
 
 export type GalleryMemoriesLoadResult = {

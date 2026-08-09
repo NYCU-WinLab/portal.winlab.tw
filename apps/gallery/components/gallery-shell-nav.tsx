@@ -37,11 +37,15 @@ export function GalleryShellNav({
   signedIn,
   viewerId = null,
   mentionNotifications = [],
+  albumsAvailable = true,
+  memoriesAvailable = true,
 }: {
   active: GalleryShellActive
   signedIn: boolean
   viewerId?: string | null
   mentionNotifications?: GalleryNotification[]
+  albumsAvailable?: boolean
+  memoriesAvailable?: boolean
 }) {
   return (
     <div
@@ -61,20 +65,24 @@ export function GalleryShellNav({
         <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
           Portal
         </GalleryNavLink>
-        <GalleryNavLink
-          href="/albums"
-          active={active === "albums"}
-          tone="shell"
-        >
-          Albums
-        </GalleryNavLink>
-        <GalleryNavLink
-          href="/memories"
-          active={active === "memories"}
-          tone="shell"
-        >
-          Memories
-        </GalleryNavLink>
+        {albumsAvailable ? (
+          <GalleryNavLink
+            href="/albums"
+            active={active === "albums"}
+            tone="shell"
+          >
+            Albums
+          </GalleryNavLink>
+        ) : null}
+        {memoriesAvailable ? (
+          <GalleryNavLink
+            href="/memories"
+            active={active === "memories"}
+            tone="shell"
+          >
+            Memories
+          </GalleryNavLink>
+        ) : null}
         {signedIn ? (
           <>
             {active !== "manage" ? (
@@ -133,24 +141,28 @@ export function GalleryShellNav({
                 Portal
               </a>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/albums"
-                className="flex cursor-pointer items-center gap-2"
-              >
-                <IconAlbum className="size-4 shrink-0" aria-hidden />
-                Albums
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/memories"
-                className="flex cursor-pointer items-center gap-2"
-              >
-                <IconHistory className="size-4 shrink-0" aria-hidden />
-                Memories
-              </Link>
-            </DropdownMenuItem>
+            {albumsAvailable ? (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/albums"
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <IconAlbum className="size-4 shrink-0" aria-hidden />
+                  Albums
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+            {memoriesAvailable ? (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/memories"
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <IconHistory className="size-4 shrink-0" aria-hidden />
+                  Memories
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
             {signedIn && active !== "manage" ? (
               <DropdownMenuItem asChild>
                 <Link

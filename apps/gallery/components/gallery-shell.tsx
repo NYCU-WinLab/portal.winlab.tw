@@ -21,6 +21,8 @@ import {
   GalleryShellNav,
   type GalleryShellActive,
 } from "@/components/gallery-shell-nav"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import { isGalleryMemoriesReady } from "@/lib/gallery/load-memories"
 import type { GalleryNotification } from "@/lib/gallery/notifications"
 import {
   GALLERY_SEASONAL_THEMES,
@@ -40,6 +42,8 @@ export function GalleryShell({
   viewerId = null,
   seasonalThemeId = null,
   mentionNotifications = [],
+  albumsAvailable = true,
+  memoriesAvailable = true,
   containerClassName,
 }: {
   children: ReactNode
@@ -48,6 +52,8 @@ export function GalleryShell({
   viewerId?: string | null
   seasonalThemeId?: GallerySeasonalThemeId | null
   mentionNotifications?: GalleryNotification[]
+  albumsAvailable?: boolean
+  memoriesAvailable?: boolean
   containerClassName?: string
 }) {
   const theme = seasonalThemeId
@@ -99,6 +105,8 @@ export function GalleryShell({
                 signedIn={signedIn}
                 viewerId={viewerId}
                 mentionNotifications={mentionNotifications}
+                albumsAvailable={albumsAvailable}
+                memoriesAvailable={memoriesAvailable}
               />
             </div>
           </div>
@@ -137,11 +145,18 @@ export async function GalleryThemedShell({
 }) {
   const supabase = await createClient()
   const user = await getCurrentUser()
-  const [seasonalThemeId, mentionNotifications] = await Promise.all([
+  const [
+    seasonalThemeId,
+    mentionNotifications,
+    albumsAvailable,
+    memoriesAvailable,
+  ] = await Promise.all([
     getGallerySeasonalThemeId(supabase),
     user
       ? loadUnreadGalleryNotifications(supabase, user.id)
       : Promise.resolve([]),
+    isGalleryAlbumsReady(supabase),
+    isGalleryMemoriesReady(supabase),
   ])
 
   return (
@@ -151,6 +166,8 @@ export async function GalleryThemedShell({
       viewerId={user?.id ?? null}
       seasonalThemeId={seasonalThemeId}
       mentionNotifications={mentionNotifications}
+      albumsAvailable={albumsAvailable}
+      memoriesAvailable={memoriesAvailable}
       containerClassName={containerClassName}
     >
       {children}
