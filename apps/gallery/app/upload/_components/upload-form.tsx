@@ -147,8 +147,9 @@ export function UploadForm({
           Develop & hang
         </h2>
         <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-          Drop polaroids onto the film strip — multi-select becomes one sequence
-          story on the wall.
+          {sequencesAvailable
+            ? "Drop polaroids onto the film strip — multi-select becomes one sequence story on the wall."
+            : "Drop polaroids onto the film strip — each file hangs as its own shot."}
         </p>
       </div>
 
@@ -172,8 +173,9 @@ export function UploadForm({
           )}
         />
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-          Base name for a single shot, or the cover title when you multi-select
-          a sequence.
+          {sequencesAvailable
+            ? "Base name for a single shot, or the cover title when you multi-select a sequence."
+            : "Base name applied to each selected shot."}
         </p>
       </div>
 
@@ -362,7 +364,7 @@ export function UploadForm({
           in your browser. Gallery storage cap is 30 MB per file after
           compression. HEIC/HEIF from iPhone are accepted.
         </p>
-        {selectedFiles.length > 1 && trimmedName ? (
+        {selectedFiles.length > 1 && trimmedName && sequencesAvailable ? (
           <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
             <p
               className={cn(
