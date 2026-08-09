@@ -60,7 +60,8 @@ async function sendResendEmail(input: {
   }
 }
 
-function escapeHtml(value: string) {
+/** Escape plain text for safe HTML email bodies. */
+export function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
