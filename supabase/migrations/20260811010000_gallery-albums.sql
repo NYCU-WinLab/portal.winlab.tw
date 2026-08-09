@@ -286,7 +286,7 @@ returns table (
   uploader_name text,
   created_by uuid,
   created_at timestamptz,
-  position integer,
+  sort_position integer,
   added_at timestamptz
 )
 language sql
@@ -303,7 +303,7 @@ as $$
     coalesce(up.name, 'Someone') as uploader_name,
     gi.created_by,
     gi.created_at,
-    gai.position,
+    gai.position as sort_position,
     gai.added_at
   from public.gallery_albums ga
   join public.gallery_album_images gai on gai.album_id = ga.id

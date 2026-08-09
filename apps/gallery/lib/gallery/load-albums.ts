@@ -30,7 +30,7 @@ type PhotoRow = {
   uploader_name: string
   created_by: string | null
   created_at: string
-  position: number
+  sort_position: number
   added_at: string
 }
 
@@ -119,7 +119,7 @@ export async function loadGalleryAlbumBySlug(
         uploader_name: row.uploader_name,
         created_by: row.created_by,
         created_at: row.created_at,
-        position: row.position,
+        position: row.sort_position,
         added_at: row.added_at,
       },
     ]
