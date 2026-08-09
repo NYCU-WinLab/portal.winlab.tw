@@ -78,6 +78,7 @@ export function TakenAtEditor({
             ? `Edit capture date for ${imageName}`
             : "Edit capture date for this work"
         }
+        aria-busy={pending}
         className={cn(
           gallerySans(),
           "!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
@@ -122,8 +123,13 @@ export function TakenAtEditor({
           >
             Cancel
           </Button>
-          <Button type="button" onClick={onSave} disabled={pending}>
-            Save
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {pending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

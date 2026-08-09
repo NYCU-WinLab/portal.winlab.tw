@@ -48,6 +48,7 @@ export function DeleteButton({
         <Button
           variant="ghost"
           disabled={pending}
+          aria-busy={pending}
           aria-label={`Delete ${name}`}
           className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
         >
@@ -63,8 +64,14 @@ export function DeleteButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Delete</AlertDialogAction>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={pending}
+            aria-busy={pending}
+            onClick={onConfirm}
+          >
+            {pending ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
