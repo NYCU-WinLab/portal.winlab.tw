@@ -40,6 +40,26 @@ export function filterUploadDayRows(
   return rows.filter(rowNeedsCaptureDate)
 }
 
+/** Ids currently shown in the Manage timeline (after Incomplete / Upload day?). */
+export function flattenVisibleManageIds(
+  timeline: Array<
+    | { kind: "sequence"; sequence: { items: Array<{ id: string }> } }
+    | { kind: "single"; row: { id: string } }
+  >
+): string[] {
+  const ids: string[] = []
+  for (const entry of timeline) {
+    if (entry.kind === "single") {
+      ids.push(entry.row.id)
+      continue
+    }
+    for (const item of entry.sequence.items) {
+      ids.push(item.id)
+    }
+  }
+  return ids
+}
+
 export function isGalleryTakenAtUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {

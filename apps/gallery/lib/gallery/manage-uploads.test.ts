@@ -9,6 +9,7 @@ import {
   looksLikeUploadDayTakenAt,
   countUploadDayRows,
   filterUploadDayRows,
+  flattenVisibleManageIds,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -154,6 +155,20 @@ describe("countUploadDayRows", () => {
     ]
     expect(countUploadDayRows(rows)).toBe(1)
     expect(filterUploadDayRows(rows).map((row) => row.id)).toEqual(["a"])
+  })
+})
+
+describe("flattenVisibleManageIds", () => {
+  test("flattens singles and sequence items in timeline order", () => {
+    expect(
+      flattenVisibleManageIds([
+        { kind: "single", row: { id: "s1" } },
+        {
+          kind: "sequence",
+          sequence: { items: [{ id: "a" }, { id: "b" }] },
+        },
+      ])
+    ).toEqual(["s1", "a", "b"])
   })
 })
 

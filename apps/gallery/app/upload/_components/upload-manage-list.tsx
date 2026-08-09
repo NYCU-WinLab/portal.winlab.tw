@@ -68,6 +68,7 @@ import {
   describeSequenceGaps,
   filterIncompleteSequences,
   findSequenceGaps,
+  flattenVisibleManageIds,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
   rowNeedsCaptureDate,
@@ -608,7 +609,15 @@ export function UploadManageList({
     [images]
   )
 
+  const visibleSelectableItems = useMemo(() => {
+    const visibleIds = new Set(flattenVisibleManageIds(visibleTimeline))
+    return selectableItems.filter((item) => visibleIds.has(item.id))
+  }, [selectableItems, visibleTimeline])
+
   const selectedItems = selectableItems.filter((item) =>
+    selectedIds.has(item.id)
+  )
+  const selectedVisibleItems = visibleSelectableItems.filter((item) =>
     selectedIds.has(item.id)
   )
 
@@ -647,11 +656,11 @@ export function UploadManageList({
       ) {
         event.preventDefault()
         setSelectedIds((current) => {
-          const allSelected =
-            selectableItems.length > 0 &&
-            selectableItems.every((item) => current.has(item.id))
-          if (allSelected) return new Set()
-          return new Set(selectableItems.map((item) => item.id))
+          const allVisibleSelected =
+            visibleSelectableItems.length > 0 &&
+            visibleSelectableItems.every((item) => current.has(item.id))
+          if (allVisibleSelected) return new Set()
+          return new Set(visibleSelectableItems.map((item) => item.id))
         })
       }
     }
@@ -663,7 +672,7 @@ export function UploadManageList({
     bulkDateOpen,
     bulkTagOpen,
     bulkUntagOpen,
-    selectableItems,
+    visibleSelectableItems,
   ])
 
   const confirmBatchDelete = () => {
@@ -773,8 +782,8 @@ export function UploadManageList({
   if (images.length === 0) return null
 
   const allSelected =
-    selectableItems.length > 0 &&
-    selectableItems.every((item) => selectedIds.has(item.id))
+    visibleSelectableItems.length > 0 &&
+    visibleSelectableItems.every((item) => selectedIds.has(item.id))
   const selectedPreview = selectedItems
     .slice(0, 4)
     .map((item) => item.name)
@@ -840,13 +849,15 @@ export function UploadManageList({
                 setSelectedIds(new Set())
                 return
               }
-              setSelectedIds(new Set(selectableItems.map((item) => item.id)))
+              setSelectedIds(
+                new Set(visibleSelectableItems.map((item) => item.id))
+              )
             }}
             className={galleryPillClass()}
           >
             {allSelected
               ? "Clear all"
-              : `Select all (${selectableItems.length})`}
+              : `Select all (${visibleSelectableItems.length})`}
           </button>
         ) : null}
       </div>
@@ -866,9 +877,9 @@ export function UploadManageList({
             aria-live="polite"
           >
             <p className={cn(gallerySans(), "text-sm text-foreground")}>
-              {selectedItems.length === 0
+              {selectedVisibleItems.length === 0
                 ? "Tap works to select"
-                : `${selectedItems.length} of ${selectableItems.length} selected`}
+                : `${selectedVisibleItems.length} of ${visibleSelectableItems.length} selected`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -879,7 +890,7 @@ export function UploadManageList({
                     return
                   }
                   setSelectedIds(
-                    new Set(selectableItems.map((item) => item.id))
+                    new Set(visibleSelectableItems.map((item) => item.id))
                   )
                 }}
                 className={galleryPillClass()}
