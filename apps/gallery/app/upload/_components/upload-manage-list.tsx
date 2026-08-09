@@ -80,6 +80,10 @@ import {
 import { galleryTaipeiCalendarDay } from "@/lib/gallery/memories"
 import { resolveWallPhotoId } from "@/lib/gallery/wall-photo-id"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import {
+  buildWallSelectionShareText,
+  describeWallSelectionCopy,
+} from "@/lib/gallery/wall-selection-share"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 
 function toTaipeiDateInput(iso: string | null | undefined): string {
@@ -826,6 +830,25 @@ export function UploadManageList({
     }
   }
 
+  const copySelectedLinks = async () => {
+    if (selectedItems.length === 0) return
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    if (!origin) {
+      toast.error("Could not copy links in this context.")
+      return
+    }
+    const text = buildWallSelectionShareText(
+      selectedItems.map((item) => item.id),
+      origin
+    )
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(describeWallSelectionCopy(selectedItems.length))
+    } catch {
+      toast.error("Could not copy to the clipboard.")
+    }
+  }
+
   if (images.length === 0) return null
 
   const allSelected =
@@ -983,6 +1006,15 @@ export function UploadManageList({
                   : selectedItems.length > 0
                     ? `ZIP (${selectedItems.length})`
                     : "ZIP"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void copySelectedLinks()}
+                disabled={isPending || selectedItems.length === 0}
+                className={cn(galleryPillClass(), "disabled:opacity-40")}
+              >
+                Links
+                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
               </button>
               <button
                 type="button"
