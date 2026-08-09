@@ -63,6 +63,7 @@ type UploadCtx = {
   labelPrefix: string
   sequenceId: string | null
   sequenceIndex: number | null
+  tagNames?: string[]
   signal?: AbortSignal
 }
 
@@ -180,6 +181,7 @@ export async function uploadImageFile(
     mediaType: "image",
     sequenceId,
     sequenceIndex,
+    tagNames: ctx.tagNames,
   })
 }
 
@@ -298,6 +300,7 @@ export async function uploadVideoFile(ctx: UploadCtx): Promise<string> {
     durationSeconds: compressed.durationSeconds,
     sequenceId,
     sequenceIndex,
+    tagNames: ctx.tagNames,
   })
 }
 
@@ -306,6 +309,7 @@ export type RunUploadOptions = {
   baseName: string
   setStatus: (s: UploadStatus) => void
   signal: AbortSignal
+  tagNames?: string[]
   /** When retrying, preserve prior sequence metadata per file. */
   sequenceMeta?: Array<{
     sequenceId: string | null
@@ -318,6 +322,7 @@ export async function runGalleryUpload({
   baseName,
   setStatus,
   signal,
+  tagNames,
   sequenceMeta,
 }: RunUploadOptions): Promise<UploadRunResult> {
   const supabase = createClient()
@@ -401,6 +406,7 @@ export async function runGalleryUpload({
           labelPrefix,
           sequenceId,
           sequenceIndex,
+          tagNames,
           signal,
         })
       } else {
@@ -413,6 +419,7 @@ export async function runGalleryUpload({
           labelPrefix,
           sequenceId,
           sequenceIndex,
+          tagNames,
           signal,
         })
       }

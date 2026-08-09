@@ -15,6 +15,7 @@ import {
   resolveGallerySiteOrigin,
 } from "@/lib/gallery/og-metadata"
 import { resolveGalleryPhotoDeepLink } from "@/lib/gallery/photo-deep-link"
+import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -29,6 +30,7 @@ type GalleryHomePageProps = {
     media?: string
     after?: string
     q?: string
+    tag?: string
   }>
 }
 
@@ -57,8 +59,9 @@ export async function generateMetadata({
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment, uploader, media, after, q } = await searchParams
-  const filters = parseGalleryHomeFilters({ uploader, media, after, q })
+  const { page, photo, comment, uploader, media, after, q, tag } =
+    await searchParams
+  const filters = parseGalleryHomeFilters({ uploader, media, after, q, tag })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -80,14 +83,24 @@ export default async function GalleryHomePage({
     }
   }
 
-  const { images, members, currentPage, hasMore } = await loadGalleryHomePages(
-    supabase,
-    {
-      throughPage,
-      userId: user?.id ?? null,
-      filters,
-    }
-  )
+  const [{ images, members, currentPage, hasMore }, popularTagsResult] =
+    await Promise.all([
+      loadGalleryHomePages(supabase, {
+        throughPage,
+        userId: user?.id ?? null,
+        filters,
+      }),
+      supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
+    ])
+
+  const popularTags: GalleryTagSuggestion[] = popularTagsResult.error
+    ? []
+    : ((popularTagsResult.data ?? []) as GalleryTagSuggestion[]).map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        use_count: Number(row.use_count) || 0,
+      }))
 
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
@@ -95,8 +108,21 @@ export default async function GalleryHomePage({
         <GalleryHomeHero />
         {user ? (
           <Suspense fallback={null}>
-            <GalleryHomeFiltersBar filters={filters} members={members} />
+            <GalleryHomeFiltersBar
+              filters={filters}
+              members={members}
+              popularTags={popularTags}
+            />
           </Suspense>
+        ) : filters.tagSlug ? (
+          <p className="mx-auto mb-6 max-w-md px-6 text-center text-xs text-zinc-600">
+            Showing tag{" "}
+            <span className="font-medium text-foreground">
+              #
+              {popularTags.find((item) => item.slug === filters.tagSlug)
+                ?.slug ?? filters.tagSlug}
+            </span>
+          </p>
         ) : null}
         <Suspense
           fallback={
@@ -116,6 +142,7 @@ export default async function GalleryHomePage({
               filters.media,
               filters.uploadedAfter ?? "",
               filters.query ?? "",
+              filters.tagSlug ?? "",
               String(currentPage),
             ].join("|")}
             initialImages={images}

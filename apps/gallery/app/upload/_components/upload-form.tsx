@@ -24,6 +24,7 @@ export function UploadForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
+  const [tagsDraft, setTagsDraft] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [dragging, setDragging] = useState(false)
@@ -80,6 +81,7 @@ export function UploadForm() {
   function resetForm() {
     formRef.current?.reset()
     setName("")
+    setTagsDraft("")
     setSelectedFiles([])
     setFailedUploads([])
   }
@@ -99,7 +101,12 @@ export function UploadForm() {
       return
     }
 
-    runUpload(files, name, { onAllSucceeded: resetForm })
+    const tagNames = tagsDraft
+      .split(/[,，]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    runUpload(files, name, { onAllSucceeded: resetForm, tagNames })
   }
 
   function onDrop(event: DragEvent<HTMLLabelElement>) {
@@ -153,6 +160,30 @@ export function UploadForm() {
         <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
           Base name for a single shot, or the cover title when you multi-select
           a sequence.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label
+          htmlFor="gallery-tags"
+          className={cn(gallerySerif(), "text-base")}
+        >
+          Tags
+        </Label>
+        <Input
+          id="gallery-tags"
+          name="tags"
+          placeholder="lab trip, sunset"
+          value={tagsDraft}
+          onChange={(e) => setTagsDraft(e.target.value)}
+          disabled={pending}
+          className={cn(
+            gallerySans(),
+            "h-11 rounded-xl border-border/60 bg-background"
+          )}
+        />
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          Optional. Comma-separated — applied to every shot in this upload.
         </p>
       </div>
 

@@ -8,6 +8,7 @@ import {
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
 } from "@/lib/gallery/reactions"
+import type { GalleryTag } from "@/lib/gallery/tags"
 
 export type GalleryImage = {
   id: string
@@ -27,6 +28,7 @@ export type GalleryImage = {
   sequence_missing_indexes: number[]
   comments: GalleryComment[]
   comment_count: number
+  tags: GalleryTag[]
   reaction_counts: ReactionCounts
   my_reaction: GalleryReaction | null
   reaction_names: ReactionNames
@@ -40,7 +42,10 @@ export type GallerySequenceItem = {
   poster_path: string | null
   created_at: string
   sequence_index: number | null
+  tags: GalleryTag[]
 }
+
+export type { GalleryTag }
 
 export type GalleryComment = {
   id: string
