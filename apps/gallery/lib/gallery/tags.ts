@@ -12,6 +12,32 @@ export type GalleryTagSuggestion = GalleryTag & {
 }
 
 /**
+ * Migration not applied yet (or PostgREST schema cache miss) — fail quietly
+ * so the wall still loads without a Next.js error overlay.
+ */
+export function isGalleryTagsUnavailable(
+  error: {
+    code?: string
+    message?: string
+  } | null
+): boolean {
+  if (!error) return false
+  const code = error.code ?? ""
+  const message = error.message ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "PGRST202" ||
+    code === "42P01" ||
+    /gallery_image_tags|gallery_tags|gallery_list_popular_tags|gallery_wall_cover_ids_for_tag/i.test(
+      message
+    ) ||
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find/i.test(message)
+  )
+}
+
+/**
  * Normalize a free-form label into a URL-safe slug.
  * Returns null when nothing usable remains.
  */

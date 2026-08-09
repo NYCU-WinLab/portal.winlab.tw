@@ -93,6 +93,7 @@ export default async function GalleryHomePage({
       supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
     ])
 
+  // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
   const popularTags: GalleryTagSuggestion[] = popularTagsResult.error
     ? []
     : ((popularTagsResult.data ?? []) as GalleryTagSuggestion[]).map((row) => ({
