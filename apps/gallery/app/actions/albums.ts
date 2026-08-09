@@ -22,6 +22,16 @@ export type AlbumActionResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { data: T }))
   | { ok: false; error: string }
 
+function albumErrorResult(error: { message?: string; code?: string }): {
+  ok: false
+  error: string
+} {
+  if (isGalleryAlbumsUnavailable(error)) {
+    return { ok: false, error: "Albums are not available yet." }
+  }
+  return { ok: false, error: error.message ?? "Album action failed." }
+}
+
 type GallerySupabase = Awaited<ReturnType<typeof createClient>>
 
 async function requireSignedIn(): Promise<
@@ -96,7 +106,7 @@ export async function createGalleryAlbum(input: {
         error: "That album name is already taken — try another.",
       }
     }
-    return { ok: false, error: error.message }
+    return albumErrorResult(error)
   }
 
   revalidateAlbumPaths(data.slug)
@@ -159,7 +169,7 @@ export async function updateGalleryAlbum(input: {
     .eq("id", input.albumId)
     .maybeSingle()
 
-  if (existingError) return { ok: false, error: existingError.message }
+  if (existingError) return albumErrorResult(existingError)
   if (!existing) return { ok: false, error: "Album not found." }
 
   const patch: Record<string, unknown> = {
@@ -194,7 +204,7 @@ export async function updateGalleryAlbum(input: {
         .eq("album_id", input.albumId)
         .eq("image_id", input.coverImageId)
         .maybeSingle()
-      if (memberError) return { ok: false, error: memberError.message }
+      if (memberError) return albumErrorResult(memberError)
       if (!member) {
         return {
           ok: false,
@@ -219,7 +229,7 @@ export async function updateGalleryAlbum(input: {
         error: "That album name is already taken — try another.",
       }
     }
-    return { ok: false, error: error.message }
+    return albumErrorResult(error)
   }
 
   revalidateAlbumPaths(existing.slug)
@@ -241,7 +251,7 @@ export async function deleteGalleryAlbum(
     .eq("id", albumId)
     .maybeSingle()
 
-  if (existingError) return { ok: false, error: existingError.message }
+  if (existingError) return albumErrorResult(existingError)
   if (!existing) return { ok: false, error: "Album not found." }
 
   const { error } = await auth.supabase
@@ -249,7 +259,7 @@ export async function deleteGalleryAlbum(
     .delete()
     .eq("id", albumId)
 
-  if (error) return { ok: false, error: error.message }
+  if (error) return albumErrorResult(error)
 
   revalidateAlbumPaths(existing.slug)
   return { ok: true }
@@ -466,10 +476,7 @@ export async function removeImagesFromGalleryAlbumBySlug(
     .maybeSingle()
 
   if (error) {
-    if (isGalleryAlbumsUnavailable(error)) {
-      return { ok: false, error: "Albums are not available yet." }
-    }
-    return { ok: false, error: error.message }
+    return albumErrorResult(error)
   }
   if (!album) return { ok: false, error: "Album not found." }
 
