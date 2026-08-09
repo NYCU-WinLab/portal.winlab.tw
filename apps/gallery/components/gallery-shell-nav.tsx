@@ -39,6 +39,7 @@ export function GalleryShellNav({
   mentionNotifications = [],
   albumsAvailable = true,
   memoriesAvailable = true,
+  notificationsAvailable = true,
 }: {
   active: GalleryShellActive
   signedIn: boolean
@@ -46,6 +47,7 @@ export function GalleryShellNav({
   mentionNotifications?: GalleryNotification[]
   albumsAvailable?: boolean
   memoriesAvailable?: boolean
+  notificationsAvailable?: boolean
 }) {
   return (
     <div
@@ -54,7 +56,7 @@ export function GalleryShellNav({
         "relative z-10 flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
       )}
     >
-      {signedIn && viewerId ? (
+      {signedIn && viewerId && notificationsAvailable ? (
         <GalleryMentionBell
           viewerId={viewerId}
           initialNotifications={mentionNotifications}

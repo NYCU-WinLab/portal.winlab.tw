@@ -23,13 +23,16 @@ import {
 } from "@/components/gallery-shell-nav"
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryMemoriesReady } from "@/lib/gallery/load-memories"
-import type { GalleryNotification } from "@/lib/gallery/notifications"
+import {
+  isGalleryNotificationsReady,
+  loadUnreadGalleryNotifications,
+  type GalleryNotification,
+} from "@/lib/gallery/notifications"
 import {
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
-import { loadUnreadGalleryNotifications } from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -44,6 +47,7 @@ export function GalleryShell({
   mentionNotifications = [],
   albumsAvailable = true,
   memoriesAvailable = true,
+  notificationsAvailable = true,
   containerClassName,
 }: {
   children: ReactNode
@@ -54,6 +58,7 @@ export function GalleryShell({
   mentionNotifications?: GalleryNotification[]
   albumsAvailable?: boolean
   memoriesAvailable?: boolean
+  notificationsAvailable?: boolean
   containerClassName?: string
 }) {
   const theme = seasonalThemeId
@@ -107,6 +112,7 @@ export function GalleryShell({
                 mentionNotifications={mentionNotifications}
                 albumsAvailable={albumsAvailable}
                 memoriesAvailable={memoriesAvailable}
+                notificationsAvailable={notificationsAvailable}
               />
             </div>
           </div>
@@ -150,6 +156,7 @@ export async function GalleryThemedShell({
     mentionNotifications,
     albumsAvailable,
     memoriesAvailable,
+    notificationsAvailable,
   ] = await Promise.all([
     getGallerySeasonalThemeId(supabase),
     user
@@ -157,6 +164,7 @@ export async function GalleryThemedShell({
       : Promise.resolve([]),
     isGalleryAlbumsReady(supabase),
     isGalleryMemoriesReady(supabase),
+    isGalleryNotificationsReady(supabase),
   ])
 
   return (
@@ -165,9 +173,10 @@ export async function GalleryThemedShell({
       signedIn={Boolean(user)}
       viewerId={user?.id ?? null}
       seasonalThemeId={seasonalThemeId}
-      mentionNotifications={mentionNotifications}
+      mentionNotifications={notificationsAvailable ? mentionNotifications : []}
       albumsAvailable={albumsAvailable}
       memoriesAvailable={memoriesAvailable}
+      notificationsAvailable={notificationsAvailable}
       containerClassName={containerClassName}
     >
       {children}
