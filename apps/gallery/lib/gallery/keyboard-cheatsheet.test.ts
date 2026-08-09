@@ -17,8 +17,9 @@ describe("isCheatSheetToggleKey", () => {
 })
 
 describe("GALLERY_WALL_SHORTCUTS", () => {
-  test("documents Esc clearing empty filters", () => {
+  test("documents Esc closing cheat sheet before Select/filters", () => {
     const esc = GALLERY_WALL_SHORTCUTS.find((row) => row.keys.includes("Esc"))
+    expect(esc?.action.toLowerCase()).toContain("cheat sheet")
     expect(esc?.action.toLowerCase()).toContain("filter")
   })
 })
@@ -33,8 +34,9 @@ describe("GALLERY_MANAGE_SHORTCUTS", () => {
     expect(joined).toContain("?")
   })
 
-  test("documents Esc clearing list filters", () => {
+  test("documents Esc closing cheat sheet before Select/filters", () => {
     const esc = GALLERY_MANAGE_SHORTCUTS.find((row) => row.keys.includes("Esc"))
+    expect(esc?.action.toLowerCase()).toContain("cheat sheet")
     expect(esc?.action.toLowerCase()).toContain("filter")
   })
 })

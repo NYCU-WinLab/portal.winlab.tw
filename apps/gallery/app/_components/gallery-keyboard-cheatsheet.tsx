@@ -75,13 +75,22 @@ export function GalleryKeyboardCheatsheet({
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
       if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      // Capture Esc so wall/Manage Select listeners do not run first.
+      if (open && event.key === "Escape") {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        setOpen(false)
+        return
+      }
+
       if (!isCheatSheetToggleKey(event.key, event.shiftKey)) return
       event.preventDefault()
       setOpen((value) => !value)
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [])
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [open])
 
   const primaryRows = slideshowOpen
     ? GALLERY_SLIDESHOW_SHORTCUTS
