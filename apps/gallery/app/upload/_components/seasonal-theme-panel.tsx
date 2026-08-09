@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition, type KeyboardEvent } from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
@@ -12,6 +12,7 @@ import {
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
+import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 import {
   GALLERY_SEASONAL_THEME_IDS,
   GALLERY_SEASONAL_THEMES,
@@ -46,6 +47,7 @@ export function SeasonalThemePanel({
 }) {
   const [selected, setSelected] = useState<ThemeChoice>(activeThemeId ?? "off")
   const [isPending, startTransition] = useTransition()
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   const onSelect = (next: ThemeChoice) => {
     const previous = selected
@@ -85,17 +87,46 @@ export function SeasonalThemePanel({
         )}
         role="radiogroup"
         aria-label="Seasonal site theme"
+        aria-busy={isPending || undefined}
+        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+          if (isPending || !settingsReady) return
+          const key = event.key
+          if (
+            key !== "ArrowLeft" &&
+            key !== "ArrowRight" &&
+            key !== "ArrowUp" &&
+            key !== "ArrowDown" &&
+            key !== "Home" &&
+            key !== "End"
+          ) {
+            return
+          }
+          event.preventDefault()
+          const current = Math.max(
+            0,
+            THEME_OPTIONS.findIndex((option) => option.value === selected)
+          )
+          const nextIndex = nextRadioIndex(current, THEME_OPTIONS.length, key)
+          const next = THEME_OPTIONS[nextIndex]
+          if (!next) return
+          onSelect(next.value)
+          queueMicrotask(() => optionRefs.current[nextIndex]?.focus())
+        }}
       >
-        {THEME_OPTIONS.map((option) => {
+        {THEME_OPTIONS.map((option, index) => {
           const checked = selected === option.value
           const isDefault = option.value === "off"
 
           return (
             <button
               key={option.value}
+              ref={(node) => {
+                optionRefs.current[index] = node
+              }}
               type="button"
               role="radio"
               aria-checked={checked}
+              tabIndex={checked ? 0 : -1}
               disabled={isPending || !settingsReady}
               onClick={() => onSelect(option.value)}
               className={cn(
