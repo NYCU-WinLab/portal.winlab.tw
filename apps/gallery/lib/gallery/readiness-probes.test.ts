@@ -4,6 +4,7 @@ import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
 import {
   isGalleryPinReady,
+  isGallerySequenceReady,
   isGalleryVideoReady,
 } from "@/lib/gallery/manage-uploads"
 import { isGalleryTagsReady } from "@/lib/gallery/tags"
@@ -79,6 +80,18 @@ describe("readiness probes", () => {
         mockClient({
           code: "PGRST204",
           message: "Could not find the 'media_type' column in the schema cache",
+        })
+      )
+    ).toBe(false)
+  })
+
+  test("isGallerySequenceReady is false when sequence_id is missing", async () => {
+    expect(
+      await isGallerySequenceReady(
+        mockClient({
+          code: "PGRST204",
+          message:
+            "Could not find the 'sequence_id' column in the schema cache",
         })
       )
     ).toBe(false)

@@ -271,6 +271,18 @@ export function isGallerySequenceUnavailable(
   )
 }
 
+/** True when gallery sequence columns are selectable. */
+export async function isGallerySequenceReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_images")
+    .select("sequence_id")
+    .limit(1)
+  if (!error) return true
+  return !isGallerySequenceUnavailable(error)
+}
+
 /** True when gallery video columns (media_type / poster / duration) are missing. */
 export function isGalleryVideoColumnsUnavailable(
   error: { code?: string; message?: string } | null
