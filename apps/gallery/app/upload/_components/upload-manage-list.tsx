@@ -28,6 +28,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
@@ -967,17 +973,6 @@ export function UploadManageList({
               >
                 {allSelected ? "Clear" : "Select all"}
               </button>
-              {takenAtAvailable ? (
-                <button
-                  type="button"
-                  onClick={openBulkDate}
-                  disabled={isPending || selectedItems.length === 0}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
-                >
-                  Set date
-                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-                </button>
-              ) : null}
               <GalleryAddToAlbum
                 imageIds={selectedItems.map((item) => item.id)}
                 triggerLabel={
@@ -997,27 +992,6 @@ export function UploadManageList({
               />
               <button
                 type="button"
-                onClick={() => void downloadSelectedZip()}
-                disabled={isPending || zipBusy || selectedItems.length === 0}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                {zipBusy
-                  ? "ZIP…"
-                  : selectedItems.length > 0
-                    ? `ZIP (${selectedItems.length})`
-                    : "ZIP"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void copySelectedLinks()}
-                disabled={isPending || selectedItems.length === 0}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                Links
-                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setBulkTagDraft("")
                   setBulkTagOpen(true)
@@ -1030,18 +1004,6 @@ export function UploadManageList({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setBulkUntagDraft("")
-                  setBulkUntagOpen(true)
-                }}
-                disabled={isPending || selectedItems.length === 0}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                Untag
-                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-              </button>
-              <button
-                type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={isPending || selectedItems.length === 0}
                 className={cn(
@@ -1049,9 +1011,105 @@ export function UploadManageList({
                   "border-destructive/30 text-destructive disabled:opacity-40"
                 )}
               >
-                Delete selected
+                Delete
                 {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
               </button>
+              <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                {takenAtAvailable ? (
+                  <button
+                    type="button"
+                    onClick={openBulkDate}
+                    disabled={isPending || selectedItems.length === 0}
+                    className={cn(galleryPillClass(), "disabled:opacity-40")}
+                  >
+                    Set date
+                    {selectedItems.length > 0
+                      ? ` (${selectedItems.length})`
+                      : ""}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void downloadSelectedZip()}
+                  disabled={isPending || zipBusy || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  {zipBusy
+                    ? "ZIP…"
+                    : selectedItems.length > 0
+                      ? `ZIP (${selectedItems.length})`
+                      : "ZIP"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copySelectedLinks()}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Links
+                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkUntagDraft("")
+                    setBulkUntagOpen(true)
+                  }}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                >
+                  Untag
+                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                </button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isPending || selectedItems.length === 0}
+                    className={cn(
+                      galleryPillClass(),
+                      "disabled:opacity-40 sm:hidden"
+                    )}
+                    aria-label="More selection actions"
+                  >
+                    More
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  {takenAtAvailable ? (
+                    <DropdownMenuItem
+                      disabled={isPending || selectedItems.length === 0}
+                      onSelect={openBulkDate}
+                    >
+                      Set date
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem
+                    disabled={
+                      isPending || zipBusy || selectedItems.length === 0
+                    }
+                    onSelect={() => void downloadSelectedZip()}
+                  >
+                    ZIP
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={isPending || selectedItems.length === 0}
+                    onSelect={() => void copySelectedLinks()}
+                  >
+                    Links
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={isPending || selectedItems.length === 0}
+                    onSelect={() => {
+                      setBulkUntagDraft("")
+                      setBulkUntagOpen(true)
+                    }}
+                  >
+                    Untag
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
