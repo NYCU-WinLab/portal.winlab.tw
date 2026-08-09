@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
+import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
 import {
   allObjectNamesPresent,
@@ -27,6 +28,8 @@ export type RegisterMediaInput = {
   sequenceId?: string | null
   sequenceIndex?: number | null
   tagNames?: string[]
+  /** ISO capture time from EXIF when known; server falls back to now(). */
+  takenAt?: string | null
 }
 
 /**
@@ -136,6 +139,8 @@ export async function registerGalleryImage(
     }
   }
 
+  const takenAt = sanitizeClientTakenAt(input.takenAt)
+
   const insertPayload: Record<string, unknown> = {
     name: trimmed,
     image_path: input.imagePath,
@@ -148,6 +153,7 @@ export async function registerGalleryImage(
     created_by: userId,
     sequence_id: input.sequenceId ?? null,
     sequence_index: input.sequenceIndex ?? null,
+    ...(takenAt ? { taken_at: takenAt } : {}),
   }
 
   // Idempotent retry: if this sequence slot already exists for the uploader,
@@ -165,6 +171,7 @@ export async function registerGalleryImage(
       await supabase.storage.from("gallery").remove(expectedPaths)
       revalidatePath("/")
       revalidatePath("/upload")
+      revalidatePath("/memories")
       return { ok: true, id: existingSlot.id }
     }
   }
@@ -193,6 +200,7 @@ export async function registerGalleryImage(
         await supabase.storage.from("gallery").remove(expectedPaths)
         revalidatePath("/")
         revalidatePath("/upload")
+        revalidatePath("/memories")
         return { ok: true, id: raced.id }
       }
     }
@@ -210,6 +218,7 @@ export async function registerGalleryImage(
 
   revalidatePath("/")
   revalidatePath("/upload")
+  revalidatePath("/memories")
   return { ok: true, id: inserted.id }
 }
 

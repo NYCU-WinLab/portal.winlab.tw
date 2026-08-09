@@ -6,9 +6,15 @@ import { GalleryInfiniteWall } from "@/app/_components/gallery-infinite-wall"
 import { GalleryHomeFiltersBar } from "@/app/_components/gallery-home-filters"
 import { GalleryHomeHero } from "@/app/_components/gallery-home-hero"
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryMemoriesTeaser } from "@/app/_components/gallery-memories-teaser"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
+import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
+import {
+  formatMemoriesDayLabel,
+  galleryTaipeiCalendarDay,
+} from "@/lib/gallery/memories"
 import {
   buildGalleryPhotoMetadata,
   DEFAULT_GALLERY_METADATA,
@@ -83,7 +89,8 @@ export default async function GalleryHomePage({
     }
   }
 
-  const [{ images, members, currentPage, hasMore }, popularTagsResult] =
+  const today = galleryTaipeiCalendarDay()
+  const [{ images, members, currentPage, hasMore }, popularTagsResult, memoryPhotos] =
     await Promise.all([
       loadGalleryHomePages(supabase, {
         throughPage,
@@ -91,6 +98,11 @@ export default async function GalleryHomePage({
         filters,
       }),
       supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
+      loadGalleryMemoriesOnThisDay(supabase, {
+        month: today.month,
+        day: today.day,
+        limit: 12,
+      }),
     ])
 
   const popularTags: GalleryTagSuggestion[] = popularTagsResult.error
@@ -106,6 +118,10 @@ export default async function GalleryHomePage({
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
         <GalleryHomeHero />
+        <GalleryMemoriesTeaser
+          photos={memoryPhotos}
+          dayLabel={formatMemoriesDayLabel(today.month, today.day)}
+        />
         {user ? (
           <Suspense fallback={null}>
             <GalleryHomeFiltersBar

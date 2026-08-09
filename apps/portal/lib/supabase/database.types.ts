@@ -995,6 +995,7 @@ export type Database = {
           poster_path: string | null
           sequence_id: string | null
           sequence_index: number | null
+          taken_at: string
         }
         Insert: {
           created_at?: string
@@ -1008,6 +1009,7 @@ export type Database = {
           poster_path?: string | null
           sequence_id?: string | null
           sequence_index?: number | null
+          taken_at?: string
         }
         Update: {
           created_at?: string
@@ -1021,6 +1023,7 @@ export type Database = {
           poster_path?: string | null
           sequence_id?: string | null
           sequence_index?: number | null
+          taken_at?: string
         }
         Relationships: [
           {
@@ -2173,6 +2176,7 @@ export type Database = {
           poster_path: string | null
           sequence_id: string | null
           sequence_index: number | null
+          taken_at: string | null
         }
         Relationships: [
           {
@@ -2314,6 +2318,26 @@ export type Database = {
         Returns: string[]
       }
       gallery_wall_cover_rank: { Args: { p_image_id: string }; Returns: number }
+      gallery_memories_on_this_day: {
+        Args: {
+          p_month: number
+          p_day: number
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          name: string
+          image_path: string
+          media_type: string
+          poster_path: string | null
+          created_by: string
+          created_at: string
+          taken_at: string
+          sequence_id: string | null
+          sequence_index: number | null
+          memory_year: number
+        }[]
+      }
       get_game_leaderboard: {
         Args: {
           p_game_type: Database["public"]["Enums"]["game_type"]

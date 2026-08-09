@@ -4,6 +4,7 @@ import Link from "next/link"
 import {
   IconAlbum,
   IconExternalLink,
+  IconHistory,
   IconLayoutGrid,
   IconLogin,
   IconMenu2,
@@ -29,7 +30,7 @@ import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
 import type { GalleryNotification } from "@/lib/gallery/notifications"
 
-export type GalleryShellActive = "home" | "manage" | "albums"
+export type GalleryShellActive = "home" | "manage" | "albums" | "memories"
 
 export function GalleryShellNav({
   active,
@@ -66,6 +67,13 @@ export function GalleryShellNav({
           tone="shell"
         >
           Albums
+        </GalleryNavLink>
+        <GalleryNavLink
+          href="/memories"
+          active={active === "memories"}
+          tone="shell"
+        >
+          Memories
         </GalleryNavLink>
         {signedIn ? (
           <>
@@ -132,6 +140,15 @@ export function GalleryShellNav({
               >
                 <IconAlbum className="size-4 shrink-0" aria-hidden />
                 Albums
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href="/memories"
+                className="flex cursor-pointer items-center gap-2"
+              >
+                <IconHistory className="size-4 shrink-0" aria-hidden />
+                Memories
               </Link>
             </DropdownMenuItem>
             {signedIn && active !== "manage" ? (

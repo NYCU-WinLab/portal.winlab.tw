@@ -19,6 +19,7 @@ import {
   GALLERY_STORAGE_MAX_BYTES,
   resolveStorageExtension,
 } from "@/lib/gallery/upload-path"
+import { extractTakenAtFromFile } from "@/lib/gallery/extract-taken-at-client"
 import { resolveMediaMimeType, type ResolvedMime } from "@/lib/gallery/mime"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -157,6 +158,14 @@ export async function uploadImageFile(
 
   setStatus({
     kind: "working",
+    label: `${labelPrefix}Reading capture time`,
+    ratio: 0.15,
+  })
+  const takenAt = await extractTakenAtFromFile(file)
+  throwIfAborted(signal)
+
+  setStatus({
+    kind: "working",
     label: `${labelPrefix}Uploading ${file.name}`,
     ratio: 0.4,
   })
@@ -182,6 +191,7 @@ export async function uploadImageFile(
     sequenceId,
     sequenceIndex,
     tagNames: ctx.tagNames,
+    takenAt,
   })
 }
 
