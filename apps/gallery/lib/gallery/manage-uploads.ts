@@ -199,6 +199,26 @@ export function resolveManageSelectionWallPhotoIds(
   return ids
 }
 
+/** Drop selected ids that are no longer in the Manage image list. */
+export function pruneManageSelectionIds(
+  selected: ReadonlySet<string>,
+  validIds: ReadonlySet<string>
+): Set<string> {
+  if (selected.size === 0) {
+    return selected instanceof Set ? selected : new Set()
+  }
+  let changed = false
+  const next = new Set<string>()
+  for (const id of selected) {
+    if (validIds.has(id)) next.add(id)
+    else changed = true
+  }
+  if (!changed) {
+    return selected instanceof Set ? selected : new Set(selected)
+  }
+  return next
+}
+
 export function isGalleryTakenAtUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {

@@ -14,6 +14,7 @@ import {
   expandManageSelectionSlideshowPhotos,
   expandManageSelectionZipItems,
   resolveManageSelectionWallPhotoIds,
+  pruneManageSelectionIds,
   swapSequenceOrder,
   type ManageUploadRow,
 } from "@/lib/gallery/manage-uploads"
@@ -287,5 +288,21 @@ describe("manageSelectionToSlideshowPhotos", () => {
       "c",
       "a",
     ])
+  })
+})
+
+describe("pruneManageSelectionIds", () => {
+  test("drops ids missing from the refresh", () => {
+    const next = pruneManageSelectionIds(
+      new Set(["a", "gone", "b"]),
+      new Set(["a", "b"])
+    )
+    expect([...next].sort()).toEqual(["a", "b"])
+  })
+
+  test("keeps the same Set reference when unchanged", () => {
+    const prev = new Set(["a"])
+    const next = pruneManageSelectionIds(prev, new Set(["a"]))
+    expect(next).toBe(prev)
   })
 })

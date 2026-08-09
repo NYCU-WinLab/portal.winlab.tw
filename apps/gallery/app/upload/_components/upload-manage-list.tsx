@@ -94,6 +94,7 @@ import {
   expandManageSelectionSlideshowPhotos,
   expandManageSelectionZipItems,
   resolveManageSelectionWallPhotoIds,
+  pruneManageSelectionIds,
   groupManageUploads,
   looksLikeUploadDayTakenAt,
   rowNeedsCaptureDate,
@@ -743,6 +744,17 @@ export function UploadManageList({
     setSelectedIds(new Set())
     selectionAnchorIdRef.current = null
   }, [incompleteOnly, uploadDayOnly])
+
+  useEffect(() => {
+    const validIds = new Set(images.map((image) => image.id))
+    setSelectedIds((prev) => pruneManageSelectionIds(prev, validIds))
+    if (
+      selectionAnchorIdRef.current &&
+      !validIds.has(selectionAnchorIdRef.current)
+    ) {
+      selectionAnchorIdRef.current = null
+    }
+  }, [images])
 
   useEffect(() => {
     if (!selectionMode) return
