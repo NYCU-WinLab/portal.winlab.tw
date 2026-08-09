@@ -18,6 +18,7 @@ describe("isCheatSheetToggleKey", () => {
 describe("GALLERY_MANAGE_SHORTCUTS", () => {
   test("covers Select-mode keys", () => {
     const joined = GALLERY_MANAGE_SHORTCUTS.flatMap((row) => row.keys).join(" ")
+    expect(joined).toContain("click")
     expect(joined).toContain("A")
     expect(joined).toContain("Shift+click")
     expect(joined).toContain("Esc")

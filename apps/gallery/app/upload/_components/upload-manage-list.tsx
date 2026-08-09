@@ -172,10 +172,26 @@ function UploadListItem({
       data-sequence-index={
         typeof sequenceIndex === "number" ? sequenceIndex : undefined
       }
+      onClick={
+        selectionMode
+          ? (event) => {
+              const target = event.target as HTMLElement | null
+              if (
+                target?.closest(
+                  "button, a, input, label, [role='button'], [data-manage-actions]"
+                )
+              ) {
+                return
+              }
+              onToggleSelected({ shiftKey: event.shiftKey })
+            }
+          : undefined
+      }
       className={cn(
         galleryPanelClass(),
         "flex items-center gap-3 !p-4 sm:gap-5",
-        "data-[sequence-drop-target=true]:ring-2 data-[sequence-drop-target=true]:ring-foreground/40"
+        "data-[sequence-drop-target=true]:ring-2 data-[sequence-drop-target=true]:ring-foreground/40",
+        selectionMode && "cursor-pointer"
       )}
     >
       {reorderHandle}
@@ -185,6 +201,7 @@ function UploadListItem({
           checked={selected}
           onChange={() => onToggleSelected()}
           onClick={(event) => {
+            event.stopPropagation()
             if (!event.shiftKey) return
             event.preventDefault()
             onToggleSelected({ shiftKey: true })
@@ -221,12 +238,20 @@ function UploadListItem({
             : ""}
         </p>
         {sequenceControls ? (
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div
+            className="flex flex-wrap items-center gap-2 pt-1"
+            data-manage-actions
+            onClick={(event) => event.stopPropagation()}
+          >
             {sequenceControls}
           </div>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+      <div
+        className="flex shrink-0 flex-wrap items-center justify-end gap-1"
+        data-manage-actions
+        onClick={(event) => event.stopPropagation()}
+      >
         {isAdmin && showWallPin ? (
           <PinWallButton
             imageId={wallPhotoId}
@@ -1091,7 +1116,7 @@ export function UploadManageList({
         </button>
         {selectionMode ? (
           <span className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-            Shift+click for ranges · A selects visible
+            Shift+click or click a row for ranges · A selects visible
           </span>
         ) : null}
         {incompleteCount > 0 ? (

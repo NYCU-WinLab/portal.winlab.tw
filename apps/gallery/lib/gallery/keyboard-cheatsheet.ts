@@ -17,6 +17,7 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
 
 /** Manage (/upload) Select-mode shortcuts. */
 export const GALLERY_MANAGE_SHORTCUTS: GalleryShortcutRow[] = [
+  { keys: ["click"], action: "Toggle select on a row" },
   { keys: ["A"], action: "Select / clear all visible" },
   { keys: ["Shift+click"], action: "Range-select from last toggle" },
   { keys: ["Esc"], action: "Exit Select mode" },
