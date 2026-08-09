@@ -20,6 +20,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import {
   addImagesToGalleryAlbum,
   createGalleryAlbum,
+  deleteGalleryAlbum,
   listMyGalleryAlbums,
 } from "@/app/actions/albums"
 import { gallerySans } from "@/components/gallery-chrome"
@@ -181,7 +182,12 @@ export function GalleryAddToAlbum({
       }
       const addedResult = await addImagesToGalleryAlbum(created.data.id, ids)
       if (!addedResult.ok) {
-        toast.error(addedResult.error)
+        const rolledBack = await deleteGalleryAlbum(created.data.id)
+        toast.error(
+          rolledBack.ok
+            ? addedResult.error
+            : `${addedResult.error} Album “${created.data.title}” may still exist empty — delete it from Albums.`
+        )
         return
       }
       const added = addedResult.data.added
@@ -201,7 +207,11 @@ export function GalleryAddToAlbum({
           <Link href={`/albums/${created.data.slug}`} className="underline">
             {created.data.title}
           </Link>
-          {added > 1 ? ` with ${added} photos` : ""}
+          {added === 1
+            ? " with 1 photo"
+            : added > 1
+              ? ` with ${added} photos`
+              : ""}
         </span>,
         { action: copyLinkAction(created.data) }
       )
