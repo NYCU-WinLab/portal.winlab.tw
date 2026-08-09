@@ -126,6 +126,17 @@ export function GalleryAddToAlbum({
       const added = result.data.added
       if (added === 0) {
         toast.message("Already in that album (or nothing new to add).")
+      } else if (added < ids.length) {
+        toast.success(
+          <span>
+            Added {added} of {ids.length} to{" "}
+            <Link href={`/albums/${album.slug}`} className="underline">
+              {album.title}
+            </Link>{" "}
+            (duplicates skipped or album near the 200 cap)
+          </span>,
+          { action: copyLinkAction(album) }
+        )
       } else {
         toast.success(
           <span>
