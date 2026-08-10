@@ -41,6 +41,10 @@ import {
   describeTagRenamed,
 } from "@/lib/gallery/tag-admin-toast"
 import { describeRetryingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeTagMergeTargetRequired,
+  describeTagNameRequired,
+} from "@/lib/gallery/validation-toasts"
 
 export function TagAdminPanel() {
   const router = useRouter()
@@ -109,7 +113,7 @@ export function TagAdminPanel() {
     if (!renameId || pending) return
     const name = normalizeGalleryTagName(renameDraft)
     if (!name) {
-      toast.error("Give the tag a usable name.")
+      toast.error(describeTagNameRequired())
       return
     }
     startTransition(async () => {
@@ -142,7 +146,7 @@ export function TagAdminPanel() {
   const submitMerge = () => {
     if (pending) return
     if (!mergeSourceId || !mergeTargetId) {
-      toast.error("Pick a target tag to merge into.")
+      toast.error(describeTagMergeTargetRequired())
       return
     }
     startTransition(async () => {

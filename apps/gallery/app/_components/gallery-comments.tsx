@@ -42,6 +42,7 @@ import {
   describeCommentUpdated,
 } from "@/lib/gallery/comment-toast"
 import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
+import { describeSignInBeforeComment } from "@/lib/gallery/validation-toasts"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import {
@@ -185,7 +186,7 @@ export function GalleryComments({
   const submit = () => {
     if (isPending) return
     if (!isSignedIn) {
-      toast.error("Please sign in before commenting.")
+      toast.error(describeSignInBeforeComment())
       return
     }
     const body = draft.trim()

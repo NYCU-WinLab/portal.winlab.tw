@@ -117,6 +117,10 @@ import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
+import {
+  describeCouldNotCopyClipboard,
+  describeCouldNotCopyLinks,
+} from "@/lib/gallery/validation-toasts"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
@@ -1086,7 +1090,7 @@ export function UploadManageList({
     }
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
-      toast.error("Could not copy links in this context.")
+      toast.error(describeCouldNotCopyLinks())
       return
     }
     const photoIds = resolveManageSelectionWallPhotoIds(
@@ -1100,7 +1104,7 @@ export function UploadManageList({
       await navigator.clipboard.writeText(text)
       toast.success(describeWallSelectionCopy(photoIds.length))
     } catch {
-      toast.error("Could not copy to the clipboard.")
+      toast.error(describeCouldNotCopyClipboard())
     } finally {
       copyLinksBusyRef.current = false
     }

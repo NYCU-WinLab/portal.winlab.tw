@@ -16,6 +16,7 @@ import { setGalleryReaction } from "@/app/actions"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
 import { nextReactionState } from "@/lib/gallery/reaction-optimistic"
 import { describeReactionOutcome } from "@/lib/gallery/reaction-outcome"
+import { describeSignInBeforeReact } from "@/lib/gallery/validation-toasts"
 import {
   GALLERY_REACTIONS,
   type GalleryReaction,
@@ -274,7 +275,7 @@ export function useGalleryCardSocial({
   const onReact = (reaction: GalleryReaction) => {
     if (isPending) return
     if (!isSignedIn) {
-      toast.error("Please sign in before reacting.")
+      toast.error(describeSignInBeforeReact())
       return
     }
 

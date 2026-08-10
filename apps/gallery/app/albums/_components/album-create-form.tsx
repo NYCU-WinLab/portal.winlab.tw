@@ -27,6 +27,7 @@ import {
 } from "@/lib/gallery/album-share"
 import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 
 export function GalleryAlbumCreateForm({ className }: { className?: string }) {
   const router = useRouter()
@@ -40,7 +41,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
     event.preventDefault()
     const normalized = normalizeGalleryAlbumTitle(title)
     if (!normalized) {
-      toast.error("Give the album a name with letters or numbers.")
+      toast.error(describeAlbumTitleRequired())
       return
     }
 

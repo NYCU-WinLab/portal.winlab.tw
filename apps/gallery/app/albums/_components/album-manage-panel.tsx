@@ -62,6 +62,7 @@ import {
   describeAlbumUpdated,
 } from "@/lib/gallery/album-manage-copy"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
@@ -160,7 +161,7 @@ export function GalleryAlbumManagePanel({
     if (pending) return
     const normalized = normalizeGalleryAlbumTitle(title)
     if (!normalized) {
-      toast.error("Give the album a name with letters or numbers.")
+      toast.error(describeAlbumTitleRequired())
       return
     }
     startTransition(async () => {

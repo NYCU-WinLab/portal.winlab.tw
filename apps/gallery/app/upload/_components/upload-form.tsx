@@ -18,6 +18,10 @@ import {
   VIDEO_MAX_DURATION_SECONDS,
   VIDEO_MAX_INPUT_BYTES,
 } from "@/lib/gallery/upload-pipeline"
+import {
+  describeUploadFileEmpty,
+  describeUploadFileRequired,
+} from "@/lib/gallery/validation-toasts"
 
 /** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
 export function UploadForm({
@@ -108,11 +112,11 @@ export function UploadForm({
       : Array.from(fileInputRef.current?.files ?? [])
 
     if (files.length === 0) {
-      toast.error("Pick a file.")
+      toast.error(describeUploadFileRequired())
       return
     }
     if (files.some((file) => file.size === 0)) {
-      toast.error("One of the selected files is empty.")
+      toast.error(describeUploadFileEmpty())
       return
     }
 

@@ -33,6 +33,7 @@ import {
 } from "@/lib/gallery/albums"
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
 import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
+import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 
 type MyAlbumOption = {
   id: string
@@ -160,7 +161,7 @@ export function GalleryAddToAlbum({
     if (pending) return
     const normalized = normalizeGalleryAlbumTitle(draftTitle)
     if (!normalized) {
-      toast.error("Give the album a name with letters or numbers.")
+      toast.error(describeAlbumTitleRequired())
       return
     }
     if (ids.length === 0) {

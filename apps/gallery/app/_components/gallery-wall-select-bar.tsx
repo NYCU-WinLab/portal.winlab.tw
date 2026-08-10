@@ -66,6 +66,10 @@ import {
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
+import {
+  describeCouldNotCopyClipboard,
+  describeCouldNotCopyLinks,
+} from "@/lib/gallery/validation-toasts"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -418,7 +422,7 @@ export function GalleryWallSelectBar({
     if (selectedIds.length === 0 || copyLinksBusyRef.current) return
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
-      toast.error("Could not copy links in this context.")
+      toast.error(describeCouldNotCopyLinks())
       return
     }
     copyLinksBusyRef.current = true
@@ -427,7 +431,7 @@ export function GalleryWallSelectBar({
       await navigator.clipboard.writeText(text)
       toast.success(describeWallSelectionCopy(selectedIds.length))
     } catch {
-      toast.error("Could not copy to the clipboard.")
+      toast.error(describeCouldNotCopyClipboard())
     } finally {
       copyLinksBusyRef.current = false
     }

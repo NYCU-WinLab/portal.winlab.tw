@@ -50,6 +50,7 @@ import {
 import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
 import { describeSignInToFavorite } from "@/lib/gallery/download-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeNothingToDownload } from "@/lib/gallery/validation-toasts"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
@@ -350,7 +351,7 @@ export function GalleryCard({
     const path = activeItem?.image_path ?? image.image_path
     const name = activeItem?.name ?? image.name
     if (!path) {
-      toast.error("Nothing to download.")
+      toast.error(describeNothingToDownload())
       return
     }
     downloadBusyRef.current = true
