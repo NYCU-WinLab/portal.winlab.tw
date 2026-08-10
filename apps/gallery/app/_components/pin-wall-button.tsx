@@ -38,6 +38,7 @@ export function PinWallButton({
       event?.preventDefault()
       event?.stopPropagation()
     }
+    if (isPending) return
 
     startTransition(async () => {
       const nextPinned = !pinnedAt

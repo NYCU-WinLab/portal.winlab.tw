@@ -52,6 +52,7 @@ export function GalleryImageTags({
   const onAdd = (event?: FormEvent) => {
     event?.preventDefault()
     const name = normalizeGalleryTagName(draft)
+    if (isPending) return
     if (!name) return
     const slug = normalizeGalleryTagSlug(name)
     if (!slug) return
@@ -81,6 +82,7 @@ export function GalleryImageTags({
   }
 
   const onRemove = (tag: GalleryTag) => {
+    if (isPending) return
     startTransition(async () => {
       const result = await detachGalleryTag(imageId, tag.id)
       if (!result.ok) {
