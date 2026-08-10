@@ -28,6 +28,7 @@ import {
   describePreviousSlideAriaLabel,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
+import { setMemoriesOverlayState } from "@/lib/gallery/memories-overlay-store"
 
 export function MemoriesDayView({
   groups,
@@ -83,6 +84,16 @@ export function MemoriesDayView({
     active && photoIds.length > 1
       ? `${photoIds.indexOf(active.id) + 1} of ${photoIds.length}`
       : null
+
+  useEffect(() => {
+    setMemoriesOverlayState({
+      lightboxOpen: Boolean(active),
+      slideshowOpen,
+    })
+    return () => {
+      setMemoriesOverlayState({ lightboxOpen: false, slideshowOpen: false })
+    }
+  }, [active, slideshowOpen])
 
   const goLightbox = (direction: "prev" | "next") => {
     if (!openId) return

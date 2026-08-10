@@ -17,4 +17,9 @@ describe("describeFocusedPhotoAnnouncement", () => {
       "Untitled, 1 of 1"
     )
   })
+
+  test("clamps out-of-range indexes", () => {
+    expect(describeFocusedPhotoAnnouncement("A", -2, 3)).toBe("A, 1 of 3")
+    expect(describeFocusedPhotoAnnouncement("A", 99, 3)).toBe("A, 3 of 3")
+  })
 })

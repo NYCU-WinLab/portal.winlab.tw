@@ -908,6 +908,15 @@ export function UploadManageList({
   }, [images])
 
   useEffect(() => {
+    if (!selectionMode) return
+    if (!selectionFocusId) return
+    if (visibleSelectableItems.some((item) => item.id === selectionFocusId)) {
+      return
+    }
+    setSelectionFocusId(null)
+  }, [selectionMode, selectionFocusId, visibleSelectableItems])
+
+  useEffect(() => {
     if (selectionMode) return
     if (!incompleteOnly && !uploadDayOnly) return
     const onKeyDown = (event: KeyboardEvent) => {

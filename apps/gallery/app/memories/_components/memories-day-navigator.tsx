@@ -12,6 +12,7 @@ import { gallerySans } from "@/components/gallery-chrome"
 import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { useMemoriesOverlayState } from "@/lib/gallery/memories-overlay-store"
 import {
   isMemoriesViewingToday,
   memoriesDayHref,
@@ -30,6 +31,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
   const prev = shiftGalleryCalendarDay(day.month, day.day, -1)
   const next = shiftGalleryCalendarDay(day.month, day.day, 1)
   const viewingToday = isMemoriesViewingToday(day)
+  const { lightboxOpen, slideshowOpen } = useMemoriesOverlayState()
 
   const softPush = (
     href: string,
@@ -134,7 +136,11 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
           <IconChevronRight className="size-4" aria-hidden />
         </Link>
       </nav>
-      <GalleryKeyboardCheatsheet memories />
+      <GalleryKeyboardCheatsheet
+        memories
+        lightboxOpen={lightboxOpen}
+        slideshowOpen={slideshowOpen}
+      />
     </div>
   )
 }

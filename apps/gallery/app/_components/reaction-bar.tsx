@@ -14,6 +14,7 @@ import {
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
 import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { describeReactTriggerAriaLabel } from "@/lib/gallery/reaction-trigger-label"
 import { shouldOpenReactionFromSignal } from "@/lib/gallery/keyboard-hint-labels"
 import { shouldStopLightboxEscape } from "@/lib/gallery/reaction-escape"
 import { nextRadioIndex } from "@/lib/gallery/radio-nav"
@@ -434,11 +435,9 @@ export function ReactionBar({
         aria-expanded={pickerOpen}
         aria-haspopup="menu"
         aria-pressed={Boolean(myReaction)}
-        aria-label={
-          myReaction
-            ? `Your reaction ${REACTION_EMOJI[myReaction]}. ArrowUp or Alt+Enter for more`
-            : "React. ArrowUp or Alt+Enter for more"
-        }
+        aria-label={describeReactTriggerAriaLabel(
+          myReaction ? REACTION_EMOJI[myReaction] : null
+        )}
         className={cn(
           "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors select-none",
           myReaction
