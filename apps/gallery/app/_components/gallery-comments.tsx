@@ -38,6 +38,10 @@ import { isCommentEdited } from "@/lib/gallery/comment-edit"
 import { applyExclusiveCommentPin } from "@/lib/gallery/comment-pin"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
+import {
+  applyMentionAtCursor,
+  mentionQueryAtCursor,
+} from "@/lib/gallery/mention-cursor"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
@@ -80,6 +84,7 @@ export function GalleryComments({
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const deleteTriggerRef = useRef<HTMLElement | null>(null)
 
   const flattened = useMemo(() => flattenGalleryComments(comments), [comments])
 
@@ -123,9 +128,7 @@ export function GalleryComments({
   }
 
   const syncMentionQuery = (value: string, cursor: number) => {
-    const before = value.slice(0, cursor)
-    const match = before.match(/@([\p{L}\p{N}._-]*)$/u)
-    setMentionQuery(match ? (match[1] ?? "") : null)
+    setMentionQuery(mentionQueryAtCursor(value, cursor))
   }
 
   const showMentionPicker = mentionQuery !== null
@@ -135,15 +138,12 @@ export function GalleryComments({
     const name = member.name
     if (!name) return
     const cursor = textareaRef.current?.selectionStart ?? draft.length
-    const before = draft.slice(0, cursor).replace(/@[\p{L}\p{N}._-]*$/u, "")
-    const after = draft.slice(cursor)
-    const next = `${before}@${name} ${after}`
+    const { next, selection } = applyMentionAtCursor(draft, cursor, name)
     setDraft(next)
     setMentionQuery(null)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
-      const pos = before.length + name.length + 2
-      textareaRef.current?.setSelectionRange(pos, pos)
+      textareaRef.current?.setSelectionRange(selection, selection)
     })
   }
 
@@ -468,7 +468,10 @@ export function GalleryComments({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setDeleteTargetId(comment.id)}
+                            onClick={(event) => {
+                              deleteTriggerRef.current = event.currentTarget
+                              setDeleteTargetId(comment.id)
+                            }}
                             className={cn(
                               galleryPillClass(),
                               "text-destructive/90 hover:text-destructive"
@@ -632,7 +635,12 @@ export function GalleryComments({
       <AlertDialog
         open={deleteTargetId !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTargetId(null)
+          if (!open) {
+            setDeleteTargetId(null)
+            const trigger = deleteTriggerRef.current
+            deleteTriggerRef.current = null
+            queueMicrotask(() => trigger?.focus())
+          }
         }}
       >
         <AlertDialogContent>
