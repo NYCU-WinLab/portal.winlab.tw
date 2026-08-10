@@ -4,6 +4,7 @@ import {
   describeCreatingLabel,
   describeDevelopingLabel,
   describeInstallingLabel,
+  describeLoadingTagsLabel,
   describeMergingLabel,
   describeRedirectingLabel,
   describeRetryingLabel,
@@ -67,5 +68,9 @@ describe("busy labels", () => {
 
   test("describeDevelopingLabel", () => {
     expect(describeDevelopingLabel()).toBe("Developing…")
+  })
+
+  test("describeLoadingTagsLabel", () => {
+    expect(describeLoadingTagsLabel()).toBe("Loading tags…")
   })
 })

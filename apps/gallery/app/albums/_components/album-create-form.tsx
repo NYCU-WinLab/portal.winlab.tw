@@ -94,7 +94,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
       try {
         router.refresh()
       } catch {
-        // Best-effort after a successful create.
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }

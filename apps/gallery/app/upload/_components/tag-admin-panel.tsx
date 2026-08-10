@@ -44,6 +44,7 @@ import {
   describeRetryingLabel,
   describeSavingLabel,
   describeMergingLabel,
+  describeLoadingTagsLabel,
 } from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import {
@@ -202,7 +203,7 @@ export function TagAdminPanel() {
 
       {!loaded && pending ? (
         <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-          Loading tags…
+          {describeLoadingTagsLabel()}
         </p>
       ) : loadError ? (
         <div className="space-y-3">

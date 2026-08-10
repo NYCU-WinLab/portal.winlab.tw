@@ -62,3 +62,8 @@ export function describeWorkingLabel(): string {
 export function describeDevelopingLabel(): string {
   return "Developing…"
 }
+
+/** Visible label while the tag catalog is loading. */
+export function describeLoadingTagsLabel(): string {
+  return "Loading tags…"
+}

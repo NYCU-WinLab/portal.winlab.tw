@@ -86,9 +86,11 @@ describe("describeAddToAlbumDialogTitle", () => {
 
 describe("describeAddToAlbumDialogDescription", () => {
   test("singular vs plural selection", () => {
-    expect(describeAddToAlbumDialogDescription(1)).toContain("this shot")
-    expect(describeAddToAlbumDialogDescription(3)).toContain(
-      "selected wall covers"
+    expect(describeAddToAlbumDialogDescription(1)).toBe(
+      "Curate this shot into one of your collections. Share links live at /albums/<slug>."
+    )
+    expect(describeAddToAlbumDialogDescription(3)).toBe(
+      "Curate the selected wall covers into one of your collections."
     )
   })
 })

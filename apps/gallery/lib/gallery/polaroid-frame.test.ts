@@ -14,6 +14,12 @@ describe("getPolaroidFrame", () => {
     expect(frame.maxWidthClass.length).toBeGreaterThan(0)
   })
 
+  test("non-uuid id uses string hash fallback", () => {
+    const frame = getPolaroidFrame("not-a-uuid")
+    expect(frame.aspectClass.length).toBeGreaterThan(0)
+    expect(getPolaroidFrame("not-a-uuid")).toEqual(frame)
+  })
+
   test("assigns different aspect classes across a sample of ids", () => {
     const ids = [
       "3f2504e0-4f89-41d3-9a0c-0305e82c3301",

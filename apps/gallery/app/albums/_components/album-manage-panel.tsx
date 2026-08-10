@@ -131,7 +131,7 @@ export function GalleryAlbumManagePanel({
     try {
       router.refresh()
     } catch {
-      // Best-effort after a successful album mutation.
+      toast.error(describeGalleryNavError("refreshGalleryChrome"))
     }
   }
 
