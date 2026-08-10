@@ -122,8 +122,10 @@ export function GalleryLightboxMediaPane({
   setLightboxFailed: (v: boolean) => void
   goLightboxPrev: () => void
   goLightboxNext: () => void
-  copyShareLink: () => void
+  copyShareLink: () => void | Promise<void>
 }) {
+  const [shareBusy, setShareBusy] = useState(false)
+
   return (
     <div {...gestureProps} className="gallery-lightbox-media relative">
       <DialogClose
@@ -140,7 +142,15 @@ export function GalleryLightboxMediaPane({
       </DialogClose>
       <button
         type="button"
-        onClick={() => void copyShareLink()}
+        onClick={() => {
+          if (shareBusy) return
+          setShareBusy(true)
+          void Promise.resolve(copyShareLink()).finally(() => {
+            setShareBusy(false)
+          })
+        }}
+        disabled={shareBusy}
+        aria-busy={shareBusy || undefined}
         aria-label="Share"
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
@@ -151,7 +161,7 @@ export function GalleryLightboxMediaPane({
             : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
           "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-          "transition-colors hover:bg-white",
+          "transition-colors hover:bg-white disabled:opacity-60",
           "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
         )}
       >
