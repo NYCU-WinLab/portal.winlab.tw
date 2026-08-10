@@ -112,6 +112,7 @@ import {
   buildWallSelectionShareText,
   describeWallSelectionCopy,
 } from "@/lib/gallery/wall-selection-share"
+import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 
@@ -1110,20 +1111,15 @@ export function UploadManageList({
         return
       }
       const { title: albumTitle, slug, added } = result.data
-      toast.success(
-        added > 0
-          ? `Album “${albumTitle}” with ${added} photo${added === 1 ? "" : "s"}`
-          : `Album “${albumTitle}” created`,
-        {
-          description: `/albums/${slug}`,
-          action: {
-            label: "Open",
-            onClick: () => {
-              window.location.href = `/albums/${slug}`
-            },
+      toast.success(describeAlbumFromSelection({ title: albumTitle, added }), {
+        description: `/albums/${slug}`,
+        action: {
+          label: "Open",
+          onClick: () => {
+            window.location.href = `/albums/${slug}`
           },
-        }
-      )
+        },
+      })
       setBulkAlbumDraft("")
       setBulkAlbumOpen(false)
       selectionAnchorIdRef.current = null

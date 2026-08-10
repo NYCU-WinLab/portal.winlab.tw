@@ -56,6 +56,7 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
+import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 import {
   buildWallSelectionShareText,
@@ -142,6 +143,7 @@ export function GalleryWallSelectBar({
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Wall selection")
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+  const moreActionsRef = useRef<HTMLButtonElement>(null)
   const [confirmKind, setConfirmKind] = useState<
     "album" | "tag" | "unsave" | null
   >(null)
@@ -304,20 +306,15 @@ export function GalleryWallSelectBar({
         return
       }
       const { title: albumTitle, slug, added } = result.data
-      toast.success(
-        added > 0
-          ? `Album “${albumTitle}” with ${added} photo${added === 1 ? "" : "s"}`
-          : `Album “${albumTitle}” created`,
-        {
-          description: `/albums/${slug}`,
-          action: {
-            label: "Open",
-            onClick: () => {
-              window.location.href = `/albums/${slug}`
-            },
+      toast.success(describeAlbumFromSelection({ title: albumTitle, added }), {
+        description: `/albums/${slug}`,
+        action: {
+          label: "Open",
+          onClick: () => {
+            window.location.href = `/albums/${slug}`
           },
-        }
-      )
+        },
+      })
       setAlbumDraft("")
       setAlbumFormOpen(false)
       onClear()
@@ -692,6 +689,7 @@ export function GalleryWallSelectBar({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
+                      ref={moreActionsRef}
                       type="button"
                       variant="outline"
                       size="sm"
@@ -811,10 +809,13 @@ export function GalleryWallSelectBar({
       <AlertDialog
         open={confirmKind !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmKind(null)
+          if (!open) {
+            setConfirmKind(null)
+            queueMicrotask(() => moreActionsRef.current?.focus())
+          }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent aria-busy={overflowBusy || undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmKind === "tag"
@@ -837,17 +838,20 @@ export function GalleryWallSelectBar({
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={overflowBusy}
+              aria-busy={overflowBusy || undefined}
               onClick={() => {
                 if (confirmKind === "tag") untagSelected()
                 else if (confirmKind === "unsave") unsaveSelected()
                 else removeSelectedFromAlbum()
               }}
             >
-              {confirmKind === "tag"
-                ? "Untag"
-                : confirmKind === "unsave"
-                  ? "Unsave"
-                  : "Remove"}
+              {overflowBusy
+                ? "Working…"
+                : confirmKind === "tag"
+                  ? "Untag"
+                  : confirmKind === "unsave"
+                    ? "Unsave"
+                    : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
