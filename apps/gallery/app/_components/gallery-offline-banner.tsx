@@ -60,6 +60,7 @@ export function GalleryOfflineBanner() {
     <div
       role="status"
       aria-live="polite"
+      aria-busy={busy || undefined}
       className={cn(
         "fixed inset-x-0 bottom-0 z-[60] border-t border-zinc-900/10",
         "bg-[#fafafa]/95 px-4 py-3 backdrop-blur-md",
