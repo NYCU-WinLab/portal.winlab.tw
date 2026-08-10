@@ -16,7 +16,13 @@ import {
   loadGalleryAlbumSummaries,
   loadMyGalleryAlbums,
 } from "@/lib/gallery/load-albums"
-import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
+import {
+  describeAlbumActionFailedError,
+  describeAlbumNotFoundError,
+  describeAlbumTitleInvalidError,
+  describeAlbumsUnavailableError,
+  describePleaseSignInFirst,
+} from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -29,9 +35,9 @@ function albumErrorResult(error: { message?: string; code?: string }): {
   error: string
 } {
   if (isGalleryAlbumsUnavailable(error)) {
-    return { ok: false, error: "Albums are not available yet." }
+    return { ok: false, error: describeAlbumsUnavailableError() }
   }
-  return { ok: false, error: error.message ?? "Album action failed." }
+  return { ok: false, error: error.message ?? describeAlbumActionFailedError() }
 }
 
 type GallerySupabase = Awaited<ReturnType<typeof createClient>>
@@ -82,7 +88,7 @@ export async function createGalleryAlbum(input: {
   const title = normalizeGalleryAlbumTitle(input.title)
   const slug = title ? normalizeGalleryAlbumSlug(title) : null
   if (!title || !slug) {
-    return { ok: false, error: "Album title is empty or invalid." }
+    return { ok: false, error: describeAlbumTitleInvalidError() }
   }
 
   const description = normalizeGalleryAlbumDescription(input.description)
@@ -172,7 +178,7 @@ export async function updateGalleryAlbum(input: {
     .maybeSingle()
 
   if (existingError) return albumErrorResult(existingError)
-  if (!existing) return { ok: false, error: "Album not found." }
+  if (!existing) return { ok: false, error: describeAlbumNotFoundError() }
 
   const patch: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -182,7 +188,7 @@ export async function updateGalleryAlbum(input: {
     const title = normalizeGalleryAlbumTitle(input.title)
     const slug = title ? normalizeGalleryAlbumSlug(title) : null
     if (!title || !slug) {
-      return { ok: false, error: "Album title is empty or invalid." }
+      return { ok: false, error: describeAlbumTitleInvalidError() }
     }
     patch.title = title
     patch.slug = slug
@@ -254,7 +260,7 @@ export async function deleteGalleryAlbum(
     .maybeSingle()
 
   if (existingError) return albumErrorResult(existingError)
-  if (!existing) return { ok: false, error: "Album not found." }
+  if (!existing) return { ok: false, error: describeAlbumNotFoundError() }
 
   const { error } = await auth.supabase
     .from("gallery_albums")
@@ -295,7 +301,7 @@ export async function addImagesToGalleryAlbum(
     .maybeSingle()
 
   if (albumError) return { ok: false, error: albumError.message }
-  if (!album) return { ok: false, error: "Album not found." }
+  if (!album) return { ok: false, error: describeAlbumNotFoundError() }
 
   const { data: addedCount, error: rpcError } = await auth.supabase.rpc(
     "gallery_album_add_images",
@@ -408,7 +414,7 @@ export async function removeImagesFromGalleryAlbum(
     .maybeSingle()
 
   if (albumError) return { ok: false, error: albumError.message }
-  if (!album) return { ok: false, error: "Album not found." }
+  if (!album) return { ok: false, error: describeAlbumNotFoundError() }
 
   const { data: removedCount, error: rpcError } = await auth.supabase.rpc(
     "gallery_album_remove_images",
@@ -480,7 +486,7 @@ export async function removeImagesFromGalleryAlbumBySlug(
   if (error) {
     return albumErrorResult(error)
   }
-  if (!album) return { ok: false, error: "Album not found." }
+  if (!album) return { ok: false, error: describeAlbumNotFoundError() }
 
   return removeImagesFromGalleryAlbum(album.id, imageIds)
 }
@@ -501,7 +507,7 @@ export async function reorderGalleryAlbumImages(
     .maybeSingle()
 
   if (albumError) return { ok: false, error: albumError.message }
-  if (!album) return { ok: false, error: "Album not found." }
+  if (!album) return { ok: false, error: describeAlbumNotFoundError() }
 
   const positions = normalizeAlbumPositions(imageIds)
   const orderedIds = positions.map((item) => item.image_id)

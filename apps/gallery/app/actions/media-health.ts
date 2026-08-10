@@ -19,6 +19,7 @@ import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 import {
   describeNothingSelectedError,
   describePleaseSignInFirst,
+  describeStorageDeleteLeftoversWarning,
 } from "@/lib/gallery/action-errors"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -268,8 +269,7 @@ export async function adminDeleteBrokenGalleryImages(
     return {
       ok: true,
       deleted: ids.length,
-      warning:
-        "Removed from the wall, but some storage files may still remain.",
+      warning: describeStorageDeleteLeftoversWarning(),
     }
   }
 

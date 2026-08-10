@@ -6,6 +6,7 @@ import {
   describeNothingSelectedError,
   describeSelectAtLeastOneWorkError,
   describeSelectAtMost100WorksError,
+  describeStorageDeleteLeftoverWarning,
 } from "@/lib/gallery/action-errors"
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
@@ -352,8 +353,7 @@ export async function deleteGalleryImage(
     revalidatePath("/upload")
     return {
       ok: true,
-      warning:
-        "Removed from the wall, but a storage file may still remain. Retry delete or purge via Media health.",
+      warning: describeStorageDeleteLeftoverWarning(),
     }
   }
 

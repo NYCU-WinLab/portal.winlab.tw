@@ -37,6 +37,7 @@ import {
   describeWallReshuffled,
 } from "@/lib/gallery/wall-shuffle-toast"
 import { describeRetryingLabel } from "@/lib/gallery/busy-labels"
+import { describeWallSelectModeHint } from "@/lib/gallery/chrome-hints"
 import { describeRetryLabel } from "@/lib/gallery/dialog-action-labels"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -322,11 +323,7 @@ export function GalleryInfiniteWall({
           onShuffle={onShuffle}
           onRestoreOrder={onRestoreOrder}
           lightboxOpen={lightboxOpen}
-          statusText={
-            selectionMode
-              ? "Select mode · Shift+click for ranges · bulk tools below"
-              : undefined
-          }
+          statusText={selectionMode ? describeWallSelectModeHint() : undefined}
           leadingActions={
             <GalleryWallSelectBar
               selectionMode={selectionMode}

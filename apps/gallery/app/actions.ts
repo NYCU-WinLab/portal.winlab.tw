@@ -16,7 +16,13 @@ import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
 } from "@/lib/gallery/bulk-pin"
-import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
+import {
+  describeMissingImageIdError,
+  describePinFailedError,
+  describePinFailedForPhotoError,
+  describePinUnavailableError,
+  describePleaseSignInFirst,
+} from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
@@ -39,7 +45,7 @@ export async function setGalleryReaction(
   imageId: string,
   reaction: GalleryReaction
 ): Promise<ReactionActionResult> {
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  if (!imageId) return { ok: false, error: describeMissingImageIdError() }
   if (!isGalleryReaction(reaction)) {
     return { ok: false, error: "Invalid reaction." }
   }
@@ -142,7 +148,7 @@ export async function addGalleryComment(
   parentId?: string | null
 ): Promise<CommentActionResult<CreatedGalleryComment>> {
   const trimmed = body.trim()
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  if (!imageId) return { ok: false, error: describeMissingImageIdError() }
   if (!trimmed) return { ok: false, error: "Comment cannot be empty." }
   if (trimmed.length > 1000) {
     return { ok: false, error: "Comment is too long (max 1000 chars)." }
@@ -444,7 +450,7 @@ export async function setGalleryCommentPin(
           "Comment pin is not available yet — apply the gallery comment pin migration.",
       }
     }
-    return { ok: false, error: `Pin failed: ${error.message}` }
+    return { ok: false, error: describePinFailedError(error.message) }
   }
 
   const pinnedAt = pinned ? new Date().toISOString() : null
@@ -462,8 +468,8 @@ export async function setGalleryImagePin(
     return {
       ok: false,
       error: result.data.failed
-        ? "Pin failed for that photo."
-        : "Missing image id.",
+        ? describePinFailedForPhotoError()
+        : describeMissingImageIdError(),
     }
   }
   return {
@@ -518,8 +524,7 @@ export async function setGalleryImagesPin(
       ) {
         return {
           ok: false,
-          error:
-            "Pin is not available yet — apply the gallery image pin migration.",
+          error: describePinUnavailableError(),
         }
       }
       failed += 1
@@ -532,7 +537,7 @@ export async function setGalleryImagesPin(
   if (okCount === 0) {
     return {
       ok: false,
-      error: firstError ? `Pin failed: ${firstError}` : "Pin failed.",
+      error: describePinFailedError(firstError),
     }
   }
 

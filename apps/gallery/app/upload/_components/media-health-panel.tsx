@@ -29,6 +29,10 @@ import {
   describeMediaHealthFoundBroken,
 } from "@/lib/gallery/media-health-toast"
 import { describeScanningLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeClearBrokenShotsAriaLabel,
+  describeMediaHealthClearAllLabel,
+} from "@/lib/gallery/chrome-hints"
 import { describeSelectAtLeastOneBrokenShot } from "@/lib/gallery/validation-toasts"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
@@ -199,7 +203,7 @@ export function MediaHealthPanel() {
               aria-pressed={allFindingsSelected}
               aria-label={
                 allFindingsSelected
-                  ? "Clear all selected broken shots"
+                  ? describeClearBrokenShotsAriaLabel()
                   : `Select all ${findings.length} broken shots`
               }
               onClick={() => {
@@ -212,7 +216,7 @@ export function MediaHealthPanel() {
               className={gallerySans()}
             >
               {allFindingsSelected
-                ? "Clear all"
+                ? describeMediaHealthClearAllLabel()
                 : `Select all (${findings.length})`}
             </Button>
             {selected.size > 0 ? (

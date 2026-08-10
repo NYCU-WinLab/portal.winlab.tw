@@ -22,6 +22,10 @@ import {
 import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeSeasonalSiteThemeAriaLabel } from "@/lib/gallery/install-theme-labels"
+import {
+  describeLimitedSeasonalThemeHint,
+  describePaperWallThemeHint,
+} from "@/lib/gallery/chrome-hints"
 import { describePaperWallThemeLabel } from "@/lib/gallery/empty-state-labels"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
@@ -34,12 +38,12 @@ const THEME_OPTIONS: Array<{
   {
     value: "off",
     label: describePaperWallThemeLabel(),
-    hint: "Default darkroom renewal",
+    hint: describePaperWallThemeHint(),
   },
   ...GALLERY_SEASONAL_THEME_IDS.map((id) => ({
     value: id as ThemeChoice,
     label: GALLERY_SEASONAL_THEMES[id].label,
-    hint: "Limited-time overlay",
+    hint: describeLimitedSeasonalThemeHint(),
   })),
 ]
 

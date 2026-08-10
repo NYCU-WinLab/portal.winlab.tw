@@ -201,7 +201,7 @@ export function GalleryTitleEditor({
           variant === "polaroid" && "truncate text-center"
         )}
         aria-label={describeEditTitleNamedAriaLabel(name)}
-        title={variant === "polaroid" ? name : "Edit title"}
+        title={variant === "polaroid" ? name : describeEditTitleAriaLabel()}
       >
         {name}
       </button>

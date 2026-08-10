@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeAlbumsUnavailableError,
+  describeAlbumActionFailedError,
+  describeAlbumNotFoundError,
+  describeAlbumTitleInvalidError,
   describeCouldNotAttachTagError,
   describeFailedToLoadMorePhotos,
   describeFavoritesUnavailableError,
   describeMissingImageError,
+  describeMissingImageIdError,
   describeMissingImageOrTagIdError,
   describeMissingSourceOrTargetTagError,
   describeMissingTagError,
@@ -13,9 +18,14 @@ import {
   describeOnlyAdminsCanMergeTagsError,
   describeOnlyAdminsCanRenameTagsError,
   describePickDifferentTagsToMergeError,
+  describePinFailedError,
+  describePinFailedForPhotoError,
+  describePinUnavailableError,
   describePleaseSignInFirst,
   describeSelectAtLeastOneWorkError,
   describeSelectAtMost100WorksError,
+  describeStorageDeleteLeftoverWarning,
+  describeStorageDeleteLeftoversWarning,
   describeTagAdminUnavailableError,
   describeTagMergeFailedError,
   describeTagNameInvalidError,
@@ -65,6 +75,23 @@ describe("action errors", () => {
     )
     expect(describeFavoritesUnavailableError()).toBe(
       "Favorites are not available yet — apply the gallery favorites migration."
+    )
+    expect(describeAlbumsUnavailableError()).toBe(
+      "Albums are not available yet."
+    )
+    expect(describeAlbumActionFailedError()).toBe("Album action failed.")
+    expect(describeAlbumTitleInvalidError()).toBe(
+      "Album title is empty or invalid."
+    )
+    expect(describeAlbumNotFoundError()).toBe("Album not found.")
+    expect(describePinFailedForPhotoError()).toBe("Pin failed for that photo.")
+    expect(describeMissingImageIdError()).toBe("Missing image id.")
+    expect(describePinUnavailableError()).toContain("pin migration")
+    expect(describePinFailedError()).toBe("Pin failed.")
+    expect(describePinFailedError("boom")).toBe("Pin failed: boom")
+    expect(describeStorageDeleteLeftoverWarning()).toContain("Media health")
+    expect(describeStorageDeleteLeftoversWarning()).toContain(
+      "some storage files"
     )
   })
 })

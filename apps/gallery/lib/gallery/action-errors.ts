@@ -91,3 +91,43 @@ export function describeSelectAtMost100WorksError(): string {
 export function describeFavoritesUnavailableError(): string {
   return "Favorites are not available yet — apply the gallery favorites migration."
 }
+
+export function describeAlbumsUnavailableError(): string {
+  return "Albums are not available yet."
+}
+
+export function describeAlbumActionFailedError(): string {
+  return "Album action failed."
+}
+
+export function describeAlbumTitleInvalidError(): string {
+  return "Album title is empty or invalid."
+}
+
+export function describeAlbumNotFoundError(): string {
+  return "Album not found."
+}
+
+export function describePinFailedForPhotoError(): string {
+  return "Pin failed for that photo."
+}
+
+export function describeMissingImageIdError(): string {
+  return "Missing image id."
+}
+
+export function describePinUnavailableError(): string {
+  return "Pin is not available yet — apply the gallery image pin migration."
+}
+
+export function describePinFailedError(detail?: string | null): string {
+  return detail ? `Pin failed: ${detail}` : "Pin failed."
+}
+
+export function describeStorageDeleteLeftoverWarning(): string {
+  return "Removed from the wall, but a storage file may still remain. Retry delete or purge via Media health."
+}
+
+export function describeStorageDeleteLeftoversWarning(): string {
+  return "Removed from the wall, but some storage files may still remain."
+}
