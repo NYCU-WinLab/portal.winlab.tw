@@ -41,6 +41,7 @@ import {
   describeCommentPosted,
   describeCommentUpdated,
 } from "@/lib/gallery/comment-toast"
+import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import {
@@ -310,7 +311,7 @@ export function GalleryComments({
           result.data.pinned_at
         )
       )
-      toast.success(nextPinned ? "Comment pinned." : "Comment unpinned.")
+      toast.success(describeCommentPinToast(nextPinned))
     })
   }
 
@@ -473,6 +474,8 @@ export function GalleryComments({
                           <button
                             type="button"
                             onClick={() => startEdit(comment)}
+                            disabled={isPending}
+                            aria-busy={isPending || undefined}
                             className={galleryPillClass()}
                           >
                             Edit
@@ -483,6 +486,8 @@ export function GalleryComments({
                               deleteTriggerRef.current = event.currentTarget
                               setDeleteTargetId(comment.id)
                             }}
+                            disabled={isPending}
+                            aria-busy={isPending || undefined}
                             className={cn(
                               galleryPillClass(),
                               "text-destructive/90 hover:text-destructive"
