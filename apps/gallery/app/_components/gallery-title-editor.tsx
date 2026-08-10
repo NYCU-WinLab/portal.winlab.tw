@@ -33,6 +33,7 @@ export function GalleryTitleEditor({
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const editTriggerRef = useRef<HTMLButtonElement>(null)
+  const focusRestoreRef = useRef<HTMLButtonElement | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const [pending, startTransition] = useTransition()
@@ -48,10 +49,13 @@ export function GalleryTitleEditor({
 
   function endEditing() {
     setEditing(false)
-    queueMicrotask(() => editTriggerRef.current?.focus())
+    const trigger = focusRestoreRef.current ?? editTriggerRef.current
+    focusRestoreRef.current = null
+    queueMicrotask(() => trigger?.focus())
   }
 
-  function beginEdit() {
+  function beginEdit(trigger?: HTMLButtonElement | null) {
+    focusRestoreRef.current = trigger ?? editTriggerRef.current
     setDraft(name)
     setEditing(true)
   }
@@ -143,10 +147,11 @@ export function GalleryTitleEditor({
             type="button"
             onClick={save}
             disabled={pending}
+            aria-busy={pending || undefined}
             className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             <IconCheck className="size-3.5" aria-hidden />
-            Save
+            {pending ? "Saving…" : "Save"}
           </button>
           <button
             type="button"
@@ -179,7 +184,7 @@ export function GalleryTitleEditor({
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          beginEdit()
+          beginEdit(event.currentTarget)
         }}
         className={cn(
           titleClass(variant),
@@ -197,7 +202,7 @@ export function GalleryTitleEditor({
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          beginEdit()
+          beginEdit(event.currentTarget)
         }}
         className={cn(
           "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors",
