@@ -36,6 +36,10 @@ import {
   normalizeGalleryTagName,
   type GalleryTagSuggestion,
 } from "@/lib/gallery/tags"
+import {
+  describeTagMerged,
+  describeTagRenamed,
+} from "@/lib/gallery/tag-admin-toast"
 
 export function TagAdminPanel() {
   const router = useRouter()
@@ -113,7 +117,7 @@ export function TagAdminPanel() {
         toast.error(result.error)
         return
       }
-      toast.success(`Renamed to "${result.data.name}"`)
+      toast.success(describeTagRenamed(result.data.name))
       setRenameId(null)
       setRenameDraft("")
       refresh()
@@ -147,7 +151,10 @@ export function TagAdminPanel() {
         return
       }
       toast.success(
-        `Merged into "${result.data.name}" (${result.data.moved_count} link${result.data.moved_count === 1 ? "" : "s"} moved)`
+        describeTagMerged({
+          name: result.data.name,
+          movedCount: result.data.moved_count,
+        })
       )
       setMergeSourceId(null)
       setMergeTargetId("")
