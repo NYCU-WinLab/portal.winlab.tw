@@ -338,7 +338,11 @@ export function GalleryAlbumManagePanel({
         return
       }
       toast.success("Album deleted")
-      router.push("/albums")
+      try {
+        router.push("/albums")
+      } catch {
+        toast.error("Could not open the albums list.")
+      }
       softRefresh()
     })
   }
