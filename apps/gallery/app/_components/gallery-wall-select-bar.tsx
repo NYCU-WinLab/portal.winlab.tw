@@ -57,6 +57,7 @@ import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
+import { describeWallAlbumPhotosRemoved } from "@/lib/gallery/wall-album-remove-toast"
 import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
 import {
   buildWallSelectionShareText,
@@ -253,7 +254,7 @@ export function GalleryWallSelectBar({
         return
       }
       const n = result.data.removed
-      toast.success(`Removed ${n} photo${n === 1 ? "" : "s"} from this album.`)
+      toast.success(describeWallAlbumPhotosRemoved(n))
       onRemovedFromAlbum?.()
       onClear()
     })
