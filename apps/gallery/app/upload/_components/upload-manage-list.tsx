@@ -660,9 +660,26 @@ export function UploadManageList({
   )
   const [slideshowTitle, setSlideshowTitle] = useState("Manage selection")
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+  const bulkDialogTriggerRef = useRef<HTMLElement | null>(null)
   const [zipBusy, setZipBusy] = useState(false)
   const copyLinksBusyRef = useRef(false)
   const [isPending, startTransition] = useTransition()
+
+  const rememberBulkTrigger = (target: EventTarget | null) => {
+    if (target instanceof HTMLElement) {
+      bulkDialogTriggerRef.current = target
+    }
+  }
+
+  const handleBulkDialogOpenChange =
+    (setOpen: (open: boolean) => void) => (open: boolean) => {
+      setOpen(open)
+      if (!open) {
+        const trigger = bulkDialogTriggerRef.current
+        bulkDialogTriggerRef.current = null
+        queueMicrotask(() => trigger?.focus())
+      }
+    }
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [uploadDayOnly, setUploadDayOnly] = useState(false)
   const incompleteCount = useMemo(
@@ -927,6 +944,7 @@ export function UploadManageList({
   }
 
   const confirmBulkDate = () => {
+    if (isPending) return
     if (!bulkDateDraft.trim()) {
       toast.error("Pick a capture date.")
       return
@@ -949,6 +967,7 @@ export function UploadManageList({
   }
 
   const confirmBulkTag = () => {
+    if (isPending) return
     const name = bulkTagDraft.trim()
     if (!name) {
       toast.error("Enter a tag.")
@@ -977,6 +996,7 @@ export function UploadManageList({
   }
 
   const confirmBulkUntag = () => {
+    if (isPending) return
     const slug = bulkUntagDraft.trim()
     if (!slug) {
       toast.error("Enter a tag slug to remove.")
@@ -1098,9 +1118,9 @@ export function UploadManageList({
   }
 
   const createAlbumFromSelection = () => {
-    if (!albumsAvailable) return
+    if (!albumsAvailable || isPending) return
     const title = bulkAlbumDraft.trim()
-    if (!title || selectedItems.length === 0 || isPending) return
+    if (!title || selectedItems.length === 0) return
     startTransition(async () => {
       const result = await createGalleryAlbumWithImages({
         title,
@@ -1342,7 +1362,8 @@ export function UploadManageList({
                   />
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(event) => {
+                      rememberBulkTrigger(event.currentTarget)
                       setBulkAlbumDraft("")
                       setBulkAlbumOpen(true)
                     }}
@@ -1369,7 +1390,8 @@ export function UploadManageList({
               {tagsAvailable ? (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    rememberBulkTrigger(event.currentTarget)
                     setBulkTagDraft("")
                     setBulkTagOpen(true)
                   }}
@@ -1382,7 +1404,10 @@ export function UploadManageList({
               ) : null}
               <button
                 type="button"
-                onClick={() => setConfirmOpen(true)}
+                onClick={(event) => {
+                  rememberBulkTrigger(event.currentTarget)
+                  setConfirmOpen(true)
+                }}
                 disabled={isPending || selectedItems.length === 0}
                 className={cn(
                   galleryPillClass(),
@@ -1396,7 +1421,10 @@ export function UploadManageList({
                 {takenAtAvailable ? (
                   <button
                     type="button"
-                    onClick={openBulkDate}
+                    onClick={(event) => {
+                      rememberBulkTrigger(event.currentTarget)
+                      openBulkDate()
+                    }}
                     disabled={isPending || selectedItems.length === 0}
                     className={cn(galleryPillClass(), "disabled:opacity-40")}
                   >
@@ -1433,7 +1461,8 @@ export function UploadManageList({
                 {tagsAvailable ? (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(event) => {
+                      rememberBulkTrigger(event.currentTarget)
                       setBulkUntagDraft("")
                       setBulkUntagOpen(true)
                     }}
@@ -1498,6 +1527,9 @@ export function UploadManageList({
                       "disabled:opacity-40 sm:hidden"
                     )}
                     aria-label="More selection actions"
+                    onClick={(event) =>
+                      rememberBulkTrigger(event.currentTarget)
+                    }
                   >
                     More
                   </button>
@@ -1697,8 +1729,11 @@ export function UploadManageList({
         startIndex={0}
       />
 
-      <Dialog open={bulkDateOpen} onOpenChange={setBulkDateOpen}>
-        <DialogContent className="gap-6">
+      <Dialog
+        open={bulkDateOpen}
+        onOpenChange={handleBulkDialogOpenChange(setBulkDateOpen)}
+      >
+        <DialogContent className="gap-6" aria-busy={isPending || undefined}>
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl italic">
               Set capture date
@@ -1742,8 +1777,11 @@ export function UploadManageList({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={bulkTagOpen} onOpenChange={setBulkTagOpen}>
-        <DialogContent className="gap-6">
+      <Dialog
+        open={bulkTagOpen}
+        onOpenChange={handleBulkDialogOpenChange(setBulkTagOpen)}
+      >
+        <DialogContent className="gap-6" aria-busy={isPending || undefined}>
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl italic">
               Tag selected
@@ -1794,8 +1832,11 @@ export function UploadManageList({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={bulkUntagOpen} onOpenChange={setBulkUntagOpen}>
-        <DialogContent className="gap-6">
+      <Dialog
+        open={bulkUntagOpen}
+        onOpenChange={handleBulkDialogOpenChange(setBulkUntagOpen)}
+      >
+        <DialogContent className="gap-6" aria-busy={isPending || undefined}>
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl italic">
               Untag selected
@@ -1846,8 +1887,11 @@ export function UploadManageList({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={bulkAlbumOpen} onOpenChange={setBulkAlbumOpen}>
-        <DialogContent className="gap-6">
+      <Dialog
+        open={bulkAlbumOpen}
+        onOpenChange={handleBulkDialogOpenChange(setBulkAlbumOpen)}
+      >
+        <DialogContent className="gap-6" aria-busy={isPending || undefined}>
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl italic">
               New album
@@ -1898,8 +1942,11 @@ export function UploadManageList({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={handleBulkDialogOpenChange(setConfirmOpen)}
+      >
+        <AlertDialogContent aria-busy={isPending || undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Permanently delete {selectedItems.length} work
