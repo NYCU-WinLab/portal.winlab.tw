@@ -113,6 +113,7 @@ import {
   describeWallSelectionCopy,
 } from "@/lib/gallery/wall-selection-share"
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
+import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 
@@ -955,9 +956,7 @@ export function UploadManageList({
         fromTaipeiDateInput(bulkDateDraft)
       )
       if (result.ok) {
-        toast.success(
-          `Set capture date on ${result.updated} work${result.updated === 1 ? "" : "s"}.`
-        )
+        toast.success(describeBulkTakenAtSet(result.updated))
         setBulkDateOpen(false)
         endSelectionMode()
       } else {
