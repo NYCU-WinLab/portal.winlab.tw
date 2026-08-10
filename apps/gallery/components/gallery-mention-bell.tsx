@@ -246,12 +246,16 @@ export function GalleryMentionBell({
       setNotifications((current) =>
         current.filter((item) => item.key !== notification.key)
       )
-      router.push(
-        buildGalleryPhotoHref({
-          photoId: notification.image_id,
-          commentId: notification.comment_id,
-        })
-      )
+      try {
+        router.push(
+          buildGalleryPhotoHref({
+            photoId: notification.image_id,
+            commentId: notification.comment_id,
+          })
+        )
+      } catch {
+        toast.error("Could not open the mentioned photo.")
+      }
     })
   }
 
