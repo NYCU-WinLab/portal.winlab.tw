@@ -95,7 +95,7 @@ export function ShareAlbumButton({
       type="button"
       onClick={() => void runShare()}
       disabled={busy || disabled}
-      aria-busy={busy}
+      aria-busy={busy || undefined}
       className={cn(
         gallerySans(),
         "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
