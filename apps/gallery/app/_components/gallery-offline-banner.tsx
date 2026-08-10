@@ -12,10 +12,17 @@ const DISMISS_KEY = "gallery-offline-banner-dismissed"
 export function GalleryOfflineBanner() {
   const [offline, setOffline] = useState(false)
   const [dismissed, setDismissed] = useState(true)
+  const [busy, setBusy] = useState(false)
 
   const dismiss = () => {
-    writeStorageItem(window.sessionStorage, DISMISS_KEY, "1")
-    setDismissed(true)
+    if (busy) return
+    setBusy(true)
+    try {
+      writeStorageItem(window.sessionStorage, DISMISS_KEY, "1")
+      setDismissed(true)
+    } finally {
+      setBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -80,8 +87,10 @@ export function GalleryOfflineBanner() {
           type="button"
           className={cn(
             gallerySans(),
-            "shrink-0 text-xs text-muted-foreground underline underline-offset-4"
+            "shrink-0 text-xs text-muted-foreground underline underline-offset-4 disabled:opacity-50"
           )}
+          disabled={busy}
+          aria-busy={busy || undefined}
           onClick={dismiss}
         >
           Dismiss
