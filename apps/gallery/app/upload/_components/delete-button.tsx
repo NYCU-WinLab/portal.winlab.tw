@@ -17,6 +17,7 @@ import {
 import { Button } from "@workspace/ui/components/button"
 
 import { deleteGalleryImage } from "@/app/upload/actions"
+import { describeArtworkDeleted } from "@/lib/gallery/delete-toast"
 
 export function DeleteButton({
   id,
@@ -46,11 +47,11 @@ export function DeleteButton({
       const result = await deleteGalleryImage(id, imagePath, posterPath)
       if (result.ok) {
         if (result.warning) {
-          toast.warning(`Deleted "${name}"`, {
+          toast.warning(describeArtworkDeleted(name), {
             description: result.warning,
           })
         } else {
-          toast.success(`Deleted "${name}"`)
+          toast.success(describeArtworkDeleted(name))
         }
         setOpen(false)
       } else {
