@@ -58,4 +58,30 @@ describe("buildGalleryPhotoHref", () => {
       "/?photo=photo-1"
     )
   })
+
+  test("omits empty comment and non-positive page", () => {
+    expect(
+      buildGalleryPhotoHref({
+        photoId: "photo-1",
+        commentId: "",
+        page: 0,
+      })
+    ).toBe("/?photo=photo-1")
+    expect(
+      buildGalleryPhotoHref({
+        photoId: "photo-1",
+        commentId: null,
+        page: null,
+      })
+    ).toBe("/?photo=photo-1")
+  })
+
+  test("keeps comment without a page bump", () => {
+    expect(
+      buildGalleryPhotoHref({
+        photoId: "photo-1",
+        commentId: "c-9",
+      })
+    ).toBe("/?photo=photo-1&comment=c-9")
+  })
 })
