@@ -34,6 +34,11 @@ describe("isGalleryPhotoId", () => {
     expect(isGalleryPhotoId("not-a-uuid")).toBe(false)
     expect(isGalleryPhotoId("")).toBe(false)
   })
+
+  test("rejects wrong version or variant nibbles", () => {
+    expect(isGalleryPhotoId("550e8400-e29b-61d4-a716-446655440000")).toBe(false)
+    expect(isGalleryPhotoId("550e8400-e29b-41d4-c716-446655440000")).toBe(false)
+  })
 })
 
 describe("buildGalleryPhotoHref", () => {
