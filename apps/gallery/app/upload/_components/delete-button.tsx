@@ -75,7 +75,7 @@ export function DeleteButton({
           Delete
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent aria-busy={pending || undefined}>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{name}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
