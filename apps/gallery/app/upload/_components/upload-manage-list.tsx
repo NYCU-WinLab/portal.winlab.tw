@@ -116,6 +116,7 @@ import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
@@ -391,7 +392,7 @@ function UploadSequenceGroup({
     const nextIds = items.map((item) => item.id)
     // Same order, but densified indexes close gaps on the server.
     persistOrder(nextIds, items)
-    toast.message("Compacting sequence slots…")
+    toast.message(describeSequenceCompactingToast())
   }
 
   const {

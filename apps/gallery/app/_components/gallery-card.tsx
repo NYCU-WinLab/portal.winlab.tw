@@ -48,6 +48,8 @@ import {
   describeSavedOriginal,
 } from "@/lib/gallery/photo-share-toast"
 import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
+import { describeSignInToFavorite } from "@/lib/gallery/download-labels"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
@@ -163,7 +165,7 @@ export function GalleryCard({
     try {
       router.replace(qs ? `/?${qs}` : "/", { scroll: false })
     } catch {
-      toast.error("Could not close the photo.")
+      toast.error(describeGalleryNavError("closePhoto"))
     }
   }
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
@@ -323,7 +325,7 @@ export function GalleryCard({
 
   const toggleFavoriteFromKeyboard = useCallback(async () => {
     if (!isSignedIn) {
-      toast.error("Sign in to save favorites.")
+      toast.error(describeSignInToFavorite())
       return
     }
     if (favoriteBusyRef.current) return

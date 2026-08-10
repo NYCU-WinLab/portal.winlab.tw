@@ -16,6 +16,7 @@ import {
   describeZipPreparingProgress,
 } from "@/lib/gallery/zip-progress"
 import { describeSequenceZipSaved } from "@/lib/gallery/sequence-zip-result"
+import { describeDownloadStoryLabel } from "@/lib/gallery/download-labels"
 
 type DownloadSequenceButtonProps = {
   items: SequenceZipSource[]
@@ -38,9 +39,7 @@ export function DownloadSequenceButton({
 }: DownloadSequenceButtonProps) {
   const [busy, setBusy] = useState(false)
   const shotCount = items.length
-  const buttonLabel =
-    label ??
-    (shotCount > 1 ? `Download story (${shotCount})` : "Download story")
+  const buttonLabel = label ?? describeDownloadStoryLabel(shotCount)
 
   const runDownload = async () => {
     if (busy || disabled || shotCount < 2) return

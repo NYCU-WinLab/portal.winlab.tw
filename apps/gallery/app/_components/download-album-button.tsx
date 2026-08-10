@@ -16,6 +16,7 @@ import {
   describeZipBusyLabel,
   describeZipPreparingProgress,
 } from "@/lib/gallery/zip-progress"
+import { describeDownloadAlbumLabel } from "@/lib/gallery/download-labels"
 
 type DownloadAlbumButtonProps = {
   items: AlbumZipSource[]
@@ -37,9 +38,7 @@ export function DownloadAlbumButton({
 }: DownloadAlbumButtonProps) {
   const [busy, setBusy] = useState(false)
   const photoCount = items.length
-  const buttonLabel =
-    label ??
-    (photoCount > 0 ? `Download album (${photoCount})` : "Download album")
+  const buttonLabel = label ?? describeDownloadAlbumLabel(photoCount)
 
   const runDownload = async () => {
     if (busy || disabled || photoCount < 1) return
