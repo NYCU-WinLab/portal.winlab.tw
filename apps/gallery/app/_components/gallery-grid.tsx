@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 import { GalleryCard } from "@/app/_components/gallery-card"
 import { GalleryCardBoundary } from "@/app/_components/gallery-card-boundary"
@@ -79,6 +80,13 @@ export function GalleryGrid({
   suspendKeyboard?: boolean
 }) {
   const router = useRouter()
+  const softReplace = (href: string, errorMessage?: string) => {
+    try {
+      router.replace(href, { scroll: false })
+    } catch {
+      if (errorMessage) toast.error(errorMessage)
+    }
+  }
   const [focusIndex, setFocusIndex] = useState(() => {
     if (!openPhotoId) return -1
     const index = images.findIndex((image) => image.id === openPhotoId)
@@ -116,12 +124,12 @@ export function GalleryGrid({
     const timer = window.setTimeout(() => {
       setOpenIndex(nextIndex)
       setFocusIndex(nextIndex)
-      router.replace(
+      softReplace(
         buildGalleryPhotoHref({
           photoId: nextImage.id,
           commentId: null,
         }),
-        { scroll: false }
+        "Could not open the next photo."
       )
     }, 0)
     return () => window.clearTimeout(timer)
@@ -142,12 +150,12 @@ export function GalleryGrid({
     if (!nextImage) return
     setOpenIndex(nextIndex)
     setFocusIndex(nextIndex)
-    router.replace(
+    softReplace(
       buildGalleryPhotoHref({
         photoId: nextImage.id,
         commentId: null,
       }),
-      { scroll: false }
+      "Could not open that photo."
     )
   }
 
@@ -157,7 +165,7 @@ export function GalleryGrid({
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    softReplace(qs ? `/?${qs}` : "/", "Could not close the photo.")
   }
 
   useEffect(() => {
@@ -173,7 +181,10 @@ export function GalleryGrid({
         hasActiveGalleryFilters(filters)
       ) {
         event.preventDefault()
-        router.replace(buildGalleryHomeHref({}))
+        softReplace(
+          buildGalleryHomeHref({}),
+          "Could not clear gallery filters."
+        )
         return
       }
 
@@ -274,7 +285,12 @@ export function GalleryGrid({
             <button
               type="button"
               className={galleryNavLinkClass()}
-              onClick={() => router.replace(buildGalleryHomeHref({}))}
+              onClick={() =>
+                softReplace(
+                  buildGalleryHomeHref({}),
+                  "Could not clear gallery filters."
+                )
+              }
             >
               Clear filters
             </button>
@@ -340,13 +356,13 @@ export function GalleryGrid({
                 if (selectionMode) return
                 if (open) {
                   setOpenIndex(index)
-                  router.replace(
+                  softReplace(
                     buildGalleryPhotoHref({
                       photoId: image.id,
                       commentId:
                         openPhotoId === image.id ? openCommentId : null,
                     }),
-                    { scroll: false }
+                    "Could not open that photo."
                   )
                 } else {
                   closeLightbox()
