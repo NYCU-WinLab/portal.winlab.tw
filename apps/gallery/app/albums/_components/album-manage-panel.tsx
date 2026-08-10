@@ -54,7 +54,13 @@ import {
   nextAlbumCoverAfterRemove,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
-import { describeAlbumPhotosRemoved } from "@/lib/gallery/album-manage-copy"
+import {
+  describeAlbumCoverUpdated,
+  describeAlbumDeleted,
+  describeAlbumPhotoRemoved,
+  describeAlbumPhotosRemoved,
+  describeAlbumUpdated,
+} from "@/lib/gallery/album-manage-copy"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
@@ -166,7 +172,7 @@ export function GalleryAlbumManagePanel({
         toast.error(result.error)
         return
       }
-      toast.success("Album updated")
+      toast.success(describeAlbumUpdated())
       if (result.data.slug !== album.slug) {
         try {
           router.replace(`/albums/${result.data.slug}`)
@@ -279,7 +285,7 @@ export function GalleryAlbumManagePanel({
         toast.error(result.error)
         return
       }
-      toast.success("Removed from album")
+      toast.success(describeAlbumPhotoRemoved())
       softRefresh()
     })
   }
@@ -329,7 +335,7 @@ export function GalleryAlbumManagePanel({
         toast.error(result.error)
         return
       }
-      toast.success("Cover updated")
+      toast.success(describeAlbumCoverUpdated())
       softRefresh()
     })
   }
@@ -342,7 +348,7 @@ export function GalleryAlbumManagePanel({
         toast.error(result.error)
         return
       }
-      toast.success("Album deleted")
+      toast.success(describeAlbumDeleted())
       try {
         router.push("/albums")
       } catch {
