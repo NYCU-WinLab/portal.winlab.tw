@@ -102,6 +102,7 @@ export function GalleryTitleEditor({
           "gallery-title-editor flex min-w-0 flex-col gap-2",
           className
         )}
+        aria-busy={pending || undefined}
       >
         <label htmlFor={inputId} className="sr-only">
           Title
