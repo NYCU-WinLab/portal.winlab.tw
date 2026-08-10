@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 
 import {
   Dialog,
@@ -14,11 +16,17 @@ import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { adjacentListId } from "@/lib/gallery/lightbox-nav"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
 import {
   findSlideshowIndexByImageId,
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
+import {
+  describeNextSlideAriaLabel,
+  describePreviousSlideAriaLabel,
+} from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
 export function MemoriesDayView({
@@ -66,6 +74,47 @@ export function MemoriesDayView({
   }, [groups])
 
   const active = openId ? (photoById.get(openId) ?? null) : null
+  const photoIds = useMemo(
+    () => slideshowPhotos.map((photo) => photo.image_id),
+    [slideshowPhotos]
+  )
+
+  const goLightbox = (direction: "prev" | "next") => {
+    if (!openId) return
+    const nextId = adjacentListId(photoIds, openId, direction)
+    if (!nextId) return
+    setLightboxFailed(false)
+    setOpenId(nextId)
+  }
+
+  useEffect(() => {
+    if (!openId || photoIds.length <= 1 || slideshowOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key === "ArrowLeft" || event.key === "k" || event.key === "K") {
+        event.preventDefault()
+        const nextId = adjacentListId(photoIds, openId, "prev")
+        if (!nextId) return
+        setLightboxFailed(false)
+        setOpenId(nextId)
+        return
+      }
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "j" ||
+        event.key === "J"
+      ) {
+        event.preventDefault()
+        const nextId = adjacentListId(photoIds, openId, "next")
+        if (!nextId) return
+        setLightboxFailed(false)
+        setOpenId(nextId)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [openId, photoIds, slideshowOpen])
 
   const openSlideshowAtIndex = (index: number, returnPhotoId?: string) => {
     setSlideshowStart(index)
@@ -112,6 +161,7 @@ export function MemoriesDayView({
         groups={groups}
         currentYear={currentYear}
         canSlideshow={slideshowPhotos.length > 0}
+        slideshowOpen={slideshowOpen}
         onOpenPhoto={(imageId) => {
           setLightboxFailed(false)
           setOpenId(imageId)
@@ -138,8 +188,39 @@ export function MemoriesDayView({
       >
         <DialogContent className="max-w-3xl border-0 bg-transparent p-0 shadow-none sm:max-w-3xl">
           {active ? (
-            <div className="overflow-hidden rounded-lg bg-[#f7f7f5] shadow-2xl">
-              <DialogTitle className="sr-only">{active.name}</DialogTitle>
+            <div className="relative overflow-hidden rounded-lg bg-[#f7f7f5] shadow-2xl">
+              <DialogTitle className="sr-only">
+                {active.name}
+                {photoIds.length > 1
+                  ? ` · ${photoIds.indexOf(active.id) + 1} of ${photoIds.length}`
+                  : ""}
+              </DialogTitle>
+              {photoIds.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    aria-label={describePreviousSlideAriaLabel()}
+                    onClick={() => goLightbox("prev")}
+                    className={cn(
+                      "absolute top-[min(38%,12rem)] left-2 z-10 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full",
+                      "bg-black/30 text-white hover:bg-black/50"
+                    )}
+                  >
+                    <IconChevronLeft className="size-5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={describeNextSlideAriaLabel()}
+                    onClick={() => goLightbox("next")}
+                    className={cn(
+                      "absolute top-[min(38%,12rem)] right-2 z-10 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full",
+                      "bg-black/30 text-white hover:bg-black/50"
+                    )}
+                  >
+                    <IconChevronRight className="size-5" aria-hidden />
+                  </button>
+                </>
+              ) : null}
               {lightboxFailed ? (
                 <div
                   className={cn(

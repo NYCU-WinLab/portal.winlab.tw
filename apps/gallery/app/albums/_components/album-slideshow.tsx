@@ -456,7 +456,7 @@ export function AlbumSlideshow({
                   )
                 }
                 className={cn(
-                  "absolute top-1/2 left-2 z-10 hidden -translate-y-1/2 sm:inline-flex",
+                  "absolute top-1/2 left-2 z-10 inline-flex -translate-y-1/2",
                   "size-11 items-center justify-center rounded-full text-zinc-200",
                   "bg-black/25 hover:bg-black/45"
                 )}
@@ -472,7 +472,7 @@ export function AlbumSlideshow({
                   )
                 }
                 className={cn(
-                  "absolute top-1/2 right-2 z-10 hidden -translate-y-1/2 sm:inline-flex",
+                  "absolute top-1/2 right-2 z-10 inline-flex -translate-y-1/2",
                   "size-11 items-center justify-center rounded-full text-zinc-200",
                   "bg-black/25 hover:bg-black/45"
                 )}

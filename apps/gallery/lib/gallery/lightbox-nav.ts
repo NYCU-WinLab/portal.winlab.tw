@@ -35,3 +35,18 @@ export function nextSequenceIndex(
   }
   return (activeIndex + 1) % sequenceLength
 }
+
+/** Wrap prev/next over a flat id list (album grid, Memories day). */
+export function adjacentListId(
+  ids: readonly string[],
+  currentId: string,
+  direction: "prev" | "next"
+): string | null {
+  if (ids.length <= 1) return null
+  const index = ids.indexOf(currentId)
+  if (index < 0) return null
+  if (direction === "prev") {
+    return ids[index === 0 ? ids.length - 1 : index - 1] ?? null
+  }
+  return ids[(index + 1) % ids.length] ?? null
+}

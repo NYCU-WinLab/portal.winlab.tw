@@ -50,6 +50,7 @@ import {
   describeDeleteLabel,
 } from "@/lib/gallery/dialog-action-labels"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import { describePinChromeLabel } from "@/lib/gallery/pin-toast"
 import {
   describeEditLabel,
@@ -123,7 +124,10 @@ export function GalleryComments({
       const node = listRef.current?.querySelector<HTMLElement>(
         `[data-comment-id="${highlightCommentId}"]`
       )
-      node?.scrollIntoView({ behavior: "smooth", block: "center" })
+      node?.scrollIntoView({
+        behavior: galleryScrollBehavior(),
+        block: "center",
+      })
       setHighlightedId(highlightCommentId)
     })
 

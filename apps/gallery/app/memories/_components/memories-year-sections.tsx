@@ -17,6 +17,7 @@ export function MemoriesYearSections({
   groups,
   currentYear,
   canSlideshow,
+  slideshowOpen = false,
   onOpenPhoto,
   onStartSlideshow,
   registerPhotoButton,
@@ -24,6 +25,7 @@ export function MemoriesYearSections({
   groups: GalleryMemoryYearGroup[]
   currentYear: number
   canSlideshow: boolean
+  slideshowOpen?: boolean
   onOpenPhoto: (imageId: string) => void
   onStartSlideshow: (startIndex: number) => void
   registerPhotoButton?: (
@@ -71,10 +73,13 @@ export function MemoriesYearSections({
                 <button
                   type="button"
                   onClick={() => onStartSlideshow(startIndex)}
+                  disabled={slideshowOpen}
+                  aria-busy={slideshowOpen || undefined}
+                  aria-expanded={slideshowOpen}
                   className={cn(
                     gallerySans(),
                     "inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-[11px] tracking-wide uppercase shadow-xs",
-                    "hover:bg-accent hover:text-accent-foreground"
+                    "hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
                   )}
                 >
                   Slideshow {group.year}

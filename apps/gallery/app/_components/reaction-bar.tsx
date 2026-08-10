@@ -157,6 +157,15 @@ export function ReactionBar({
         return
       }
 
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault()
+        event.stopPropagation()
+        const reaction =
+          hoveredReaction ?? myReaction ?? GALLERY_REACTIONS[0] ?? null
+        if (reaction) pickReaction(reaction)
+        return
+      }
+
       const navKey =
         event.key === "ArrowLeft" ||
         event.key === "ArrowRight" ||
@@ -191,7 +200,26 @@ export function ReactionBar({
     }
     window.addEventListener("keydown", onKeyDown, true)
     return () => window.removeEventListener("keydown", onKeyDown, true)
-  }, [pickerOpen, closePicker, hoveredReaction, myReaction])
+  }, [pickerOpen, closePicker, hoveredReaction, myReaction, pickReaction])
+
+  const focusReactionButton = (reaction: GalleryReaction) => {
+    queueMicrotask(() => {
+      const button = zoneRef.current?.querySelector<HTMLButtonElement>(
+        `[data-reaction="${reaction}"]`
+      )
+      button?.focus()
+    })
+  }
+
+  const openPickerFromKeyboard = () => {
+    if (!canReact || busy) return
+    openPicker()
+    const reaction = myReaction ?? GALLERY_REACTIONS[0]
+    if (reaction) {
+      setHoveredReaction(reaction)
+      focusReactionButton(reaction)
+    }
+  }
 
   const onZoneEnter = (e: React.PointerEvent) => {
     if (!canReact || e.pointerType === "touch" || touchAwaitingPick.current)
@@ -367,6 +395,16 @@ export function ReactionBar({
         aria-busy={busy || undefined}
         onClick={onTriggerClick}
         onContextMenu={(e) => e.preventDefault()}
+        onKeyDown={(event) => {
+          if (!canReact || busy || pickerOpen) return
+          if (
+            event.key === "ArrowUp" ||
+            (event.key === "Enter" && event.altKey)
+          ) {
+            event.preventDefault()
+            openPickerFromKeyboard()
+          }
+        }}
         aria-expanded={pickerOpen}
         aria-haspopup="menu"
         aria-pressed={Boolean(myReaction)}

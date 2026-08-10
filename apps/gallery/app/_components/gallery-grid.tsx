@@ -26,6 +26,7 @@ import {
   describeUploadAPhotoLabel,
 } from "@/lib/gallery/empty-state-labels"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import type { GalleryImage, GalleryMember } from "@/lib/gallery/types"
@@ -100,12 +101,29 @@ export function GalleryGrid({
     const index = images.findIndex((image) => image.id === openPhotoId)
     return index >= 0 ? index : -1
   })
-  const [keyboardNavActive, setKeyboardNavActive] = useState(false)
   const [openIndex, setOpenIndex] = useState<number | null>(() => {
     if (!openPhotoId) return null
     const index = images.findIndex((image) => image.id === openPhotoId)
     return index >= 0 ? index : null
   })
+  const [keyboardNavActive, setKeyboardNavActive] = useState(() =>
+    Boolean(openPhotoId)
+  )
+  const cardFocusRefs = useRef(new Map<string, HTMLButtonElement>())
+
+  useEffect(() => {
+    if (!keyboardNavActive || focusIndex < 0 || openIndex !== null) return
+    const image = images[focusIndex]
+    if (!image) return
+    const node = cardFocusRefs.current.get(image.id)
+    if (!node) return
+    node.scrollIntoView({
+      block: "nearest",
+      behavior: galleryScrollBehavior(),
+    })
+    node.focus({ preventScroll: true })
+  }, [focusIndex, images, keyboardNavActive, openIndex])
+
   const pendingAdvanceNextRef = useRef(false)
 
   useEffect(() => {
@@ -379,6 +397,10 @@ export function GalleryGrid({
               gridFocused={
                 keyboardNavActive && focusIndex === index && openIndex === null
               }
+              wallFocusRef={(node) => {
+                if (node) cardFocusRefs.current.set(image.id, node)
+                else cardFocusRefs.current.delete(image.id)
+              }}
               hasWallPrev={openIndex === index && index > 0}
               hasWallNext={
                 openIndex === index && (index < images.length - 1 || hasMore)

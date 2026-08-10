@@ -95,6 +95,7 @@ export function GalleryCard({
   open,
   onOpenChange,
   gridFocused = false,
+  wallFocusRef,
   hasWallPrev = false,
   hasWallNext = false,
   onWallNavigate,
@@ -121,6 +122,8 @@ export function GalleryCard({
   open?: boolean
   onOpenChange?: (open: boolean) => void
   gridFocused?: boolean
+  /** Registers the polaroid open/select trigger for wall J/K focus. */
+  wallFocusRef?: (node: HTMLButtonElement | null) => void
   hasWallPrev?: boolean
   hasWallNext?: boolean
   onWallNavigate?: (direction: "prev" | "next") => void
@@ -493,6 +496,7 @@ export function GalleryCard({
               {selectionMode ? (
                 <button
                   type="button"
+                  ref={wallFocusRef}
                   aria-pressed={selected}
                   aria-label={
                     selected
@@ -565,6 +569,7 @@ export function GalleryCard({
                 <DialogTrigger asChild>
                   <button
                     type="button"
+                    ref={wallFocusRef}
                     className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {thumbFailed ? (
