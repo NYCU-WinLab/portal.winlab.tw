@@ -13,6 +13,7 @@ import {
   runGalleryUpload,
   type UploadStatus,
 } from "@/lib/gallery/upload-pipeline"
+import { describeUploadWorksToast } from "@/lib/gallery/upload-toast"
 
 type RunOptions = {
   onAllSucceeded?: () => void
@@ -75,17 +76,16 @@ export function useGalleryUpload({
     failures: UploadFailure[]
   ) {
     if (successCount <= 0) return
-    const suffix = successCount > 1 ? "s" : ""
     if (wallPhotoId) {
       const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-      toast.success(`Uploaded ${successCount} work${suffix}.`, {
+      toast.success(describeUploadWorksToast(successCount), {
         action: {
           label: "View on wall",
           onClick: () => softPush(href, "Could not open the wall photo."),
         },
       })
     } else {
-      toast.success(`Uploaded ${successCount} work${suffix}.`)
+      toast.success(describeUploadWorksToast(successCount))
     }
 
     if (sequenceId && failures.length > 0) {
