@@ -1244,6 +1244,8 @@ export function UploadManageList({
           <button
             type="button"
             onClick={() => setIncompleteOnly((value) => !value)}
+            disabled={isPending}
+            aria-busy={isPending || undefined}
             className={cn(
               galleryPillClass(),
               incompleteOnly && "border-foreground/25 bg-foreground/[0.06]"
@@ -1259,6 +1261,8 @@ export function UploadManageList({
           <button
             type="button"
             onClick={() => setUploadDayOnly((value) => !value)}
+            disabled={isPending}
+            aria-busy={isPending || undefined}
             className={cn(
               galleryPillClass(),
               uploadDayOnly && "border-foreground/25 bg-foreground/[0.06]"
