@@ -12,7 +12,10 @@ import { toast } from "sonner"
 
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { useGalleryUpload } from "@/hooks/gallery/use-gallery-upload"
-import { describeDevelopingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeDevelopingLabel,
+  describeCancelUploadLabel,
+} from "@/lib/gallery/busy-labels"
 import { describeHangUploadLabel } from "@/lib/gallery/hang-upload-label"
 import { formatFailurePreview } from "@/lib/gallery/upload-errors"
 import { buildArtworkName } from "@/lib/gallery/upload-naming"
@@ -483,7 +486,7 @@ export function UploadForm({
             onClick={cancelUpload}
             className={cn(gallerySans(), "self-start")}
           >
-            Cancel upload
+            {describeCancelUploadLabel()}
           </Button>
         </div>
       ) : null}

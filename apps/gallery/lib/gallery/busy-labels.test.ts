@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeCancelUploadLabel,
   describeCreatingLabel,
   describeDevelopingLabel,
   describeInstallingLabel,
@@ -72,5 +73,9 @@ describe("busy labels", () => {
 
   test("describeLoadingTagsLabel", () => {
     expect(describeLoadingTagsLabel()).toBe("Loading tags…")
+  })
+
+  test("describeCancelUploadLabel", () => {
+    expect(describeCancelUploadLabel()).toBe("Cancel upload")
   })
 })

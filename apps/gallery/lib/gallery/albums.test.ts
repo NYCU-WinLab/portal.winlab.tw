@@ -117,6 +117,10 @@ describe("nextAlbumCoverAfterRemove", () => {
     expect(nextAlbumCoverAfterRemove("a", [], ["a"])).toBe(null)
   })
 
+  test("clears cover when the only photo was removed", () => {
+    expect(nextAlbumCoverAfterRemove("solo", [], ["solo"])).toBe(null)
+  })
+
   test("keeps cover when remaining list omits it but it was not removed", () => {
     expect(nextAlbumCoverAfterRemove("a", ["b"], [])).toBe("a")
   })
@@ -148,5 +152,30 @@ describe("albumMatchesQuery", () => {
 
   test("rejects non-matches", () => {
     expect(albumMatchesQuery(album, "world-cup")).toBe(false)
+  })
+
+  test("matches unicode title text", () => {
+    expect(
+      albumMatchesQuery(
+        {
+          title: "實驗室出遊",
+          slug: "lab-trip",
+          description: null,
+          owner_name: "小明",
+        },
+        "實驗"
+      )
+    ).toBe(true)
+    expect(
+      albumMatchesQuery(
+        {
+          title: "實驗室出遊",
+          slug: "lab-trip",
+          description: null,
+          owner_name: "小明",
+        },
+        "小明"
+      )
+    ).toBe(true)
   })
 })

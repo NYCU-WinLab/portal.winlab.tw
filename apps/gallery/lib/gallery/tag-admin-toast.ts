@@ -12,3 +12,8 @@ export function describeTagMerged(input: {
   const links = movedCount === 1 ? "link" : "links"
   return `Merged into "${name}" (${movedCount} ${links} moved)`
 }
+
+/** Inline status when the manage tags dialog fails to load. */
+export function describeCouldNotLoadTags(error: string): string {
+  return `Could not load tags — ${error}`
+}

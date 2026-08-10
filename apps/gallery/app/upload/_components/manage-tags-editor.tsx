@@ -15,7 +15,9 @@ import { cn } from "@workspace/ui/lib/utils"
 import { GalleryImageTags } from "@/app/_components/gallery-image-tags"
 import { listGalleryImageTags } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeLoadingTagsLabel } from "@/lib/gallery/busy-labels"
 import type { GalleryTag } from "@/lib/gallery/tags"
+import { describeCouldNotLoadTags } from "@/lib/gallery/tag-admin-toast"
 
 export function ManageTagsEditor({
   imageId,
@@ -79,7 +81,7 @@ export function ManageTagsEditor({
         </DialogHeader>
         {pending && tags == null && !loadError ? (
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-            Loading tags…
+            {describeLoadingTagsLabel()}
           </p>
         ) : loadError ? (
           <div className="space-y-3">
@@ -88,7 +90,7 @@ export function ManageTagsEditor({
               aria-live="polite"
               className={cn(gallerySans(), "text-sm text-amber-800")}
             >
-              Could not load tags — {loadError}
+              {describeCouldNotLoadTags(loadError)}
             </p>
             <Button
               type="button"

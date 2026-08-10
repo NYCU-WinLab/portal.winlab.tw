@@ -40,7 +40,7 @@ export function SignOutButton({
         try {
           router.refresh()
         } catch {
-          // Best-effort after a successful sign-out.
+          toast.error(describeGalleryNavError("refreshGalleryChrome"))
         }
       } catch {
         toast.error(describeCouldNotSignOut())

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeCouldNotLoadTags,
   describeTagMerged,
   describeTagRenamed,
 } from "@/lib/gallery/tag-admin-toast"
@@ -21,6 +22,14 @@ describe("describeTagMerged", () => {
   test("plural link count", () => {
     expect(describeTagMerged({ name: "lab", movedCount: 4 })).toBe(
       'Merged into "lab" (4 links moved)'
+    )
+  })
+})
+
+describe("describeCouldNotLoadTags", () => {
+  test("prefixes the load error", () => {
+    expect(describeCouldNotLoadTags("network down")).toBe(
+      "Could not load tags — network down"
     )
   })
 })

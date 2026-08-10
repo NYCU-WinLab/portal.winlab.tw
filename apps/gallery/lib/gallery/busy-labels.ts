@@ -67,3 +67,8 @@ export function describeDevelopingLabel(): string {
 export function describeLoadingTagsLabel(): string {
   return "Loading tags…"
 }
+
+/** Visible label for canceling an in-flight upload. */
+export function describeCancelUploadLabel(): string {
+  return "Cancel upload"
+}
