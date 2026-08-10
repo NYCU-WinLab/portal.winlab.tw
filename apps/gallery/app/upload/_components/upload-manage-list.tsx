@@ -116,6 +116,7 @@ import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
+import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
 
 type SelectableItem = {
   id: string
@@ -1027,14 +1028,27 @@ export function UploadManageList({
     const zipItems = expandManageSelectionZipItems(orderedSelectedIds, images)
     if (zipItems.length === 0) return
     setZipBusy(true)
-    const toastId = toast.loading(`Preparing selection… 0/${zipItems.length}`)
+    const toastId = toast.loading(
+      describeZipPreparingProgress({
+        completed: 0,
+        total: zipItems.length,
+        noun: "selection",
+      })
+    )
     try {
       const result = await downloadAlbumZip(zipItems, {
         zipName: buildAlbumZipFilename("manage-selection"),
         onProgress: ({ completed, total }) => {
-          toast.loading(`Preparing selection… ${completed}/${total}`, {
-            id: toastId,
-          })
+          toast.loading(
+            describeZipPreparingProgress({
+              completed,
+              total,
+              noun: "selection",
+            }),
+            {
+              id: toastId,
+            }
+          )
         },
       })
       const copy = describeZipDownloadResult({

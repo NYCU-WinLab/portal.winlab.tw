@@ -12,6 +12,7 @@ import {
   type AlbumZipSource,
 } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
+import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
 
 type DownloadAlbumButtonProps = {
   items: AlbumZipSource[]
@@ -40,14 +41,27 @@ export function DownloadAlbumButton({
   const runDownload = async () => {
     if (busy || disabled || photoCount < 1) return
     setBusy(true)
-    const toastId = toast.loading(`Preparing album… 0/${photoCount}`)
+    const toastId = toast.loading(
+      describeZipPreparingProgress({
+        completed: 0,
+        total: photoCount,
+        noun: "album",
+      })
+    )
     try {
       const result = await downloadAlbumZip(items, {
         zipName: albumTitle ? buildAlbumZipFilename(albumTitle) : undefined,
         onProgress: ({ completed, total }) => {
-          toast.loading(`Preparing album… ${completed}/${total}`, {
-            id: toastId,
-          })
+          toast.loading(
+            describeZipPreparingProgress({
+              completed,
+              total,
+              noun: "album",
+            }),
+            {
+              id: toastId,
+            }
+          )
         },
       })
       const copy = describeZipDownloadResult({

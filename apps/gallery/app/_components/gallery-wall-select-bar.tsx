@@ -64,6 +64,7 @@ import {
 } from "@/lib/gallery/wall-selection-share"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
+import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -368,15 +369,26 @@ export function GalleryWallSelectBar({
     if (zipBusy || selectedZipItems.length === 0) return
     setZipBusy(true)
     const toastId = toast.loading(
-      `Preparing selection… 0/${selectedZipItems.length}`
+      describeZipPreparingProgress({
+        completed: 0,
+        total: selectedZipItems.length,
+        noun: "selection",
+      })
     )
     try {
       const result = await downloadAlbumZip(selectedZipItems, {
         zipName: buildAlbumZipFilename("wall-selection"),
         onProgress: ({ completed, total }) => {
-          toast.loading(`Preparing selection… ${completed}/${total}`, {
-            id: toastId,
-          })
+          toast.loading(
+            describeZipPreparingProgress({
+              completed,
+              total,
+              noun: "selection",
+            }),
+            {
+              id: toastId,
+            }
+          )
         },
       })
       const copy = describeZipDownloadResult({
