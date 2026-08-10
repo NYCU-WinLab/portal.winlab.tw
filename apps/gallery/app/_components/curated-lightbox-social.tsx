@@ -22,8 +22,8 @@ import {
   type ReactionCounts,
   type ReactionNames,
 } from "@/lib/gallery/reactions"
-import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 import type { GalleryTag } from "@/lib/gallery/tags"
+import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 import { describeSignInBeforeReact } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@workspace/ui/lib/utils"
@@ -58,6 +58,8 @@ export function CuratedLightboxSocial({
   const [members, setMembers] = useState<GalleryMember[]>([])
   const [tags, setTags] = useState<GalleryTag[]>([])
   const [tagsAvailable, setTagsAvailable] = useState(true)
+  const [tagsError, setTagsError] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(true)
   const [openSignal, setOpenSignal] = useState(0)
   const [pending, startTransition] = useTransition()
   const openRef = useRef(open)
@@ -87,9 +89,11 @@ export function CuratedLightboxSocial({
     if (tagResult.ok) {
       setTags(tagResult.data)
       setTagsAvailable(true)
+      setTagsError(null)
     } else {
       setTags([])
       setTagsAvailable(false)
+      setTagsError(tagResult.error)
     }
     if (!memberResult.error) {
       setMembers(
@@ -112,8 +116,14 @@ export function CuratedLightboxSocial({
       setReactionsAvailable(true)
       setComments([])
       setTags([])
+      setTagsError(null)
+      setDetailsOpen(true)
       return
     }
+    const narrow =
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 639px)").matches
+    setDetailsOpen(!narrow)
     void refresh()
   }, [open, refresh])
 
@@ -126,6 +136,11 @@ export function CuratedLightboxSocial({
         ctrlKey: event.ctrlKey,
         altKey: event.altKey,
       })
+      if (action === "toggle-details") {
+        event.preventDefault()
+        setDetailsOpen((value) => !value)
+        return
+      }
       if (action !== "react") return
       event.preventDefault()
       if (!reactionsAvailable || !signedIn) {
@@ -178,28 +193,56 @@ export function CuratedLightboxSocial({
           onReact={onReact}
         />
       ) : null}
-      {tagsAvailable ? (
-        <GalleryImageTags imageId={imageId} tags={tags} canEdit={signedIn} />
-      ) : null}
-      {signedIn && albumsAvailable ? (
-        <GalleryAddToAlbum imageIds={[imageId]} />
-      ) : null}
-      {commentsAvailable ? (
-        <div className="max-h-[min(40vh,22rem)] min-h-[10rem] overflow-hidden rounded-xl border border-border/50 bg-background/70">
-          <GalleryComments
-            imageId={imageId}
-            comments={comments}
-            onCommentsChange={setComments}
-            isSignedIn={signedIn}
-            viewerId={viewerId}
-            viewerName={viewerName}
-            members={members}
-            isAdmin={isAdmin}
-            commentPinAvailable={commentPinAvailable}
-            commentLikesAvailable={commentLikesAvailable}
-          />
-        </div>
-      ) : null}
+      <button
+        type="button"
+        className={cn(
+          gallerySans(),
+          "text-xs text-muted-foreground underline-offset-2 hover:underline sm:hidden"
+        )}
+        aria-expanded={detailsOpen}
+        aria-keyshortcuts="I"
+        onClick={() => setDetailsOpen((value) => !value)}
+      >
+        {detailsOpen ? "Hide details" : "Show details"}
+      </button>
+      {detailsOpen ? (
+        <>
+          {tagsAvailable ? (
+            <GalleryImageTags
+              imageId={imageId}
+              tags={tags}
+              canEdit={signedIn}
+            />
+          ) : tagsError ? (
+            <p role="status" className="text-[11px] text-muted-foreground">
+              Tags unavailable — {tagsError}
+            </p>
+          ) : null}
+          {signedIn && albumsAvailable ? (
+            <GalleryAddToAlbum imageIds={[imageId]} />
+          ) : null}
+          {commentsAvailable ? (
+            <div className="max-h-[min(40vh,22rem)] min-h-[10rem] overflow-hidden rounded-xl border border-border/50 bg-background/70">
+              <GalleryComments
+                imageId={imageId}
+                comments={comments}
+                onCommentsChange={setComments}
+                isSignedIn={signedIn}
+                viewerId={viewerId}
+                viewerName={viewerName}
+                members={members}
+                isAdmin={isAdmin}
+                commentPinAvailable={commentPinAvailable}
+                commentLikesAvailable={commentLikesAvailable}
+              />
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-[11px] text-muted-foreground sm:hidden">
+          Press I for comments, tags, and albums.
+        </p>
+      )}
     </div>
   )
 }

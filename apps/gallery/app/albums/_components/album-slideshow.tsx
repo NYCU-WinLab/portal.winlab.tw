@@ -27,6 +27,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { prefersReducedMotion } from "@/lib/gallery/motion"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import {
   GALLERY_SLIDESHOW_DEFAULT_MS,
@@ -81,6 +82,7 @@ export function AlbumSlideshow({
   const [intervalMs, setIntervalMs] = useState(GALLERY_SLIDESHOW_DEFAULT_MS)
   const [videoMuted, setVideoMuted] = useState(true)
   const [mediaFailed, setMediaFailed] = useState(false)
+  const [reduceMotion, setReduceMotion] = useState(false)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -94,6 +96,7 @@ export function AlbumSlideshow({
     setIntervalMs(readStoredSlideshowIntervalMs(window.localStorage))
     setVideoMuted(true)
     setMediaFailed(false)
+    setReduceMotion(prefersReducedMotion())
     touchStartRef.current = null
     suppressClickRef.current = false
   }, [open, startIndex, photos.length])
@@ -207,11 +210,12 @@ export function AlbumSlideshow({
     if (!open || paused || photos.length < 2) return
     const current = photos[index]
     if (current?.media_type === "video") return
+    const delay = reduceMotion ? intervalMs * 2 : intervalMs
     const id = window.setInterval(() => {
       setIndex((current) => nextSlideshowIndex(current, photos.length))
-    }, intervalMs)
+    }, delay)
     return () => window.clearInterval(id)
-  }, [open, paused, photos, index, intervalMs])
+  }, [open, paused, photos, index, intervalMs, reduceMotion])
 
   useEffect(() => {
     if (!open) return
@@ -280,6 +284,8 @@ export function AlbumSlideshow({
 
   const autoAdvanceActive =
     open && !paused && photos.length > 1 && photo.media_type !== "video"
+  const segmentAnimActive = autoAdvanceActive && !reduceMotion
+  const effectiveIntervalMs = reduceMotion ? intervalMs * 2 : intervalMs
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -435,18 +441,18 @@ export function AlbumSlideshow({
             />
             <span
               aria-hidden
-              key={`${index}-${intervalMs}-${autoAdvanceActive ? "go" : "stop"}`}
+              key={`${index}-${effectiveIntervalMs}-${segmentAnimActive ? "go" : "stop"}`}
               className={cn(
                 "absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-white/85 transition group-hover:h-1",
-                autoAdvanceActive && "gallery-slideshow-segment-fill"
+                segmentAnimActive && "gallery-slideshow-segment-fill"
               )}
               style={{
                 left: `${(index / photos.length) * 100}%`,
                 width: `${(1 / photos.length) * 100}%`,
-                transform: autoAdvanceActive ? undefined : "scaleX(1)",
+                transform: segmentAnimActive ? undefined : "scaleX(1)",
                 transformOrigin: "left center",
-                animationDuration: autoAdvanceActive
-                  ? `${intervalMs}ms`
+                animationDuration: segmentAnimActive
+                  ? `${effectiveIntervalMs}ms`
                   : undefined,
               }}
             />

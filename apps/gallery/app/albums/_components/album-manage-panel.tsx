@@ -191,6 +191,8 @@ export function GalleryAlbumManagePanel({
     })
     if (!options?.shiftKey) {
       selectionAnchorIdRef.current = imageId
+    } else if (!anchor) {
+      selectionAnchorIdRef.current = imageId
     }
   }
 

@@ -52,9 +52,6 @@ export function TakenAtEditor({
   function openEditor(nextOpen: boolean) {
     if (nextOpen) setDraft(toTaipeiDateInput(takenAt ?? createdAt))
     setOpen(nextOpen)
-    if (!nextOpen) {
-      queueMicrotask(() => triggerRef.current?.focus())
-    }
   }
 
   function onSave() {
@@ -93,7 +90,13 @@ export function TakenAtEditor({
       >
         Date
       </Button>
-      <DialogContent className="gap-6">
+      <DialogContent
+        className="gap-6"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          triggerRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl italic">
             Capture date

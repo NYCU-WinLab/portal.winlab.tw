@@ -525,6 +525,8 @@ export function GalleryWallSelectBar({
             )}
             role="status"
             aria-live="polite"
+            aria-atomic="true"
+            key={`wall-select-${selectedCount}`}
           >
             <p
               className={cn(gallerySans(), "shrink-0 text-sm text-foreground")}
