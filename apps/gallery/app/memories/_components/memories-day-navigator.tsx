@@ -34,6 +34,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
   const viewingToday = isMemoriesViewingToday(day)
   const { lightboxOpen, slideshowOpen } = useMemoriesOverlayState()
 
+  // softPush is memoized on router so the keydown effect stays stable.
   const softPush = useCallback(
     (
       href: string,

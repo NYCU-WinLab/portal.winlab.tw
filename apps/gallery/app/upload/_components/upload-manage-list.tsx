@@ -77,7 +77,7 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { galleryScrollBehavior } from "@/lib/gallery/motion"
-import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
+import { describeFocusedManageRowAnnouncement } from "@/lib/gallery/focus-announcement"
 import { describeManageSelectHintLabel } from "@/lib/gallery/keyboard-hint-labels"
 import {
   describeManageSelectAllLabel,
@@ -1473,7 +1473,7 @@ export function UploadManageList({
                   )
                   const item = visibleSelectableItems[index]
                   return item
-                    ? describeFocusedPhotoAnnouncement(
+                    ? describeFocusedManageRowAnnouncement(
                         item.name,
                         index,
                         visibleSelectableItems.length

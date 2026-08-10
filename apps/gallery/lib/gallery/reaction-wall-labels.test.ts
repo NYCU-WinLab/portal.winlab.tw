@@ -11,6 +11,7 @@ describe("reaction and wall region labels", () => {
     expect(describeShowWhoReactedAriaLabel()).toBe("Show who reacted")
     expect(describeChooseReactionAriaLabel()).toContain("Choose a reaction")
     expect(describeChooseReactionAriaLabel().toLowerCase()).toContain("enter")
+    expect(describeChooseReactionAriaLabel().length).toBeLessThan(120)
     expect(describeGalleryWallAriaLabel()).toBe("Gallery wall")
   })
 })
