@@ -16,6 +16,7 @@ import {
   loadGalleryAlbumSummaries,
   loadMyGalleryAlbums,
 } from "@/lib/gallery/load-albums"
+import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
 export type AlbumActionResult<T = undefined> =
@@ -280,7 +281,7 @@ export async function addImagesToGalleryAlbum(
 
   const ids = normalizeGalleryAlbumImageIds(imageIds)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const auth = await requireSignedIn()
@@ -393,7 +394,7 @@ export async function removeImagesFromGalleryAlbum(
 
   const ids = normalizeGalleryAlbumImageIds(imageIds)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const auth = await requireSignedIn()
@@ -504,7 +505,7 @@ export async function reorderGalleryAlbumImages(
   const positions = normalizeAlbumPositions(imageIds)
   const orderedIds = positions.map((item) => item.image_id)
   if (orderedIds.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const { data: updatedCount, error: rpcError } = await auth.supabase.rpc(

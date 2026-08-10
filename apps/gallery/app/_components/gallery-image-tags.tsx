@@ -26,6 +26,7 @@ import {
   normalizeGalleryTagSlug,
   type GalleryTag,
 } from "@/lib/gallery/tags"
+import { describeTagLimitReached } from "@/lib/gallery/validation-toasts"
 import { cn } from "@workspace/ui/lib/utils"
 
 export function GalleryImageTags({
@@ -62,7 +63,7 @@ export function GalleryImageTags({
     const slug = normalizeGalleryTagSlug(name)
     if (!slug) return
     if (tags.length >= GALLERY_TAGS_PER_IMAGE_MAX) {
-      toast.error(`At most ${GALLERY_TAGS_PER_IMAGE_MAX} tags per photo.`)
+      toast.error(describeTagLimitReached(GALLERY_TAGS_PER_IMAGE_MAX))
       return
     }
     if (tags.some((tag) => tag.slug === slug)) {

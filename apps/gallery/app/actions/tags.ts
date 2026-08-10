@@ -10,6 +10,7 @@ import {
   type GalleryTag,
   type GalleryTagSuggestion,
 } from "@/lib/gallery/tags"
+import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
 export type TagActionResult<T = undefined> =
@@ -123,7 +124,7 @@ export async function attachGalleryTagToImages(
     new Set(imageIds.map((id) => id.trim()).filter(Boolean))
   ).slice(0, 200)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const supabase = await createClient()
@@ -212,7 +213,7 @@ export async function detachGalleryTagFromImagesBySlug(
   ).slice(0, 200)
   const slug = normalizeGalleryTagSlug(tagSlug)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
   if (!slug) return { ok: false, error: "Missing tag." }
 

@@ -16,6 +16,7 @@ import {
   describeSelectAtLeastOnePhoto,
   describeSignInBeforeComment,
   describeSignInBeforeReact,
+  describeTagLimitReached,
   describeTagMergeTargetRequired,
   describeTagNameRequired,
   describeUploadFileEmpty,
@@ -83,5 +84,9 @@ describe("validation toasts", () => {
     expect(describeInvalidTagSlug()).toBe(
       "Use letters, numbers, or hyphens for a tag slug."
     )
+  })
+
+  test("tag limit", () => {
+    expect(describeTagLimitReached(8)).toBe("At most 8 tags per photo.")
   })
 })

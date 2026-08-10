@@ -16,6 +16,7 @@ import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
 } from "@/lib/gallery/bulk-pin"
+import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
   isActivityNotificationsUnavailable,
@@ -478,7 +479,7 @@ export async function setGalleryImagesPin(
 > {
   const ids = normalizeGalleryPinImageIds(imageIds)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const supabase = await createClient()

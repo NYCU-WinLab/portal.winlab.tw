@@ -92,3 +92,8 @@ export function describeCouldNotStartSignIn(): string {
 export function describeInvalidTagSlug(): string {
   return "Use letters, numbers, or hyphens for a tag slug."
 }
+
+/** Cap reached when attaching tags on a photo. */
+export function describeTagLimitReached(max: number): string {
+  return `At most ${max} tags per photo.`
+}

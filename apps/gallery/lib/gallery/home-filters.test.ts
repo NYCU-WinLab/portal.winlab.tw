@@ -220,4 +220,34 @@ describe("describeGalleryFilteredEmpty", () => {
       description: 'Nothing matches Saved · "axolotl".',
     })
   })
+
+  test("uses video-only empty copy", () => {
+    expect(
+      describeGalleryFilteredEmpty(
+        {
+          ...EMPTY_GALLERY_HOME_FILTERS,
+          media: "video",
+        },
+        []
+      )
+    ).toEqual({
+      title: "No videos on the wall",
+      description: "Hang a clip from Manage, or clear the Videos filter.",
+    })
+  })
+
+  test("uses album-only empty copy", () => {
+    expect(
+      describeGalleryFilteredEmpty(
+        {
+          ...EMPTY_GALLERY_HOME_FILTERS,
+          albumSlug: "lab-trip",
+        },
+        []
+      )
+    ).toEqual({
+      title: "This album is empty",
+      description: "Nothing is filed under lab-trip yet.",
+    })
+  })
 })

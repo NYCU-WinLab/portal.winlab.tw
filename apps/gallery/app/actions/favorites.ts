@@ -7,6 +7,7 @@ import {
   normalizeGalleryFavoriteImageIds,
 } from "@/lib/gallery/favorites-bulk"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
+import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
 export type FavoriteActionResult =
@@ -32,7 +33,7 @@ export async function setGalleryFavorites(
 ): Promise<BulkFavoriteActionResult> {
   const ids = normalizeGalleryFavoriteImageIds(imageIds)
   if (ids.length === 0) {
-    return { ok: false, error: "Select at least one photo." }
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
 
   const supabase = await createClient()

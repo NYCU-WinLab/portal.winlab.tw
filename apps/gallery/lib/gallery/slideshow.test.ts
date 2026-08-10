@@ -255,6 +255,52 @@ describe("expandWallSelectionSlideshowPhotos", () => {
       },
     ])
   })
+
+  test("empty selection yields empty slideshow", () => {
+    expect(
+      expandWallSelectionSlideshowPhotos(
+        [],
+        [
+          {
+            id: "a",
+            name: "Solo",
+            image_path: "u/a.jpg",
+            media_type: "image",
+            poster_path: null,
+            sequence_count: 1,
+            sequence_items: [],
+          },
+        ]
+      )
+    ).toEqual([])
+  })
+
+  test("skips missing ids", () => {
+    expect(
+      expandWallSelectionSlideshowPhotos(
+        ["missing", "a"],
+        [
+          {
+            id: "a",
+            name: "Solo",
+            image_path: "u/a.jpg",
+            media_type: "image",
+            poster_path: null,
+            sequence_count: 1,
+            sequence_items: [],
+          },
+        ]
+      )
+    ).toEqual([
+      {
+        image_id: "a",
+        name: "Solo",
+        image_path: "u/a.jpg",
+        media_type: "image",
+        poster_path: null,
+      },
+    ])
+  })
 })
 
 describe("shuffleSlideshowPhotos", () => {
@@ -288,5 +334,21 @@ describe("shuffleSlideshowPhotos", () => {
     expect(shuffled.map((p) => p.image_id).sort()).toEqual(["a", "b", "c"])
     expect(photos.map((p) => p.image_id)).toEqual(["a", "b", "c"])
     expect(shuffled).not.toBe(photos)
+  })
+
+  test("empty and single-item arrays are identity copies", () => {
+    expect(shuffleSlideshowPhotos([], () => 0.5)).toEqual([])
+    const one = [
+      {
+        image_id: "a",
+        name: "A",
+        image_path: "u/a.jpg",
+        media_type: "image" as const,
+        poster_path: null,
+      },
+    ]
+    const out = shuffleSlideshowPhotos(one, () => 0.5)
+    expect(out).toEqual(one)
+    expect(out).not.toBe(one)
   })
 })

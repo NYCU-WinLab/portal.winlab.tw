@@ -52,7 +52,7 @@ export function SignInButton({ next }: { next?: string }) {
     <Button
       onClick={onClick}
       disabled={pending}
-      aria-busy={pending}
+      aria-busy={pending || undefined}
       className="w-full"
     >
       {pending ? "Redirecting…" : "Continue with Keycloak"}

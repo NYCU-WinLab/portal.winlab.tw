@@ -53,7 +53,7 @@ export function SignOutButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      aria-busy={pending}
+      aria-busy={pending || undefined}
       aria-label={iconOnly ? "Sign out" : undefined}
       className={cn(
         className,
