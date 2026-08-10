@@ -7,3 +7,8 @@ export function describeFavoriteToast(favorited: boolean): string {
 export function describeFavoriteAriaLabel(favorited: boolean): string {
   return favorited ? "Remove from favorites" : "Save to favorites"
 }
+
+/** Visible label on the favorite toggle control. */
+export function describeFavoriteButtonLabel(favorited: boolean): string {
+  return favorited ? "Saved" : "Save"
+}

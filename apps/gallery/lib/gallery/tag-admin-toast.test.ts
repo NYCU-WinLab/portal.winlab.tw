@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeAddTagAriaLabel,
   describeCouldNotLoadTags,
   describeEditTagsAriaLabel,
   describeTagMerged,
@@ -47,5 +48,9 @@ describe("manage tags chrome labels", () => {
 
   test("describeEditTagsAriaLabel", () => {
     expect(describeEditTagsAriaLabel("Sunset")).toBe("Edit tags for Sunset")
+  })
+
+  test("describeAddTagAriaLabel", () => {
+    expect(describeAddTagAriaLabel()).toBe("Add tag")
   })
 })

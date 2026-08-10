@@ -27,6 +27,7 @@ import {
   type GalleryTag,
 } from "@/lib/gallery/tags"
 import { describeTagLimitReached } from "@/lib/gallery/validation-toasts"
+import { describeAddTagAriaLabel } from "@/lib/gallery/tag-admin-toast"
 import { cn } from "@workspace/ui/lib/utils"
 
 export function GalleryImageTags({
@@ -174,7 +175,7 @@ export function GalleryImageTags({
               galleryFilterChipClass(false),
               "inline-flex items-center gap-1 disabled:opacity-50"
             )}
-            aria-label="Add tag"
+            aria-label={describeAddTagAriaLabel()}
           >
             <IconPlus className="size-3.5" aria-hidden />
             Tag

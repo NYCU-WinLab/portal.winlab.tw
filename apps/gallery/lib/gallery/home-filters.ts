@@ -147,6 +147,16 @@ export function describeClearSearchAriaLabel(): string {
   return "Clear search"
 }
 
+/** aria-label for clearing all active home filters. */
+export function describeClearFiltersAriaLabel(): string {
+  return "Clear filters"
+}
+
+/** aria-label for the home filters disclosure control. */
+export function describeFilterGalleryAriaLabel(): string {
+  return "Filter gallery"
+}
+
 function isOnlyFilter(
   filters: GalleryHomeFilters,
   key: keyof GalleryHomeFilters

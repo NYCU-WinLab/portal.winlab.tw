@@ -10,6 +10,7 @@ import { toggleGalleryFavorite } from "@/app/actions/favorites"
 import { gallerySans } from "@/components/gallery-chrome"
 import {
   describeFavoriteAriaLabel,
+  describeFavoriteButtonLabel,
   describeFavoriteToast,
 } from "@/lib/gallery/favorite-toast"
 
@@ -70,7 +71,7 @@ export function FavoritePhotoButton({
       ) : (
         <IconBookmark className="size-3.5" aria-hidden />
       )}
-      {favorited ? "Saved" : "Save"}
+      {describeFavoriteButtonLabel(favorited)}
     </button>
   )
 }

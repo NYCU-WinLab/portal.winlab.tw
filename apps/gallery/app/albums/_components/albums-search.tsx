@@ -8,6 +8,12 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import {
+  describeAlbumsSearchPlaceholder,
+  describeClearAlbumSearchAriaLabel,
+  describeSearchAlbumsAriaLabel,
+  describeSearchAlbumsInputAriaLabel,
+} from "@/lib/gallery/albums-search-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 export function GalleryAlbumsSearch({
@@ -69,7 +75,7 @@ export function GalleryAlbumsSearch({
       onSubmit={submit}
       className="flex w-full max-w-md items-center gap-2"
       role="search"
-      aria-label="Search albums"
+      aria-label={describeSearchAlbumsAriaLabel()}
       aria-busy={pending || undefined}
     >
       <div className="relative min-w-0 flex-1">
@@ -81,8 +87,8 @@ export function GalleryAlbumsSearch({
           type="search"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Search title, slug, owner…"
-          aria-label="Search albums by title, slug, or owner"
+          placeholder={describeAlbumsSearchPlaceholder()}
+          aria-label={describeSearchAlbumsInputAriaLabel()}
           className={cn(
             gallerySans(),
             "min-h-10 w-full rounded-md border border-input bg-background py-2 pr-9 pl-9 text-sm shadow-xs outline-none",
@@ -92,7 +98,7 @@ export function GalleryAlbumsSearch({
         {draft ? (
           <button
             type="button"
-            aria-label="Clear album search"
+            aria-label={describeClearAlbumSearchAriaLabel()}
             className="absolute top-1/2 right-2.5 inline-flex size-7 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
             onClick={clear}
           >

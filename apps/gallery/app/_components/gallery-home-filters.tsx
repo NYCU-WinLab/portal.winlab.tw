@@ -39,6 +39,8 @@ import {
   describeGalleryFilterSummary,
   describeHomeSearchPlaceholder,
   describeClearSearchAriaLabel,
+  describeClearFiltersAriaLabel,
+  describeFilterGalleryAriaLabel,
   hasActiveGalleryFilters,
   type GalleryHomeFilters,
   type GalleryMediaFilter,
@@ -264,7 +266,7 @@ export function GalleryHomeFiltersBar({
 
   return (
     <nav
-      aria-label="Filter gallery"
+      aria-label={describeFilterGalleryAriaLabel()}
       aria-busy={isPending || undefined}
       className={cn(
         gallerySans(),
@@ -556,7 +558,7 @@ export function GalleryHomeFiltersBar({
                   "inline-flex items-center gap-1",
                   isPending && "opacity-50"
                 )}
-                aria-label="Clear filters"
+                aria-label={describeClearFiltersAriaLabel()}
               >
                 <IconX className="size-3" aria-hidden />
               </button>

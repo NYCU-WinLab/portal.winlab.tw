@@ -7,6 +7,8 @@ import {
   describeGalleryFilteredEmpty,
   describeHomeSearchPlaceholder,
   describeClearSearchAriaLabel,
+  describeClearFiltersAriaLabel,
+  describeFilterGalleryAriaLabel,
   hasActiveGalleryFilters,
   parseGalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
@@ -264,5 +266,12 @@ describe("describeHomeSearchPlaceholder", () => {
 describe("describeClearSearchAriaLabel", () => {
   test("returns clear-search aria label", () => {
     expect(describeClearSearchAriaLabel()).toBe("Clear search")
+  })
+})
+
+describe("home filter chrome aria-labels", () => {
+  test("clear filters and filter gallery", () => {
+    expect(describeClearFiltersAriaLabel()).toBe("Clear filters")
+    expect(describeFilterGalleryAriaLabel()).toBe("Filter gallery")
   })
 })
