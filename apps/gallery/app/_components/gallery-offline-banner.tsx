@@ -6,6 +6,11 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
 import { readStorageItem, writeStorageItem } from "@/lib/gallery/safe-storage"
+import {
+  describeDismissOfflineLabel,
+  describeOfflineBannerDescription,
+  describeOfflineBannerTitle,
+} from "@/lib/gallery/offline-banner-labels"
 
 const DISMISS_KEY = "gallery-offline-banner-dismissed"
 
@@ -72,7 +77,7 @@ export function GalleryOfflineBanner() {
           <p
             className={cn(gallerySans(), "text-sm font-medium text-foreground")}
           >
-            You&apos;re offline
+            {describeOfflineBannerTitle()}
           </p>
           <p
             className={cn(
@@ -80,8 +85,7 @@ export function GalleryOfflineBanner() {
               "mt-0.5 text-xs text-muted-foreground"
             )}
           >
-            Cached wall photos may still open. Uploads, comments, and reactions
-            need a network connection.
+            {describeOfflineBannerDescription()}
           </p>
         </div>
         <button
@@ -94,7 +98,7 @@ export function GalleryOfflineBanner() {
           aria-busy={busy || undefined}
           onClick={dismiss}
         >
-          Dismiss
+          {describeDismissOfflineLabel()}
         </button>
       </div>
     </div>

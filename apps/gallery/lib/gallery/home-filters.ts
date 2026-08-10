@@ -1,3 +1,8 @@
+import {
+  describeNoSavedPhotosDescription,
+  describeNoSavedPhotosTitle,
+} from "@/lib/gallery/empty-state-labels"
+
 export type GalleryMediaFilter = "all" | "image" | "video"
 
 export type GalleryHomeFilters = {
@@ -184,8 +189,8 @@ export function describeGalleryFilteredEmpty(
 ): { title: string; description: string } {
   if (filters.savedOnly && isOnlyFilter(filters, "savedOnly")) {
     return {
-      title: "No saved photos yet",
-      description: "Tap the bookmark on a polaroid to keep it here.",
+      title: describeNoSavedPhotosTitle(),
+      description: describeNoSavedPhotosDescription(),
     }
   }
   if (filters.albumSlug && isOnlyFilter(filters, "albumSlug")) {

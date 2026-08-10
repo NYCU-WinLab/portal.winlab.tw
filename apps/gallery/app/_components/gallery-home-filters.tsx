@@ -2,6 +2,7 @@
 
 import {
   useMemo,
+  useRef,
   useState,
   useTransition,
   type FormEvent,
@@ -146,6 +147,7 @@ export function GalleryHomeFiltersBar({
   const [searchDraft, setSearchDraft] = useState(filters.query ?? "")
   const [tagDraft, setTagDraft] = useState("")
   const [prevQuery, setPrevQuery] = useState(filters.query)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   if (filters.query !== prevQuery) {
     setPrevQuery(filters.query)
@@ -155,6 +157,10 @@ export function GalleryHomeFiltersBar({
   const mediaOptions = MEDIA_OPTIONS.filter(
     (option) => videoAvailable || option.value !== "video"
   )
+
+  const focusSearchInput = () => {
+    queueMicrotask(() => searchInputRef.current?.focus())
+  }
 
   const apply = (next: GalleryHomeFilters) => {
     const photo = searchParams.get("photo")
@@ -263,6 +269,7 @@ export function GalleryHomeFiltersBar({
       savedOnly: false,
       albumSlug: null,
     })
+    focusSearchInput()
   }
 
   return (
@@ -307,6 +314,7 @@ export function GalleryHomeFiltersBar({
                 aria-hidden
               />
               <input
+                ref={searchInputRef}
                 type="search"
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
@@ -324,6 +332,7 @@ export function GalleryHomeFiltersBar({
                   onClick={() => {
                     setSearchDraft("")
                     apply({ ...filters, query: null })
+                    focusSearchInput()
                   }}
                 >
                   <IconX className="size-3.5" aria-hidden />

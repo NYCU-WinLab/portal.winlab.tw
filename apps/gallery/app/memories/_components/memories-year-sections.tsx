@@ -12,6 +12,7 @@ import {
   memoriesYearsAgoLabel,
   type GalleryMemoryYearGroup,
 } from "@/lib/gallery/memories"
+import { describeMemoriesYearSlideshowAriaLabel } from "@/lib/gallery/memories-year-slideshow-label"
 
 export function MemoriesYearSections({
   groups,
@@ -76,6 +77,9 @@ export function MemoriesYearSections({
                   disabled={slideshowOpen}
                   aria-busy={slideshowOpen || undefined}
                   aria-expanded={slideshowOpen}
+                  aria-label={describeMemoriesYearSlideshowAriaLabel(
+                    group.year
+                  )}
                   className={cn(
                     gallerySans(),
                     "inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-[11px] tracking-wide uppercase shadow-xs",

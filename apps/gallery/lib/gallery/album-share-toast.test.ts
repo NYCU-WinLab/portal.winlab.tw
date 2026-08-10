@@ -11,6 +11,7 @@ import {
 describe("describeAlbumShareCopied", () => {
   test("returns the clipboard success title", () => {
     expect(describeAlbumShareCopied()).toBe("Share link copied")
+    expect(describeAlbumShareCopied().length).toBeGreaterThan(0)
   })
 })
 

@@ -97,6 +97,14 @@ export function describeClearSearchLabel(): string {
   return "Clear search"
 }
 
+export function describeNoSavedPhotosTitle(): string {
+  return "No saved photos yet"
+}
+
+export function describeNoSavedPhotosDescription(): string {
+  return "Tap the bookmark on a polaroid to keep it here."
+}
+
 export function describeShowAllAlbumsLabel(): string {
   return "Show all albums"
 }

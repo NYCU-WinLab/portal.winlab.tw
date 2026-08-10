@@ -415,6 +415,8 @@ export function GalleryCard({
         return
       }
       if (action === "download") {
+        // Click path busy state lives on DownloadOriginalButton; keyboard
+        // download is a one-shot toast flow without a dedicated control.
         void downloadOriginalFromKeyboard()
         return
       }
