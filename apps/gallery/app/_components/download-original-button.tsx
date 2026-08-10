@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
+import { describeSavedOriginal } from "@/lib/gallery/photo-share-toast"
 
 type DownloadOriginalButtonProps = {
   displayName: string
@@ -29,7 +30,7 @@ export function DownloadOriginalButton({
     setBusy(true)
     try {
       await downloadGalleryOriginal({ displayName, imagePath })
-      toast.success("Saved original")
+      toast.success(describeSavedOriginal())
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not download"

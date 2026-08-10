@@ -43,6 +43,10 @@ import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
 import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import { shareOrCopyPhotoLink } from "@/lib/gallery/photo-share"
+import {
+  describePhotoLinkCopied,
+  describeSavedOriginal,
+} from "@/lib/gallery/photo-share-toast"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
@@ -306,7 +310,7 @@ export function GalleryCard({
         toast.error(result.message)
         return
       }
-      if (result.mode === "copied") toast.success("Link copied.")
+      if (result.mode === "copied") toast.success(describePhotoLinkCopied())
     } finally {
       shareBusyRef.current = false
     }
@@ -347,7 +351,7 @@ export function GalleryCard({
     downloadBusyRef.current = true
     try {
       await downloadGalleryOriginal({ displayName: name, imagePath: path })
-      toast.success("Saved original")
+      toast.success(describeSavedOriginal())
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not download"
