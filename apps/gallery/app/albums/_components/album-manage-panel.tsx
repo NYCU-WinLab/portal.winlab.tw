@@ -168,7 +168,12 @@ export function GalleryAlbumManagePanel({
       }
       toast.success("Album updated")
       if (result.data.slug !== album.slug) {
-        router.replace(`/albums/${result.data.slug}`)
+        try {
+          router.replace(`/albums/${result.data.slug}`)
+        } catch {
+          toast.error("Could not open the renamed album.")
+          softRefresh()
+        }
       } else {
         softRefresh()
       }
