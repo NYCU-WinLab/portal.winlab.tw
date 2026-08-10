@@ -142,6 +142,11 @@ export function describeHomeSearchPlaceholder(tagsAvailable: boolean): string {
   return tagsAvailable ? "Search titles & tags…" : "Search titles…"
 }
 
+/** aria-label for clearing the home search draft. */
+export function describeClearSearchAriaLabel(): string {
+  return "Clear search"
+}
+
 function isOnlyFilter(
   filters: GalleryHomeFilters,
   key: keyof GalleryHomeFilters

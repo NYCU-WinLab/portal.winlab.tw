@@ -8,7 +8,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { toggleGalleryFavorite } from "@/app/actions/favorites"
 import { gallerySans } from "@/components/gallery-chrome"
-import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
+import {
+  describeFavoriteAriaLabel,
+  describeFavoriteToast,
+} from "@/lib/gallery/favorite-toast"
 
 type FavoritePhotoButtonProps = {
   imageId: string
@@ -53,7 +56,7 @@ export function FavoritePhotoButton({
       disabled={pending}
       aria-pressed={favorited}
       aria-busy={pending || undefined}
-      aria-label={favorited ? "Remove from favorites" : "Save to favorites"}
+      aria-label={describeFavoriteAriaLabel(favorited)}
       className={cn(
         gallerySans(),
         "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",

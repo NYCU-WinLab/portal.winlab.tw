@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
+import {
+  describeFavoriteAriaLabel,
+  describeFavoriteToast,
+} from "@/lib/gallery/favorite-toast"
 
 describe("describeFavoriteToast", () => {
   test("saved", () => {
@@ -9,5 +12,12 @@ describe("describeFavoriteToast", () => {
 
   test("removed", () => {
     expect(describeFavoriteToast(false)).toBe("Removed from favorites")
+  })
+})
+
+describe("describeFavoriteAriaLabel", () => {
+  test("toggles with favorited state", () => {
+    expect(describeFavoriteAriaLabel(true)).toBe("Remove from favorites")
+    expect(describeFavoriteAriaLabel(false)).toBe("Save to favorites")
   })
 })

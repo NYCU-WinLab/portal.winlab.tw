@@ -6,6 +6,7 @@ import {
   describeGalleryFilterSummary,
   describeGalleryFilteredEmpty,
   describeHomeSearchPlaceholder,
+  describeClearSearchAriaLabel,
   hasActiveGalleryFilters,
   parseGalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
@@ -257,5 +258,11 @@ describe("describeHomeSearchPlaceholder", () => {
   test("mentions tags when available", () => {
     expect(describeHomeSearchPlaceholder(true)).toBe("Search titles & tags…")
     expect(describeHomeSearchPlaceholder(false)).toBe("Search titles…")
+  })
+})
+
+describe("describeClearSearchAriaLabel", () => {
+  test("returns clear-search aria label", () => {
+    expect(describeClearSearchAriaLabel()).toBe("Clear search")
   })
 })

@@ -37,9 +37,12 @@ import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { isCommentEdited } from "@/lib/gallery/comment-edit"
 import { applyExclusiveCommentPin } from "@/lib/gallery/comment-pin"
 import {
+  describeAddCommentPlaceholder,
   describeCommentDeleted,
   describeCommentPosted,
   describeCommentUpdated,
+  describeMentionSomeoneAriaLabel,
+  describeReplyCommentPlaceholder,
 } from "@/lib/gallery/comment-toast"
 import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
@@ -602,8 +605,8 @@ export function GalleryComments({
             placeholder={
               isSignedIn
                 ? replyTarget
-                  ? "Write a reply… @ to mention"
-                  : "Add a comment… @ to mention"
+                  ? describeReplyCommentPlaceholder()
+                  : describeAddCommentPlaceholder()
                 : describeSignInToCommentLabel()
             }
             disabled={!isSignedIn || isPending}
@@ -613,7 +616,7 @@ export function GalleryComments({
             {isSignedIn ? (
               <button
                 type="button"
-                aria-label="Mention someone"
+                aria-label={describeMentionSomeoneAriaLabel()}
                 disabled={isPending}
                 onClick={() => {
                   const el = textareaRef.current

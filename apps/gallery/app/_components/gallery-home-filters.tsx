@@ -38,6 +38,7 @@ import {
   buildGalleryHomeHref,
   describeGalleryFilterSummary,
   describeHomeSearchPlaceholder,
+  describeClearSearchAriaLabel,
   hasActiveGalleryFilters,
   type GalleryHomeFilters,
   type GalleryMediaFilter,
@@ -315,7 +316,7 @@ export function GalleryHomeFiltersBar({
               {searchDraft ? (
                 <button
                   type="button"
-                  aria-label="Clear search"
+                  aria-label={describeClearSearchAriaLabel()}
                   className="absolute top-1/2 right-2.5 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 hover:text-foreground"
                   onClick={() => {
                     setSearchDraft("")

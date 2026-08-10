@@ -183,6 +183,20 @@ describe("albumMatchesQuery", () => {
     ).toBe(true)
   })
 
+  test("matches description only", () => {
+    expect(
+      albumMatchesQuery(
+        {
+          title: "Quiet",
+          slug: "quiet",
+          description: "Snowfall in Nantou hills",
+          owner_name: "Alice",
+        },
+        "snowfall"
+      )
+    ).toBe(true)
+  })
+
   test("matches unicode title text", () => {
     expect(
       albumMatchesQuery(

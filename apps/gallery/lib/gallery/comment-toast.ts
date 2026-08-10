@@ -12,3 +12,18 @@ export function describeCommentDeleted(): string {
 export function describeCommentUpdated(): string {
   return "Comment updated."
 }
+
+/** Placeholder for a top-level comment draft. */
+export function describeAddCommentPlaceholder(): string {
+  return "Add a comment… @ to mention"
+}
+
+/** Placeholder when replying to a comment. */
+export function describeReplyCommentPlaceholder(): string {
+  return "Write a reply… @ to mention"
+}
+
+/** aria-label for inserting an @ mention trigger. */
+export function describeMentionSomeoneAriaLabel(): string {
+  return "Mention someone"
+}
