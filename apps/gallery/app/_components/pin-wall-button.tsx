@@ -51,13 +51,21 @@ export function PinWallButton({
       onPinnedChange?.(result.data.pinned_at)
       toast.success(nextPinned ? "Pinned to wall top." : "Unpinned.")
       if (nextPinned && navigateHomeOnPin) {
-        router.push("/")
+        try {
+          router.push("/")
+        } catch {
+          toast.error("Could not open the wall home.")
+        }
         return
       }
       if (nextPinned && scrollToWallTop) {
         window.scrollTo({ top: 0, behavior: "smooth" })
       }
-      router.refresh()
+      try {
+        router.refresh()
+      } catch {
+        // Refresh is best-effort after a successful pin mutation.
+      }
     })
   }
 
