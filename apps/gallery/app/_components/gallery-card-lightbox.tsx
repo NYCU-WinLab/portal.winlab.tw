@@ -33,6 +33,12 @@ import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import {
+  describeLightboxCloseAriaLabel,
+  describeLightboxNextAriaLabel,
+  describeLightboxPreviousAriaLabel,
+  describeLightboxShareAriaLabel,
+} from "@/lib/gallery/lightbox-labels"
+import {
   formatReactionSummary,
   totalReactions,
   type GalleryReaction,
@@ -129,7 +135,7 @@ export function GalleryLightboxMediaPane({
   return (
     <div {...gestureProps} className="gallery-lightbox-media relative">
       <DialogClose
-        aria-label="Close"
+        aria-label={describeLightboxCloseAriaLabel()}
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
@@ -151,7 +157,7 @@ export function GalleryLightboxMediaPane({
         }}
         disabled={shareBusy}
         aria-busy={shareBusy || undefined}
-        aria-label="Share"
+        aria-label={describeLightboxShareAriaLabel()}
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
           isSignedIn
@@ -230,7 +236,7 @@ export function GalleryLightboxMediaPane({
           type="button"
           onClick={goLightboxPrev}
           className="absolute top-1/2 left-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:left-3 sm:h-10 sm:w-10"
-          aria-label="Previous"
+          aria-label={describeLightboxPreviousAriaLabel()}
         >
           <IconChevronLeft className="h-5 w-5" />
         </button>
@@ -240,7 +246,7 @@ export function GalleryLightboxMediaPane({
           type="button"
           onClick={goLightboxNext}
           className="absolute top-1/2 right-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:right-3 sm:h-10 sm:w-10"
-          aria-label="Next"
+          aria-label={describeLightboxNextAriaLabel()}
         >
           <IconChevronRight className="h-5 w-5" />
         </button>

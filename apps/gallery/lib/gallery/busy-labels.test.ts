@@ -20,6 +20,7 @@ import {
   describeUntaggingLabel,
   describeWorkingLabel,
   describeSaveNameLabel,
+  describeBackToTopAriaLabel,
 } from "@/lib/gallery/busy-labels"
 
 describe("busy labels", () => {
@@ -97,5 +98,9 @@ describe("busy labels", () => {
 
   test("describeSaveNameLabel", () => {
     expect(describeSaveNameLabel()).toBe("Save name")
+  })
+
+  test("describeBackToTopAriaLabel", () => {
+    expect(describeBackToTopAriaLabel()).toBe("Back to top")
   })
 })

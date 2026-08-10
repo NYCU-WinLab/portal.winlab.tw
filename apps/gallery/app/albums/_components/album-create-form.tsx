@@ -26,6 +26,7 @@ import {
   shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
 import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
+import { describeCreateAlbumLabel } from "@/lib/gallery/album-manage-copy"
 import { describeCreatingLabel } from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
@@ -103,7 +104,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
     <form
       onSubmit={onSubmit}
       className={cn("space-y-4", className)}
-      aria-label="Create album"
+      aria-label={describeCreateAlbumLabel()}
       aria-busy={pending || undefined}
     >
       <div className="space-y-2">
@@ -150,7 +151,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
         </p>
       </div>
       <Button type="submit" disabled={pending} aria-busy={pending || undefined}>
-        {pending ? describeCreatingLabel() : "Create album"}
+        {pending ? describeCreatingLabel() : describeCreateAlbumLabel()}
       </Button>
     </form>
   )

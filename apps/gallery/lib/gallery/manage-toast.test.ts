@@ -4,6 +4,8 @@ import {
   describeArtworkNameUpdated,
   describeArtworkTitleUpdated,
   describeCaptureDateUpdated,
+  describeEditTitleAriaLabel,
+  describeEditTitleNamedAriaLabel,
   describeSequenceUpdated,
 } from "@/lib/gallery/manage-toast"
 
@@ -22,5 +24,10 @@ describe("manage toast helpers", () => {
 
   test("describeSequenceUpdated", () => {
     expect(describeSequenceUpdated()).toBe("Sequence updated.")
+  })
+
+  test("edit title aria-labels", () => {
+    expect(describeEditTitleAriaLabel()).toBe("Edit title")
+    expect(describeEditTitleNamedAriaLabel("Sunset")).toBe("Edit title: Sunset")
   })
 })

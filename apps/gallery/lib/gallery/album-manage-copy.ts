@@ -23,3 +23,8 @@ export function describeAlbumCoverUpdated(): string {
 export function describeAlbumDeleted(): string {
   return "Album deleted"
 }
+
+/** Form aria-label / idle submit label for creating an album. */
+export function describeCreateAlbumLabel(): string {
+  return "Create album"
+}

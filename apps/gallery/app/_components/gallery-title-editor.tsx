@@ -8,7 +8,11 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { renameGalleryImage } from "@/app/upload/actions"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
-import { describeArtworkTitleUpdated } from "@/lib/gallery/manage-toast"
+import {
+  describeArtworkTitleUpdated,
+  describeEditTitleAriaLabel,
+  describeEditTitleNamedAriaLabel,
+} from "@/lib/gallery/manage-toast"
 import { describeSavingLabel } from "@/lib/gallery/busy-labels"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
@@ -195,7 +199,7 @@ export function GalleryTitleEditor({
           "focus-visible:ring-2 focus-visible:ring-zinc-800/15 focus-visible:outline-none",
           variant === "polaroid" && "truncate text-center"
         )}
-        aria-label={`Edit title: ${name}`}
+        aria-label={describeEditTitleNamedAriaLabel(name)}
         title={variant === "polaroid" ? name : "Edit title"}
       >
         {name}
@@ -213,7 +217,7 @@ export function GalleryTitleEditor({
           "focus-visible:ring-2 focus-visible:ring-zinc-800/15 focus-visible:outline-none",
           "opacity-70 group-hover:opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
         )}
-        aria-label="Edit title"
+        aria-label={describeEditTitleAriaLabel()}
       >
         <IconPencil className="size-3.5" aria-hidden />
       </button>

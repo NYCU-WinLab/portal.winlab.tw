@@ -92,3 +92,8 @@ export function describeCancelUploadLabel(): string {
 export function describeSaveNameLabel(): string {
   return "Save name"
 }
+
+/** aria-label for scrolling the wall back to the top. */
+export function describeBackToTopAriaLabel(): string {
+  return "Back to top"
+}

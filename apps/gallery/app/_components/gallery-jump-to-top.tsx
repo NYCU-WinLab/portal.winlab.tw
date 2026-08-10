@@ -7,6 +7,7 @@ import { IconArrowUp } from "@tabler/icons-react"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeBackToTopAriaLabel } from "@/lib/gallery/busy-labels"
 import { shouldShowJumpToTop } from "@/lib/gallery/scroll-visibility"
 
 /**
@@ -60,7 +61,7 @@ export function GalleryJumpToTop() {
       onClick={jump}
       disabled={scrolling}
       aria-busy={scrolling || undefined}
-      aria-label="Back to top"
+      aria-label={describeBackToTopAriaLabel()}
       tabIndex={visible ? 0 : -1}
       aria-hidden={!visible}
       className={cn(

@@ -6,6 +6,7 @@ import {
   describeAlbumPhotoRemoved,
   describeAlbumPhotosRemoved,
   describeAlbumUpdated,
+  describeCreateAlbumLabel,
 } from "@/lib/gallery/album-manage-copy"
 
 describe("describeAlbumPhotosRemoved", () => {
@@ -34,5 +35,9 @@ describe("album manage toast helpers", () => {
 
   test("describeAlbumDeleted", () => {
     expect(describeAlbumDeleted()).toBe("Album deleted")
+  })
+
+  test("describeCreateAlbumLabel", () => {
+    expect(describeCreateAlbumLabel()).toBe("Create album")
   })
 })

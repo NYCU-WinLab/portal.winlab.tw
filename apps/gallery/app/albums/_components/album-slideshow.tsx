@@ -39,6 +39,14 @@ import {
   writeStoredSlideshowIntervalMs,
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
+import {
+  describeCloseSlideshowAriaLabel,
+  describeNextSlideAriaLabel,
+  describePreviousSlideAriaLabel,
+  describeSlideshowMuteAriaLabel,
+  describeSlideshowPlaybackAriaLabel,
+  describeSlideshowProgressAriaLabel,
+} from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function mediaUrl(photo: GallerySlideshowPhoto): string {
@@ -311,7 +319,7 @@ export function AlbumSlideshow({
                   "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
                 )}
                 aria-pressed={videoMuted}
-                aria-label={videoMuted ? "Unmute video" : "Mute video"}
+                aria-label={describeSlideshowMuteAriaLabel(videoMuted)}
               >
                 {videoMuted ? (
                   <IconVolumeOff className="size-5" aria-hidden />
@@ -329,7 +337,7 @@ export function AlbumSlideshow({
                 "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
               )}
               aria-pressed={paused}
-              aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
+              aria-label={describeSlideshowPlaybackAriaLabel(paused)}
             >
               {paused ? (
                 <IconPlayerPlay className="size-5" aria-hidden />
@@ -344,7 +352,7 @@ export function AlbumSlideshow({
                 gallerySans(),
                 "inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/10"
               )}
-              aria-label="Close slideshow"
+              aria-label={describeCloseSlideshowAriaLabel()}
             >
               <IconX className="size-5" aria-hidden />
             </button>
@@ -355,7 +363,7 @@ export function AlbumSlideshow({
           <button
             type="button"
             role="slider"
-            aria-label="Slideshow progress"
+            aria-label={describeSlideshowProgressAriaLabel()}
             aria-orientation="horizontal"
             aria-valuemin={1}
             aria-valuemax={photos.length}
@@ -441,7 +449,7 @@ export function AlbumSlideshow({
             <>
               <button
                 type="button"
-                aria-label="Previous slide"
+                aria-label={describePreviousSlideAriaLabel()}
                 onClick={() =>
                   setIndex((current) =>
                     prevSlideshowIndex(current, photos.length)
@@ -457,7 +465,7 @@ export function AlbumSlideshow({
               </button>
               <button
                 type="button"
-                aria-label="Next slide"
+                aria-label={describeNextSlideAriaLabel()}
                 onClick={() =>
                   setIndex((current) =>
                     nextSlideshowIndex(current, photos.length)

@@ -61,6 +61,12 @@ import {
   describeAlbumPhotosRemoved,
   describeAlbumUpdated,
 } from "@/lib/gallery/album-manage-copy"
+import {
+  describeMoveDownAriaLabel,
+  describeMoveUpAriaLabel,
+  describeRemoveFromAlbumAriaLabel,
+  describeSelectAllPhotosAriaLabel,
+} from "@/lib/gallery/album-manage-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -512,7 +518,7 @@ export function GalleryAlbumManagePanel({
                   checked={allSelected}
                   disabled={pending}
                   onCheckedChange={(value) => toggleSelectAll(value === true)}
-                  aria-label="Select all photos"
+                  aria-label={describeSelectAllPhotosAriaLabel()}
                 />
                 Select all
               </label>
@@ -650,7 +656,7 @@ export function GalleryAlbumManagePanel({
                       size="icon-sm"
                       variant="ghost"
                       disabled={pending || index === 0}
-                      aria-label="Move up"
+                      aria-label={describeMoveUpAriaLabel()}
                       onClick={() => movePhoto(index, -1)}
                     >
                       <IconArrowUp className="size-4" />
@@ -660,7 +666,7 @@ export function GalleryAlbumManagePanel({
                       size="icon-sm"
                       variant="ghost"
                       disabled={pending || index === photos.length - 1}
-                      aria-label="Move down"
+                      aria-label={describeMoveDownAriaLabel()}
                       onClick={() => movePhoto(index, 1)}
                     >
                       <IconArrowDown className="size-4" />
@@ -670,7 +676,7 @@ export function GalleryAlbumManagePanel({
                       size="icon-sm"
                       variant="ghost"
                       disabled={pending}
-                      aria-label="Remove from album"
+                      aria-label={describeRemoveFromAlbumAriaLabel()}
                       onClick={(event) => {
                         removePhotoTriggerRef.current = event.currentTarget
                         setConfirmRemoveId(photo.image_id)
