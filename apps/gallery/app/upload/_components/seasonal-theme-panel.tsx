@@ -21,6 +21,7 @@ import {
 } from "@/lib/gallery/seasonal-themes"
 import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeSeasonalSiteThemeAriaLabel } from "@/lib/gallery/install-theme-labels"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
@@ -93,7 +94,7 @@ export function SeasonalThemePanel({
           "mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
         )}
         role="radiogroup"
-        aria-label="Seasonal site theme"
+        aria-label={describeSeasonalSiteThemeAriaLabel()}
         aria-busy={isPending || undefined}
         onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
           if (isPending || !settingsReady) return

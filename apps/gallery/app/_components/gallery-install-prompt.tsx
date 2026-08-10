@@ -10,6 +10,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeInstallingLabel } from "@/lib/gallery/busy-labels"
+import { describeDismissInstallPromptAriaLabel } from "@/lib/gallery/install-theme-labels"
 import {
   GALLERY_PWA_INSTALL_DISMISS_KEY,
   isIosDevice,
@@ -180,7 +181,7 @@ export function GalleryInstallPrompt() {
             variant="ghost"
             disabled={busy}
             aria-busy={busy || undefined}
-            aria-label="Dismiss install prompt"
+            aria-label={describeDismissInstallPromptAriaLabel()}
             onClick={dismiss}
           >
             <IconX className="h-4 w-4" />

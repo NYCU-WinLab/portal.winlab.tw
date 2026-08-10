@@ -29,7 +29,9 @@ import {
   describeAddToAlbumDialogTitle,
   describeAddToAlbumTriggerLabel,
   describeAlbumCreateRollbackError,
+  describeCreateAlbumAndAddPhotosAriaLabel,
   describeCreateAlbumStarted,
+  describeNewAlbumTitlePlaceholder,
 } from "@/lib/gallery/add-to-album-result"
 import {
   GALLERY_ALBUM_TITLE_MAX,
@@ -297,7 +299,7 @@ export function GalleryAddToAlbum({
               value={draftTitle}
               onChange={(event) => setDraftTitle(event.target.value)}
               maxLength={GALLERY_ALBUM_TITLE_MAX}
-              placeholder="New album title"
+              placeholder={describeNewAlbumTitlePlaceholder()}
               disabled={pending || count === 0}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -311,7 +313,7 @@ export function GalleryAddToAlbum({
               size="icon"
               disabled={pending || count === 0}
               aria-busy={pending || undefined}
-              aria-label="Create album and add photos"
+              aria-label={describeCreateAlbumAndAddPhotosAriaLabel()}
               onClick={createAndAdd}
             >
               <IconPlus className="size-4" />

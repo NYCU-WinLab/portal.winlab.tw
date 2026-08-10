@@ -18,6 +18,7 @@ import {
   hasActiveGalleryFilters,
   type GalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
+import { describeGalleryWallAriaLabel } from "@/lib/gallery/reaction-wall-labels"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
@@ -325,7 +326,7 @@ export function GalleryGrid({
     <div
       key={wallEpoch}
       className="grid grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:grid-cols-3 lg:gap-x-9 lg:gap-y-14"
-      aria-label="Gallery wall"
+      aria-label={describeGalleryWallAriaLabel()}
     >
       {images.map((image, index) => (
         <div

@@ -123,6 +123,7 @@ import {
   describeTaggingLabel,
   describeUntaggingLabel,
 } from "@/lib/gallery/busy-labels"
+import { describeMoreSelectionActionsAriaLabel } from "@/lib/gallery/wall-select-labels"
 import {
   describeSequenceCompactingToast,
   describeCouldNotBuildZip,
@@ -1575,7 +1576,7 @@ export function UploadManageList({
                       galleryPillClass(),
                       "disabled:opacity-40 sm:hidden"
                     )}
-                    aria-label="More selection actions"
+                    aria-label={describeMoreSelectionActionsAriaLabel()}
                     onClick={(event) =>
                       rememberBulkTrigger(event.currentTarget)
                     }

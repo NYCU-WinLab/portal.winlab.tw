@@ -80,6 +80,13 @@ import {
   describeTaggingLabel,
   describeWorkingLabel,
 } from "@/lib/gallery/busy-labels"
+import {
+  describeAlbumTitlePlaceholder,
+  describeMoreSelectionActionsAriaLabel,
+  describeNewAlbumTitleAriaLabel,
+  describeTagDraftPlaceholder,
+  describeTagToApplyAriaLabel,
+} from "@/lib/gallery/wall-select-labels"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -631,8 +638,8 @@ export function GalleryWallSelectBar({
                   <Input
                     value={tagDraft}
                     onChange={(e) => setTagDraft(e.target.value)}
-                    placeholder="Tag…"
-                    aria-label="Tag to apply to selection"
+                    placeholder={describeTagDraftPlaceholder()}
+                    aria-label={describeTagToApplyAriaLabel()}
                     disabled={selectedCount === 0 || pending}
                     autoFocus
                     className={cn(
@@ -679,8 +686,8 @@ export function GalleryWallSelectBar({
                   <Input
                     value={albumDraft}
                     onChange={(e) => setAlbumDraft(e.target.value)}
-                    placeholder="Album title…"
-                    aria-label="New album title"
+                    placeholder={describeAlbumTitlePlaceholder()}
+                    aria-label={describeNewAlbumTitleAriaLabel()}
                     disabled={selectedCount === 0 || pending}
                     autoFocus
                     className={cn(
@@ -728,7 +735,7 @@ export function GalleryWallSelectBar({
                         gallerySans(),
                         "h-8 shrink-0 gap-1.5 text-[11px] uppercase"
                       )}
-                      aria-label="More selection actions"
+                      aria-label={describeMoreSelectionActionsAriaLabel()}
                     >
                       <IconDots className="size-3.5" aria-hidden />
                       More

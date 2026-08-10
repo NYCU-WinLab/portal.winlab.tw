@@ -13,6 +13,7 @@ import {
   type GalleryReaction,
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
+import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
 
 const HOVER_SHOW_MS = 400
 const HOVER_HIDE_MS = 250
@@ -266,7 +267,7 @@ export function ReactionBar({
     >
       <div
         role="menu"
-        aria-label="Choose a reaction"
+        aria-label={describeChooseReactionAriaLabel()}
         aria-hidden={!pickerOpen}
         className={cn(
           "absolute right-0 bottom-full z-20 mb-1 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg select-none",

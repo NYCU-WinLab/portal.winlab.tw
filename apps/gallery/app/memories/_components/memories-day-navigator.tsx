@@ -12,6 +12,11 @@ import {
   shiftGalleryCalendarDay,
   type GalleryCalendarDay,
 } from "@/lib/gallery/memories"
+import {
+  describeChooseCalendarDayAriaLabel,
+  describeNextDayAriaLabel,
+  describePreviousDayAriaLabel,
+} from "@/lib/gallery/keyboard-memories-labels"
 
 /** Prev / next / today controls for the Memories calendar day. */
 export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
@@ -21,7 +26,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
 
   return (
     <nav
-      aria-label="Choose a calendar day"
+      aria-label={describeChooseCalendarDayAriaLabel()}
       className={cn(
         gallerySans(),
         "flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
@@ -33,7 +38,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
           "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
           "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
         )}
-        aria-label="Previous day"
+        aria-label={describePreviousDayAriaLabel()}
       >
         <IconChevronLeft className="size-4" aria-hidden />
         <span className="hidden sm:inline">Previous</span>
@@ -64,7 +69,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
           "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
           "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
         )}
-        aria-label="Next day"
+        aria-label={describeNextDayAriaLabel()}
       >
         <span className="hidden sm:inline">Next</span>
         <IconChevronRight className="size-4" aria-hidden />

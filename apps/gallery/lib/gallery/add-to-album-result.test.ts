@@ -6,7 +6,9 @@ import {
   describeAddToAlbumDialogTitle,
   describeAddToAlbumTriggerLabel,
   describeAlbumCreateRollbackError,
+  describeCreateAlbumAndAddPhotosAriaLabel,
   describeCreateAlbumStarted,
+  describeNewAlbumTitlePlaceholder,
 } from "@/lib/gallery/add-to-album-result"
 
 describe("describeAddToAlbumResult", () => {
@@ -105,5 +107,14 @@ describe("describeAlbumCreateRollbackError", () => {
     ).toBe(
       "Album is full. Album “Retreat” may still exist empty — delete it from Albums."
     )
+  })
+})
+
+describe("describeCreateAlbumAndAddPhotosAriaLabel", () => {
+  test("create-and-add control", () => {
+    expect(describeCreateAlbumAndAddPhotosAriaLabel()).toBe(
+      "Create album and add photos"
+    )
+    expect(describeNewAlbumTitlePlaceholder()).toBe("New album title")
   })
 })

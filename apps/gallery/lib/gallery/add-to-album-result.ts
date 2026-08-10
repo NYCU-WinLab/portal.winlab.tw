@@ -66,3 +66,13 @@ export function describeAlbumCreateRollbackError(input: {
 }): string {
   return `${input.addError} Album “${input.title}” may still exist empty — delete it from Albums.`
 }
+
+/** aria-label for creating an album and adding the current selection. */
+export function describeCreateAlbumAndAddPhotosAriaLabel(): string {
+  return "Create album and add photos"
+}
+
+/** Placeholder for the inline new-album title field. */
+export function describeNewAlbumTitlePlaceholder(): string {
+  return "New album title"
+}

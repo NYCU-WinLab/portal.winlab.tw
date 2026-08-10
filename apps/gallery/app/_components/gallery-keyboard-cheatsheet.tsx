@@ -14,6 +14,10 @@ import {
   isCheatSheetToggleKey,
   type GalleryShortcutRow,
 } from "@/lib/gallery/keyboard-cheatsheet"
+import {
+  describeCloseShortcutsAriaLabel,
+  describeKeyboardShortcutsAriaLabel,
+} from "@/lib/gallery/keyboard-memories-labels"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 
 function ShortcutTable({
@@ -121,7 +125,7 @@ export function GalleryKeyboardCheatsheet({
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Keyboard shortcuts"
+        aria-label={describeKeyboardShortcutsAriaLabel()}
         aria-expanded={open}
         aria-busy={open || undefined}
         onClick={() => setSheetOpen(!open)}
@@ -142,7 +146,7 @@ export function GalleryKeyboardCheatsheet({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Keyboard shortcuts"
+          aria-label={describeKeyboardShortcutsAriaLabel()}
           className={cn(
             "fixed right-4 bottom-4 z-[95] w-[min(20rem,calc(100vw-2rem))]",
             "rounded-xl border p-4 shadow-xl backdrop-blur-md",
@@ -175,7 +179,7 @@ export function GalleryKeyboardCheatsheet({
             </div>
             <button
               type="button"
-              aria-label="Close shortcuts"
+              aria-label={describeCloseShortcutsAriaLabel()}
               className={cn(
                 "inline-flex size-7 items-center justify-center rounded-full",
                 dark

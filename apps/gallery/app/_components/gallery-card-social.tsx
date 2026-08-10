@@ -17,6 +17,7 @@ import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
 import { nextReactionState } from "@/lib/gallery/reaction-optimistic"
 import { describeReactionOutcome } from "@/lib/gallery/reaction-outcome"
 import { describeSignInBeforeReact } from "@/lib/gallery/validation-toasts"
+import { describeShowWhoReactedAriaLabel } from "@/lib/gallery/reaction-wall-labels"
 import {
   GALLERY_REACTIONS,
   type GalleryReaction,
@@ -51,7 +52,7 @@ export function ReactionSummary({
             galleryPillClass(),
             "max-w-full flex-wrap gap-x-1.5 gap-y-1"
           )}
-          aria-label="Show who reacted"
+          aria-label={describeShowWhoReactedAriaLabel()}
         >
           {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (
             <span
