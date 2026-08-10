@@ -32,6 +32,10 @@ import {
   restoreGalleryWallOrder,
   shuffleGalleryWallOrder,
 } from "@/lib/gallery/wall-shuffle"
+import {
+  describeWallOrderRestored,
+  describeWallReshuffled,
+} from "@/lib/gallery/wall-shuffle-toast"
 import { cn } from "@workspace/ui/lib/utils"
 
 type PrefetchedPage = {
@@ -256,14 +260,14 @@ export function GalleryInfiniteWall({
     setImages((prev) => shuffleGalleryWallOrder(prev))
     setShuffled(true)
     setWallEpoch((epoch) => epoch + 1)
-    toast.success("Wall reshuffled.")
+    toast.success(describeWallReshuffled())
   }, [images.length])
 
   const onRestoreOrder = useCallback(() => {
     setImages((prev) => restoreGalleryWallOrder(prev, loadOrderIdsRef.current))
     setShuffled(false)
     setWallEpoch((epoch) => epoch + 1)
-    toast.success("Wall order restored.")
+    toast.success(describeWallOrderRestored())
   }, [])
 
   const onArtworkRenamed = useCallback(
