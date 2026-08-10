@@ -375,7 +375,9 @@ export function MediaHealthPanel() {
               aria-busy={isPending || undefined}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isPending ? describeDeletingLabel() : "Delete forever"}
+              {isPending
+                ? describeDeletingLabel()
+                : describeDeleteForeverLabel()}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
