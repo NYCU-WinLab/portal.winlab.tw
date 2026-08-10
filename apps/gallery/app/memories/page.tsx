@@ -131,6 +131,7 @@ export default async function MemoriesPage({
             signedIn={Boolean(user)}
             viewerId={user?.id ?? null}
             viewerName={user?.name ?? "You"}
+            isAdmin={Boolean(user?.isAdmin)}
           />
         )}
       </div>

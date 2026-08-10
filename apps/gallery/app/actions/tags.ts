@@ -17,15 +17,18 @@ import {
   describeMissingSourceOrTargetTagError,
   describeMissingTagError,
   describeMissingTagIdError,
+  describeOnlyAdminsCanDeleteTagsError,
   describeOnlyAdminsCanMergeTagsError,
   describeOnlyAdminsCanRenameTagsError,
   describePickDifferentTagsToMergeError,
   describePleaseSignInFirst,
   describeTagAdminUnavailableError,
+  describeTagDeleteFailedError,
   describeTagMergeFailedError,
   describeTagNameInvalidError,
   describeTagNotFoundError,
   describeTagRenameFailedError,
+  describeTagStillInUseError,
   describeTagsUnavailableError,
 } from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
@@ -400,6 +403,44 @@ export async function adminMergeGalleryTags(
       moved_count: Number(row.moved_count) || 0,
     },
   }
+}
+
+export async function adminDeleteUnusedGalleryTag(
+  tagId: string
+): Promise<TagActionResult<{ id: string }>> {
+  if (!tagId) return { ok: false, error: describeMissingTagIdError() }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!profile?.is_admin) {
+    return { ok: false, error: describeOnlyAdminsCanDeleteTagsError() }
+  }
+
+  const { error } = await supabase.rpc("gallery_admin_delete_unused_tag", {
+    p_tag_id: tagId,
+  })
+
+  if (error) {
+    if (isGalleryTagsUnavailable(error)) {
+      return { ok: false, error: describeTagAdminUnavailableError() }
+    }
+    if (/still in use/i.test(error.message)) {
+      return { ok: false, error: describeTagStillInUseError() }
+    }
+    return { ok: false, error: error.message || describeTagDeleteFailedError() }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return { ok: true, data: { id: tagId } }
 }
 
 /** Tags attached to one image (Manage / lightbox loaders). */

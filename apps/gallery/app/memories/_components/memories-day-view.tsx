@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
@@ -14,8 +15,9 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { CuratedLightboxActions } from "@/app/_components/curated-lightbox-actions"
-import { CuratedLightboxReactions } from "@/app/_components/curated-lightbox-reactions"
+import { CuratedLightboxSocial } from "@/app/_components/curated-lightbox-social"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
+import { TakenAtEditor } from "@/app/upload/_components/taken-at-editor"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
@@ -44,6 +46,7 @@ export function MemoriesDayView({
   signedIn = false,
   viewerId = null,
   viewerName = "You",
+  isAdmin = false,
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
@@ -52,7 +55,9 @@ export function MemoriesDayView({
   signedIn?: boolean
   viewerId?: string | null
   viewerName?: string
+  isAdmin?: boolean
 }) {
+  const router = useRouter()
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -430,13 +435,31 @@ export function MemoriesDayView({
                   signedIn={signedIn}
                   initialFavorited={Boolean(active.is_favorited)}
                 />
-                <CuratedLightboxReactions
+                <CuratedLightboxSocial
                   open={Boolean(active)}
                   imageId={active.id}
                   signedIn={signedIn}
                   viewerId={viewerId}
                   viewerName={viewerName}
+                  isAdmin={isAdmin}
                 />
+                {signedIn &&
+                (isAdmin ||
+                  (viewerId != null && active.created_by === viewerId)) ? (
+                  <TakenAtEditor
+                    id={active.id}
+                    takenAt={active.taken_at}
+                    createdAt={active.created_at}
+                    imageName={active.name}
+                    onUpdated={() => {
+                      try {
+                        router.refresh()
+                      } catch {
+                        // soft-fail refresh
+                      }
+                    }}
+                  />
+                ) : null}
                 {slideshowPhotos.length > 0 ? (
                   <button
                     type="button"

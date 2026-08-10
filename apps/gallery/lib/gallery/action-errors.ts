@@ -67,6 +67,18 @@ export function describeOnlyAdminsCanMergeTagsError(): string {
   return "Only admins can merge tags."
 }
 
+export function describeOnlyAdminsCanDeleteTagsError(): string {
+  return "Only admins can delete tags."
+}
+
+export function describeTagStillInUseError(): string {
+  return "Tag still in use — merge or detach it first."
+}
+
+export function describeTagDeleteFailedError(): string {
+  return "Could not delete tag."
+}
+
 export function describeTagRenameFailedError(): string {
   return "Rename failed."
 }

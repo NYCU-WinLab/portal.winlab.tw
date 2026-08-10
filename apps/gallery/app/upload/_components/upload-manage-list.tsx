@@ -79,6 +79,7 @@ import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import { describeFocusedManageRowAnnouncement } from "@/lib/gallery/focus-announcement"
 import { describeManageSelectHintLabel } from "@/lib/gallery/keyboard-hint-labels"
+import { describeSequenceReorderAnnouncement } from "@/lib/gallery/reorder-announcement"
 import {
   describeManageSelectAllLabel,
   describeManageSelectAllShortLabel,
@@ -391,6 +392,7 @@ function UploadSequenceGroup({
 }) {
   const [items, setItems] = useState(initialItems)
   const [isPending, startTransition] = useTransition()
+  const [reorderAnnounce, setReorderAnnounce] = useState("")
   const orderedIds = useMemo(() => items.map((item) => item.id), [items])
   const gapInfo = useMemo(
     () => findSequenceGaps(items.map((item) => item.sequence_index)),
@@ -418,12 +420,22 @@ function UploadSequenceGroup({
   }
 
   const move = (fromIndex: number, toIndex: number) => {
+    const moved = items[fromIndex]
     const nextIds = swapSequenceOrder(orderedIds, fromIndex, toIndex)
     if (!nextIds) return
     const nextItems = nextIds
       .map((id) => items.find((item) => item.id === id))
       .filter((item): item is ManageUploadRow => Boolean(item))
     persistOrder(nextIds, nextItems)
+    if (moved) {
+      setReorderAnnounce(
+        describeSequenceReorderAnnouncement(
+          moved.name,
+          toIndex,
+          nextItems.length
+        )
+      )
+    }
   }
 
   const setCover = (index: number) => {
@@ -449,6 +461,7 @@ function UploadSequenceGroup({
 
   const {
     listRef,
+    draggingIndex,
     onHandlePointerDown,
     onHandlePointerMove,
     onHandlePointerUp,
@@ -538,6 +551,9 @@ function UploadSequenceGroup({
           </button>
         </div>
       ) : null}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {reorderAnnounce}
+      </p>
       <ul
         ref={listRef}
         className="flex flex-col gap-3"
@@ -579,6 +595,7 @@ function UploadSequenceGroup({
                   <button
                     type="button"
                     aria-label={`Reorder ${image.name}`}
+                    aria-grabbed={draggingIndex === index}
                     disabled={isPending}
                     className={cn(
                       "inline-flex size-11 shrink-0 touch-none items-center justify-center rounded-md",

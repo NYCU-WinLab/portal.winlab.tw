@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
+import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
+import { GalleryComments } from "@/app/_components/gallery-comments"
+import { GalleryImageTags } from "@/app/_components/gallery-image-tags"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { setGalleryReaction } from "@/app/actions"
+import { listGalleryImageTags } from "@/app/actions/tags"
+import { gallerySans } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
 import { resolveLightboxShortcut } from "@/lib/gallery/lightbox-shortcuts"
@@ -17,28 +22,42 @@ import {
   type ReactionCounts,
   type ReactionNames,
 } from "@/lib/gallery/reactions"
+import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
+import type { GalleryTag } from "@/lib/gallery/tags"
 import { describeSignInBeforeReact } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@workspace/ui/lib/utils"
 
-/** Reactions + R shortcut for album / Memories lightboxes. */
-export function CuratedLightboxReactions({
+/** Reactions, comments, tags, add-to-album for album / Memories lightboxes. */
+export function CuratedLightboxSocial({
   open,
   imageId,
   signedIn,
   viewerId,
   viewerName,
+  isAdmin = false,
+  albumsAvailable = true,
 }: {
   open: boolean
   imageId: string
   signedIn: boolean
   viewerId: string | null
   viewerName: string
+  isAdmin?: boolean
+  albumsAvailable?: boolean
 }) {
   const [counts, setCounts] = useState<ReactionCounts>(EMPTY_REACTION_COUNTS)
   const [myReaction, setMyReaction] = useState<GalleryReaction | null>(null)
   const [namesByReaction, setNamesByReaction] =
     useState<ReactionNames>(EMPTY_REACTION_NAMES)
   const [reactionsAvailable, setReactionsAvailable] = useState(true)
+  const [comments, setComments] = useState<GalleryComment[]>([])
+  const [commentsAvailable, setCommentsAvailable] = useState(true)
+  const [commentPinAvailable, setCommentPinAvailable] = useState(true)
+  const [commentLikesAvailable, setCommentLikesAvailable] = useState(true)
+  const [members, setMembers] = useState<GalleryMember[]>([])
+  const [tags, setTags] = useState<GalleryTag[]>([])
+  const [tagsAvailable, setTagsAvailable] = useState(true)
   const [openSignal, setOpenSignal] = useState(0)
   const [pending, startTransition] = useTransition()
   const openRef = useRef(open)
@@ -47,12 +66,42 @@ export function CuratedLightboxReactions({
   const refresh = useCallback(async () => {
     if (!openRef.current) return
     const supabase = createClient()
-    const social = await loadLightboxSocial(supabase, imageId, viewerId)
+    const [social, tagResult, memberResult] = await Promise.all([
+      loadLightboxSocial(supabase, imageId, viewerId),
+      listGalleryImageTags(imageId),
+      supabase
+        .from("user_profiles")
+        .select("id, name")
+        .order("name")
+        .limit(200),
+    ])
     if (!openRef.current) return
     setCounts(social.reaction_counts)
     setMyReaction(social.my_reaction)
     setNamesByReaction(social.reaction_names)
     setReactionsAvailable(social.reactionsAvailable)
+    setComments(social.comments)
+    setCommentsAvailable(true)
+    setCommentPinAvailable(social.commentPinAvailable)
+    setCommentLikesAvailable(social.commentLikesAvailable)
+    if (tagResult.ok) {
+      setTags(tagResult.data)
+      setTagsAvailable(true)
+    } else {
+      setTags([])
+      setTagsAvailable(false)
+    }
+    if (!memberResult.error) {
+      setMembers(
+        (
+          (memberResult.data ?? []) as { id: string; name: string | null }[]
+        ).map((row) => ({
+          id: row.id,
+          name: row.name,
+          email: null,
+        }))
+      )
+    }
   }, [imageId, viewerId])
 
   useEffect(() => {
@@ -61,6 +110,8 @@ export function CuratedLightboxReactions({
       setMyReaction(null)
       setNamesByReaction(EMPTY_REACTION_NAMES)
       setReactionsAvailable(true)
+      setComments([])
+      setTags([])
       return
     }
     void refresh()
@@ -113,16 +164,42 @@ export function CuratedLightboxReactions({
     })
   }
 
-  if (!open || !reactionsAvailable) return null
+  if (!open) return null
 
   return (
-    <ReactionBar
-      counts={counts}
-      myReaction={myReaction}
-      canReact={signedIn && !pending}
-      busy={pending}
-      openSignal={openSignal}
-      onReact={onReact}
-    />
+    <div className={cn("space-y-3", gallerySans())}>
+      {reactionsAvailable ? (
+        <ReactionBar
+          counts={counts}
+          myReaction={myReaction}
+          canReact={signedIn && !pending}
+          busy={pending}
+          openSignal={openSignal}
+          onReact={onReact}
+        />
+      ) : null}
+      {tagsAvailable ? (
+        <GalleryImageTags imageId={imageId} tags={tags} canEdit={signedIn} />
+      ) : null}
+      {signedIn && albumsAvailable ? (
+        <GalleryAddToAlbum imageIds={[imageId]} />
+      ) : null}
+      {commentsAvailable ? (
+        <div className="max-h-[min(40vh,22rem)] min-h-[10rem] overflow-hidden rounded-xl border border-border/50 bg-background/70">
+          <GalleryComments
+            imageId={imageId}
+            comments={comments}
+            onCommentsChange={setComments}
+            isSignedIn={signedIn}
+            viewerId={viewerId}
+            viewerName={viewerName}
+            members={members}
+            isAdmin={isAdmin}
+            commentPinAvailable={commentPinAvailable}
+            commentLikesAvailable={commentLikesAvailable}
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }

@@ -689,6 +689,11 @@ export function GalleryComments({
             </Button>
           </div>
         </div>
+        {isSignedIn ? (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            ⌘/Ctrl+Enter to post · Shift+Enter for a new line
+          </p>
+        ) : null}
       </div>
 
       <AlertDialog

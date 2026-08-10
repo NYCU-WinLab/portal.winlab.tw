@@ -13,6 +13,11 @@ export function describeTagMerged(input: {
   return `Merged into "${name}" (${movedCount} ${links} moved)`
 }
 
+/** Toast after deleting an unused tag. */
+export function describeTagDeleted(name: string): string {
+  return `Deleted "${name}"`
+}
+
 /** Inline status when the manage tags dialog fails to load. */
 export function describeCouldNotLoadTags(error: string): string {
   return `Could not load tags — ${error}`

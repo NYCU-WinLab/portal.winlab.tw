@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { IconGitMerge, IconPencil } from "@tabler/icons-react"
+import { IconGitMerge, IconPencil, IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import {
@@ -21,6 +21,7 @@ import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
 
 import {
+  adminDeleteUnusedGalleryTag,
   adminMergeGalleryTags,
   adminRenameGalleryTag,
   listPopularGalleryTags,
@@ -41,6 +42,7 @@ import {
   describeRetryLabel,
 } from "@/lib/gallery/dialog-action-labels"
 import {
+  describeTagDeleted,
   describeTagMerged,
   describeTagRenamed,
 } from "@/lib/gallery/tag-admin-toast"
@@ -67,6 +69,7 @@ export function TagAdminPanel() {
   const [renameDraft, setRenameDraft] = useState("")
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null)
   const [mergeTargetId, setMergeTargetId] = useState<string>("")
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const dialogTriggerRef = useRef<HTMLElement | null>(null)
 
   const refresh = () => {
@@ -99,6 +102,10 @@ export function TagAdminPanel() {
   const mergeSource = useMemo(
     () => tags.find((tag) => tag.id === mergeSourceId) ?? null,
     [tags, mergeSourceId]
+  )
+  const deleteTarget = useMemo(
+    () => tags.find((tag) => tag.id === deleteId) ?? null,
+    [tags, deleteId]
   )
   const mergeTargets = useMemo(
     () => tags.filter((tag) => tag.id !== mergeSourceId),
@@ -183,6 +190,34 @@ export function TagAdminPanel() {
     })
   }
 
+  const openDelete = (
+    tag: GalleryTagSuggestion,
+    trigger?: HTMLElement | null
+  ) => {
+    dialogTriggerRef.current = trigger ?? null
+    setDeleteId(tag.id)
+  }
+
+  const submitDelete = () => {
+    if (!deleteId || pending) return
+    startTransition(async () => {
+      const name = deleteTarget?.name ?? "tag"
+      const result = await adminDeleteUnusedGalleryTag(deleteId)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(describeTagDeleted(name))
+      setDeleteId(null)
+      refresh()
+      try {
+        router.refresh()
+      } catch {
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
+      }
+    })
+  }
+
   return (
     <section
       className={cn(galleryPanelClass(), "space-y-5")}
@@ -201,8 +236,8 @@ export function TagAdminPanel() {
           Tag catalog
         </h2>
         <p className={gallerySectionLeadClass()}>
-          Rename a label or merge duplicates. Members still create tags by
-          typing them on photos — this is cleanup only.
+          Rename a label, merge duplicates, or delete unused tags. Members still
+          create tags by typing them on photos — this is cleanup only.
         </p>
       </div>
 
@@ -282,6 +317,16 @@ export function TagAdminPanel() {
                 >
                   <IconGitMerge className="size-3.5" aria-hidden />
                   Merge
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending || tag.use_count > 0}
+                  onClick={(event) => openDelete(tag, event.currentTarget)}
+                >
+                  <IconTrash className="size-3.5" aria-hidden />
+                  Delete
                 </Button>
               </div>
             </li>
@@ -389,6 +434,40 @@ export function TagAdminPanel() {
               aria-busy={pending || undefined}
             >
               {pending ? describeMergingLabel() : "Merge tags"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteId(null)
+            restoreDialogFocus()
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete &ldquo;{deleteTarget?.name ?? "tag"}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Only unused tags can be deleted. This removes the catalog label
+              permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={submitDelete}
+              disabled={pending}
+              aria-busy={pending || undefined}
+            >
+              {pending ? describeSavingLabel() : "Delete tag"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
