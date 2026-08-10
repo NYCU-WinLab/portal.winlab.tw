@@ -84,7 +84,7 @@ export function TakenAtEditor({
             ? `Edit capture date for ${imageName}`
             : "Edit capture date for this work"
         }
-        aria-busy={pending}
+        aria-busy={pending || undefined}
         className={cn(
           gallerySans(),
           "!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
@@ -133,7 +133,7 @@ export function TakenAtEditor({
             type="button"
             onClick={onSave}
             disabled={pending}
-            aria-busy={pending}
+            aria-busy={pending || undefined}
           >
             {pending ? "Saving…" : "Save"}
           </Button>
