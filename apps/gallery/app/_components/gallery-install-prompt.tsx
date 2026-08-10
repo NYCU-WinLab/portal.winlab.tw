@@ -26,6 +26,7 @@ export function GalleryInstallPrompt() {
   const [iosHint, setIosHint] = useState(false)
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null)
+  const [busy, setBusy] = useState(false)
   const primaryActionRef = useRef<HTMLButtonElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
 
@@ -69,6 +70,7 @@ export function GalleryInstallPrompt() {
   }, [])
 
   const dismiss = () => {
+    if (busy) return
     writeStorageItem(window.localStorage, GALLERY_PWA_INSTALL_DISMISS_KEY, "1")
     setVisible(false)
     setDeferredPrompt(null)
@@ -79,17 +81,11 @@ export function GalleryInstallPrompt() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
-      writeStorageItem(
-        window.localStorage,
-        GALLERY_PWA_INSTALL_DISMISS_KEY,
-        "1"
-      )
-      setVisible(false)
-      setDeferredPrompt(null)
+      dismiss()
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [visible])
+  }, [visible, busy])
 
   useEffect(() => {
     if (!visible) return
@@ -107,12 +103,15 @@ export function GalleryInstallPrompt() {
   }, [visible])
 
   const install = async () => {
-    if (!deferredPrompt) return
+    if (!deferredPrompt || busy) return
+    setBusy(true)
     try {
       await deferredPrompt.prompt()
       await deferredPrompt.userChoice
     } catch {
       // Browser cancelled / blocked the install sheet — still dismiss.
+    } finally {
+      setBusy(false)
     }
     dismiss()
   }
@@ -165,10 +164,12 @@ export function GalleryInstallPrompt() {
               ref={primaryActionRef}
               type="button"
               size="sm"
+              disabled={busy}
+              aria-busy={busy || undefined}
               onClick={() => void install()}
             >
               <IconDownload className="h-4 w-4" />
-              Install
+              {busy ? "Installing…" : "Install"}
             </Button>
           ) : null}
           <Button
@@ -176,6 +177,8 @@ export function GalleryInstallPrompt() {
             type="button"
             size="icon-sm"
             variant="ghost"
+            disabled={busy}
+            aria-busy={busy || undefined}
             aria-label="Dismiss install prompt"
             onClick={dismiss}
           >
