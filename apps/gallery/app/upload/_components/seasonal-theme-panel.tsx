@@ -50,6 +50,8 @@ export function SeasonalThemePanel({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   const onSelect = (next: ThemeChoice) => {
+    if (isPending || !settingsReady) return
+    if (next === selected) return
     const previous = selected
     setSelected(next)
     startTransition(async () => {
@@ -128,6 +130,7 @@ export function SeasonalThemePanel({
               aria-checked={checked}
               tabIndex={checked ? 0 : -1}
               disabled={isPending || !settingsReady}
+              aria-busy={isPending || undefined}
               onClick={() => onSelect(option.value)}
               className={cn(
                 "min-w-[8.5rem] flex-1 rounded-xl border px-4 py-3 text-left transition-colors",
