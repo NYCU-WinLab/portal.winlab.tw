@@ -1061,7 +1061,13 @@ export function UploadManageList({
   }
 
   const copySelectedLinks = async () => {
-    if (orderedSelectedIds.length === 0 || copyLinksBusyRef.current) return
+    if (
+      isPending ||
+      orderedSelectedIds.length === 0 ||
+      copyLinksBusyRef.current
+    ) {
+      return
+    }
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
       toast.error("Could not copy links in this context.")
@@ -1451,6 +1457,7 @@ export function UploadManageList({
                   type="button"
                   onClick={() => void copySelectedLinks()}
                   disabled={isPending || selectedWallLinkCount === 0}
+                  aria-busy={isPending || undefined}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
                   Links
@@ -1490,6 +1497,7 @@ export function UploadManageList({
                       type="button"
                       onClick={() => setSelectedFavorites(false)}
                       disabled={isPending || selectedItems.length === 0}
+                      aria-busy={isPending || undefined}
                       className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Unsave
@@ -1502,6 +1510,7 @@ export function UploadManageList({
                       type="button"
                       onClick={() => pinSelected(true)}
                       disabled={isPending || selectedItems.length === 0}
+                      aria-busy={isPending || undefined}
                       className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Pin
@@ -1510,6 +1519,7 @@ export function UploadManageList({
                       type="button"
                       onClick={() => pinSelected(false)}
                       disabled={isPending || selectedItems.length === 0}
+                      aria-busy={isPending || undefined}
                       className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Unpin
