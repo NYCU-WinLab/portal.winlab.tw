@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { useGalleryUpload } from "@/hooks/gallery/use-gallery-upload"
 import { describeDevelopingLabel } from "@/lib/gallery/busy-labels"
+import { describeHangUploadLabel } from "@/lib/gallery/hang-upload-label"
 import { formatFailurePreview } from "@/lib/gallery/upload-errors"
 import { buildArtworkName } from "@/lib/gallery/upload-naming"
 import {
@@ -78,6 +79,7 @@ export function UploadForm({
   }, [selectedFiles, videoAvailable])
 
   function assignFiles(files: File[]) {
+    if (pending || status.kind === "working") return
     const next = files.filter((file) => {
       if (file.size <= 0) return false
       if (file.type.startsWith("image/")) return true
@@ -494,11 +496,10 @@ export function UploadForm({
       >
         {pending || status.kind === "working"
           ? describeDevelopingLabel()
-          : selectedFiles.length > 1
-            ? sequencesAvailable
-              ? `Hang sequence (${selectedFiles.length})`
-              : `Hang ${selectedFiles.length} shots`
-            : "Hang on the wall"}
+          : describeHangUploadLabel({
+              fileCount: selectedFiles.length,
+              sequencesAvailable,
+            })}
       </Button>
     </form>
   )

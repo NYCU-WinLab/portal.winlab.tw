@@ -13,5 +13,8 @@ describe("describeGalleryNavError", () => {
     expect(describeGalleryNavError("openMentionedPhoto")).toBe(
       "Could not open the mentioned photo."
     )
+    expect(describeGalleryNavError("refreshGalleryChrome")).toBe(
+      galleryNavErrors.refreshGalleryChrome
+    )
   })
 })

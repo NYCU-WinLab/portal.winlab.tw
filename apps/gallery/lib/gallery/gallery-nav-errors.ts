@@ -16,6 +16,7 @@ export const galleryNavErrors = {
   updateGalleryFilters: "Could not update gallery filters.",
   updateAlbumSearch: "Could not update album search.",
   signedOutHome: "Signed out, but could not open the home page.",
+  refreshGalleryChrome: "Theme saved, but the page could not refresh.",
 } as const
 
 export type GalleryNavErrorKey = keyof typeof galleryNavErrors

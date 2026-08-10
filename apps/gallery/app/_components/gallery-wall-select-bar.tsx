@@ -71,6 +71,7 @@ import {
   describeCouldNotCopyLinks,
 } from "@/lib/gallery/validation-toasts"
 import { describeCouldNotBuildZip } from "@/lib/gallery/download-labels"
+import { describeErrorMessage } from "@/lib/gallery/error-message"
 import {
   describeCreatingLabel,
   describeTaggingLabel,
@@ -416,9 +417,9 @@ export function GalleryWallSelectBar({
         toast.success(copy.title, { id: toastId })
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : describeCouldNotBuildZip()
-      toast.error(message, { id: toastId })
+      toast.error(describeErrorMessage(error, describeCouldNotBuildZip()), {
+        id: toastId,
+      })
     } finally {
       setZipBusy(false)
     }

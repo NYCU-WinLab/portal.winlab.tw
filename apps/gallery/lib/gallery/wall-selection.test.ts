@@ -19,6 +19,10 @@ describe("toggleWallSelection", () => {
     expect([...removed]).toEqual(["b"])
     expect(added.has("a")).toBe(true)
   })
+
+  test("adds onto an empty set", () => {
+    expect([...toggleWallSelection(new Set(), "x")]).toEqual(["x"])
+  })
 })
 
 describe("toggleSelectAllWallIds", () => {
@@ -48,6 +52,12 @@ describe("orderedSelectedWallIds", () => {
 
   test("returns empty when nothing selected", () => {
     expect(orderedSelectedWallIds(["a"], new Set())).toEqual([])
+  })
+
+  test("drops selected ids that are not on the wall", () => {
+    expect(
+      orderedSelectedWallIds(["a", "b"], new Set(["b", "ghost", "a"]))
+    ).toEqual(["a", "b"])
   })
 })
 

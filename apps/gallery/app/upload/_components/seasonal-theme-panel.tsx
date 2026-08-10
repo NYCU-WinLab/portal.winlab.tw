@@ -20,6 +20,7 @@ import {
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
@@ -69,7 +70,7 @@ export function SeasonalThemePanel({
       try {
         router.refresh()
       } catch {
-        // Best-effort so SSR chrome picks up the new theme.
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }

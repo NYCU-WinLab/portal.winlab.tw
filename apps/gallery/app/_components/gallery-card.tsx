@@ -52,6 +52,7 @@ import {
   describeSignInToFavorite,
   describeCouldNotDownload,
 } from "@/lib/gallery/download-labels"
+import { describeErrorMessage } from "@/lib/gallery/error-message"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeNothingToDownload } from "@/lib/gallery/validation-toasts"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
@@ -362,9 +363,7 @@ export function GalleryCard({
       await downloadGalleryOriginal({ displayName: name, imagePath: path })
       toast.success(describeSavedOriginal())
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : describeCouldNotDownload()
-      toast.error(message)
+      toast.error(describeErrorMessage(error, describeCouldNotDownload()))
     } finally {
       downloadBusyRef.current = false
     }

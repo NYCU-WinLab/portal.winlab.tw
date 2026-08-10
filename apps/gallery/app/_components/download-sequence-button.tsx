@@ -20,6 +20,7 @@ import {
   describeCouldNotBuildZip,
   describeDownloadStoryLabel,
 } from "@/lib/gallery/download-labels"
+import { describeErrorMessage } from "@/lib/gallery/error-message"
 
 type DownloadSequenceButtonProps = {
   items: SequenceZipSource[]
@@ -72,9 +73,9 @@ export function DownloadSequenceButton({
       })
       toast.success(describeSequenceZipSaved(result.count), { id: toastId })
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : describeCouldNotBuildZip()
-      toast.error(message, { id: toastId })
+      toast.error(describeErrorMessage(error, describeCouldNotBuildZip()), {
+        id: toastId,
+      })
     } finally {
       setBusy(false)
     }
