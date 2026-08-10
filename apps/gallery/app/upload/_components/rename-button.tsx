@@ -62,7 +62,7 @@ export function RenameButton({
         variant="ghost"
         onClick={() => openEditor(true)}
         aria-label={`Rename ${name}`}
-        aria-busy={pending}
+        aria-busy={pending || undefined}
         className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
       >
         Rename
@@ -109,7 +109,7 @@ export function RenameButton({
             type="button"
             onClick={onSave}
             disabled={pending}
-            aria-busy={pending}
+            aria-busy={pending || undefined}
           >
             {pending ? "Saving…" : "Save"}
           </Button>
