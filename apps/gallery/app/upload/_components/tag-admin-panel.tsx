@@ -323,6 +323,16 @@ export function TagAdminPanel() {
                   size="sm"
                   variant="ghost"
                   disabled={pending || tag.use_count > 0}
+                  title={
+                    tag.use_count > 0
+                      ? "Still attached to photos — merge or detach first"
+                      : undefined
+                  }
+                  aria-description={
+                    tag.use_count > 0
+                      ? "Still attached to photos — merge or detach first"
+                      : undefined
+                  }
                   onClick={(event) => openDelete(tag, event.currentTarget)}
                 >
                   <IconTrash className="size-3.5" aria-hidden />

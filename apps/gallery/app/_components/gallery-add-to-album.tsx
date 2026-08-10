@@ -230,9 +230,7 @@ export function GalleryAddToAlbum({
           ensureAlbums()
           return
         }
-        if (controlledOpen === undefined) {
-          queueMicrotask(() => triggerRef.current?.focus())
-        }
+        queueMicrotask(() => triggerRef.current?.focus())
       }}
     >
       {controlledOpen === undefined ? (
@@ -254,7 +252,14 @@ export function GalleryAddToAlbum({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent className="sm:max-w-md" aria-busy={pending || undefined}>
+      <DialogContent
+        className="sm:max-w-md"
+        aria-busy={pending || undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          triggerRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle className={gallerySans()}>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>

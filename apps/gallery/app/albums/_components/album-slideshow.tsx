@@ -86,6 +86,7 @@ export function AlbumSlideshow({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const muteButtonRef = useRef<HTMLButtonElement | null>(null)
   const pausedRef = useRef(paused)
   pausedRef.current = paused
 
@@ -231,6 +232,7 @@ export function AlbumSlideshow({
         if (current?.media_type !== "video") return
         event.preventDefault()
         setVideoMuted((value) => !value)
+        queueMicrotask(() => muteButtonRef.current?.focus())
         return
       }
       if (event.key === "[" || event.key === "-") {
@@ -332,6 +334,7 @@ export function AlbumSlideshow({
             {photo.media_type === "video" ? (
               <button
                 type="button"
+                ref={muteButtonRef}
                 onClick={() => setVideoMuted((value) => !value)}
                 className={cn(
                   gallerySans(),

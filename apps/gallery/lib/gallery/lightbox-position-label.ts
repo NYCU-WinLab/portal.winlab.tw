@@ -7,5 +7,6 @@ export function describeAlbumLightboxPositionLabel(
   const safeName = name.trim() || "Untitled"
   if (total <= 1) return safeName
   const position = Math.min(Math.max(index, 0), total - 1) + 1
-  return `${safeName} · ${position} of ${total}`
+  const edge = position === 1 ? " · first" : position === total ? " · last" : ""
+  return `${safeName} · ${position} of ${total}${edge}`
 }

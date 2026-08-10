@@ -52,6 +52,7 @@ export function CuratedLightboxActions({
   const shareBusyRef = useRef(false)
   const downloadBusyRef = useRef(false)
   const [shareBusy, setShareBusy] = useState(false)
+  const [downloadBusy, setDownloadBusy] = useState(false)
 
   useEffect(() => {
     setFavorited(initialFavorited)
@@ -106,6 +107,7 @@ export function CuratedLightboxActions({
       return
     }
     downloadBusyRef.current = true
+    setDownloadBusy(true)
     try {
       await downloadGalleryOriginal({ displayName: name, imagePath })
       toast.success(describeSavedOriginal())
@@ -113,6 +115,7 @@ export function CuratedLightboxActions({
       toast.error(describeErrorMessage(error, describeCouldNotDownload()))
     } finally {
       downloadBusyRef.current = false
+      setDownloadBusy(false)
     }
   }, [imagePath, name])
 
@@ -167,7 +170,14 @@ export function CuratedLightboxActions({
           onChanged={setFavorited}
         />
       ) : null}
-      <DownloadOriginalButton displayName={name} imagePath={imagePath} />
+      <DownloadOriginalButton
+        displayName={name}
+        imagePath={imagePath}
+        disabled={downloadBusy}
+      />
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {downloadBusy ? "Downloading original…" : ""}
+      </span>
       <button
         type="button"
         onClick={() => {

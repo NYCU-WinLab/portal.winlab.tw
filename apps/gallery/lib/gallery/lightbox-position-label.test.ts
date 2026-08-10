@@ -7,13 +7,22 @@ describe("describeAlbumLightboxPositionLabel", () => {
     expect(describeAlbumLightboxPositionLabel("Lab", 0, 1)).toBe("Lab")
   })
 
-  test("includes 1-based position in a multi list", () => {
+  test("includes middle position without edge words", () => {
     expect(describeAlbumLightboxPositionLabel("Lab", 1, 4)).toBe("Lab · 2 of 4")
   })
 
-  test("falls back when the name is blank", () => {
+  test("marks first and last edges", () => {
+    expect(describeAlbumLightboxPositionLabel("Lab", 0, 4)).toBe(
+      "Lab · 1 of 4 · first"
+    )
+    expect(describeAlbumLightboxPositionLabel("Lab", 3, 4)).toBe(
+      "Lab · 4 of 4 · last"
+    )
+  })
+
+  test("falls back for blank names", () => {
     expect(describeAlbumLightboxPositionLabel("  ", 0, 2)).toBe(
-      "Untitled · 1 of 2"
+      "Untitled · 1 of 2 · first"
     )
   })
 })

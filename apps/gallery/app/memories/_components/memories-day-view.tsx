@@ -145,7 +145,7 @@ export function MemoriesDayView({
         event.preventDefault()
         setKeyboardNavActive(false)
         setFocusIndex(-1)
-        ;(document.activeElement as HTMLElement | null)?.blur?.()
+        queueMicrotask(() => slideshowButtonRef.current?.focus())
         return
       }
       if (!gridArmed) return
