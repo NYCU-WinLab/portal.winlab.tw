@@ -28,7 +28,7 @@ export type ActionResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string }
 export type RegisterResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; warning?: string }
   | { ok: false; error: string }
 
 export type RegisterMediaInput = {
@@ -295,15 +295,29 @@ export async function registerGalleryImage(
     }
   }
 
+  let warning: string | undefined
   const tagNames = parseGalleryTagList(input.tagNames)
   if (tagNames.length > 0) {
-    await attachGalleryTagsToImage(inserted.id, tagNames, userId, supabase)
+    const attached = await attachGalleryTagsToImage(
+      inserted.id,
+      tagNames,
+      userId,
+      supabase
+    )
+    if (attached.failed > 0) {
+      warning =
+        attached.failed === 1
+          ? "Hung on the wall, but one tag could not be attached."
+          : `Hung on the wall, but ${attached.failed} tags could not be attached.`
+    }
   }
 
   revalidatePath("/")
   revalidatePath("/upload")
   revalidatePath("/memories")
-  return { ok: true, id: inserted.id }
+  return warning
+    ? { ok: true, id: inserted.id, warning }
+    : { ok: true, id: inserted.id }
 }
 
 export async function deleteGalleryImage(

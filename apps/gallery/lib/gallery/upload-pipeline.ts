@@ -1,5 +1,7 @@
 "use client"
 
+import { toast } from "sonner"
+
 import { registerGalleryImage } from "@/app/upload/actions"
 import {
   describeUploadFailure,
@@ -116,6 +118,9 @@ async function registerOrCleanup(
     await supabase.storage.from("gallery").remove(paths)
     const stage = stageFromRegisterError(result.error)
     throw new UploadFailureError(stage, result.error)
+  }
+  if (result.warning) {
+    toast.warning(result.warning)
   }
   return result.id
 }

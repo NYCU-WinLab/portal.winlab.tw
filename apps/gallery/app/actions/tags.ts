@@ -261,10 +261,15 @@ export async function attachGalleryTagsToImage(
   rawNames: string[],
   userId: string,
   supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<void> {
+): Promise<{ attached: number; failed: number }> {
+  let attached = 0
+  let failed = 0
   for (const raw of rawNames) {
     const ensured = await ensureGalleryTag(supabase, userId, raw)
-    if (!ensured.ok) continue
+    if (!ensured.ok) {
+      failed += 1
+      continue
+    }
     const { error } = await supabase.from("gallery_image_tags").insert({
       image_id: imageId,
       tag_id: ensured.data.id,
@@ -272,8 +277,12 @@ export async function attachGalleryTagsToImage(
     })
     if (error && !/duplicate|unique|23505/i.test(error.message)) {
       console.error("[gallery] attach tag on upload failed", error)
+      failed += 1
+      continue
     }
+    attached += 1
   }
+  return { attached, failed }
 }
 
 export async function adminRenameGalleryTag(
