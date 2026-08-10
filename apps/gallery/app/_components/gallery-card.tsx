@@ -506,6 +506,7 @@ export function GalleryCard({
                 <button
                   type="button"
                   ref={wallFocusRef}
+                  data-wall-focused={gridFocused ? "true" : undefined}
                   aria-pressed={selected}
                   aria-label={
                     selected
@@ -579,6 +580,7 @@ export function GalleryCard({
                   <button
                     type="button"
                     ref={wallFocusRef}
+                    data-wall-focused={gridFocused ? "true" : undefined}
                     className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {thumbFailed ? (

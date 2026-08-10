@@ -62,4 +62,9 @@ describe("edgeListId", () => {
   test("returns null for empty lists", () => {
     expect(edgeListId([], "first")).toBeNull()
   })
+
+  test("returns the only id for a singleton list", () => {
+    expect(edgeListId(["solo"], "first")).toBe("solo")
+    expect(edgeListId(["solo"], "last")).toBe("solo")
+  })
 })

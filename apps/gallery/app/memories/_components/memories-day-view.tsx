@@ -18,6 +18,7 @@ import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import { adjacentListId, edgeListId } from "@/lib/gallery/lightbox-nav"
+import { describeAlbumLightboxPositionLabel } from "@/lib/gallery/lightbox-position-label"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
 import {
   findSlideshowIndexByImageId,
@@ -80,10 +81,13 @@ export function MemoriesDayView({
     () => slideshowPhotos.map((photo) => photo.image_id),
     [slideshowPhotos]
   )
-  const activeIndexLabel =
-    active && photoIds.length > 1
-      ? `${photoIds.indexOf(active.id) + 1} of ${photoIds.length}`
-      : null
+  const activeIndexLabel = active
+    ? describeAlbumLightboxPositionLabel(
+        active.name,
+        photoIds.indexOf(active.id),
+        photoIds.length
+      )
+    : null
 
   useEffect(() => {
     setMemoriesOverlayState({
@@ -235,13 +239,9 @@ export function MemoriesDayView({
                 else if (swipe === "next") goLightbox("next")
               }}
             >
-              <DialogTitle className="sr-only">
-                {active.name}
-                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
-              </DialogTitle>
+              <DialogTitle className="sr-only">{activeIndexLabel}</DialogTitle>
               <p className="sr-only" aria-live="polite" aria-atomic="true">
-                {active.name}
-                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
+                {activeIndexLabel}
               </p>
               {photoIds.length > 1 ? (
                 <>

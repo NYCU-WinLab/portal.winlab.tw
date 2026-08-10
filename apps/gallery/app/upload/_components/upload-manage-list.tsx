@@ -209,6 +209,9 @@ function UploadListItem({
   return (
     <li
       data-manage-id={image.id}
+      data-manage-focused={
+        selectionMode && selectionFocused ? "true" : undefined
+      }
       data-sequence-index={
         typeof sequenceIndex === "number" ? sequenceIndex : undefined
       }

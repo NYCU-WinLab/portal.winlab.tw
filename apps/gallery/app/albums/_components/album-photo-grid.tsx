@@ -22,6 +22,7 @@ import type { GalleryAlbumPhoto } from "@/lib/gallery/albums"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import { adjacentListId, edgeListId } from "@/lib/gallery/lightbox-nav"
+import { describeAlbumLightboxPositionLabel } from "@/lib/gallery/lightbox-position-label"
 import {
   findSlideshowIndexByImageId,
   type GallerySlideshowPhoto,
@@ -112,10 +113,13 @@ export function GalleryAlbumPhotoGrid({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const active = photos.find((p) => p.image_id === openId) ?? null
   const photoIds = useMemo(() => photos.map((p) => p.image_id), [photos])
-  const activeIndexLabel =
-    active && photoIds.length > 1
-      ? `${photoIds.indexOf(active.image_id) + 1} of ${photoIds.length}`
-      : null
+  const activeIndexLabel = active
+    ? describeAlbumLightboxPositionLabel(
+        active.name,
+        photoIds.indexOf(active.image_id),
+        photoIds.length
+      )
+    : null
 
   const goLightbox = (direction: "prev" | "next") => {
     if (!openId) return
@@ -275,13 +279,9 @@ export function GalleryAlbumPhotoGrid({
                 else if (swipe === "next") goLightbox("next")
               }}
             >
-              <DialogTitle className="sr-only">
-                {active.name}
-                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
-              </DialogTitle>
+              <DialogTitle className="sr-only">{activeIndexLabel}</DialogTitle>
               <p className="sr-only" aria-live="polite" aria-atomic="true">
-                {active.name}
-                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
+                {activeIndexLabel}
               </p>
               {photoIds.length > 1 ? (
                 <>

@@ -9,7 +9,8 @@ import {
 describe("reaction and wall region labels", () => {
   test("aria-labels", () => {
     expect(describeShowWhoReactedAriaLabel()).toBe("Show who reacted")
-    expect(describeChooseReactionAriaLabel()).toBe("Choose a reaction")
+    expect(describeChooseReactionAriaLabel()).toContain("Choose a reaction")
+    expect(describeChooseReactionAriaLabel().toLowerCase()).toContain("enter")
     expect(describeGalleryWallAriaLabel()).toBe("Gallery wall")
   })
 })

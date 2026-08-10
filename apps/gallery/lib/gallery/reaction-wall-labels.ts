@@ -5,7 +5,7 @@ export function describeShowWhoReactedAriaLabel(): string {
 
 /** aria-label for the reaction picker control. */
 export function describeChooseReactionAriaLabel(): string {
-  return "Choose a reaction"
+  return "Choose a reaction. Arrow keys move, Enter confirms, Escape closes"
 }
 
 /** aria-label for the main gallery wall region. */

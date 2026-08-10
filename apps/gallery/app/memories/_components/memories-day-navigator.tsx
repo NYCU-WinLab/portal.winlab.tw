@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
@@ -34,16 +34,19 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
   const viewingToday = isMemoriesViewingToday(day)
   const { lightboxOpen, slideshowOpen } = useMemoriesOverlayState()
 
-  const softPush = (
-    href: string,
-    errorKey: "memoriesPreviousDay" | "memoriesNextDay" | "memoriesToday"
-  ) => {
-    try {
-      router.push(href)
-    } catch {
-      toast.error(describeGalleryNavError(errorKey))
-    }
-  }
+  const softPush = useCallback(
+    (
+      href: string,
+      errorKey: "memoriesPreviousDay" | "memoriesNextDay" | "memoriesToday"
+    ) => {
+      try {
+        router.push(href)
+      } catch {
+        toast.error(describeGalleryNavError(errorKey))
+      }
+    },
+    [router]
+  )
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -83,7 +86,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [next.day, next.month, prev.day, prev.month, router, viewingToday])
+  }, [next.day, next.month, prev.day, prev.month, softPush, viewingToday])
 
   const todayHint = describeMemoriesTodayShortcutHint(viewingToday)
 
