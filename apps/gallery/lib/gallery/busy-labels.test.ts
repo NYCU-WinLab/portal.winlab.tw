@@ -13,6 +13,7 @@ import {
   describeSavingLabel,
   describeScanningLabel,
   describeSharingLabel,
+  describeSignOutAriaLabel,
   describeSignOutLabel,
   describeSigningOutLabel,
   describeTaggingLabel,
@@ -35,6 +36,10 @@ describe("busy labels", () => {
 
   test("describeContinueWithKeycloakLabel", () => {
     expect(describeContinueWithKeycloakLabel()).toBe("Continue with Keycloak")
+  })
+
+  test("describeSignOutAriaLabel", () => {
+    expect(describeSignOutAriaLabel()).toBe("Sign out")
   })
 
   test("describeSavingLabel", () => {

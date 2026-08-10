@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeCouldNotLoadTags,
+  describeEditTagsAriaLabel,
   describeTagMerged,
   describeTagRenamed,
+  describeTagsButtonLabel,
 } from "@/lib/gallery/tag-admin-toast"
 
 describe("describeTagRenamed", () => {
@@ -35,5 +37,15 @@ describe("describeCouldNotLoadTags", () => {
 
   test("keeps an empty suffix", () => {
     expect(describeCouldNotLoadTags("")).toBe("Could not load tags — ")
+  })
+})
+
+describe("manage tags chrome labels", () => {
+  test("describeTagsButtonLabel", () => {
+    expect(describeTagsButtonLabel()).toBe("Tags")
+  })
+
+  test("describeEditTagsAriaLabel", () => {
+    expect(describeEditTagsAriaLabel("Sunset")).toBe("Edit tags for Sunset")
   })
 })

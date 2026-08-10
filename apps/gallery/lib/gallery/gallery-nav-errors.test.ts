@@ -25,4 +25,17 @@ describe("describeGalleryNavError", () => {
       expect(galleryNavErrors[key].length).toBeGreaterThan(0)
     }
   })
+
+  test("keeps a stable minimum key count", () => {
+    expect(Object.keys(galleryNavErrors).length).toBeGreaterThanOrEqual(17)
+  })
+
+  test("covers home and wall soft-fail keys", () => {
+    expect(describeGalleryNavError("openWallHome")).toBe(
+      galleryNavErrors.openWallHome
+    )
+    expect(describeGalleryNavError("signedOutHome")).toBe(
+      galleryNavErrors.signedOutHome
+    )
+  })
 })

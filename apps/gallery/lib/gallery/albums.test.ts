@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   albumMatchesQuery,
+  GALLERY_ALBUM_DESCRIPTION_MAX,
   GALLERY_ALBUM_PHOTOS_MAX,
   isGalleryAlbumsUnavailable,
   nextAlbumCoverAfterRemove,
@@ -48,6 +49,19 @@ describe("normalizeGalleryAlbumDescription", () => {
     expect(normalizeGalleryAlbumDescription("  Photos from the trip. ")).toBe(
       "Photos from the trip."
     )
+  })
+
+  test("rejects overlong descriptions", () => {
+    expect(
+      normalizeGalleryAlbumDescription(
+        "x".repeat(GALLERY_ALBUM_DESCRIPTION_MAX + 1)
+      )
+    ).toBeNull()
+    expect(
+      normalizeGalleryAlbumDescription(
+        "x".repeat(GALLERY_ALBUM_DESCRIPTION_MAX)
+      )
+    ).toBe("x".repeat(GALLERY_ALBUM_DESCRIPTION_MAX))
   })
 })
 

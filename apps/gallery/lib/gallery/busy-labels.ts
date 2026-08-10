@@ -18,6 +18,11 @@ export function describeContinueWithKeycloakLabel(): string {
   return "Continue with Keycloak"
 }
 
+/** aria-label for icon-only sign-out. */
+export function describeSignOutAriaLabel(): string {
+  return "Sign out"
+}
+
 /** Visible label while a Save control is in flight. */
 export function describeSavingLabel(): string {
   return "Saving…"

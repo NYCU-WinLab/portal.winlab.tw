@@ -17,7 +17,11 @@ import { listGalleryImageTags } from "@/app/actions/tags"
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeLoadingTagsLabel } from "@/lib/gallery/busy-labels"
 import type { GalleryTag } from "@/lib/gallery/tags"
-import { describeCouldNotLoadTags } from "@/lib/gallery/tag-admin-toast"
+import {
+  describeCouldNotLoadTags,
+  describeEditTagsAriaLabel,
+  describeTagsButtonLabel,
+} from "@/lib/gallery/tag-admin-toast"
 
 export function ManageTagsEditor({
   imageId,
@@ -67,13 +71,13 @@ export function ManageTagsEditor({
         onClick={() => openEditor(true)}
         disabled={pending}
         aria-busy={pending || undefined}
-        aria-label={`Edit tags for ${imageName}`}
+        aria-label={describeEditTagsAriaLabel(imageName)}
         className={cn(
           gallerySans(),
           "!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
         )}
       >
-        Tags
+        {describeTagsButtonLabel()}
       </Button>
       <DialogContent className="gap-6" aria-busy={pending || undefined}>
         <DialogHeader>

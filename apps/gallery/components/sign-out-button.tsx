@@ -9,6 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
 import {
+  describeSignOutAriaLabel,
   describeSignOutLabel,
   describeSigningOutLabel,
 } from "@/lib/gallery/busy-labels"
@@ -57,7 +58,7 @@ export function SignOutButton({
       onClick={onClick}
       disabled={pending}
       aria-busy={pending || undefined}
-      aria-label={iconOnly ? "Sign out" : undefined}
+      aria-label={iconOnly ? describeSignOutAriaLabel() : undefined}
       className={cn(
         className,
         "disabled:pointer-events-none disabled:opacity-50"

@@ -17,3 +17,13 @@ export function describeTagMerged(input: {
 export function describeCouldNotLoadTags(error: string): string {
   return `Could not load tags — ${error}`
 }
+
+/** Visible label for the manage-tags dialog trigger. */
+export function describeTagsButtonLabel(): string {
+  return "Tags"
+}
+
+/** aria-label for editing tags on a named artwork. */
+export function describeEditTagsAriaLabel(imageName: string): string {
+  return `Edit tags for ${imageName}`
+}
