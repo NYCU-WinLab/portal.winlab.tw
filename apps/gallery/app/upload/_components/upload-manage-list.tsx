@@ -115,6 +115,7 @@ import {
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
+import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
@@ -2008,7 +2009,7 @@ export function UploadManageList({
               onClick={confirmBatchDelete}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isPending ? "Deleting…" : "Delete forever"}
+              {isPending ? describeDeletingLabel() : "Delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

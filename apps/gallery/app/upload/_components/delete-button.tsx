@@ -18,6 +18,7 @@ import { Button } from "@workspace/ui/components/button"
 
 import { deleteGalleryImage } from "@/app/upload/actions"
 import { describeArtworkDeleted } from "@/lib/gallery/delete-toast"
+import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 
 export function DeleteButton({
   id,
@@ -67,7 +68,7 @@ export function DeleteButton({
           ref={triggerRef}
           variant="ghost"
           disabled={pending}
-          aria-busy={pending}
+          aria-busy={pending || undefined}
           aria-label={`Delete ${name}`}
           className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
         >
@@ -86,10 +87,10 @@ export function DeleteButton({
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending}
-            aria-busy={pending}
+            aria-busy={pending || undefined}
             onClick={onConfirm}
           >
-            {pending ? "Deleting…" : "Delete"}
+            {pending ? describeDeletingLabel() : "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -21,6 +21,12 @@ import {
   summarizeFindings,
   type MediaHealthFinding,
 } from "@/lib/gallery/media-health"
+import {
+  describeDeletingLabel,
+  describeMediaHealthAllHealthy,
+  describeMediaHealthDeleted,
+  describeMediaHealthFoundBroken,
+} from "@/lib/gallery/media-health-toast"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
   AlertDialog,
@@ -107,12 +113,13 @@ export function MediaHealthPanel() {
       setHasScanned(true)
       const finalSummary = summarizeFindings(collected)
       if (finalSummary.total === 0) {
-        toast.success(
-          `Scanned ${scanned} shot${scanned === 1 ? "" : "s"} — all healthy.`
-        )
+        toast.success(describeMediaHealthAllHealthy(scanned))
       } else {
         toast.message(
-          `Found ${finalSummary.total} broken shot${finalSummary.total === 1 ? "" : "s"} across ${scanned}.`
+          describeMediaHealthFoundBroken({
+            broken: finalSummary.total,
+            scanned,
+          })
         )
       }
     })
@@ -143,7 +150,7 @@ export function MediaHealthPanel() {
       const deletedIds = new Set(items.map((item) => item.id))
       setFindings((prev) => prev.filter((f) => !deletedIds.has(f.id)))
       setSelected(new Set())
-      const message = `Removed ${result.deleted} broken shot${result.deleted === 1 ? "" : "s"} from the wall.`
+      const message = describeMediaHealthDeleted(result.deleted)
       if (result.warning) {
         toast.warning(message, { description: result.warning })
       } else {
@@ -365,7 +372,7 @@ export function MediaHealthPanel() {
               aria-busy={isPending || undefined}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isPending ? "Deleting…" : "Delete forever"}
+              {isPending ? describeDeletingLabel() : "Delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
