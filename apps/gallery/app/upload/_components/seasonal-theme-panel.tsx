@@ -18,6 +18,7 @@ import {
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
+import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
@@ -62,11 +63,7 @@ export function SeasonalThemePanel({
         toast.error(result.error)
         return
       }
-      if (themeId) {
-        toast.success(`${GALLERY_SEASONAL_THEMES[themeId].label} theme is on.`)
-      } else {
-        toast.success("Back to paper wall.")
-      }
+      toast.success(describeSeasonalThemeToast(themeId))
     })
   }
 
