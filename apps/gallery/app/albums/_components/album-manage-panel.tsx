@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState, useTransition } from "react"
+import { useCallback, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   IconArrowDown,
@@ -111,6 +111,9 @@ export function GalleryAlbumManagePanel({
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const deleteAlbumTriggerRef = useRef<HTMLButtonElement>(null)
+  const removeSelectedTriggerRef = useRef<HTMLButtonElement>(null)
+  const removePhotoTriggerRef = useRef<HTMLElement | null>(null)
   const confirmRemovePhoto = photos.find(
     (photo) => photo.image_id === confirmRemoveId
   )
@@ -418,14 +421,25 @@ export function GalleryAlbumManagePanel({
             disabled={pending}
           />
         ) : null}
-        <AlertDialog>
+        <AlertDialog
+          onOpenChange={(open) => {
+            if (!open) {
+              queueMicrotask(() => deleteAlbumTriggerRef.current?.focus())
+            }
+          }}
+        >
           <AlertDialogTrigger asChild>
-            <Button type="button" variant="outline" disabled={pending}>
+            <Button
+              ref={deleteAlbumTriggerRef}
+              type="button"
+              variant="outline"
+              disabled={pending}
+            >
               <IconTrash className="size-4" aria-hidden />
               Delete album
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent>
+          <AlertDialogContent aria-busy={pending || undefined}>
             <AlertDialogHeader>
               <AlertDialogTitle>
                 Delete &ldquo;{album.title}&rdquo;?
@@ -471,9 +485,18 @@ export function GalleryAlbumManagePanel({
                 Select all
               </label>
               {selectedCount > 0 ? (
-                <AlertDialog>
+                <AlertDialog
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      queueMicrotask(() =>
+                        removeSelectedTriggerRef.current?.focus()
+                      )
+                    }
+                  }}
+                >
                   <AlertDialogTrigger asChild>
                     <Button
+                      ref={removeSelectedTriggerRef}
                       type="button"
                       size="sm"
                       variant="outline"
@@ -483,7 +506,7 @@ export function GalleryAlbumManagePanel({
                       Remove selected ({selectedCount})
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent aria-busy={pending || undefined}>
                     <AlertDialogHeader>
                       <AlertDialogTitle>
                         Remove {selectedCount} photo
@@ -616,7 +639,10 @@ export function GalleryAlbumManagePanel({
                       variant="ghost"
                       disabled={pending}
                       aria-label="Remove from album"
-                      onClick={() => setConfirmRemoveId(photo.image_id)}
+                      onClick={(event) => {
+                        removePhotoTriggerRef.current = event.currentTarget
+                        setConfirmRemoveId(photo.image_id)
+                      }}
                     >
                       <IconX className="size-4" />
                     </Button>
@@ -631,10 +657,15 @@ export function GalleryAlbumManagePanel({
       <AlertDialog
         open={confirmRemoveId !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmRemoveId(null)
+          if (!open) {
+            setConfirmRemoveId(null)
+            const trigger = removePhotoTriggerRef.current
+            removePhotoTriggerRef.current = null
+            queueMicrotask(() => trigger?.focus())
+          }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent aria-busy={pending || undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Remove{" "}
@@ -652,11 +683,12 @@ export function GalleryAlbumManagePanel({
             <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={pending || !confirmRemoveId}
+              aria-busy={pending || undefined}
               onClick={() => {
                 if (confirmRemoveId) removePhoto(confirmRemoveId)
               }}
             >
-              Remove
+              {pending ? "Removing…" : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
