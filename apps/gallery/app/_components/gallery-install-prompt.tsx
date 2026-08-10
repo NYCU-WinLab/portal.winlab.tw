@@ -9,6 +9,7 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeInstallingLabel } from "@/lib/gallery/busy-labels"
 import {
   GALLERY_PWA_INSTALL_DISMISS_KEY,
   isIosDevice,
@@ -169,7 +170,7 @@ export function GalleryInstallPrompt() {
               onClick={() => void install()}
             >
               <IconDownload className="h-4 w-4" />
-              {busy ? "Installing…" : "Install"}
+              {busy ? describeInstallingLabel() : "Install"}
             </Button>
           ) : null}
           <Button

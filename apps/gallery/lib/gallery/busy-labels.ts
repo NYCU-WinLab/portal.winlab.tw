@@ -27,3 +27,38 @@ export function describeRedirectingLabel(): string {
 export function describeSharingLabel(): string {
   return "Sharing…"
 }
+
+/** Visible label while tag merge is in flight. */
+export function describeMergingLabel(): string {
+  return "Merging…"
+}
+
+/** Visible label while attaching tags. */
+export function describeTaggingLabel(): string {
+  return "Tagging…"
+}
+
+/** Visible label while detaching tags. */
+export function describeUntaggingLabel(): string {
+  return "Untagging…"
+}
+
+/** Visible label while media-health scan is running. */
+export function describeScanningLabel(): string {
+  return "Scanning…"
+}
+
+/** Visible label while PWA install is in flight. */
+export function describeInstallingLabel(): string {
+  return "Installing…"
+}
+
+/** Visible label for generic overflow confirm actions. */
+export function describeWorkingLabel(): string {
+  return "Working…"
+}
+
+/** Visible label while upload / develop pipeline is running. */
+export function describeDevelopingLabel(): string {
+  return "Developing…"
+}

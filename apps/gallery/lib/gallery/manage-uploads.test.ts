@@ -110,6 +110,14 @@ describe("findSequenceGaps", () => {
     expect(describeSequenceGaps([0])).toBe("Missing cover (shot 1)")
     expect(describeSequenceGaps([1, 3])).toBe("Missing shot 2, shot 4")
   })
+
+  test("describeSequenceGaps empty and long lists", () => {
+    expect(describeSequenceGaps([])).toBeNull()
+    expect(describeSequenceGaps([2])).toBe("Missing shot 3")
+    expect(describeSequenceGaps([0, 1, 4])).toBe(
+      "Missing cover, shot 2, shot 5"
+    )
+  })
 })
 
 describe("looksLikeUploadDayTakenAt", () => {

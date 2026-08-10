@@ -44,6 +44,11 @@ export function describeAddToAlbumTriggerLabel(count: number): string {
   return count > 1 ? `Add ${count} to album` : "Add to album"
 }
 
+/** Dialog title for the add-to-album picker. */
+export function describeAddToAlbumDialogTitle(count: number): string {
+  return count > 1 ? `Add ${count} photos to album` : "Add to album"
+}
+
 /**
  * Error when create succeeded but add failed, and deleting the empty album
  * also failed — warn that an empty shell may remain.

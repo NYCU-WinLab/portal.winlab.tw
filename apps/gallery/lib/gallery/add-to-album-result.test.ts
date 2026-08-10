@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeAddToAlbumResult,
+  describeAddToAlbumDialogTitle,
   describeAddToAlbumTriggerLabel,
   describeAlbumCreateRollbackError,
   describeCreateAlbumStarted,
@@ -71,6 +72,14 @@ describe("describeAddToAlbumTriggerLabel", () => {
     expect(describeAddToAlbumTriggerLabel(1)).toBe("Add to album")
     expect(describeAddToAlbumTriggerLabel(0)).toBe("Add to album")
     expect(describeAddToAlbumTriggerLabel(3)).toBe("Add 3 to album")
+  })
+})
+
+describe("describeAddToAlbumDialogTitle", () => {
+  test("singular vs plural selection", () => {
+    expect(describeAddToAlbumDialogTitle(1)).toBe("Add to album")
+    expect(describeAddToAlbumDialogTitle(0)).toBe("Add to album")
+    expect(describeAddToAlbumDialogTitle(4)).toBe("Add 4 photos to album")
   })
 })
 

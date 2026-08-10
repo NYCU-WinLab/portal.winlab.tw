@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { useGalleryUpload } from "@/hooks/gallery/use-gallery-upload"
+import { describeDevelopingLabel } from "@/lib/gallery/busy-labels"
 import { formatFailurePreview } from "@/lib/gallery/upload-errors"
 import { buildArtworkName } from "@/lib/gallery/upload-naming"
 import {
@@ -487,11 +488,11 @@ export function UploadForm({
         type="submit"
         size="lg"
         disabled={pending || status.kind === "working"}
-        aria-busy={pending || status.kind === "working"}
+        aria-busy={pending || status.kind === "working" || undefined}
         className={cn(gallerySans(), "h-12 rounded-full")}
       >
         {pending || status.kind === "working"
-          ? "Developing…"
+          ? describeDevelopingLabel()
           : selectedFiles.length > 1
             ? sequencesAvailable
               ? `Hang sequence (${selectedFiles.length})`

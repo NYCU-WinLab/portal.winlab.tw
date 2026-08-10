@@ -119,6 +119,8 @@ import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 import {
   describeCreatingLabel,
   describeSavingLabel,
+  describeTaggingLabel,
+  describeUntaggingLabel,
 } from "@/lib/gallery/busy-labels"
 import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
 import {
@@ -1476,7 +1478,7 @@ export function UploadManageList({
                   type="button"
                   onClick={() => void downloadSelectedZip()}
                   disabled={isPending || zipBusy || selectedZipCount === 0}
-                  aria-busy={zipBusy}
+                  aria-busy={zipBusy || undefined}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
                   {zipBusy
@@ -1614,7 +1616,7 @@ export function UploadManageList({
                   ) : null}
                   <DropdownMenuItem
                     disabled={isPending || zipBusy || selectedZipCount === 0}
-                    aria-busy={zipBusy}
+                    aria-busy={zipBusy || undefined}
                     onSelect={() => void downloadSelectedZip()}
                   >
                     {selectedZipCount > 0 ? `ZIP (${selectedZipCount})` : "ZIP"}
@@ -1868,7 +1870,7 @@ export function UploadManageList({
               disabled={isPending}
               aria-busy={isPending || undefined}
             >
-              {isPending ? "Tagging…" : "Tag"}
+              {isPending ? describeTaggingLabel() : "Tag"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1923,7 +1925,7 @@ export function UploadManageList({
               disabled={isPending}
               aria-busy={isPending || undefined}
             >
-              {isPending ? "Untagging…" : "Untag"}
+              {isPending ? describeUntaggingLabel() : "Untag"}
             </Button>
           </DialogFooter>
         </DialogContent>

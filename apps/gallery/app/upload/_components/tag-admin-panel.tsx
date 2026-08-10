@@ -43,6 +43,7 @@ import {
 import {
   describeRetryingLabel,
   describeSavingLabel,
+  describeMergingLabel,
 } from "@/lib/gallery/busy-labels"
 import {
   describeTagMergeTargetRequired,
@@ -376,7 +377,7 @@ export function TagAdminPanel() {
               disabled={pending || !mergeTargetId}
               aria-busy={pending || undefined}
             >
-              {pending ? "Merging…" : "Merge tags"}
+              {pending ? describeMergingLabel() : "Merge tags"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

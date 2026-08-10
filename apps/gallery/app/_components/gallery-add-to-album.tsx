@@ -25,6 +25,7 @@ import {
 import { gallerySans } from "@/components/gallery-chrome"
 import {
   describeAddToAlbumResult,
+  describeAddToAlbumDialogTitle,
   describeAddToAlbumTriggerLabel,
   describeAlbumCreateRollbackError,
   describeCreateAlbumStarted,
@@ -101,8 +102,7 @@ export function GalleryAddToAlbum({
 
   const ids = imageIds.filter(Boolean)
   const count = ids.length
-  const dialogTitle =
-    title ?? (count > 1 ? `Add ${count} photos to album` : "Add to album")
+  const dialogTitle = title ?? describeAddToAlbumDialogTitle(count)
   const dialogDescription =
     description ??
     (count > 1

@@ -2,11 +2,18 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeCreatingLabel,
+  describeDevelopingLabel,
+  describeInstallingLabel,
+  describeMergingLabel,
   describeRedirectingLabel,
   describeRetryingLabel,
   describeSavingLabel,
+  describeScanningLabel,
   describeSharingLabel,
   describeSigningOutLabel,
+  describeTaggingLabel,
+  describeUntaggingLabel,
+  describeWorkingLabel,
 } from "@/lib/gallery/busy-labels"
 
 describe("busy labels", () => {
@@ -32,5 +39,33 @@ describe("busy labels", () => {
 
   test("describeSharingLabel", () => {
     expect(describeSharingLabel()).toBe("Sharing…")
+  })
+
+  test("describeMergingLabel", () => {
+    expect(describeMergingLabel()).toBe("Merging…")
+  })
+
+  test("describeTaggingLabel", () => {
+    expect(describeTaggingLabel()).toBe("Tagging…")
+  })
+
+  test("describeUntaggingLabel", () => {
+    expect(describeUntaggingLabel()).toBe("Untagging…")
+  })
+
+  test("describeScanningLabel", () => {
+    expect(describeScanningLabel()).toBe("Scanning…")
+  })
+
+  test("describeInstallingLabel", () => {
+    expect(describeInstallingLabel()).toBe("Installing…")
+  })
+
+  test("describeWorkingLabel", () => {
+    expect(describeWorkingLabel()).toBe("Working…")
+  })
+
+  test("describeDevelopingLabel", () => {
+    expect(describeDevelopingLabel()).toBe("Developing…")
   })
 })

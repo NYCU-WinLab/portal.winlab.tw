@@ -70,4 +70,11 @@ describe("restoreGalleryWallOrder", () => {
       restoreGalleryWallOrder(images, ["b", "missing", "b"]).map((i) => i.id)
     ).toEqual(["b", "a", "c"])
   })
+
+  test("empty images or empty order", () => {
+    expect(restoreGalleryWallOrder([], ["a", "b"])).toEqual([])
+    expect(
+      restoreGalleryWallOrder([{ id: "a" }, { id: "b" }], []).map((i) => i.id)
+    ).toEqual(["a", "b"])
+  })
 })

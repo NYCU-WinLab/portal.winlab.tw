@@ -70,7 +70,11 @@ import {
   describeCouldNotCopyClipboard,
   describeCouldNotCopyLinks,
 } from "@/lib/gallery/validation-toasts"
-import { describeCreatingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeCreatingLabel,
+  describeTaggingLabel,
+  describeWorkingLabel,
+} from "@/lib/gallery/busy-labels"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -521,7 +525,7 @@ export function GalleryWallSelectBar({
                   variant="outline"
                   size="sm"
                   disabled={selectedZipItems.length === 0 || zipBusy}
-                  aria-busy={zipBusy}
+                  aria-busy={zipBusy || undefined}
                   className={cn(
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"
@@ -645,7 +649,7 @@ export function GalleryWallSelectBar({
                     )}
                   >
                     <IconTag className="size-3.5" aria-hidden />
-                    {pending ? "Tagging…" : "Tag"}
+                    {pending ? describeTaggingLabel() : "Tag"}
                   </Button>
                   <Button
                     type="button"
@@ -867,7 +871,7 @@ export function GalleryWallSelectBar({
               }}
             >
               {overflowBusy
-                ? "Working…"
+                ? describeWorkingLabel()
                 : confirmKind === "tag"
                   ? "Untag"
                   : confirmKind === "unsave"

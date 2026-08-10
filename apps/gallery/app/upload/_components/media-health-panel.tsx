@@ -27,6 +27,7 @@ import {
   describeMediaHealthDeleted,
   describeMediaHealthFoundBroken,
 } from "@/lib/gallery/media-health-toast"
+import { describeScanningLabel } from "@/lib/gallery/busy-labels"
 import { describeSelectAtLeastOneBrokenShot } from "@/lib/gallery/validation-toasts"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
@@ -184,7 +185,7 @@ export function MediaHealthPanel() {
           className={cn(gallerySans(), "gap-1.5")}
         >
           <IconRefresh className="size-3.5" aria-hidden />
-          {isPending && progress ? "Scanning…" : "Scan gallery"}
+          {isPending && progress ? describeScanningLabel() : "Scan gallery"}
         </Button>
 
         {findings.length > 0 ? (
