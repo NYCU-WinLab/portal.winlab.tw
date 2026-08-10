@@ -25,6 +25,7 @@ import {
   buildGalleryAlbumShareUrl,
   shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
+import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
 
 export function GalleryAlbumCreateForm({ className }: { className?: string }) {
   const router = useRouter()
@@ -58,20 +59,40 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
         preferCopy: true,
       })
       if (share.ok && share.mode === "copied") {
-        toast.success(`Album “${result.data.title}” ready — link copied`, {
-          description: shareUrl ?? undefined,
-        })
+        toast.success(
+          describeAlbumCreateReady({
+            title: result.data.title,
+            linkCopied: true,
+          }),
+          {
+            description: shareUrl ?? undefined,
+          }
+        )
       } else {
-        toast.success(`Album “${result.data.title}” is ready`, {
-          description: shareUrl
-            ? `Share: ${shareUrl}`
-            : "Open the album to copy its share link.",
-        })
+        toast.success(
+          describeAlbumCreateReady({
+            title: result.data.title,
+            linkCopied: false,
+          }),
+          {
+            description: shareUrl
+              ? `Share: ${shareUrl}`
+              : "Open the album to copy its share link.",
+          }
+        )
       }
       setTitle("")
       setDescription("")
-      router.push(`/albums/${result.data.slug}`)
-      router.refresh()
+      try {
+        router.push(`/albums/${result.data.slug}`)
+      } catch {
+        toast.error("Could not open the new album.")
+      }
+      try {
+        router.refresh()
+      } catch {
+        // Best-effort after a successful create.
+      }
     })
   }
 
