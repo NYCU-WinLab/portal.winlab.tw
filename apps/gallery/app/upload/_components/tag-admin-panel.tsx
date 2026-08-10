@@ -50,6 +50,7 @@ export function TagAdminPanel() {
   const dialogTriggerRef = useRef<HTMLElement | null>(null)
 
   const refresh = () => {
+    if (pending) return
     startTransition(async () => {
       const result = await listPopularGalleryTags(100)
       if (!result.ok) {
