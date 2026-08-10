@@ -7,6 +7,7 @@ import {
   normalizeGalleryFavoriteImageIds,
 } from "@/lib/gallery/favorites-bulk"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
+import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -39,7 +40,7 @@ export async function setGalleryFavorites(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   if (favorited) {
     const rows = ids.map((image_id) => ({ user_id: userId, image_id }))

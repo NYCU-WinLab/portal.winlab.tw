@@ -16,6 +16,7 @@ import {
   loadGalleryAlbumSummaries,
   loadMyGalleryAlbums,
 } from "@/lib/gallery/load-albums"
+import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -42,7 +43,7 @@ async function requireSignedIn(): Promise<
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
   return { ok: true, supabase, userId }
 }
 

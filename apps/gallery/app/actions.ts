@@ -16,6 +16,7 @@ import {
   describeBulkPinResult,
   normalizeGalleryPinImageIds,
 } from "@/lib/gallery/bulk-pin"
+import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
 import {
@@ -46,7 +47,7 @@ export async function setGalleryReaction(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: existing, error: fetchError } = await supabase
     .from("gallery_image_votes")
@@ -150,7 +151,7 @@ export async function addGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   if (parentId) {
     const { data: parent, error: parentError } = await supabase
@@ -226,7 +227,7 @@ export async function updateGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const updatedAt = new Date().toISOString()
   let data: CreatedGalleryComment | null = null
@@ -297,7 +298,7 @@ export async function deleteGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_comments")
@@ -328,7 +329,7 @@ export async function toggleGalleryCommentLike(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: existing, error: fetchError } = await supabase
     .from("gallery_comment_likes")
@@ -415,7 +416,7 @@ export async function setGalleryCommentPin(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -485,7 +486,7 @@ export async function setGalleryImagesPin(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -558,7 +559,7 @@ export async function markGalleryActivityNotificationsRead(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_activity_notifications")
@@ -597,7 +598,7 @@ export async function markGalleryMentionsRead(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_comment_mentions")
@@ -635,7 +636,7 @@ export async function setGallerySeasonalTheme(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")

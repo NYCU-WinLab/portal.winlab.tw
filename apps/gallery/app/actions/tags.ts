@@ -10,6 +10,14 @@ import {
   type GalleryTag,
   type GalleryTagSuggestion,
 } from "@/lib/gallery/tags"
+import {
+  describeCouldNotAttachTagError,
+  describePleaseSignInFirst,
+  describeTagAdminUnavailableError,
+  describeTagNameInvalidError,
+  describeTagNotFoundError,
+  describeTagsUnavailableError,
+} from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -25,7 +33,7 @@ async function ensureGalleryTag(
   const name = normalizeGalleryTagName(rawName)
   const slug = name ? normalizeGalleryTagSlug(name) : null
   if (!name || !slug) {
-    return { ok: false, error: "Tag name is empty or invalid." }
+    return { ok: false, error: describeTagNameInvalidError() }
   }
 
   const { data: existing, error: existingError } = await supabase
@@ -36,7 +44,7 @@ async function ensureGalleryTag(
 
   if (existingError) {
     if (isGalleryTagsUnavailable(existingError)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: existingError.message }
   }
@@ -68,7 +76,7 @@ async function ensureGalleryTag(
       }
     }
     if (isGalleryTagsUnavailable(insertError)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: insertError.message }
   }
@@ -111,7 +119,7 @@ export async function attachGalleryTag(
   const result = await attachGalleryTagToImages([imageId], rawName)
   if (!result.ok) return result
   if (!result.data.tag) {
-    return { ok: false, error: "Could not attach that tag." }
+    return { ok: false, error: describeCouldNotAttachTagError() }
   }
   return { ok: true, data: result.data.tag }
 }
@@ -130,7 +138,7 @@ export async function attachGalleryTagToImages(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const ensured = await ensureGalleryTag(supabase, userId, rawName)
   if (!ensured.ok) return ensured
@@ -144,7 +152,7 @@ export async function attachGalleryTagToImages(
 
     if (countError) {
       if (isGalleryTagsUnavailable(countError)) {
-        return { ok: false, error: "Tags are not available yet." }
+        return { ok: false, error: describeTagsUnavailableError() }
       }
       return { ok: false, error: countError.message }
     }
@@ -161,7 +169,7 @@ export async function attachGalleryTagToImages(
     if (linkError) {
       if (/duplicate|unique|23505/i.test(linkError.message)) continue
       if (isGalleryTagsUnavailable(linkError)) {
-        return { ok: false, error: "Tags are not available yet." }
+        return { ok: false, error: describeTagsUnavailableError() }
       }
       return { ok: false, error: linkError.message }
     }
@@ -184,7 +192,7 @@ export async function detachGalleryTag(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_image_tags")
@@ -194,7 +202,7 @@ export async function detachGalleryTag(
 
   if (error) {
     if (isGalleryTagsUnavailable(error)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: error.message }
   }
@@ -220,7 +228,7 @@ export async function detachGalleryTagFromImagesBySlug(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: tag, error: tagError } = await supabase
     .from("gallery_tags")
@@ -230,11 +238,11 @@ export async function detachGalleryTagFromImagesBySlug(
 
   if (tagError) {
     if (isGalleryTagsUnavailable(tagError)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: tagError.message }
   }
-  if (!tag) return { ok: false, error: "Tag not found." }
+  if (!tag) return { ok: false, error: describeTagNotFoundError() }
 
   const { error, count } = await supabase
     .from("gallery_image_tags")
@@ -244,7 +252,7 @@ export async function detachGalleryTagFromImagesBySlug(
 
   if (error) {
     if (isGalleryTagsUnavailable(error)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: error.message }
   }
@@ -292,12 +300,12 @@ export async function adminRenameGalleryTag(
 ): Promise<TagActionResult<GalleryTag>> {
   if (!tagId) return { ok: false, error: "Missing tag id." }
   const name = normalizeGalleryTagName(rawName)
-  if (!name) return { ok: false, error: "Tag name is empty or invalid." }
+  if (!name) return { ok: false, error: describeTagNameInvalidError() }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -315,7 +323,7 @@ export async function adminRenameGalleryTag(
 
   if (error) {
     if (isGalleryTagsUnavailable(error)) {
-      return { ok: false, error: "Tag admin is not available yet." }
+      return { ok: false, error: describeTagAdminUnavailableError() }
     }
     return { ok: false, error: error.message }
   }
@@ -345,7 +353,7 @@ export async function adminMergeGalleryTags(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -363,7 +371,7 @@ export async function adminMergeGalleryTags(
 
   if (error) {
     if (isGalleryTagsUnavailable(error)) {
-      return { ok: false, error: "Tag admin is not available yet." }
+      return { ok: false, error: describeTagAdminUnavailableError() }
     }
     return { ok: false, error: error.message }
   }
@@ -399,7 +407,7 @@ export async function listGalleryImageTags(
 
   if (error) {
     if (isGalleryTagsUnavailable(error)) {
-      return { ok: false, error: "Tags are not available yet." }
+      return { ok: false, error: describeTagsUnavailableError() }
     }
     return { ok: false, error: error.message }
   }

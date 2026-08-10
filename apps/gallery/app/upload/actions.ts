@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache"
 
+import {
+  describeNothingSelectedError,
+  describeSelectAtLeastOneWorkError,
+} from "@/lib/gallery/action-errors"
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
 import {
@@ -365,7 +369,7 @@ export async function deleteGalleryImages(
   }[]
 ): Promise<ActionResult> {
   if (items.length === 0) {
-    return { ok: false, error: "Nothing selected." }
+    return { ok: false, error: describeNothingSelectedError() }
   }
 
   const supabase = await createClient()
@@ -652,7 +656,7 @@ export async function updateGalleryImagesTakenAt(
 
   const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))]
   if (uniqueIds.length === 0) {
-    return { ok: false, error: "Select at least one work." }
+    return { ok: false, error: describeSelectAtLeastOneWorkError() }
   }
   if (uniqueIds.length > 100) {
     return { ok: false, error: "Select at most 100 works at a time." }

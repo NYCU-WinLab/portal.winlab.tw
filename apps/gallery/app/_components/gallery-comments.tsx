@@ -46,6 +46,7 @@ import {
 } from "@/lib/gallery/comment-toast"
 import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import { describeCancelLabel } from "@/lib/gallery/dialog-action-labels"
 import {
   describeSignInBeforeComment,
   describeSignInToCommentLabel,
@@ -674,7 +675,9 @@ export function GalleryComments({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={isPending}
               aria-busy={isPending || undefined}

@@ -36,6 +36,7 @@ import {
   normalizeGalleryTagName,
   type GalleryTagSuggestion,
 } from "@/lib/gallery/tags"
+import { describeCancelLabel } from "@/lib/gallery/dialog-action-labels"
 import {
   describeTagMerged,
   describeTagRenamed,
@@ -318,7 +319,9 @@ export function TagAdminPanel() {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={submitRename}
               disabled={pending}
@@ -374,7 +377,9 @@ export function TagAdminPanel() {
             </select>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={submitMerge}
               disabled={pending || !mergeTargetId}

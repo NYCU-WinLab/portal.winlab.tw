@@ -67,6 +67,11 @@ import {
   describeRemoveFromAlbumAriaLabel,
   describeSelectAllPhotosAriaLabel,
 } from "@/lib/gallery/album-manage-labels"
+import {
+  describeAlbumManageDeleteLabel,
+  describeAlbumManageRemoveLabel,
+  describeCancelLabel,
+} from "@/lib/gallery/dialog-action-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -488,13 +493,15 @@ export function GalleryAlbumManagePanel({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={pending}>
+                {describeCancelLabel()}
+              </AlertDialogCancel>
               <AlertDialogAction
                 disabled={pending}
                 aria-busy={pending || undefined}
                 onClick={onDelete}
               >
-                {pending ? "Deleting?" : "Delete"}
+                {describeAlbumManageDeleteLabel(pending)}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -565,7 +572,7 @@ export function GalleryAlbumManagePanel({
                         aria-busy={pending || undefined}
                         onClick={removeSelected}
                       >
-                        {pending ? "Removing?" : "Remove"}
+                        {describeAlbumManageRemoveLabel(pending)}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -718,7 +725,9 @@ export function GalleryAlbumManagePanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={pending || !confirmRemoveId}
               aria-busy={pending || undefined}
@@ -726,7 +735,7 @@ export function GalleryAlbumManagePanel({
                 if (confirmRemoveId) removePhoto(confirmRemoveId)
               }}
             >
-              {pending ? "Removing?" : "Remove"}
+              {describeAlbumManageRemoveLabel(pending)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

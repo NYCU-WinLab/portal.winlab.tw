@@ -16,6 +16,10 @@ import {
 } from "@/lib/gallery/media-health"
 import { isGalleryVideoColumnsUnavailable } from "@/lib/gallery/manage-uploads"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
+import {
+  describeNothingSelectedError,
+  describePleaseSignInFirst,
+} from "@/lib/gallery/action-errors"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -42,7 +46,7 @@ async function requireGalleryAdmin(): Promise<
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -203,7 +207,7 @@ export async function adminDeleteBrokenGalleryImages(
   if (!gate.ok) return gate
 
   if (items.length === 0) {
-    return { ok: false, error: "Nothing selected." }
+    return { ok: false, error: describeNothingSelectedError() }
   }
   if (items.length > MEDIA_HEALTH_PAGE_SIZE) {
     return {
