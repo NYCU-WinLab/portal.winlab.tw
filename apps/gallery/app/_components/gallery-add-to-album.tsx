@@ -1,7 +1,6 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
-import Link from "next/link"
 import { IconAlbum, IconPlus } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -24,6 +23,10 @@ import {
   listMyGalleryAlbums,
 } from "@/app/actions/albums"
 import { gallerySans } from "@/components/gallery-chrome"
+import {
+  describeAddToAlbumResult,
+  describeCreateAlbumStarted,
+} from "@/lib/gallery/add-to-album-result"
 import {
   GALLERY_ALBUM_TITLE_MAX,
   normalizeGalleryAlbumTitle,
@@ -113,6 +116,7 @@ export function GalleryAddToAlbum({
   }
 
   const addTo = (album: MyAlbumOption) => {
+    if (pending) return
     if (ids.length === 0) {
       toast.error("Select at least one photo.")
       return
@@ -124,29 +128,15 @@ export function GalleryAddToAlbum({
         return
       }
       const added = result.data.added
-      if (added === 0) {
-        toast.message("Already in that album (or nothing new to add).")
-      } else if (added < ids.length) {
-        toast.success(
-          <span>
-            Added {added} of {ids.length} to{" "}
-            <Link href={`/albums/${album.slug}`} className="underline">
-              {album.title}
-            </Link>{" "}
-            (duplicates skipped or album near the 200 cap)
-          </span>,
-          { action: copyLinkAction(album) }
-        )
+      const copy = describeAddToAlbumResult({
+        added,
+        selected: ids.length,
+        albumTitle: album.title,
+      })
+      if (copy.kind === "message") {
+        toast.message(copy.title)
       } else {
-        toast.success(
-          <span>
-            Added {added} to{" "}
-            <Link href={`/albums/${album.slug}`} className="underline">
-              {album.title}
-            </Link>
-          </span>,
-          { action: copyLinkAction(album) }
-        )
+        toast.success(copy.title, { action: copyLinkAction(album) })
       }
       setAlbums((prev) =>
         (prev ?? []).map((item) =>
@@ -166,6 +156,7 @@ export function GalleryAddToAlbum({
   }
 
   const createAndAdd = () => {
+    if (pending) return
     const normalized = normalizeGalleryAlbumTitle(draftTitle)
     if (!normalized) {
       toast.error("Give the album a name with letters or numbers.")
@@ -203,17 +194,10 @@ export function GalleryAddToAlbum({
       ])
       setDraftTitle("")
       toast.success(
-        <span>
-          Started{" "}
-          <Link href={`/albums/${created.data.slug}`} className="underline">
-            {created.data.title}
-          </Link>
-          {added === 1
-            ? " with 1 photo"
-            : added > 1
-              ? ` with ${added} photos`
-              : ""}
-        </span>,
+        describeCreateAlbumStarted({
+          title: created.data.title,
+          added,
+        }),
         { action: copyLinkAction(created.data) }
       )
       onAdded?.({
