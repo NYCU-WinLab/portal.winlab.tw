@@ -17,6 +17,7 @@ import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-ch
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import { adjacentListId } from "@/lib/gallery/lightbox-nav"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
 import {
@@ -47,6 +48,7 @@ export function MemoriesDayView({
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
   const photoButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const lightboxReturnIdRef = useRef<string | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
   const onSlideshowOpenChange = (open: boolean) => {
     setSlideshowOpen(open)
@@ -78,6 +80,10 @@ export function MemoriesDayView({
     () => slideshowPhotos.map((photo) => photo.image_id),
     [slideshowPhotos]
   )
+  const activeIndexLabel =
+    active && photoIds.length > 1
+      ? `${photoIds.indexOf(active.id) + 1} of ${photoIds.length}`
+      : null
 
   const goLightbox = (direction: "prev" | "next") => {
     if (!openId) return
@@ -188,13 +194,34 @@ export function MemoriesDayView({
       >
         <DialogContent className="max-w-3xl border-0 bg-transparent p-0 shadow-none sm:max-w-3xl">
           {active ? (
-            <div className="relative overflow-hidden rounded-lg bg-[#f7f7f5] shadow-2xl">
+            <div
+              className="relative overflow-hidden rounded-lg bg-[#f7f7f5] shadow-2xl"
+              onTouchStart={(event) => {
+                const touch = event.touches[0]
+                if (!touch) return
+                touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+              }}
+              onTouchEnd={(event) => {
+                if (!touchStartRef.current || photoIds.length <= 1) return
+                const touch = event.changedTouches[0]
+                if (!touch) return
+                const swipe = resolveLightboxSwipe(
+                  touch.clientX - touchStartRef.current.x,
+                  touch.clientY - touchStartRef.current.y
+                )
+                touchStartRef.current = null
+                if (swipe === "prev") goLightbox("prev")
+                else if (swipe === "next") goLightbox("next")
+              }}
+            >
               <DialogTitle className="sr-only">
                 {active.name}
-                {photoIds.length > 1
-                  ? ` · ${photoIds.indexOf(active.id) + 1} of ${photoIds.length}`
-                  : ""}
+                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
               </DialogTitle>
+              <p className="sr-only" aria-live="polite" aria-atomic="true">
+                {active.name}
+                {activeIndexLabel ? ` · ${activeIndexLabel}` : ""}
+              </p>
               {photoIds.length > 1 ? (
                 <>
                   <button

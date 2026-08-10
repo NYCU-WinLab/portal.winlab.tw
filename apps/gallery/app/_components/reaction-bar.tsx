@@ -32,6 +32,7 @@ export function ReactionBar({
   myReaction,
   canReact,
   busy = false,
+  openSignal = 0,
   onReact,
 }: {
   counts: ReactionCounts
@@ -39,6 +40,8 @@ export function ReactionBar({
   canReact: boolean
   /** True while a reaction mutation is in flight. */
   busy?: boolean
+  /** Increment to open the picker from an external keyboard shortcut. */
+  openSignal?: number
   onReact: (reaction: GalleryReaction) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -46,6 +49,7 @@ export function ReactionBar({
     useState<GalleryReaction | null>(null)
 
   const zoneRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const hoverShowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -93,6 +97,7 @@ export function ReactionBar({
     activePointerId.current = null
     setHoveredReaction(null)
     setPickerOpen(false)
+    queueMicrotask(() => triggerRef.current?.focus())
   }, [clearHoverShow, clearHoverHide, clearLongPress])
 
   const scheduleClose = useCallback(() => {
@@ -220,6 +225,22 @@ export function ReactionBar({
       focusReactionButton(reaction)
     }
   }
+
+  const openSignalSeen = useRef(0)
+  useEffect(() => {
+    if (openSignal <= 0 || openSignal === openSignalSeen.current) return
+    openSignalSeen.current = openSignal
+    if (!canReact || busy) return
+    openPicker()
+    const reaction = myReaction ?? GALLERY_REACTIONS[0]
+    if (!reaction) return
+    setHoveredReaction(reaction)
+    queueMicrotask(() => {
+      zoneRef.current
+        ?.querySelector<HTMLButtonElement>(`[data-reaction="${reaction}"]`)
+        ?.focus()
+    })
+  }, [openSignal, canReact, busy, myReaction, openPicker])
 
   const onZoneEnter = (e: React.PointerEvent) => {
     if (!canReact || e.pointerType === "touch" || touchAwaitingPick.current)
@@ -390,6 +411,7 @@ export function ReactionBar({
       </div>
 
       <button
+        ref={triggerRef}
         type="button"
         disabled={!canReact || busy}
         aria-busy={busy || undefined}

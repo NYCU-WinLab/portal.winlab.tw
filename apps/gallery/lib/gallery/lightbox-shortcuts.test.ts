@@ -12,6 +12,7 @@ describe("resolveLightboxShortcut", () => {
     expect(resolveLightboxShortcut("S")).toBe("share")
     expect(resolveLightboxShortcut("f")).toBe("favorite")
     expect(resolveLightboxShortcut("D")).toBe("download")
+    expect(resolveLightboxShortcut("r")).toBe("react")
   })
 
   test("ignores modified keys and unknowns", () => {

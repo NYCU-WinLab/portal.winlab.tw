@@ -38,6 +38,13 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
       )
         return
       if (isTypingTarget(event.target)) return
+      if (
+        document.querySelector(
+          '[data-slot="dialog-content"][data-state="open"]'
+        )
+      ) {
+        return
+      }
 
       const key = event.key
       if (key === "ArrowLeft" || key === "k" || key === "K") {

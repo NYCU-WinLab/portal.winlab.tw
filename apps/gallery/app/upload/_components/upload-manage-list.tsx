@@ -76,6 +76,7 @@ import {
 } from "@/lib/gallery/bulk-tag"
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import {
   describeManageSelectAllLabel,
   describeManageSelectAllShortLabel,
@@ -173,6 +174,7 @@ function UploadListItem({
   selected,
   onToggleSelected,
   selectionMode,
+  selectionFocused = false,
   isAdmin = false,
   showWallPin = false,
   takenAtAvailable = true,
@@ -186,6 +188,7 @@ function UploadListItem({
   selected: boolean
   onToggleSelected: (options?: { shiftKey?: boolean }) => void
   selectionMode: boolean
+  selectionFocused?: boolean
   isAdmin?: boolean
   showWallPin?: boolean
   takenAtAvailable?: boolean
@@ -203,6 +206,7 @@ function UploadListItem({
 
   return (
     <li
+      data-manage-id={image.id}
       data-sequence-index={
         typeof sequenceIndex === "number" ? sequenceIndex : undefined
       }
@@ -230,7 +234,10 @@ function UploadListItem({
         selectionMode && "cursor-pointer",
         selectionMode &&
           selected &&
-          "border-foreground/35 bg-foreground/[0.07] shadow-[inset_3px_0_0_0_currentColor] ring-2 ring-foreground/25"
+          "border-foreground/35 bg-foreground/[0.07] shadow-[inset_3px_0_0_0_currentColor] ring-2 ring-foreground/25",
+        selectionMode &&
+          selectionFocused &&
+          "ring-2 ring-ring ring-offset-2 ring-offset-background"
       )}
     >
       {reorderHandle}
@@ -358,6 +365,7 @@ function UploadSequenceGroup({
   allImages,
   selectionMode,
   selectedIds,
+  selectionFocusId = null,
   onToggleSelected,
   isAdmin = false,
   takenAtAvailable = true,
@@ -369,6 +377,7 @@ function UploadSequenceGroup({
   allImages: ManageUploadRow[]
   selectionMode: boolean
   selectedIds: Set<string>
+  selectionFocusId?: string | null
   onToggleSelected: (id: string, options?: { shiftKey?: boolean }) => void
   isAdmin?: boolean
   takenAtAvailable?: boolean
@@ -554,6 +563,7 @@ function UploadSequenceGroup({
                 onToggleSelected(image.id, options)
               }
               selectionMode={selectionMode}
+              selectionFocused={selectionFocusId === image.id}
               isAdmin={isAdmin}
               showWallPin={pinAvailable && image.sequence_index === 0}
               takenAtAvailable={takenAtAvailable}
@@ -690,6 +700,7 @@ export function UploadManageList({
   }, [nameCollator, singles, sequences, sortMode])
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionFocusId, setSelectionFocusId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkDateOpen, setBulkDateOpen] = useState(false)
   const [bulkDateDraft, setBulkDateDraft] = useState("")
@@ -847,12 +858,32 @@ export function UploadManageList({
 
   const endSelectionMode = () => {
     clearSelection()
+    setSelectionFocusId(null)
     setSelectionMode(false)
+  }
+
+  const focusManageRow = (id: string) => {
+    setSelectionFocusId(id)
+    queueMicrotask(() => {
+      const row = document.querySelector<HTMLElement>(
+        `[data-manage-id="${CSS.escape(id)}"]`
+      )
+      row?.scrollIntoView({
+        block: "nearest",
+        behavior: galleryScrollBehavior(),
+      })
+      row
+        ?.querySelector<HTMLInputElement>('input[type="checkbox"]')
+        ?.focus({ preventScroll: true })
+    })
   }
 
   const toggleSelectionMode = () => {
     setSelectionMode((mode) => {
-      if (mode) clearSelection()
+      if (mode) {
+        clearSelection()
+        setSelectionFocusId(null)
+      }
       return !mode
     })
   }
@@ -946,6 +977,56 @@ export function UploadManageList({
             null
           return next
         })
+        return
+      }
+      if (
+        event.key === "j" ||
+        event.key === "J" ||
+        event.key === "ArrowRight" ||
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault()
+        if (visibleSelectableItems.length === 0) return
+        const current = selectionFocusId
+          ? visibleSelectableItems.findIndex(
+              (item) => item.id === selectionFocusId
+            )
+          : -1
+        const nextIndex = Math.min(
+          visibleSelectableItems.length - 1,
+          Math.max(0, current + 1)
+        )
+        const next = visibleSelectableItems[nextIndex]
+        if (next) focusManageRow(next.id)
+        return
+      }
+      if (
+        event.key === "k" ||
+        event.key === "K" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault()
+        if (visibleSelectableItems.length === 0) return
+        const current = selectionFocusId
+          ? visibleSelectableItems.findIndex(
+              (item) => item.id === selectionFocusId
+            )
+          : 0
+        const nextIndex = Math.max(0, current - 1)
+        const next = visibleSelectableItems[nextIndex]
+        if (next) focusManageRow(next.id)
+        return
+      }
+      if (
+        (event.key === " " || event.key === "Enter") &&
+        selectionFocusId &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault()
+        toggleSelected(selectionFocusId, { shiftKey: event.shiftKey })
       }
     }
     window.addEventListener("keydown", onKeyDown)
@@ -959,6 +1040,7 @@ export function UploadManageList({
     bulkAlbumOpen,
     slideshowOpen,
     visibleSelectableItems,
+    selectionFocusId,
   ])
 
   const confirmBatchDelete = () => {
@@ -1755,6 +1837,7 @@ export function UploadManageList({
               allImages={images}
               selectionMode={selectionMode}
               selectedIds={selectedIds}
+              selectionFocusId={selectionFocusId}
               onToggleSelected={toggleSelected}
               isAdmin={isAdmin}
               takenAtAvailable={takenAtAvailable}
@@ -1782,6 +1865,7 @@ export function UploadManageList({
                 toggleSelected(entry.row.id, options)
               }
               selectionMode={selectionMode}
+              selectionFocused={selectionFocusId === entry.row.id}
               isAdmin={isAdmin}
               showWallPin={pinAvailable}
               takenAtAvailable={takenAtAvailable}

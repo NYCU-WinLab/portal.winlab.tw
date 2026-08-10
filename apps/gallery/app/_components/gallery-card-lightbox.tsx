@@ -326,6 +326,7 @@ export function GalleryLightboxSocialAside({
   canReact,
   reactionBusy = false,
   onReact,
+  reactionOpenSignal = 0,
   comments,
   setComments,
   onArtworkRenamed,
@@ -364,6 +365,7 @@ export function GalleryLightboxSocialAside({
   canReact: boolean
   reactionBusy?: boolean
   onReact: (reaction: GalleryReaction) => void
+  reactionOpenSignal?: number
   comments: GalleryComment[]
   setComments: Dispatch<SetStateAction<GalleryComment[]>>
   onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
@@ -586,6 +588,7 @@ export function GalleryLightboxSocialAside({
             myReaction={myReaction}
             canReact={canReact}
             busy={reactionBusy}
+            openSignal={reactionOpenSignal}
             onReact={onReact}
           />
         ) : null}

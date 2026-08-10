@@ -372,6 +372,8 @@ export function GalleryCard({
     }
   }, [activeItem?.image_path, activeItem?.name, image.image_path, image.name])
 
+  const [reactionOpenSignal, setReactionOpenSignal] = useState(0)
+
   useEffect(() => {
     if (!isDialogOpen) return
 
@@ -414,17 +416,24 @@ export function GalleryCard({
       }
       if (action === "download") {
         void downloadOriginalFromKeyboard()
+        return
+      }
+      if (action === "react") {
+        if (!lightboxReactionsAvailable || !canReact) return
+        setReactionOpenSignal((n) => n + 1)
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [
+    canReact,
     copyShareLink,
     downloadOriginalFromKeyboard,
     goLightboxNext,
     goLightboxPrev,
     isDialogOpen,
+    lightboxReactionsAvailable,
     sequenceMedia.length,
     toggleFavoriteFromKeyboard,
   ])
@@ -726,6 +735,7 @@ export function GalleryCard({
                   canReact={canReact}
                   reactionBusy={reactionBusy}
                   onReact={onReact}
+                  reactionOpenSignal={reactionOpenSignal}
                   comments={comments}
                   setComments={setComments}
                   onArtworkRenamed={onArtworkRenamed}

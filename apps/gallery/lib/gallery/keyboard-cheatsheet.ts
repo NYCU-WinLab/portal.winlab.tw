@@ -20,6 +20,9 @@ export const GALLERY_WALL_SHORTCUTS: GalleryShortcutRow[] = [
 
 /** Manage (/upload) Select-mode shortcuts. */
 export const GALLERY_MANAGE_SHORTCUTS: GalleryShortcutRow[] = [
+  { keys: ["J", "→"], action: "Next row" },
+  { keys: ["K", "←"], action: "Previous row" },
+  { keys: ["Space", "Enter"], action: "Toggle select on focused row" },
   { keys: ["click"], action: "Toggle select on a row" },
   { keys: ["A"], action: "Select / clear all visible" },
   { keys: ["Shift+click"], action: "Range-select from last toggle" },
@@ -35,6 +38,7 @@ export const GALLERY_LIGHTBOX_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["←", "→"], action: "Prev / next (sequence, then wall)" },
   { keys: ["Home", "End"], action: "First / last shot in sequence" },
   { keys: ["F"], action: "Toggle favorite" },
+  { keys: ["R"], action: "Open reaction picker" },
   { keys: ["D"], action: "Download original" },
   { keys: ["S"], action: "Share link" },
   { keys: ["I"], action: "Toggle comments panel (mobile)" },

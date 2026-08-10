@@ -11,6 +11,7 @@ export type LightboxShortcutAction =
   | "share"
   | "favorite"
   | "download"
+  | "react"
   | null
 
 export function resolveLightboxShortcut(
@@ -26,5 +27,6 @@ export function resolveLightboxShortcut(
   if (key === "s" || key === "S") return "share"
   if (key === "f" || key === "F") return "favorite"
   if (key === "d" || key === "D") return "download"
+  if (key === "r" || key === "R") return "react"
   return null
 }
