@@ -29,8 +29,16 @@ export function SignOutButton({
           toast.error(error.message || "Could not sign out.")
           return
         }
-        router.replace("/")
-        router.refresh()
+        try {
+          router.replace("/")
+        } catch {
+          toast.error("Signed out, but could not open the home page.")
+        }
+        try {
+          router.refresh()
+        } catch {
+          // Best-effort after a successful sign-out.
+        }
       } catch {
         toast.error("Could not sign out.")
       }
