@@ -96,7 +96,7 @@ export function DownloadAlbumButton({
         onClick={() => void runDownload()}
         disabled={busy || disabled || photoCount < 1}
         aria-label={buttonLabel}
-        aria-busy={busy}
+        aria-busy={busy || undefined}
         className={cn(
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
           "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
@@ -116,7 +116,7 @@ export function DownloadAlbumButton({
         type="button"
         onClick={() => void runDownload()}
         disabled={busy || disabled || photoCount < 1}
-        aria-busy={busy}
+        aria-busy={busy || undefined}
         className={cn(
           "text-[11px] text-muted-foreground/80 underline-offset-2",
           "hover:text-foreground hover:underline disabled:opacity-50",
@@ -133,7 +133,7 @@ export function DownloadAlbumButton({
       type="button"
       onClick={() => void runDownload()}
       disabled={busy || disabled || photoCount < 1}
-      aria-busy={busy}
+      aria-busy={busy || undefined}
       className={cn(
         "inline-flex items-center gap-1.5 disabled:opacity-50",
         className

@@ -46,7 +46,7 @@ export function DownloadOriginalButton({
       onClick={() => void run()}
       disabled={busy || disabled || !imagePath.trim()}
       aria-label="Save original"
-      aria-busy={busy}
+      aria-busy={busy || undefined}
       className={cn(
         "inline-flex h-11 w-11 items-center justify-center rounded-full",
         "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
