@@ -1,18 +1,36 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeCreatingLabel,
+  describeRedirectingLabel,
   describeRetryingLabel,
+  describeSavingLabel,
+  describeSharingLabel,
   describeSigningOutLabel,
 } from "@/lib/gallery/busy-labels"
 
-describe("describeRetryingLabel", () => {
-  test("returns the retry busy label", () => {
+describe("busy labels", () => {
+  test("describeRetryingLabel", () => {
     expect(describeRetryingLabel()).toBe("Retrying…")
   })
-})
 
-describe("describeSigningOutLabel", () => {
-  test("returns the sign-out busy label", () => {
+  test("describeSigningOutLabel", () => {
     expect(describeSigningOutLabel()).toBe("Signing out…")
+  })
+
+  test("describeSavingLabel", () => {
+    expect(describeSavingLabel()).toBe("Saving…")
+  })
+
+  test("describeCreatingLabel", () => {
+    expect(describeCreatingLabel()).toBe("Creating…")
+  })
+
+  test("describeRedirectingLabel", () => {
+    expect(describeRedirectingLabel()).toBe("Redirecting…")
+  })
+
+  test("describeSharingLabel", () => {
+    expect(describeSharingLabel()).toBe("Sharing…")
   })
 })

@@ -26,6 +26,7 @@ import {
   shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
 import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
+import { describeCreatingLabel } from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 
@@ -149,7 +150,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
         </p>
       </div>
       <Button type="submit" disabled={pending} aria-busy={pending || undefined}>
-        {pending ? "Creating…" : "Create album"}
+        {pending ? describeCreatingLabel() : "Create album"}
       </Button>
     </form>
   )

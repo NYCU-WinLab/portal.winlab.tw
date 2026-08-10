@@ -41,6 +41,8 @@ function asMediaType(value: string | null): "image" | "video" | null {
   return null
 }
 
+export { asMediaType }
+
 export async function loadGalleryAlbumSummaries(
   supabase: SupabaseClient,
   limit = 60

@@ -40,7 +40,10 @@ import {
   describeTagMerged,
   describeTagRenamed,
 } from "@/lib/gallery/tag-admin-toast"
-import { describeRetryingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeRetryingLabel,
+  describeSavingLabel,
+} from "@/lib/gallery/busy-labels"
 import {
   describeTagMergeTargetRequired,
   describeTagNameRequired,
@@ -317,7 +320,7 @@ export function TagAdminPanel() {
               disabled={pending}
               aria-busy={pending || undefined}
             >
-              {pending ? "Saving…" : "Save name"}
+              {pending ? describeSavingLabel() : "Save name"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

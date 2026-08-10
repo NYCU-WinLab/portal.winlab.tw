@@ -116,6 +116,10 @@ import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import {
+  describeCreatingLabel,
+  describeSavingLabel,
+} from "@/lib/gallery/busy-labels"
 import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
 import {
   describeCouldNotCopyClipboard,
@@ -1809,7 +1813,7 @@ export function UploadManageList({
               disabled={isPending}
               aria-busy={isPending || undefined}
             >
-              {isPending ? "Saving…" : "Save"}
+              {isPending ? describeSavingLabel() : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1974,7 +1978,7 @@ export function UploadManageList({
               disabled={isPending || !bulkAlbumDraft.trim()}
               aria-busy={isPending || undefined}
             >
-              {isPending ? "Creating…" : "Create"}
+              {isPending ? describeCreatingLabel() : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

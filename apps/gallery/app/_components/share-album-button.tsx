@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
 import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
+import { describeSharingLabel } from "@/lib/gallery/busy-labels"
 import { gallerySans } from "@/components/gallery-chrome"
 
 type ShareAlbumButtonProps = {
@@ -86,7 +87,7 @@ export function ShareAlbumButton({
         )}
       >
         <IconLink className="size-3.5 shrink-0" aria-hidden />
-        {busy ? "Sharing…" : buttonLabel}
+        {busy ? describeSharingLabel() : buttonLabel}
       </button>
     )
   }
@@ -107,7 +108,7 @@ export function ShareAlbumButton({
       )}
     >
       <IconLink className="size-3.5" aria-hidden />
-      {busy ? "Sharing…" : buttonLabel}
+      {busy ? describeSharingLabel() : buttonLabel}
     </button>
   )
 }

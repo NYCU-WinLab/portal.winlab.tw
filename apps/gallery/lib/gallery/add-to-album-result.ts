@@ -38,3 +38,19 @@ export function describeCreateAlbumStarted(input: {
   if (added > 1) return `Started ${title} with ${added} photos`
   return `Started ${title}`
 }
+
+/** Trigger label for the add-to-album control. */
+export function describeAddToAlbumTriggerLabel(count: number): string {
+  return count > 1 ? `Add ${count} to album` : "Add to album"
+}
+
+/**
+ * Error when create succeeded but add failed, and deleting the empty album
+ * also failed — warn that an empty shell may remain.
+ */
+export function describeAlbumCreateRollbackError(input: {
+  title: string
+  addError: string
+}): string {
+  return `${input.addError} Album “${input.title}” may still exist empty — delete it from Albums.`
+}

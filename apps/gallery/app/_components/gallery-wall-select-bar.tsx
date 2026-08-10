@@ -70,6 +70,7 @@ import {
   describeCouldNotCopyClipboard,
   describeCouldNotCopyLinks,
 } from "@/lib/gallery/validation-toasts"
+import { describeCreatingLabel } from "@/lib/gallery/busy-labels"
 
 export function GalleryWallSelectBar({
   selectionMode,
@@ -688,7 +689,7 @@ export function GalleryWallSelectBar({
                     aria-busy={pending || undefined}
                     className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
                   >
-                    {pending ? "Creating…" : "Create"}
+                    {pending ? describeCreatingLabel() : "Create"}
                   </Button>
                   <Button
                     type="button"

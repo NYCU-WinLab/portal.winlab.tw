@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeAddToAlbumResult,
+  describeAddToAlbumTriggerLabel,
+  describeAlbumCreateRollbackError,
   describeCreateAlbumStarted,
 } from "@/lib/gallery/add-to-album-result"
 
@@ -60,6 +62,27 @@ describe("describeCreateAlbumStarted", () => {
   test("falls back without a count", () => {
     expect(describeCreateAlbumStarted({ title: "Empty", added: 0 })).toBe(
       "Started Empty"
+    )
+  })
+})
+
+describe("describeAddToAlbumTriggerLabel", () => {
+  test("singular vs plural selection", () => {
+    expect(describeAddToAlbumTriggerLabel(1)).toBe("Add to album")
+    expect(describeAddToAlbumTriggerLabel(0)).toBe("Add to album")
+    expect(describeAddToAlbumTriggerLabel(3)).toBe("Add 3 to album")
+  })
+})
+
+describe("describeAlbumCreateRollbackError", () => {
+  test("warns that an empty album may remain", () => {
+    expect(
+      describeAlbumCreateRollbackError({
+        title: "Retreat",
+        addError: "Album is full.",
+      })
+    ).toBe(
+      "Album is full. Album “Retreat” may still exist empty — delete it from Albums."
     )
   })
 })

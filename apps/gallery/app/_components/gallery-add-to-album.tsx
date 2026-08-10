@@ -25,6 +25,8 @@ import {
 import { gallerySans } from "@/components/gallery-chrome"
 import {
   describeAddToAlbumResult,
+  describeAddToAlbumTriggerLabel,
+  describeAlbumCreateRollbackError,
   describeCreateAlbumStarted,
 } from "@/lib/gallery/add-to-album-result"
 import {
@@ -183,7 +185,10 @@ export function GalleryAddToAlbum({
         toast.error(
           rolledBack.ok
             ? addedResult.error
-            : `${addedResult.error} Album “${created.data.title}” may still exist empty — delete it from Albums.`
+            : describeAlbumCreateRollbackError({
+                title: created.data.title,
+                addError: addedResult.error,
+              })
         )
         return
       }
@@ -244,8 +249,7 @@ export function GalleryAddToAlbum({
             )}
           >
             <IconAlbum className="size-3.5" aria-hidden />
-            {triggerLabel ??
-              (count > 1 ? `Add ${count} to album` : "Add to album")}
+            {triggerLabel ?? describeAddToAlbumTriggerLabel(count)}
           </Button>
         </DialogTrigger>
       ) : null}

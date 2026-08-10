@@ -16,6 +16,7 @@ import { Input } from "@workspace/ui/components/input"
 import { renameGalleryImage } from "@/app/upload/actions"
 import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
 import { describeArtworkNameUpdated } from "@/lib/gallery/manage-toast"
+import { describeSavingLabel } from "@/lib/gallery/busy-labels"
 
 export function RenameButton({
   id,
@@ -111,7 +112,7 @@ export function RenameButton({
             disabled={pending}
             aria-busy={pending || undefined}
           >
-            {pending ? "Saving…" : "Save"}
+            {pending ? describeSavingLabel() : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
