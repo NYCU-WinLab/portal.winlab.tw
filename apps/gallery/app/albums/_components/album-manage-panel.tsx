@@ -54,6 +54,7 @@ import {
   nextAlbumCoverAfterRemove,
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
+import { describeAlbumPhotosRemoved } from "@/lib/gallery/album-manage-copy"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
@@ -296,11 +297,7 @@ export function GalleryAlbumManagePanel({
         return
       }
       const removed = result.data.removed
-      toast.success(
-        removed === 1
-          ? "Removed 1 photo from album"
-          : `Removed ${removed} photos from album`
-      )
+      toast.success(describeAlbumPhotosRemoved(removed))
       router.refresh()
     })
   }
