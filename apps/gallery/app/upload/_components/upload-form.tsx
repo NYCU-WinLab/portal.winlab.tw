@@ -102,6 +102,7 @@ export function UploadForm({
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (pending || status.kind === "working") return
     const files = selectedFiles.length
       ? selectedFiles
       : Array.from(fileInputRef.current?.files ?? [])
