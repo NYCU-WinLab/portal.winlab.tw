@@ -619,13 +619,14 @@ export function GalleryWallSelectBar({
                     disabled={
                       selectedCount === 0 || pending || !tagDraft.trim()
                     }
+                    aria-busy={pending || undefined}
                     className={cn(
                       gallerySans(),
                       "h-8 gap-1.5 text-[11px] uppercase"
                     )}
                   >
                     <IconTag className="size-3.5" aria-hidden />
-                    Tag
+                    {pending ? "Tagging…" : "Tag"}
                   </Button>
                   <Button
                     type="button"
@@ -666,9 +667,10 @@ export function GalleryWallSelectBar({
                     disabled={
                       selectedCount === 0 || pending || !albumDraft.trim()
                     }
+                    aria-busy={pending || undefined}
                     className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
                   >
-                    Create
+                    {pending ? "Creating…" : "Create"}
                   </Button>
                   <Button
                     type="button"
