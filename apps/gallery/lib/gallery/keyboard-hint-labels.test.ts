@@ -32,5 +32,6 @@ describe("shouldOpenReactionFromSignal", () => {
     expect(shouldOpenReactionFromSignal(1, 2)).toBe(true)
     expect(shouldOpenReactionFromSignal(2, 2)).toBe(false)
     expect(shouldOpenReactionFromSignal(0, 0)).toBe(false)
+    expect(shouldOpenReactionFromSignal(3, 3)).toBe(false)
   })
 })

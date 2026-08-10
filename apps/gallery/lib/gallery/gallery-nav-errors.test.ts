@@ -27,7 +27,7 @@ describe("describeGalleryNavError", () => {
   })
 
   test("keeps a stable minimum key count", () => {
-    expect(Object.keys(galleryNavErrors).length).toBeGreaterThanOrEqual(17)
+    expect(Object.keys(galleryNavErrors).length).toBeGreaterThanOrEqual(20)
   })
 
   test("covers home and wall soft-fail keys", () => {

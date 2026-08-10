@@ -1031,13 +1031,14 @@ export function UploadManageList({
       }
       if (
         (event.key === " " || event.key === "Enter") &&
-        selectionFocusId &&
         !event.metaKey &&
         !event.ctrlKey &&
         !event.altKey
       ) {
         event.preventDefault()
-        toggleSelected(selectionFocusId, { shiftKey: event.shiftKey })
+        if (selectionFocusId) {
+          toggleSelected(selectionFocusId, { shiftKey: event.shiftKey })
+        }
       }
     }
     window.addEventListener("keydown", onKeyDown)

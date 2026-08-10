@@ -286,6 +286,7 @@ export function GalleryAlbumPhotoGrid({
                   <button
                     type="button"
                     aria-label={describePreviousSlideAriaLabel()}
+                    aria-keyshortcuts="ArrowLeft"
                     onClick={() => goLightbox("prev")}
                     className={cn(
                       "absolute top-[min(38%,12rem)] left-2 z-10 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full",
@@ -297,6 +298,7 @@ export function GalleryAlbumPhotoGrid({
                   <button
                     type="button"
                     aria-label={describeNextSlideAriaLabel()}
+                    aria-keyshortcuts="ArrowRight"
                     onClick={() => goLightbox("next")}
                     className={cn(
                       "absolute top-[min(38%,12rem)] right-2 z-10 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full",
