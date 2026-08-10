@@ -123,6 +123,7 @@ export function GalleryKeyboardCheatsheet({
         type="button"
         aria-label="Keyboard shortcuts"
         aria-expanded={open}
+        aria-busy={open || undefined}
         onClick={() => setSheetOpen(!open)}
         className={cn(
           gallerySans(),
