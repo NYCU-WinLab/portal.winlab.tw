@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useRef, useState } from "react"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -105,7 +106,13 @@ export function GalleryMemoriesTeaser({
             <button
               ref={slideshowButtonRef}
               type="button"
-              onClick={() => setSlideshowOpen(true)}
+              onClick={() => {
+                if (slideshowPhotos.length === 0) {
+                  toast.error("No memories to play right now.")
+                  return
+                }
+                setSlideshowOpen(true)
+              }}
               className={cn(
                 gallerySans(),
                 "inline-flex h-8 items-center rounded-md border border-input bg-background px-2.5 text-xs shadow-xs",
