@@ -40,6 +40,7 @@ import {
   describeTagMerged,
   describeTagRenamed,
 } from "@/lib/gallery/tag-admin-toast"
+import { describeRetryingLabel } from "@/lib/gallery/busy-labels"
 
 export function TagAdminPanel() {
   const router = useRouter()
@@ -212,7 +213,7 @@ export function TagAdminPanel() {
             onClick={refresh}
             className={gallerySans()}
           >
-            {pending ? "Retrying…" : "Retry"}
+            {pending ? describeRetryingLabel() : "Retry"}
           </Button>
         </div>
       ) : tags.length === 0 ? (

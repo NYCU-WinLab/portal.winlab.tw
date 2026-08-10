@@ -36,6 +36,7 @@ import {
   describeWallOrderRestored,
   describeWallReshuffled,
 } from "@/lib/gallery/wall-shuffle-toast"
+import { describeRetryingLabel } from "@/lib/gallery/busy-labels"
 import { cn } from "@workspace/ui/lib/utils"
 
 type PrefetchedPage = {
@@ -460,7 +461,7 @@ export function GalleryInfiniteWall({
             aria-busy={loadingMore || undefined}
             className="text-xs underline underline-offset-4 disabled:opacity-50"
           >
-            {loadingMore ? "Retrying…" : "Retry"}
+            {loadingMore ? describeRetryingLabel() : "Retry"}
           </button>
         </div>
       ) : null}
