@@ -452,9 +452,11 @@ export function GalleryInfiniteWall({
           <button
             type="button"
             onClick={() => void loadMore()}
-            className="text-xs underline underline-offset-4"
+            disabled={loadingMore}
+            aria-busy={loadingMore || undefined}
+            className="text-xs underline underline-offset-4 disabled:opacity-50"
           >
-            Retry
+            {loadingMore ? "Retrying…" : "Retry"}
           </button>
         </div>
       ) : null}
