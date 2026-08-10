@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
+import { describeSigningOutLabel } from "@/lib/gallery/busy-labels"
 
 export function SignOutButton({
   className,
@@ -60,7 +61,7 @@ export function SignOutButton({
       {iconOnly ? (
         <IconLogout className="size-4" aria-hidden />
       ) : pending ? (
-        "Signing out…"
+        describeSigningOutLabel()
       ) : (
         "Sign out"
       )}
