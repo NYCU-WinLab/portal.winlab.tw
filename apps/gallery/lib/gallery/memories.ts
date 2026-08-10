@@ -17,6 +17,7 @@ export type GalleryMemoryPhoto = {
   sequence_index: number | null
   memory_year: number
   uploader_name: string
+  is_favorited?: boolean
 }
 
 export type GalleryMemoryYearGroup = {

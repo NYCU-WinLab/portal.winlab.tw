@@ -14,6 +14,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { CuratedLightboxActions } from "@/app/_components/curated-lightbox-actions"
+import { CuratedLightboxReactions } from "@/app/_components/curated-lightbox-reactions"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
@@ -41,12 +42,16 @@ export function MemoriesDayView({
   slideshowPhotos,
   slideshowTitle,
   signedIn = false,
+  viewerId = null,
+  viewerName = "You",
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
   slideshowPhotos: GallerySlideshowPhoto[]
   slideshowTitle: string
   signedIn?: boolean
+  viewerId?: string | null
+  viewerName?: string
 }) {
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
@@ -423,6 +428,14 @@ export function MemoriesDayView({
                   name={active.name}
                   imagePath={active.image_path}
                   signedIn={signedIn}
+                  initialFavorited={Boolean(active.is_favorited)}
+                />
+                <CuratedLightboxReactions
+                  open={Boolean(active)}
+                  imageId={active.id}
+                  signedIn={signedIn}
+                  viewerId={viewerId}
+                  viewerName={viewerName}
                 />
                 {slideshowPhotos.length > 0 ? (
                   <button

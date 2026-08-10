@@ -2,7 +2,10 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 
 import { isGalleryAlbumsUnavailable } from "@/lib/gallery/albums"
 import { isGalleryCommentsUnavailable } from "@/lib/gallery/comment-edit"
-import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
+import {
+  isGalleryFavoritesUnavailable,
+  loadFavoritedImageIds,
+} from "@/lib/gallery/favorites"
 import type { GalleryHomeFilters } from "@/lib/gallery/home-filters"
 import {
   findSequenceGaps,
@@ -305,30 +308,6 @@ async function resolveAlbumCoverIds(
   const ids = ((coverIdRows ?? []) as string[]).filter(Boolean)
   if (ids.length === 0) return "none"
   return ids
-}
-
-async function loadFavoritedImageIds(
-  supabase: SupabaseClient,
-  userId: string | null,
-  imageIds: string[]
-): Promise<Set<string>> {
-  if (!userId || imageIds.length === 0) return new Set()
-  const { data, error } = await supabase
-    .from("gallery_favorites")
-    .select("image_id")
-    .eq("user_id", userId)
-    .in("image_id", imageIds)
-  if (error) {
-    if (!isGalleryFavoritesUnavailable(error)) {
-      console.error("[gallery] failed to load favorites", error)
-    }
-    return new Set()
-  }
-  return new Set(
-    ((data ?? []) as { image_id: string }[])
-      .map((row) => row.image_id)
-      .filter(Boolean)
-  )
 }
 
 function applyFavoriteFlags(

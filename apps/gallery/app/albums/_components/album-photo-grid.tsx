@@ -14,6 +14,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { CuratedLightboxActions } from "@/app/_components/curated-lightbox-actions"
+import { CuratedLightboxReactions } from "@/app/_components/curated-lightbox-reactions"
 import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import {
   galleryPolaroidClass,
@@ -104,10 +105,14 @@ export function GalleryAlbumPhotoGrid({
   photos,
   albumTitle,
   signedIn = false,
+  viewerId = null,
+  viewerName = "You",
 }: {
   photos: GalleryAlbumPhoto[]
   albumTitle: string
   signedIn?: boolean
+  viewerId?: string | null
+  viewerName?: string
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxFailed, setLightboxFailed] = useState(false)
@@ -450,6 +455,14 @@ export function GalleryAlbumPhotoGrid({
                   name={active.name}
                   imagePath={active.image_path}
                   signedIn={signedIn}
+                  initialFavorited={Boolean(active.is_favorited)}
+                />
+                <CuratedLightboxReactions
+                  open={Boolean(active)}
+                  imageId={active.image_id}
+                  signedIn={signedIn}
+                  viewerId={viewerId}
+                  viewerName={viewerName}
                 />
                 <button
                   type="button"

@@ -31,6 +31,7 @@ export type GalleryAlbumPhoto = {
   created_at: string
   position: number
   added_at: string
+  is_favorited?: boolean
 }
 
 export type GalleryAlbumDetail = {

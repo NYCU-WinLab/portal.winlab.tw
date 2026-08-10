@@ -30,6 +30,7 @@ import {
 } from "@/lib/gallery/og-metadata"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 import { createClient } from "@/lib/supabase/server"
+import { loadFavoritedImageIds } from "@/lib/gallery/favorites"
 import { getCurrentUser } from "@/lib/user"
 import { cn } from "@workspace/ui/lib/utils"
 import { headers } from "next/headers"
@@ -125,6 +126,17 @@ export default async function GalleryAlbumDetailPage({
 
   const album = await loadGalleryAlbumBySlug(supabase, slug)
   if (!album) notFound()
+
+  if (user) {
+    const favoritedIds = await loadFavoritedImageIds(
+      supabase,
+      user.id,
+      album.photos.map((photo) => photo.image_id)
+    )
+    for (const photo of album.photos) {
+      photo.is_favorited = favoritedIds.has(photo.image_id)
+    }
+  }
 
   const canManage =
     Boolean(user) && (user?.id === album.created_by || Boolean(user?.isAdmin))
@@ -238,6 +250,8 @@ export default async function GalleryAlbumDetailPage({
             photos={album.photos}
             albumTitle={album.title}
             signedIn={Boolean(user)}
+            viewerId={user?.id ?? null}
+            viewerName={user?.name ?? "You"}
           />
         )}
 

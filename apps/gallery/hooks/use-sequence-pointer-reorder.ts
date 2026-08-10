@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, type PointerEvent } from "react"
+import { useCallback, useRef, useState, type PointerEvent } from "react"
 
 /**
  * Pointer-based reorder for Manage sequence rows (mouse + touch).
@@ -18,10 +18,12 @@ export function useSequencePointerReorder({
   const listRef = useRef<HTMLUListElement | null>(null)
   const dragFromRef = useRef<number | null>(null)
   const activePointerIdRef = useRef<number | null>(null)
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
 
   const clearDrag = useCallback(() => {
     dragFromRef.current = null
     activePointerIdRef.current = null
+    setDraggingIndex(null)
     listRef.current
       ?.querySelectorAll("[data-sequence-drop-target]")
       .forEach((node) => {
@@ -73,6 +75,7 @@ export function useSequencePointerReorder({
       event.stopPropagation()
       dragFromRef.current = index
       activePointerIdRef.current = event.pointerId
+      setDraggingIndex(index)
       event.currentTarget.setPointerCapture(event.pointerId)
       highlightTarget(index)
     },
@@ -109,6 +112,7 @@ export function useSequencePointerReorder({
 
   return {
     listRef,
+    draggingIndex,
     onHandlePointerDown,
     onHandlePointerMove,
     onHandlePointerUp: finishPointer,

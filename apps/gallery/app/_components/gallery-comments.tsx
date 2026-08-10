@@ -182,6 +182,15 @@ export function GalleryComments({
       setMentionQuery(null)
       return
     }
+    if (
+      event.key === "Enter" &&
+      (event.metaKey || event.ctrlKey) &&
+      mentionQuery == null
+    ) {
+      event.preventDefault()
+      submit()
+      return
+    }
     if (mentionPickerEmpty) return
     if (event.key === "ArrowDown") {
       event.preventDefault()

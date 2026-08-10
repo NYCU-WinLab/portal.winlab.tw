@@ -21,6 +21,7 @@ import {
 } from "@/lib/gallery/empty-state-labels"
 import { flattenMemoryGroupsForSlideshow } from "@/lib/gallery/slideshow"
 import { createClient } from "@/lib/supabase/server"
+import { loadFavoritedImageIds } from "@/lib/gallery/favorites"
 import { getCurrentUser } from "@/lib/user"
 
 export const dynamic = "force-dynamic"
@@ -51,6 +52,16 @@ export default async function MemoriesPage({
   })
   const photos = memoriesResult.photos
   const memoriesAvailable = memoriesResult.available
+  if (user && photos.length > 0) {
+    const favoritedIds = await loadFavoritedImageIds(
+      supabase,
+      user.id,
+      photos.map((photo) => photo.id)
+    )
+    for (const photo of photos) {
+      photo.is_favorited = favoritedIds.has(photo.id)
+    }
+  }
   const groups = groupMemoriesByYear(photos)
   const slideshowPhotos = flattenMemoryGroupsForSlideshow(groups)
 
@@ -118,6 +129,8 @@ export default async function MemoriesPage({
             slideshowPhotos={slideshowPhotos}
             slideshowTitle={`Memories · ${label}`}
             signedIn={Boolean(user)}
+            viewerId={user?.id ?? null}
+            viewerName={user?.name ?? "You"}
           />
         )}
       </div>

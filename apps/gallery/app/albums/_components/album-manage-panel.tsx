@@ -84,9 +84,14 @@ import { describeFocusedManageRowAnnouncement } from "@/lib/gallery/focus-announ
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { galleryScrollBehavior } from "@/lib/gallery/motion"
+import { describeSequenceReorderAnnouncement } from "@/lib/gallery/reorder-announcement"
 import { stepFocusIndex } from "@/lib/gallery/roving-focus"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import {
+  selectWallIdRange,
+  toggleWallSelection,
+} from "@/lib/gallery/wall-selection"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
   if (photo.media_type === "video" && photo.poster_path) {
@@ -142,12 +147,14 @@ export function GalleryAlbumManagePanel({
   const [coverImageId, setCoverImageId] = useState(album.cover_image_id)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [selectionFocusId, setSelectionFocusId] = useState<string | null>(null)
+  const [reorderAnnounce, setReorderAnnounce] = useState("")
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const deleteAlbumTriggerRef = useRef<HTMLButtonElement>(null)
   const removeSelectedTriggerRef = useRef<HTMLButtonElement>(null)
   const removePhotoTriggerRef = useRef<HTMLElement | null>(null)
   const rowRefs = useRef(new Map<string, HTMLLIElement>())
+  const selectionAnchorIdRef = useRef<string | null>(null)
   const confirmRemovePhoto = photos.find(
     (photo) => photo.image_id === confirmRemoveId
   )
@@ -165,21 +172,37 @@ export function GalleryAlbumManagePanel({
   const allSelected =
     photos.length > 0 && photos.every((photo) => selected.has(photo.image_id))
 
-  const toggleSelected = (imageId: string, next: boolean) => {
+  const toggleSelected = (
+    imageId: string,
+    options?: { shiftKey?: boolean; next?: boolean }
+  ) => {
+    const anchor = selectionAnchorIdRef.current
     setSelected((prev) => {
-      const copy = new Set(prev)
-      if (next) copy.add(imageId)
-      else copy.delete(imageId)
-      return copy
+      if (options?.shiftKey && anchor) {
+        return selectWallIdRange(prev, photoIds, anchor, imageId)
+      }
+      if (typeof options?.next === "boolean") {
+        const copy = new Set(prev)
+        if (options.next) copy.add(imageId)
+        else copy.delete(imageId)
+        return copy
+      }
+      return toggleWallSelection(prev, imageId)
     })
+    if (!options?.shiftKey) {
+      selectionAnchorIdRef.current = imageId
+    }
   }
 
   const toggleSelectAll = (next: boolean) => {
     if (!next) {
       setSelected(new Set())
+      selectionAnchorIdRef.current = null
       return
     }
     setSelected(new Set(photoIds))
+    selectionAnchorIdRef.current =
+      photoIds[photoIds.length - 1] ?? selectionAnchorIdRef.current
   }
 
   const focusManageRow = useCallback((id: string) => {
@@ -217,6 +240,7 @@ export function GalleryAlbumManagePanel({
         event.preventDefault()
         setSelected(new Set())
         setSelectionFocusId(null)
+        selectionAnchorIdRef.current = null
         return
       }
       if (event.key === "a" || event.key === "A") {
@@ -256,7 +280,7 @@ export function GalleryAlbumManagePanel({
       }
       if ((event.key === " " || event.key === "Enter") && selectionFocusId) {
         event.preventDefault()
-        toggleSelected(selectionFocusId, !selected.has(selectionFocusId))
+        toggleSelected(selectionFocusId, { shiftKey: event.shiftKey })
       }
     }
     window.addEventListener("keydown", onKeyDown)
@@ -320,6 +344,9 @@ export function GalleryAlbumManagePanel({
         setPhotos(photos)
         return
       }
+      setReorderAnnounce(
+        describeSequenceReorderAnnouncement(item.name, nextIndex, next.length)
+      )
       softRefresh()
     })
   }
@@ -342,6 +369,7 @@ export function GalleryAlbumManagePanel({
         if (!item) return prev
         next.splice(toIndex, 0, item)
         const previous = prev
+        const moved = item
         startTransition(async () => {
           const result = await reorderGalleryAlbumImages(
             album.id,
@@ -352,6 +380,13 @@ export function GalleryAlbumManagePanel({
             setPhotos(previous)
             return
           }
+          setReorderAnnounce(
+            describeSequenceReorderAnnouncement(
+              moved.name,
+              toIndex,
+              next.length
+            )
+          )
           softRefresh()
         })
         return next
@@ -362,6 +397,7 @@ export function GalleryAlbumManagePanel({
 
   const {
     listRef,
+    draggingIndex,
     onHandlePointerDown,
     onHandlePointerMove,
     onHandlePointerUp,
@@ -618,6 +654,8 @@ export function GalleryAlbumManagePanel({
           <GalleryKeyboardCheatsheet manage />
         </div>
         <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {reorderAnnounce}
+          {reorderAnnounce && selectionFocusId ? " ? " : ""}
           {selectionFocusId
             ? (() => {
                 const index = photos.findIndex(
@@ -732,6 +770,7 @@ export function GalleryAlbumManagePanel({
                   <button
                     type="button"
                     aria-label={`Drag to reorder ${photo.name}`}
+                    aria-grabbed={draggingIndex === index}
                     disabled={pending}
                     className={cn(
                       "inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground",
@@ -751,7 +790,15 @@ export function GalleryAlbumManagePanel({
                     disabled={pending}
                     onCheckedChange={(value) => {
                       setSelectionFocusId(photo.image_id)
-                      toggleSelected(photo.image_id, value === true)
+                      toggleSelected(photo.image_id, {
+                        next: value === true,
+                      })
+                    }}
+                    onClick={(event) => {
+                      if (!event.shiftKey) return
+                      event.preventDefault()
+                      setSelectionFocusId(photo.image_id)
+                      toggleSelected(photo.image_id, { shiftKey: true })
                     }}
                     aria-label={`Select ${photo.name}`}
                   />
@@ -846,7 +893,7 @@ export function GalleryAlbumManagePanel({
             <AlertDialogTitle>
               Remove{" "}
               {confirmRemovePhoto?.name
-                ? `?${confirmRemovePhoto.name}?`
+                ? `\u201c${confirmRemovePhoto.name}\u201d`
                 : "this photo"}{" "}
               from the album?
             </AlertDialogTitle>

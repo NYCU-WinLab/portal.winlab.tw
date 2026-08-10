@@ -40,3 +40,28 @@ export async function isGalleryFavoritesReady(
   if (!error) return true
   return !isGalleryFavoritesUnavailable(error)
 }
+
+/** Which of the given image ids the viewer has saved. */
+export async function loadFavoritedImageIds(
+  supabase: SupabaseClient,
+  userId: string | null,
+  imageIds: string[]
+): Promise<Set<string>> {
+  if (!userId || imageIds.length === 0) return new Set()
+  const { data, error } = await supabase
+    .from("gallery_favorites")
+    .select("image_id")
+    .eq("user_id", userId)
+    .in("image_id", imageIds)
+  if (error) {
+    if (!isGalleryFavoritesUnavailable(error)) {
+      console.error("[gallery] failed to load favorites", error)
+    }
+    return new Set()
+  }
+  return new Set(
+    ((data ?? []) as { image_id: string }[])
+      .map((row) => row.image_id)
+      .filter(Boolean)
+  )
+}
