@@ -19,6 +19,13 @@ describe("nextRadioIndex", () => {
     expect(nextRadioIndex(0, 4, "End")).toBe(3)
   })
 
+  test("Home and End ignore out-of-range current", () => {
+    expect(nextRadioIndex(99, 5, "Home")).toBe(0)
+    expect(nextRadioIndex(-3, 5, "End")).toBe(4)
+    expect(nextRadioIndex(0, 1, "Home")).toBe(0)
+    expect(nextRadioIndex(0, 1, "End")).toBe(0)
+  })
+
   test("clamps an out-of-range current index before moving", () => {
     expect(nextRadioIndex(99, 3, "ArrowLeft")).toBe(1)
     expect(nextRadioIndex(-5, 3, "ArrowRight")).toBe(1)
