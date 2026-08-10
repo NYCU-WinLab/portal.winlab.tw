@@ -12,6 +12,7 @@ import {
   type SequenceZipSource,
 } from "@/lib/gallery/zip-names"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
+import { describeSequenceZipSaved } from "@/lib/gallery/sequence-zip-result"
 
 type DownloadSequenceButtonProps = {
   items: SequenceZipSource[]
@@ -64,10 +65,7 @@ export function DownloadSequenceButton({
           )
         },
       })
-      toast.success(
-        `Saved ${result.count} shot${result.count === 1 ? "" : "s"} as ZIP`,
-        { id: toastId }
-      )
+      toast.success(describeSequenceZipSaved(result.count), { id: toastId })
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not build the ZIP"
