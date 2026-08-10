@@ -14,3 +14,24 @@ export function describeAlbumCreateReady(input: {
   }
   return `Album “${title}” is ready`
 }
+
+/** Default share button label (viewer / soft share). */
+export function describeShareAlbumLabel(): string {
+  return "Share album"
+}
+
+/** Emphasized share button label for owners copying the link. */
+export function describeCopyShareLinkLabel(): string {
+  return "Copy share link"
+}
+
+/** Resolve the share button label from emphasize + optional override. */
+export function describeShareAlbumButtonLabel(input: {
+  emphasize?: boolean
+  label?: string
+}): string {
+  if (input.label) return input.label
+  return input.emphasize
+    ? describeCopyShareLinkLabel()
+    : describeShareAlbumLabel()
+}

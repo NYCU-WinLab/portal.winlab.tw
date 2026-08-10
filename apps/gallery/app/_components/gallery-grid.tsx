@@ -19,6 +19,7 @@ import {
   type GalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
 import { describeGalleryWallAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { describeNothingOnWallYetTitle } from "@/lib/gallery/empty-state-labels"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
@@ -302,7 +303,7 @@ export function GalleryGrid({
     }
     return (
       <GalleryEmptyState
-        title="Nothing on the wall yet"
+        title={describeNothingOnWallYetTitle()}
         description="Hang the first polaroid — the lab wall is waiting."
         action={
           isSignedIn ? (

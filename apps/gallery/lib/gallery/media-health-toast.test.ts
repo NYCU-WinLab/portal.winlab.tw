@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeDeleteForeverLabel,
   describeDeletingLabel,
   describeMediaHealthAllHealthy,
   describeMediaHealthDeleted,
@@ -43,5 +44,11 @@ describe("describeMediaHealthDeleted", () => {
 describe("describeDeletingLabel", () => {
   test("returns the busy delete label", () => {
     expect(describeDeletingLabel()).toBe("Deleting…")
+  })
+})
+
+describe("describeDeleteForeverLabel", () => {
+  test("returns the idle permanent-delete label", () => {
+    expect(describeDeleteForeverLabel()).toBe("Delete forever")
   })
 })

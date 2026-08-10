@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeManageSelectAllLabel,
+  describeManageSelectAllShortLabel,
+  describeManageSelectAllTitle,
   describeManageSelectModeLabel,
+  describeWallSelectAllLabel,
+  describeWallSelectAllTitle,
   describeWallSelectModeLabel,
   describeWallSelectionCount,
   orderedSelectedWallIds,
@@ -85,6 +90,21 @@ describe("select mode labels", () => {
   test("describeManageSelectModeLabel", () => {
     expect(describeManageSelectModeLabel(false)).toBe("Select")
     expect(describeManageSelectModeLabel(true)).toBe("Cancel selection")
+  })
+
+  test("select-all / clear-all labels", () => {
+    expect(describeWallSelectAllLabel(false)).toBe("Select all")
+    expect(describeWallSelectAllLabel(true)).toBe("Clear all")
+    expect(describeWallSelectAllTitle(false)).toBe("Select all photos")
+    expect(describeWallSelectAllTitle(true)).toBe("Clear all selected photos")
+    expect(describeManageSelectAllLabel(false, 12)).toBe("Select all (12)")
+    expect(describeManageSelectAllLabel(true)).toBe("Clear all")
+    expect(describeManageSelectAllShortLabel(false)).toBe("Select all")
+    expect(describeManageSelectAllShortLabel(true)).toBe("Clear")
+    expect(describeManageSelectAllTitle(false, 12)).toBe(
+      "Select all 12 visible works"
+    )
+    expect(describeManageSelectAllTitle(true)).toBe("Clear all selected works")
   })
 })
 

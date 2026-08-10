@@ -49,6 +49,47 @@ export function describeManageSelectModeLabel(selectionMode: boolean): string {
   return selectionMode ? "Cancel selection" : "Select"
 }
 
+/** Visible select-all / clear-all label on the wall select bar. */
+export function describeWallSelectAllLabel(allSelected: boolean): string {
+  return allSelected ? "Clear all" : "Select all"
+}
+
+/** Title / aria for wall select-all control. */
+export function describeWallSelectAllTitle(allSelected: boolean): string {
+  return allSelected ? "Clear all selected photos" : "Select all photos"
+}
+
+/** Manage select-all visible label (count when selecting). */
+export function describeManageSelectAllLabel(
+  allSelected: boolean,
+  visibleCount?: number
+): string {
+  if (allSelected) return "Clear all"
+  if (typeof visibleCount === "number") {
+    return `Select all (${visibleCount})`
+  }
+  return "Select all"
+}
+
+/** Compact Manage select-all label in the sticky bulk bar. */
+export function describeManageSelectAllShortLabel(
+  allSelected: boolean
+): string {
+  return allSelected ? "Clear" : "Select all"
+}
+
+/** Manage select-all aria-label (count when selecting). */
+export function describeManageSelectAllTitle(
+  allSelected: boolean,
+  visibleCount?: number
+): string {
+  if (allSelected) return "Clear all selected works"
+  if (typeof visibleCount === "number") {
+    return `Select all ${visibleCount} visible works`
+  }
+  return "Select all works"
+}
+
 /**
  * Add every wall id between `fromId` and `toId` (inclusive) to the selection.
  * If either id is missing from the wall order, falls back to toggling `toId`.

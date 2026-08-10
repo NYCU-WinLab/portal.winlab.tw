@@ -59,6 +59,8 @@ import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeWallAlbumPhotosRemoved } from "@/lib/gallery/wall-album-remove-toast"
 import {
+  describeWallSelectAllLabel,
+  describeWallSelectAllTitle,
   describeWallSelectModeLabel,
   describeWallSelectionCount,
 } from "@/lib/gallery/wall-selection"
@@ -482,9 +484,7 @@ export function GalleryWallSelectBar({
           type="button"
           onClick={onToggleSelectAll}
           aria-pressed={allSelected}
-          aria-label={
-            allSelected ? "Clear all selected photos" : "Select all photos"
-          }
+          aria-label={describeWallSelectAllTitle(allSelected)}
           className={cn(
             gallerySans(),
             "inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] tracking-wide uppercase shadow-sm backdrop-blur-sm transition-colors",
@@ -493,7 +493,7 @@ export function GalleryWallSelectBar({
           )}
         >
           <IconSquare className="size-3.5" aria-hidden />
-          {allSelected ? "Clear all" : "Select all"}
+          {describeWallSelectAllLabel(allSelected)}
         </button>
       ) : null}
 

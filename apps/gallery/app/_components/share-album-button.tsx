@@ -7,7 +7,10 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
-import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
+import {
+  describeAlbumShareCopied,
+  describeShareAlbumButtonLabel,
+} from "@/lib/gallery/album-share-toast"
 import { describeSharingLabel } from "@/lib/gallery/busy-labels"
 import { gallerySans } from "@/components/gallery-chrome"
 
@@ -32,7 +35,7 @@ export function ShareAlbumButton({
   disabled = false,
 }: ShareAlbumButtonProps) {
   const [busy, setBusy] = useState(false)
-  const buttonLabel = label ?? (emphasize ? "Copy share link" : "Share album")
+  const buttonLabel = describeShareAlbumButtonLabel({ emphasize, label })
 
   const runShare = async () => {
     if (busy || disabled) return

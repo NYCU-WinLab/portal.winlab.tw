@@ -21,3 +21,8 @@ export function describeMediaHealthDeleted(deleted: number): string {
 export function describeDeletingLabel(): string {
   return "Deleting…"
 }
+
+/** Idle label for permanent delete actions. */
+export function describeDeleteForeverLabel(): string {
+  return "Delete forever"
+}

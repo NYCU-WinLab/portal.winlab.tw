@@ -12,6 +12,7 @@ import {
   gallerySerif,
 } from "@/components/gallery-chrome"
 import type { GalleryAlbumSummary } from "@/lib/gallery/albums"
+import { describeCopyShareLinkLabel } from "@/lib/gallery/album-share-toast"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function coverSrc(album: GalleryAlbumSummary): string | null {
@@ -121,7 +122,7 @@ export function GalleryAlbumCard({
             slug={album.slug}
             title={album.title}
             variant="icon"
-            label="Copy share link"
+            label={describeCopyShareLinkLabel()}
             className="h-8 w-8 bg-white/90 shadow-md"
           />
         </div>

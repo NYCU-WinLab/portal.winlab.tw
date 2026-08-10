@@ -14,6 +14,11 @@ import {
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumSummaries } from "@/lib/gallery/load-albums"
 import { albumMatchesQuery, isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import {
+  describeAlbumsEmptyTitle,
+  describeAlbumsNotReadyTitle,
+  describeBackToTheWallLabel,
+} from "@/lib/gallery/empty-state-labels"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 import { cn } from "@workspace/ui/lib/utils"
@@ -57,14 +62,14 @@ export default async function GalleryAlbumsPage({
 
         {!albumsReady ? (
           <GalleryEmptyState
-            title="Albums not ready yet"
+            title={describeAlbumsNotReadyTitle()}
             description="Apply the gallery albums migration, then refresh — Manage already soft-hides album tools until then."
             action={
               <Link
                 href="/"
                 className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
               >
-                Back to the wall
+                {describeBackToTheWallLabel()}
               </Link>
             }
           />
@@ -161,13 +166,10 @@ export default async function GalleryAlbumsPage({
 
             {visibleAlbums.length === 0 ? (
               <GalleryEmptyState
-                title={
-                  query
-                    ? "No albums match that search"
-                    : mineOnly
-                      ? "You have no albums yet"
-                      : "No albums yet"
-                }
+                title={describeAlbumsEmptyTitle({
+                  query: Boolean(query),
+                  mineOnly,
+                })}
                 description={
                   query
                     ? "Try another title, slug, owner, or clear the search."
@@ -199,7 +201,7 @@ export default async function GalleryAlbumsPage({
                     >
                       {query || mineOnly
                         ? "Show all albums"
-                        : "Back to the wall"}
+                        : describeBackToTheWallLabel()}
                     </Link>
                   </p>
                 }

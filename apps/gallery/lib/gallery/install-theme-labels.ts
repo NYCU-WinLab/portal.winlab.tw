@@ -7,3 +7,8 @@ export function describeDismissInstallPromptAriaLabel(): string {
 export function describeSeasonalSiteThemeAriaLabel(): string {
   return "Seasonal site theme"
 }
+
+/** Idle label for the PWA install action. */
+export function describeInstallLabel(): string {
+  return "Install"
+}

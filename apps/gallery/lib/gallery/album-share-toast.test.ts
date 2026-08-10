@@ -3,6 +3,9 @@ import { describe, expect, test } from "bun:test"
 import {
   describeAlbumCreateReady,
   describeAlbumShareCopied,
+  describeCopyShareLinkLabel,
+  describeShareAlbumButtonLabel,
+  describeShareAlbumLabel,
 } from "@/lib/gallery/album-share-toast"
 
 describe("describeAlbumShareCopied", () => {
@@ -22,5 +25,21 @@ describe("describeAlbumCreateReady", () => {
     expect(
       describeAlbumCreateReady({ title: "Demo day", linkCopied: false })
     ).toBe("Album “Demo day” is ready")
+  })
+})
+
+describe("share album button labels", () => {
+  test("defaults and emphasize", () => {
+    expect(describeShareAlbumLabel()).toBe("Share album")
+    expect(describeCopyShareLinkLabel()).toBe("Copy share link")
+    expect(describeShareAlbumButtonLabel({ emphasize: false })).toBe(
+      "Share album"
+    )
+    expect(describeShareAlbumButtonLabel({ emphasize: true })).toBe(
+      "Copy share link"
+    )
+    expect(
+      describeShareAlbumButtonLabel({ emphasize: true, label: "Custom" })
+    ).toBe("Custom")
   })
 })

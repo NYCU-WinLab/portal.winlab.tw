@@ -12,6 +12,11 @@ import {
   isMemoriesViewingToday,
   resolveMemoriesCalendarDay,
 } from "@/lib/gallery/memories"
+import {
+  describeBackToTheWallLabel,
+  describeMemoriesEmptyTrayTitle,
+  describeMemoriesNotReadyTitle,
+} from "@/lib/gallery/empty-state-labels"
 import { flattenMemoryGroupsForSlideshow } from "@/lib/gallery/slideshow"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
@@ -70,20 +75,20 @@ export default async function MemoriesPage({
 
         {!memoriesAvailable ? (
           <GalleryEmptyState
-            title="Not ready yet"
+            title={describeMemoriesNotReadyTitle()}
             description="Memories needs the gallery memories migration (capture dates + on-this-day RPC). Apply it, then refresh — Manage already soft-hides capture-date tools until then."
             action={
               <Link
                 href="/"
                 className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
               >
-                Back to the wall
+                {describeBackToTheWallLabel()}
               </Link>
             }
           />
         ) : groups.length === 0 ? (
           <GalleryEmptyState
-            title="Empty tray"
+            title={describeMemoriesEmptyTrayTitle()}
             description={`Nothing from a past ${label} yet. Shots need a capture date (EXIF or upload day) to land here. Hang a polaroid today, and next year it will show up.`}
             action={
               <p className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
@@ -91,7 +96,7 @@ export default async function MemoriesPage({
                   href="/"
                   className="underline decoration-zinc-400/80 underline-offset-4 hover:decoration-zinc-700"
                 >
-                  Back to the wall
+                  {describeBackToTheWallLabel()}
                 </Link>
                 {user ? (
                   <Link

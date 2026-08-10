@@ -22,6 +22,7 @@ import {
   type MediaHealthFinding,
 } from "@/lib/gallery/media-health"
 import {
+  describeDeleteForeverLabel,
   describeDeletingLabel,
   describeMediaHealthAllHealthy,
   describeMediaHealthDeleted,

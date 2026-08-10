@@ -77,6 +77,9 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
+  describeManageSelectAllLabel,
+  describeManageSelectAllShortLabel,
+  describeManageSelectAllTitle,
   describeManageSelectModeLabel,
   selectWallIdRange,
   toggleWallSelection,
@@ -116,7 +119,10 @@ import {
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
 import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
-import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import {
+  describeDeleteForeverLabel,
+  describeDeletingLabel,
+} from "@/lib/gallery/media-health-toast"
 import {
   describeCreatingLabel,
   describeSavingLabel,
@@ -1331,16 +1337,16 @@ export function UploadManageList({
                 null
             }}
             aria-pressed={allSelected}
-            aria-label={
-              allSelected
-                ? "Clear all selected works"
-                : `Select all ${visibleSelectableItems.length} visible works`
-            }
+            aria-label={describeManageSelectAllTitle(
+              allSelected,
+              visibleSelectableItems.length
+            )}
             className={galleryPillClass()}
           >
-            {allSelected
-              ? "Clear all"
-              : `Select all (${visibleSelectableItems.length})`}
+            {describeManageSelectAllLabel(
+              allSelected,
+              visibleSelectableItems.length
+            )}
           </button>
         ) : null}
         <GalleryKeyboardCheatsheet
@@ -1383,14 +1389,13 @@ export function UploadManageList({
                       ?.id ?? null
                 }}
                 aria-pressed={allSelected}
-                aria-label={
-                  allSelected
-                    ? "Clear all selected works"
-                    : `Select all ${visibleSelectableItems.length} visible works`
-                }
+                aria-label={describeManageSelectAllTitle(
+                  allSelected,
+                  visibleSelectableItems.length
+                )}
                 className={galleryPillClass()}
               >
-                {allSelected ? "Clear" : "Select all"}
+                {describeManageSelectAllShortLabel(allSelected)}
               </button>
               {albumsAvailable ? (
                 <>
@@ -2034,7 +2039,9 @@ export function UploadManageList({
               onClick={confirmBatchDelete}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isPending ? describeDeletingLabel() : "Delete forever"}
+              {isPending
+                ? describeDeletingLabel()
+                : describeDeleteForeverLabel()}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
