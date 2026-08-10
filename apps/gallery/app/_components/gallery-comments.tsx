@@ -177,6 +177,7 @@ export function GalleryComments({
   }
 
   const submit = () => {
+    if (isPending) return
     if (!isSignedIn) {
       toast.error("Please sign in before commenting.")
       return
@@ -209,6 +210,7 @@ export function GalleryComments({
   }
 
   const removeComment = (commentId: string) => {
+    if (isPending) return
     startTransition(async () => {
       const result = await deleteGalleryComment(commentId)
       if (!result.ok) {
@@ -237,6 +239,7 @@ export function GalleryComments({
   }
 
   const saveEdit = (commentId: string) => {
+    if (isPending) return
     const body = editDraft.trim()
     if (!body) return
 
@@ -264,6 +267,7 @@ export function GalleryComments({
   }
 
   const toggleLike = (commentId: string) => {
+    if (isPending) return
     startTransition(async () => {
       const result = await toggleGalleryCommentLike(commentId)
       if (!result.ok) {
@@ -285,6 +289,7 @@ export function GalleryComments({
   }
 
   const togglePin = (comment: GalleryComment) => {
+    if (isPending) return
     const nextPinned = !comment.pinned_at
     startTransition(async () => {
       const result = await setGalleryCommentPin(comment.id, nextPinned)
