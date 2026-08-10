@@ -114,6 +114,7 @@ import {
 } from "@/lib/gallery/wall-selection-share"
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeBulkTakenAtSet } from "@/lib/gallery/bulk-taken-at"
+import { describeSequenceUpdated } from "@/lib/gallery/manage-toast"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
 import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
@@ -357,7 +358,7 @@ function UploadSequenceGroup({
         toast.error(result.error)
         setItems(initialItems)
       } else {
-        toast.success("Sequence updated.")
+        toast.success(describeSequenceUpdated())
       }
     })
   }

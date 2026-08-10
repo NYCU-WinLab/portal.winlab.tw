@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { renameGalleryImage } from "@/app/upload/actions"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { describeArtworkTitleUpdated } from "@/lib/gallery/manage-toast"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
 
@@ -74,7 +75,7 @@ export function GalleryTitleEditor({
         return
       }
       onRenamed?.(result.names)
-      toast.success("Title updated")
+      toast.success(describeArtworkTitleUpdated())
       endEditing()
     })
   }

@@ -16,6 +16,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { updateGalleryImageTakenAt } from "@/app/upload/actions"
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeCaptureDateUpdated } from "@/lib/gallery/manage-toast"
 import {
   fromTaipeiDateInput,
   toTaipeiDateInput,
@@ -63,7 +64,7 @@ export function TakenAtEditor({
       )
       if (result.ok) {
         onUpdated?.(result.takenAt)
-        toast.success("Capture date updated")
+        toast.success(describeCaptureDateUpdated())
         setOpen(false)
       } else {
         toast.error(result.error)

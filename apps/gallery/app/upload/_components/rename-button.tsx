@@ -15,6 +15,7 @@ import { Input } from "@workspace/ui/components/input"
 
 import { renameGalleryImage } from "@/app/upload/actions"
 import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
+import { describeArtworkNameUpdated } from "@/lib/gallery/manage-toast"
 
 export function RenameButton({
   id,
@@ -45,7 +46,7 @@ export function RenameButton({
         const applied =
           result.names.find((patch) => patch.id === id)?.name ?? draft
         onRenamed?.(applied)
-        toast.success("Name updated")
+        toast.success(describeArtworkNameUpdated())
         setOpen(false)
       } else {
         toast.error(result.error)
