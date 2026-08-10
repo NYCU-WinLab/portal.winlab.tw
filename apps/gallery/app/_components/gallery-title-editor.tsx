@@ -134,7 +134,7 @@ export function GalleryTitleEditor({
           )}
           autoComplete="off"
           spellCheck={false}
-          aria-busy={pending}
+          aria-busy={pending || undefined}
         />
         <div
           className={cn(
