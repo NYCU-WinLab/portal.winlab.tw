@@ -69,12 +69,14 @@ type WallFilterable = {
   ilike(column: string, value: string): WallFilterable
 }
 
+export type { WallFilterable }
+
 /**
  * Apply the shared wall filters (uploader / media / after / query). Typed
  * against the flat WallFilterable shape so TS never re-instantiates the full
  * PostgREST builder generic; callers cast the result back to their builder.
  */
-function applyWallFilters(
+export function applyWallFilters(
   query: WallFilterable,
   filters: GalleryHomeFilters,
   options: { skipQuery?: boolean } = {}
