@@ -47,6 +47,7 @@ import {
   describePhotoLinkCopied,
   describeSavedOriginal,
 } from "@/lib/gallery/photo-share-toast"
+import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
@@ -336,9 +337,7 @@ export function GalleryCard({
         toast.error(result.error)
         return
       }
-      toast.success(
-        result.favorited ? "Saved to favorites" : "Removed from favorites"
-      )
+      toast.success(describeFavoriteToast(result.favorited))
     } finally {
       favoriteBusyRef.current = false
     }
