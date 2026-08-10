@@ -15,6 +15,7 @@ import { galleryPillClass } from "@/components/gallery-chrome"
 import { setGalleryReaction } from "@/app/actions"
 import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
 import { nextReactionState } from "@/lib/gallery/reaction-optimistic"
+import { describeReactionOutcome } from "@/lib/gallery/reaction-outcome"
 import {
   GALLERY_REACTIONS,
   type GalleryReaction,
@@ -294,9 +295,7 @@ export function useGalleryCardSocial({
       setCounts(next.counts)
       setNamesByReaction(next.names)
       setMyReaction(next.myReaction)
-      if (next.outcome === "removed") toast.success("Reaction removed.")
-      else if (next.outcome === "updated") toast.success("Reaction updated.")
-      else toast.success("Reaction added.")
+      toast.success(describeReactionOutcome(next.outcome))
     })
   }
 
