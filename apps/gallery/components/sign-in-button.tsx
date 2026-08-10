@@ -20,6 +20,7 @@ export function SignInButton({ next }: { next?: string }) {
   const [pending, startTransition] = useTransition()
 
   function onClick() {
+    if (pending) return
     startTransition(async () => {
       try {
         if (typeof window !== "undefined" && next && next.startsWith("/")) {

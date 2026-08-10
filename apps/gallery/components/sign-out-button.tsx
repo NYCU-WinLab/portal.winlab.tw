@@ -20,6 +20,7 @@ export function SignOutButton({
   const router = useRouter()
 
   function onClick() {
+    if (pending) return
     startTransition(async () => {
       try {
         const supabase = createClient()
