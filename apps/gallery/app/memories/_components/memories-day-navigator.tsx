@@ -32,7 +32,7 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
 
   const softPush = (
     href: string,
-    errorKey: "memoriesPreviousDay" | "memoriesNextDay"
+    errorKey: "memoriesPreviousDay" | "memoriesNextDay" | "memoriesToday"
   ) => {
     try {
       router.push(href)
@@ -68,12 +68,18 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
       if (key === "ArrowRight" || key === "j" || key === "J") {
         event.preventDefault()
         softPush(memoriesDayHref(next.month, next.day), "memoriesNextDay")
+        return
+      }
+      if (key === "t" || key === "T") {
+        if (viewingToday) return
+        event.preventDefault()
+        softPush("/memories", "memoriesToday")
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [next.day, next.month, prev.day, prev.month, router])
+  }, [next.day, next.month, prev.day, prev.month, router, viewingToday])
 
   return (
     <nav

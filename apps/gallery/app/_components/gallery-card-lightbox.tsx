@@ -289,7 +289,7 @@ export function GalleryLightboxMediaPane({
             "gallery-lightbox-hint pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-full bg-black/40 px-2.5 py-1 text-[10px] tracking-wide text-white/80 uppercase backdrop-blur-sm sm:block"
           )}
         >
-          ← → navigate · S share · ? keys
+          ← → navigate · R react · S share · ? keys
         </p>
       ) : null}
     </div>

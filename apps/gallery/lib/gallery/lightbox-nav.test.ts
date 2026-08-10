@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   adjacentListId,
+  edgeListId,
   nextSequenceIndex,
   resolveLightboxNextStep,
   resolveLightboxPrevStep,
@@ -49,5 +50,16 @@ describe("adjacentListId", () => {
 
   test("returns null when current id is missing", () => {
     expect(adjacentListId(["a", "b"], "z", "next")).toBeNull()
+  })
+})
+
+describe("edgeListId", () => {
+  test("returns first and last", () => {
+    expect(edgeListId(["a", "b", "c"], "first")).toBe("a")
+    expect(edgeListId(["a", "b", "c"], "last")).toBe("c")
+  })
+
+  test("returns null for empty lists", () => {
+    expect(edgeListId([], "first")).toBeNull()
   })
 })

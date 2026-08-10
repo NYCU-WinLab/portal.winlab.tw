@@ -50,3 +50,12 @@ export function adjacentListId(
   }
   return ids[(index + 1) % ids.length] ?? null
 }
+
+/** First or last id in a list (Home/End jumps). */
+export function edgeListId(
+  ids: readonly string[],
+  edge: "first" | "last"
+): string | null {
+  if (ids.length === 0) return null
+  return (edge === "first" ? ids[0] : ids[ids.length - 1]) ?? null
+}

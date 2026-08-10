@@ -19,6 +19,7 @@ export const galleryNavErrors = {
   refreshGalleryChrome: "Theme saved, but the page could not refresh.",
   memoriesPreviousDay: "Could not open the previous Memories day.",
   memoriesNextDay: "Could not open the next Memories day.",
+  memoriesToday: "Could not open today’s Memories.",
 } as const
 
 export type GalleryNavErrorKey = keyof typeof galleryNavErrors

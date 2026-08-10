@@ -433,8 +433,8 @@ export function ReactionBar({
         aria-pressed={Boolean(myReaction)}
         aria-label={
           myReaction
-            ? `Your reaction ${REACTION_EMOJI[myReaction]}. Hold or hover for more`
-            : "React. Hold or hover for more"
+            ? `Your reaction ${REACTION_EMOJI[myReaction]}. ArrowUp or Alt+Enter for more`
+            : "React. ArrowUp or Alt+Enter for more"
         }
         className={cn(
           "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors select-none",

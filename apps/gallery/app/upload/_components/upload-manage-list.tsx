@@ -1377,7 +1377,8 @@ export function UploadManageList({
         </button>
         {selectionMode ? (
           <span className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-            Shift+click or click a row for ranges · A selects visible
+            J/K move focus · Space toggles · Shift+click ranges · A selects
+            visible
           </span>
         ) : null}
         {sequencesAvailable && incompleteCount > 0 ? (

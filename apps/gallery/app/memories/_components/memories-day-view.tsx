@@ -18,7 +18,7 @@ import { MemoriesYearSections } from "@/app/memories/_components/memories-year-s
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
-import { adjacentListId } from "@/lib/gallery/lightbox-nav"
+import { adjacentListId, edgeListId } from "@/lib/gallery/lightbox-nav"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
 import {
   findSlideshowIndexByImageId,
@@ -120,7 +120,7 @@ export function MemoriesDayView({
       }
       if (event.key === "Home") {
         event.preventDefault()
-        const first = photoIds[0]
+        const first = edgeListId(photoIds, "first")
         if (!first || first === openId) return
         setLightboxFailed(false)
         setOpenId(first)
@@ -128,7 +128,7 @@ export function MemoriesDayView({
       }
       if (event.key === "End") {
         event.preventDefault()
-        const last = photoIds[photoIds.length - 1]
+        const last = edgeListId(photoIds, "last")
         if (!last || last === openId) return
         setLightboxFailed(false)
         setOpenId(last)

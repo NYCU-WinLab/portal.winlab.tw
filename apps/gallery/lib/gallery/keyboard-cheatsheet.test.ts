@@ -70,6 +70,7 @@ describe("GALLERY_MEMORIES_SHORTCUTS", () => {
     expect(joined).toContain("→")
     expect(joined).toContain("J")
     expect(joined).toContain("K")
+    expect(joined).toContain("T")
     expect(joined).toContain("?")
   })
 })
