@@ -13,7 +13,6 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
-import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
@@ -172,11 +171,6 @@ export function MemoriesDayView({
             Slideshow
           </button>
         ) : null}
-        <GalleryKeyboardCheatsheet
-          memories
-          slideshowOpen={slideshowOpen}
-          lightboxOpen={Boolean(active)}
-        />
       </div>
 
       <MemoriesYearSections

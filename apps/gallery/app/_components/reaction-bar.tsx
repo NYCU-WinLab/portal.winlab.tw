@@ -14,6 +14,7 @@ import {
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
 import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { shouldOpenReactionFromSignal } from "@/lib/gallery/keyboard-hint-labels"
 import { shouldStopLightboxEscape } from "@/lib/gallery/reaction-escape"
 import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 
@@ -229,7 +230,9 @@ export function ReactionBar({
 
   const openSignalSeen = useRef(0)
   useEffect(() => {
-    if (openSignal <= 0 || openSignal === openSignalSeen.current) return
+    if (!shouldOpenReactionFromSignal(openSignalSeen.current, openSignal)) {
+      return
+    }
     openSignalSeen.current = openSignal
     if (!canReact || busy) return
     openPicker()

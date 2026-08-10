@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
@@ -82,55 +83,58 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
   }, [next.day, next.month, prev.day, prev.month, router, viewingToday])
 
   return (
-    <nav
-      aria-label={describeChooseCalendarDayAriaLabel()}
-      className={cn(
-        gallerySans(),
-        "flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-      )}
-    >
-      <Link
-        href={memoriesDayHref(prev.month, prev.day)}
+    <div className="flex flex-wrap items-center gap-2">
+      <nav
+        aria-label={describeChooseCalendarDayAriaLabel()}
         className={cn(
-          "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
-          "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
+          gallerySans(),
+          "flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
         )}
-        aria-label={describePreviousDayAriaLabel()}
       >
-        <IconChevronLeft className="size-4" aria-hidden />
-        <span className="hidden sm:inline">Previous</span>
-      </Link>
-
-      {viewingToday ? (
-        <span
-          className="inline-flex h-9 items-center rounded-md px-2.5 text-xs tracking-[0.14em] text-muted-foreground uppercase"
-          aria-current="date"
-        >
-          Today
-        </span>
-      ) : (
         <Link
-          href="/memories"
+          href={memoriesDayHref(prev.month, prev.day)}
           className={cn(
-            "inline-flex h-9 items-center rounded-md border border-border/60 bg-background/70 px-2.5 text-xs tracking-[0.14em] uppercase",
+            "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
             "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
           )}
+          aria-label={describePreviousDayAriaLabel()}
         >
-          Today
+          <IconChevronLeft className="size-4" aria-hidden />
+          <span className="hidden sm:inline">Previous</span>
         </Link>
-      )}
 
-      <Link
-        href={memoriesDayHref(next.month, next.day)}
-        className={cn(
-          "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
-          "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
+        {viewingToday ? (
+          <span
+            className="inline-flex h-9 items-center rounded-md px-2.5 text-xs tracking-[0.14em] text-muted-foreground uppercase"
+            aria-current="date"
+          >
+            Today
+          </span>
+        ) : (
+          <Link
+            href="/memories"
+            className={cn(
+              "inline-flex h-9 items-center rounded-md border border-border/60 bg-background/70 px-2.5 text-xs tracking-[0.14em] uppercase",
+              "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
+            )}
+          >
+            Today
+          </Link>
         )}
-        aria-label={describeNextDayAriaLabel()}
-      >
-        <span className="hidden sm:inline">Next</span>
-        <IconChevronRight className="size-4" aria-hidden />
-      </Link>
-    </nav>
+
+        <Link
+          href={memoriesDayHref(next.month, next.day)}
+          className={cn(
+            "inline-flex h-9 items-center gap-1 rounded-md border border-border/60 bg-background/70 px-2.5",
+            "hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:outline-none"
+          )}
+          aria-label={describeNextDayAriaLabel()}
+        >
+          <span className="hidden sm:inline">Next</span>
+          <IconChevronRight className="size-4" aria-hidden />
+        </Link>
+      </nav>
+      <GalleryKeyboardCheatsheet memories />
+    </div>
   )
 }

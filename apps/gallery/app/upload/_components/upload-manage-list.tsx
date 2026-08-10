@@ -78,6 +78,7 @@ import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
+import { describeManageSelectHintLabel } from "@/lib/gallery/keyboard-hint-labels"
 import {
   describeManageSelectAllLabel,
   describeManageSelectAllShortLabel,
@@ -1377,8 +1378,7 @@ export function UploadManageList({
         </button>
         {selectionMode ? (
           <span className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-            J/K move focus · Space toggles · Shift+click ranges · A selects
-            visible
+            {describeManageSelectHintLabel()}
           </span>
         ) : null}
         {sequencesAvailable && incompleteCount > 0 ? (

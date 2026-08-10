@@ -187,12 +187,16 @@ export function GalleryGrid({
   }
 
   const closeLightbox = () => {
+    const returnId = openIndex !== null ? (images[openIndex]?.id ?? null) : null
     setOpenIndex(null)
     const params = new URLSearchParams(window.location.search)
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
     softReplace(qs ? `/?${qs}` : "/", describeGalleryNavError("closePhoto"))
+    queueMicrotask(() => {
+      if (returnId) cardFocusRefs.current.get(returnId)?.focus()
+    })
   }
 
   useEffect(() => {

@@ -31,6 +31,7 @@ import {
 } from "@/app/_components/gallery-card-media"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
+import { describeLightboxHintLabel } from "@/lib/gallery/keyboard-hint-labels"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import {
   describeLightboxCloseAriaLabel,
@@ -289,7 +290,7 @@ export function GalleryLightboxMediaPane({
             "gallery-lightbox-hint pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-full bg-black/40 px-2.5 py-1 text-[10px] tracking-wide text-white/80 uppercase backdrop-blur-sm sm:block"
           )}
         >
-          ← → navigate · R react · S share · ? keys
+          {describeLightboxHintLabel()}
         </p>
       ) : null}
     </div>
