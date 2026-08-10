@@ -42,6 +42,7 @@ import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
 import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { shareOrCopyPhotoLink } from "@/lib/gallery/photo-share"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
@@ -281,33 +282,31 @@ export function GalleryCard({
 
   const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
   const favoriteBusyRef = useRef(false)
+  const shareBusyRef = useRef(false)
 
   useEffect(() => {
     setFavorited(Boolean(image.is_favorited))
   }, [image.id, image.is_favorited])
 
   const copyShareLink = useCallback(async () => {
-    const href = buildGalleryPhotoHref({
-      photoId: image.id,
-      commentId: highlightCommentId,
-    })
-    const url = `${window.location.origin}${href}`
-    const title = activeItem?.name ?? image.name
-
+    if (shareBusyRef.current) return
+    shareBusyRef.current = true
     try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ title, url })
+      const href = buildGalleryPhotoHref({
+        photoId: image.id,
+        commentId: highlightCommentId,
+      })
+      const url = `${window.location.origin}${href}`
+      const title = activeItem?.name ?? image.name
+      const result = await shareOrCopyPhotoLink({ url, title })
+      if (!result.ok) {
+        if (result.reason === "aborted") return
+        toast.error(result.message)
         return
       }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return
-    }
-
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success("Link copied.")
-    } catch {
-      toast.error("Could not copy link.")
+      if (result.mode === "copied") toast.success("Link copied.")
+    } finally {
+      shareBusyRef.current = false
     }
   }, [activeItem?.name, highlightCommentId, image.id, image.name])
 
