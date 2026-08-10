@@ -660,6 +660,7 @@ export function UploadManageList({
   const [slideshowTitle, setSlideshowTitle] = useState("Manage selection")
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
   const [zipBusy, setZipBusy] = useState(false)
+  const copyLinksBusyRef = useRef(false)
   const [isPending, startTransition] = useTransition()
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [uploadDayOnly, setUploadDayOnly] = useState(false)
@@ -1039,7 +1040,7 @@ export function UploadManageList({
   }
 
   const copySelectedLinks = async () => {
-    if (orderedSelectedIds.length === 0) return
+    if (orderedSelectedIds.length === 0 || copyLinksBusyRef.current) return
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
       toast.error("Could not copy links in this context.")
@@ -1050,12 +1051,15 @@ export function UploadManageList({
       images
     )
     if (photoIds.length === 0) return
+    copyLinksBusyRef.current = true
     const text = buildWallSelectionShareText(photoIds, origin)
     try {
       await navigator.clipboard.writeText(text)
       toast.success(describeWallSelectionCopy(photoIds.length))
     } catch {
       toast.error("Could not copy to the clipboard.")
+    } finally {
+      copyLinksBusyRef.current = false
     }
   }
 

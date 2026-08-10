@@ -131,6 +131,7 @@ export function GalleryWallSelectBar({
   const [pending, startTransition] = useTransition()
   const [saveOpenBusy, setSaveOpenBusy] = useState(false)
   const [zipBusy, setZipBusy] = useState(false)
+  const copyLinksBusyRef = useRef(false)
   const [tagDraft, setTagDraft] = useState("")
   const [albumDraft, setAlbumDraft] = useState("")
   const [tagFormOpen, setTagFormOpen] = useState(false)
@@ -404,18 +405,21 @@ export function GalleryWallSelectBar({
   }
 
   const copySelectedLinks = async () => {
-    if (selectedIds.length === 0) return
+    if (selectedIds.length === 0 || copyLinksBusyRef.current) return
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     if (!origin) {
       toast.error("Could not copy links in this context.")
       return
     }
+    copyLinksBusyRef.current = true
     const text = buildWallSelectionShareText(selectedIds, origin)
     try {
       await navigator.clipboard.writeText(text)
       toast.success(describeWallSelectionCopy(selectedIds.length))
     } catch {
       toast.error("Could not copy to the clipboard.")
+    } finally {
+      copyLinksBusyRef.current = false
     }
   }
 
