@@ -2,7 +2,7 @@
 export function describeZipPreparingProgress(input: {
   completed: number
   total: number
-  noun: "album" | "selection"
+  noun: "album" | "selection" | "story"
 }): string {
   const { completed, total, noun } = input
   return `Preparing ${noun}… ${completed}/${total}`

@@ -11,6 +11,7 @@ import {
   buildSequenceZipFilename,
   type SequenceZipSource,
 } from "@/lib/gallery/zip-names"
+import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
 
 type DownloadSequenceButtonProps = {
   items: SequenceZipSource[]
@@ -40,14 +41,27 @@ export function DownloadSequenceButton({
   const runDownload = async () => {
     if (busy || disabled || shotCount < 2) return
     setBusy(true)
-    const toastId = toast.loading(`Preparing story… 0/${shotCount}`)
+    const toastId = toast.loading(
+      describeZipPreparingProgress({
+        completed: 0,
+        total: shotCount,
+        noun: "story",
+      })
+    )
     try {
       const result = await downloadSequenceZip(items, {
         zipName: coverName ? buildSequenceZipFilename(coverName) : undefined,
         onProgress: ({ completed, total }) => {
-          toast.loading(`Preparing story… ${completed}/${total}`, {
-            id: toastId,
-          })
+          toast.loading(
+            describeZipPreparingProgress({
+              completed,
+              total,
+              noun: "story",
+            }),
+            {
+              id: toastId,
+            }
+          )
         },
       })
       toast.success(

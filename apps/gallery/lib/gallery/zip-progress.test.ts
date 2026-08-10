@@ -19,4 +19,14 @@ describe("describeZipPreparingProgress", () => {
       })
     ).toBe("Preparing selection… 2/5")
   })
+
+  test("formats story progress", () => {
+    expect(
+      describeZipPreparingProgress({
+        completed: 1,
+        total: 3,
+        noun: "story",
+      })
+    ).toBe("Preparing story… 1/3")
+  })
 })
