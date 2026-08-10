@@ -579,6 +579,7 @@ export function GalleryLightboxSocialAside({
             counts={counts}
             myReaction={myReaction}
             canReact={canReact}
+            busy={reactionBusy}
             onReact={onReact}
           />
         ) : null}
