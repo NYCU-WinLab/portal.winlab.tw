@@ -119,6 +119,14 @@ export function GalleryAlbumManagePanel({
     (photo) => photo.image_id === confirmRemoveId
   )
 
+  const softRefresh = () => {
+    try {
+      router.refresh()
+    } catch {
+      // Best-effort after a successful album mutation.
+    }
+  }
+
   const photoIds = useMemo(() => photos.map((p) => p.image_id), [photos])
   const selectedCount = selected.size
   const allSelected =
@@ -162,7 +170,7 @@ export function GalleryAlbumManagePanel({
       if (result.data.slug !== album.slug) {
         router.replace(`/albums/${result.data.slug}`)
       } else {
-        router.refresh()
+        softRefresh()
       }
     })
   }
@@ -186,7 +194,7 @@ export function GalleryAlbumManagePanel({
         setPhotos(photos)
         return
       }
-      router.refresh()
+      softRefresh()
     })
   }
 
@@ -218,7 +226,7 @@ export function GalleryAlbumManagePanel({
             setPhotos(previous)
             return
           }
-          router.refresh()
+          softRefresh()
         })
         return next
       })
@@ -267,7 +275,7 @@ export function GalleryAlbumManagePanel({
         return
       }
       toast.success("Removed from album")
-      router.refresh()
+      softRefresh()
     })
   }
 
@@ -298,7 +306,7 @@ export function GalleryAlbumManagePanel({
       }
       const removed = result.data.removed
       toast.success(describeAlbumPhotosRemoved(removed))
-      router.refresh()
+      softRefresh()
     })
   }
 
@@ -317,7 +325,7 @@ export function GalleryAlbumManagePanel({
         return
       }
       toast.success("Cover updated")
-      router.refresh()
+      softRefresh()
     })
   }
 
@@ -331,7 +339,7 @@ export function GalleryAlbumManagePanel({
       }
       toast.success("Album deleted")
       router.push("/albums")
-      router.refresh()
+      softRefresh()
     })
   }
 
@@ -390,7 +398,7 @@ export function GalleryAlbumManagePanel({
       >
         <p className="font-medium text-foreground">Share this album</p>
         <p className="mt-0.5">
-          Copy the link and send it — anyone signed into Gallery can open{" "}
+          Copy the link and send it ? anyone signed into Gallery can open{" "}
           <span className="text-foreground">/albums/{album.slug}</span>.
         </p>
         <div className="mt-2">
@@ -452,7 +460,7 @@ export function GalleryAlbumManagePanel({
                 Delete &ldquo;{album.title}&rdquo;?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Photos stay on the wall — only this curated collection goes
+                Photos stay on the wall ? only this curated collection goes
                 away. The share link stops working.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -463,7 +471,7 @@ export function GalleryAlbumManagePanel({
                 aria-busy={pending || undefined}
                 onClick={onDelete}
               >
-                {pending ? "Deleting…" : "Delete"}
+                {pending ? "Deleting?" : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -520,7 +528,7 @@ export function GalleryAlbumManagePanel({
                         {selectedCount === 1 ? "" : "s"}?
                       </AlertDialogTitle>
                       <AlertDialogDescription>
-                        Photos stay on the wall — only this album membership is
+                        Photos stay on the wall ? only this album membership is
                         cleared. If the cover is included, the next remaining
                         shot becomes the cover.
                       </AlertDialogDescription>
@@ -534,7 +542,7 @@ export function GalleryAlbumManagePanel({
                         aria-busy={pending || undefined}
                         onClick={removeSelected}
                       >
-                        {pending ? "Removing…" : "Remove"}
+                        {pending ? "Removing?" : "Remove"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -545,7 +553,7 @@ export function GalleryAlbumManagePanel({
         </div>
         {photos.length === 0 ? (
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-            Add photos from the wall lightbox — pick &ldquo;Add to album&rdquo;.
+            Add photos from the wall lightbox ? pick &ldquo;Add to album&rdquo;.
           </p>
         ) : (
           <ul ref={listRef} className="space-y-2">
@@ -677,7 +685,7 @@ export function GalleryAlbumManagePanel({
             <AlertDialogTitle>
               Remove{" "}
               {confirmRemovePhoto?.name
-                ? `“${confirmRemovePhoto.name}”`
+                ? `?${confirmRemovePhoto.name}?`
                 : "this photo"}{" "}
               from the album?
             </AlertDialogTitle>
@@ -695,7 +703,7 @@ export function GalleryAlbumManagePanel({
                 if (confirmRemoveId) removePhoto(confirmRemoveId)
               }}
             >
-              {pending ? "Removing…" : "Remove"}
+              {pending ? "Removing?" : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
