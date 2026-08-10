@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { setGalleryImagePin } from "@/app/actions"
 import { galleryPillClass } from "@/components/gallery-chrome"
+import { describePinToast } from "@/lib/gallery/pin-toast"
 import { cn } from "@workspace/ui/lib/utils"
 
 export function PinWallButton({
@@ -49,7 +50,7 @@ export function PinWallButton({
       }
       setPinnedAt(result.data.pinned_at)
       onPinnedChange?.(result.data.pinned_at)
-      toast.success(nextPinned ? "Pinned to wall top." : "Unpinned.")
+      toast.success(describePinToast(nextPinned))
       if (nextPinned && navigateHomeOnPin) {
         try {
           router.push("/")
