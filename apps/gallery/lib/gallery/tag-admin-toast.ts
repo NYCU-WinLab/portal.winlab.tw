@@ -32,3 +32,8 @@ export function describeEditTagsAriaLabel(imageName: string): string {
 export function describeAddTagAriaLabel(): string {
   return "Add tag"
 }
+
+/** Placeholder for the add-tag input on a photo. */
+export function describeAddTagPlaceholder(): string {
+  return "Add a tag…"
+}

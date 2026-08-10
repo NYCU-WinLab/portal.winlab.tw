@@ -47,6 +47,7 @@ import {
 } from "@/lib/gallery/home-filters"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeInvalidTagSlug } from "@/lib/gallery/validation-toasts"
+import { describeTagSlugPlaceholder } from "@/lib/gallery/wall-select-labels"
 import type { GalleryMember } from "@/lib/gallery/types"
 import {
   normalizeGalleryTagSlug,
@@ -456,7 +457,7 @@ export function GalleryHomeFiltersBar({
                             applyTagDraft()
                           }
                         }}
-                        placeholder="slug…"
+                        placeholder={describeTagSlugPlaceholder()}
                         className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
                       />
                       <button
@@ -670,7 +671,7 @@ export function GalleryHomeFiltersBar({
                           applyTagDraft()
                         }
                       }}
-                      placeholder="slug…"
+                      placeholder={describeTagSlugPlaceholder()}
                       className="min-h-7 min-w-0 flex-1 rounded-[2px] border border-zinc-800/15 bg-white px-2 text-xs outline-none"
                     />
                     <button

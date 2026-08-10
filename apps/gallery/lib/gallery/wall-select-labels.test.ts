@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeAlbumTitlePlaceholder,
+  describeBulkTagExamplesPlaceholder,
   describeMoreSelectionActionsAriaLabel,
   describeNewAlbumTitleAriaLabel,
+  describeSignInToCurateLabel,
   describeTagDraftPlaceholder,
+  describeTagSlugPlaceholder,
   describeTagToApplyAriaLabel,
 } from "@/lib/gallery/wall-select-labels"
 
@@ -20,5 +23,11 @@ describe("wall select labels", () => {
   test("bulk-curate placeholders", () => {
     expect(describeTagDraftPlaceholder()).toBe("Tag…")
     expect(describeAlbumTitlePlaceholder()).toBe("Album title…")
+    expect(describeBulkTagExamplesPlaceholder()).toBe("retreat, axolotl…")
+    expect(describeTagSlugPlaceholder()).toBe("slug…")
+  })
+
+  test("signed-out curate label", () => {
+    expect(describeSignInToCurateLabel()).toBe("Sign in to curate")
   })
 })

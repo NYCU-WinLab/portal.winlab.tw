@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeAddTagAriaLabel,
+  describeAddTagPlaceholder,
   describeCouldNotLoadTags,
   describeEditTagsAriaLabel,
   describeTagMerged,
@@ -52,5 +53,9 @@ describe("manage tags chrome labels", () => {
 
   test("describeAddTagAriaLabel", () => {
     expect(describeAddTagAriaLabel()).toBe("Add tag")
+  })
+
+  test("describeAddTagPlaceholder", () => {
+    expect(describeAddTagPlaceholder()).toBe("Add a tag…")
   })
 })

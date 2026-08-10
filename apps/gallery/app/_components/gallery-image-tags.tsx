@@ -27,7 +27,10 @@ import {
   type GalleryTag,
 } from "@/lib/gallery/tags"
 import { describeTagLimitReached } from "@/lib/gallery/validation-toasts"
-import { describeAddTagAriaLabel } from "@/lib/gallery/tag-admin-toast"
+import {
+  describeAddTagAriaLabel,
+  describeAddTagPlaceholder,
+} from "@/lib/gallery/tag-admin-toast"
 import { cn } from "@workspace/ui/lib/utils"
 
 export function GalleryImageTags({
@@ -159,7 +162,7 @@ export function GalleryImageTags({
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
             maxLength={40}
-            placeholder="Add a tag…"
+            placeholder={describeAddTagPlaceholder()}
             disabled={isPending || tags.length >= GALLERY_TAGS_PER_IMAGE_MAX}
             className="min-h-8 min-w-0 flex-1 rounded-[2px] border border-zinc-800/18 bg-white/90 px-2.5 text-xs outline-none placeholder:text-zinc-400 focus:border-zinc-800/35"
           />

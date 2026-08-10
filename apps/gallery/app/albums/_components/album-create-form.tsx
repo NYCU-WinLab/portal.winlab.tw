@@ -26,7 +26,11 @@ import {
   shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
 import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
-import { describeCreateAlbumLabel } from "@/lib/gallery/album-manage-copy"
+import {
+  describeCreateAlbumLabel,
+  describeAlbumCreateDescriptionPlaceholder,
+  describeAlbumCreateTitlePlaceholder,
+} from "@/lib/gallery/album-manage-copy"
 import { describeCreatingLabel } from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
@@ -116,7 +120,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           maxLength={GALLERY_ALBUM_TITLE_MAX}
-          placeholder="Lab retreat, demo day…"
+          placeholder={describeAlbumCreateTitlePlaceholder()}
           disabled={pending}
           required
         />
@@ -131,7 +135,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           maxLength={GALLERY_ALBUM_DESCRIPTION_MAX}
-          placeholder="A short note for anyone opening the share link."
+          placeholder={describeAlbumCreateDescriptionPlaceholder()}
           disabled={pending}
           rows={3}
         />

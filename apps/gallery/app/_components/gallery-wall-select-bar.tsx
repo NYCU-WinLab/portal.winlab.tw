@@ -86,6 +86,7 @@ import {
   describeNewAlbumTitleAriaLabel,
   describeTagDraftPlaceholder,
   describeTagToApplyAriaLabel,
+  describeSignInToCurateLabel,
 } from "@/lib/gallery/wall-select-labels"
 
 export function GalleryWallSelectBar({
@@ -622,10 +623,10 @@ export function GalleryWallSelectBar({
                       "h-8 gap-1.5 text-[11px] uppercase"
                     )}
                     disabled
-                    title="Sign in to curate"
+                    title={describeSignInToCurateLabel()}
                   >
                     <IconAlbum className="size-3.5" aria-hidden />
-                    Sign in to curate
+                    {describeSignInToCurateLabel()}
                   </Button>
                 )}
               </div>

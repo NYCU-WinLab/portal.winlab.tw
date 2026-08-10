@@ -123,7 +123,12 @@ import {
   describeTaggingLabel,
   describeUntaggingLabel,
 } from "@/lib/gallery/busy-labels"
-import { describeMoreSelectionActionsAriaLabel } from "@/lib/gallery/wall-select-labels"
+import {
+  describeAlbumTitlePlaceholder,
+  describeBulkTagExamplesPlaceholder,
+  describeMoreSelectionActionsAriaLabel,
+  describeTagSlugPlaceholder,
+} from "@/lib/gallery/wall-select-labels"
 import {
   describeSequenceCompactingToast,
   describeCouldNotBuildZip,
@@ -1856,7 +1861,7 @@ export function UploadManageList({
                 }
               }}
               disabled={isPending}
-              placeholder="retreat, axolotl…"
+              placeholder={describeBulkTagExamplesPlaceholder()}
               className="text-base"
               autoComplete="off"
             />
@@ -1911,7 +1916,7 @@ export function UploadManageList({
                 }
               }}
               disabled={isPending}
-              placeholder="slug…"
+              placeholder={describeTagSlugPlaceholder()}
               className="text-base"
               autoComplete="off"
             />
@@ -1965,7 +1970,7 @@ export function UploadManageList({
                   createAlbumFromSelection()
                 }
               }}
-              placeholder="Album title…"
+              placeholder={describeAlbumTitlePlaceholder()}
               disabled={isPending}
               className="text-base"
               autoFocus

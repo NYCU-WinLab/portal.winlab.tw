@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeAlbumCoverUpdated,
+  describeAlbumCreateDescriptionPlaceholder,
+  describeAlbumCreateTitlePlaceholder,
   describeAlbumDeleted,
   describeAlbumPhotoRemoved,
   describeAlbumPhotosRemoved,
@@ -39,5 +41,12 @@ describe("album manage toast helpers", () => {
 
   test("describeCreateAlbumLabel", () => {
     expect(describeCreateAlbumLabel()).toBe("Create album")
+  })
+
+  test("create form placeholders", () => {
+    expect(describeAlbumCreateTitlePlaceholder()).toBe("Lab retreat, demo day…")
+    expect(describeAlbumCreateDescriptionPlaceholder()).toBe(
+      "A short note for anyone opening the share link."
+    )
   })
 })

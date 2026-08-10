@@ -28,3 +28,13 @@ export function describeAlbumDeleted(): string {
 export function describeCreateAlbumLabel(): string {
   return "Create album"
 }
+
+/** Placeholder for the album create title field. */
+export function describeAlbumCreateTitlePlaceholder(): string {
+  return "Lab retreat, demo day…"
+}
+
+/** Placeholder for the album create description field. */
+export function describeAlbumCreateDescriptionPlaceholder(): string {
+  return "A short note for anyone opening the share link."
+}

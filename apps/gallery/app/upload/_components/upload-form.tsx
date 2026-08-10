@@ -16,6 +16,10 @@ import {
   describeDevelopingLabel,
   describeCancelUploadLabel,
 } from "@/lib/gallery/busy-labels"
+import {
+  describeUntitledLabMomentPlaceholder,
+  describeUploadTagsPlaceholder,
+} from "@/lib/gallery/upload-form-labels"
 import { describeHangUploadLabel } from "@/lib/gallery/hang-upload-label"
 import { formatFailurePreview } from "@/lib/gallery/upload-errors"
 import { buildArtworkName } from "@/lib/gallery/upload-naming"
@@ -180,7 +184,7 @@ export function UploadForm({
         <Input
           id="gallery-name"
           name="name"
-          placeholder="Untitled lab moment"
+          placeholder={describeUntitledLabMomentPlaceholder()}
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={pending}
@@ -206,7 +210,7 @@ export function UploadForm({
         <Input
           id="gallery-tags"
           name="tags"
-          placeholder="lab trip, sunset"
+          placeholder={describeUploadTagsPlaceholder()}
           value={tagsDraft}
           onChange={(e) => setTagsDraft(e.target.value)}
           disabled={pending}
