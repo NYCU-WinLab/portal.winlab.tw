@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import {
   describeNothingSelectedError,
   describeSelectAtLeastOneWorkError,
+  describeSelectAtMost100WorksError,
 } from "@/lib/gallery/action-errors"
 import { attachGalleryTagsToImage } from "@/app/actions/tags"
 import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
@@ -659,7 +660,7 @@ export async function updateGalleryImagesTakenAt(
     return { ok: false, error: describeSelectAtLeastOneWorkError() }
   }
   if (uniqueIds.length > 100) {
-    return { ok: false, error: "Select at most 100 works at a time." }
+    return { ok: false, error: describeSelectAtMost100WorksError() }
   }
 
   const supabase = await createClient()

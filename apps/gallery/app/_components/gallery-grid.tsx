@@ -19,7 +19,12 @@ import {
   type GalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
 import { describeGalleryWallAriaLabel } from "@/lib/gallery/reaction-wall-labels"
-import { describeNothingOnWallYetTitle } from "@/lib/gallery/empty-state-labels"
+import {
+  describeNothingOnWallYetDescription,
+  describeNothingOnWallYetTitle,
+  describeSignInToUploadLabel,
+  describeUploadAPhotoLabel,
+} from "@/lib/gallery/empty-state-labels"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
@@ -304,18 +309,18 @@ export function GalleryGrid({
     return (
       <GalleryEmptyState
         title={describeNothingOnWallYetTitle()}
-        description="Hang the first polaroid — the lab wall is waiting."
+        description={describeNothingOnWallYetDescription()}
         action={
           isSignedIn ? (
             <Link href="/upload" className={galleryNavLinkClass(true)}>
-              Upload a photo
+              {describeUploadAPhotoLabel()}
             </Link>
           ) : (
             <Link
               href="/auth/login?next=/upload"
               className={galleryNavLinkClass(true)}
             >
-              Sign in to upload
+              {describeSignInToUploadLabel()}
             </Link>
           )
         }

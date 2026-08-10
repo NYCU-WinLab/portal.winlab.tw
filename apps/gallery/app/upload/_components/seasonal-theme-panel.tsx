@@ -22,6 +22,7 @@ import {
 import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeSeasonalSiteThemeAriaLabel } from "@/lib/gallery/install-theme-labels"
+import { describePaperWallThemeLabel } from "@/lib/gallery/empty-state-labels"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
@@ -32,7 +33,7 @@ const THEME_OPTIONS: Array<{
 }> = [
   {
     value: "off",
-    label: "Paper wall",
+    label: describePaperWallThemeLabel(),
     hint: "Default darkroom renewal",
   },
   ...GALLERY_SEASONAL_THEME_IDS.map((id) => ({

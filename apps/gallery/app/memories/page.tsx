@@ -14,7 +14,9 @@ import {
 } from "@/lib/gallery/memories"
 import {
   describeBackToTheWallLabel,
+  describeMemoriesEmptyTrayDescription,
   describeMemoriesEmptyTrayTitle,
+  describeMemoriesNotReadyDescription,
   describeMemoriesNotReadyTitle,
 } from "@/lib/gallery/empty-state-labels"
 import { flattenMemoryGroupsForSlideshow } from "@/lib/gallery/slideshow"
@@ -76,7 +78,7 @@ export default async function MemoriesPage({
         {!memoriesAvailable ? (
           <GalleryEmptyState
             title={describeMemoriesNotReadyTitle()}
-            description="Memories needs the gallery memories migration (capture dates + on-this-day RPC). Apply it, then refresh — Manage already soft-hides capture-date tools until then."
+            description={describeMemoriesNotReadyDescription()}
             action={
               <Link
                 href="/"
@@ -89,7 +91,7 @@ export default async function MemoriesPage({
         ) : groups.length === 0 ? (
           <GalleryEmptyState
             title={describeMemoriesEmptyTrayTitle()}
-            description={`Nothing from a past ${label} yet. Shots need a capture date (EXIF or upload day) to land here. Hang a polaroid today, and next year it will show up.`}
+            description={describeMemoriesEmptyTrayDescription(label)}
             action={
               <p className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
                 <Link

@@ -15,9 +15,13 @@ import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumSummaries } from "@/lib/gallery/load-albums"
 import { albumMatchesQuery, isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import {
+  describeAlbumsEmptyDescription,
   describeAlbumsEmptyTitle,
+  describeAlbumsNotReadyDescription,
   describeAlbumsNotReadyTitle,
   describeBackToTheWallLabel,
+  describeClearSearchLabel,
+  describeShowAllAlbumsLabel,
 } from "@/lib/gallery/empty-state-labels"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
@@ -63,7 +67,7 @@ export default async function GalleryAlbumsPage({
         {!albumsReady ? (
           <GalleryEmptyState
             title={describeAlbumsNotReadyTitle()}
-            description="Apply the gallery albums migration, then refresh — Manage already soft-hides album tools until then."
+            description={describeAlbumsNotReadyDescription()}
             action={
               <Link
                 href="/"
@@ -170,15 +174,11 @@ export default async function GalleryAlbumsPage({
                   query: Boolean(query),
                   mineOnly,
                 })}
-                description={
-                  query
-                    ? "Try another title, slug, owner, or clear the search."
-                    : mineOnly
-                      ? "Create one above, or clear the filter to browse everyone else’s collections."
-                      : user
-                        ? "Name a collection above, then add photos from any lightbox on the wall."
-                        : "When lab members curate collections, they will show up here."
-                }
+                description={describeAlbumsEmptyDescription({
+                  query: Boolean(query),
+                  mineOnly,
+                  signedIn: Boolean(user),
+                })}
                 action={
                   <p className="flex flex-wrap justify-center gap-x-4 gap-y-2">
                     {query ? (
@@ -189,7 +189,7 @@ export default async function GalleryAlbumsPage({
                           "text-sm text-foreground underline-offset-2 hover:underline"
                         )}
                       >
-                        Clear search
+                        {describeClearSearchLabel()}
                       </Link>
                     ) : null}
                     <Link
@@ -200,7 +200,7 @@ export default async function GalleryAlbumsPage({
                       )}
                     >
                       {query || mineOnly
-                        ? "Show all albums"
+                        ? describeShowAllAlbumsLabel()
                         : describeBackToTheWallLabel()}
                     </Link>
                   </p>

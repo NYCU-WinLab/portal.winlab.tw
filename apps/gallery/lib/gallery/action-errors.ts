@@ -42,3 +42,47 @@ export function describeCouldNotAttachTagError(): string {
 export function describeTagNotFoundError(): string {
   return "Tag not found."
 }
+
+export function describeMissingImageOrTagIdError(): string {
+  return "Missing image or tag id."
+}
+
+export function describeMissingTagError(): string {
+  return "Missing tag."
+}
+
+export function describeMissingTagIdError(): string {
+  return "Missing tag id."
+}
+
+export function describeMissingImageError(): string {
+  return "Missing image."
+}
+
+export function describeOnlyAdminsCanRenameTagsError(): string {
+  return "Only admins can rename tags."
+}
+
+export function describeOnlyAdminsCanMergeTagsError(): string {
+  return "Only admins can merge tags."
+}
+
+export function describeTagRenameFailedError(): string {
+  return "Rename failed."
+}
+
+export function describeTagMergeFailedError(): string {
+  return "Merge failed."
+}
+
+export function describeMissingSourceOrTargetTagError(): string {
+  return "Missing source or target tag."
+}
+
+export function describePickDifferentTagsToMergeError(): string {
+  return "Pick two different tags to merge."
+}
+
+export function describeSelectAtMost100WorksError(): string {
+  return "Select at most 100 works at a time."
+}

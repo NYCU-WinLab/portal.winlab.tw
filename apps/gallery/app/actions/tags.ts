@@ -12,10 +12,20 @@ import {
 } from "@/lib/gallery/tags"
 import {
   describeCouldNotAttachTagError,
+  describeMissingImageError,
+  describeMissingImageOrTagIdError,
+  describeMissingSourceOrTargetTagError,
+  describeMissingTagError,
+  describeMissingTagIdError,
+  describeOnlyAdminsCanMergeTagsError,
+  describeOnlyAdminsCanRenameTagsError,
+  describePickDifferentTagsToMergeError,
   describePleaseSignInFirst,
   describeTagAdminUnavailableError,
+  describeTagMergeFailedError,
   describeTagNameInvalidError,
   describeTagNotFoundError,
+  describeTagRenameFailedError,
   describeTagsUnavailableError,
 } from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
@@ -186,7 +196,7 @@ export async function detachGalleryTag(
   tagId: string
 ): Promise<TagActionResult> {
   if (!imageId || !tagId) {
-    return { ok: false, error: "Missing image or tag id." }
+    return { ok: false, error: describeMissingImageOrTagIdError() }
   }
 
   const supabase = await createClient()
@@ -223,7 +233,7 @@ export async function detachGalleryTagFromImagesBySlug(
   if (ids.length === 0) {
     return { ok: false, error: describeSelectAtLeastOnePhoto() }
   }
-  if (!slug) return { ok: false, error: "Missing tag." }
+  if (!slug) return { ok: false, error: describeMissingTagError() }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
@@ -298,7 +308,7 @@ export async function adminRenameGalleryTag(
   tagId: string,
   rawName: string
 ): Promise<TagActionResult<GalleryTag>> {
-  if (!tagId) return { ok: false, error: "Missing tag id." }
+  if (!tagId) return { ok: false, error: describeMissingTagIdError() }
   const name = normalizeGalleryTagName(rawName)
   if (!name) return { ok: false, error: describeTagNameInvalidError() }
 
@@ -313,7 +323,7 @@ export async function adminRenameGalleryTag(
     .eq("id", userId)
     .maybeSingle()
   if (!profile?.is_admin) {
-    return { ok: false, error: "Only admins can rename tags." }
+    return { ok: false, error: describeOnlyAdminsCanRenameTagsError() }
   }
 
   const { data, error } = await supabase.rpc("gallery_admin_rename_tag", {
@@ -329,7 +339,7 @@ export async function adminRenameGalleryTag(
   }
 
   const row = Array.isArray(data) ? data[0] : data
-  if (!row?.id) return { ok: false, error: "Rename failed." }
+  if (!row?.id) return { ok: false, error: describeTagRenameFailedError() }
 
   revalidatePath("/")
   revalidatePath("/upload")
@@ -344,10 +354,10 @@ export async function adminMergeGalleryTags(
   targetTagId: string
 ): Promise<TagActionResult<GalleryTag & { moved_count: number }>> {
   if (!sourceTagId || !targetTagId) {
-    return { ok: false, error: "Missing source or target tag." }
+    return { ok: false, error: describeMissingSourceOrTargetTagError() }
   }
   if (sourceTagId === targetTagId) {
-    return { ok: false, error: "Pick two different tags to merge." }
+    return { ok: false, error: describePickDifferentTagsToMergeError() }
   }
 
   const supabase = await createClient()
@@ -361,7 +371,7 @@ export async function adminMergeGalleryTags(
     .eq("id", userId)
     .maybeSingle()
   if (!profile?.is_admin) {
-    return { ok: false, error: "Only admins can merge tags." }
+    return { ok: false, error: describeOnlyAdminsCanMergeTagsError() }
   }
 
   const { data, error } = await supabase.rpc("gallery_admin_merge_tags", {
@@ -377,7 +387,7 @@ export async function adminMergeGalleryTags(
   }
 
   const row = Array.isArray(data) ? data[0] : data
-  if (!row?.id) return { ok: false, error: "Merge failed." }
+  if (!row?.id) return { ok: false, error: describeTagMergeFailedError() }
 
   revalidatePath("/")
   revalidatePath("/upload")
@@ -397,7 +407,7 @@ export async function listGalleryImageTags(
   imageId: string
 ): Promise<TagActionResult<GalleryTag[]>> {
   const id = imageId.trim()
-  if (!id) return { ok: false, error: "Missing image." }
+  if (!id) return { ok: false, error: describeMissingImageError() }
 
   const supabase = await createClient()
   const { data, error } = await supabase

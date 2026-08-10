@@ -13,9 +13,12 @@ import { GalleryThemedShell } from "@/components/gallery-shell"
 import { loadGalleryAlbumBySlug } from "@/lib/gallery/load-albums"
 import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
 import {
+  describeAlbumPageNotReadyDescription,
+  describeAlbumStillEmptyDescription,
   describeAlbumStillEmptyTitle,
   describeAlbumsNotReadyTitle,
   describeBackToTheWallLabel,
+  describeBrowseTheWallLabel,
 } from "@/lib/gallery/empty-state-labels"
 import {
   describeCopyShareLinkLabel,
@@ -102,7 +105,7 @@ export default async function GalleryAlbumDetailPage({
           </p>
           <GalleryEmptyState
             title={describeAlbumsNotReadyTitle()}
-            description="Apply the gallery albums migration, then refresh this page."
+            description={describeAlbumPageNotReadyDescription()}
             action={
               <Link
                 href="/"
@@ -217,11 +220,7 @@ export default async function GalleryAlbumDetailPage({
         {album.photos.length === 0 ? (
           <GalleryEmptyState
             title={describeAlbumStillEmptyTitle()}
-            description={
-              canManage
-                ? "Open any photo on the wall and choose Add to album."
-                : "The curator has not hung any photos here yet."
-            }
+            description={describeAlbumStillEmptyDescription(canManage)}
             action={
               <Link
                 href="/"
@@ -230,7 +229,7 @@ export default async function GalleryAlbumDetailPage({
                   "text-sm text-foreground underline-offset-2 hover:underline"
                 )}
               >
-                Browse the wall
+                {describeBrowseTheWallLabel()}
               </Link>
             }
           />
