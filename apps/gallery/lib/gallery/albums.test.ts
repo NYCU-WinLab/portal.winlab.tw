@@ -116,6 +116,15 @@ describe("nextAlbumCoverAfterRemove", () => {
   test("clears cover when nothing remains", () => {
     expect(nextAlbumCoverAfterRemove("a", [], ["a"])).toBe(null)
   })
+
+  test("keeps cover when remaining list omits it but it was not removed", () => {
+    expect(nextAlbumCoverAfterRemove("a", ["b"], [])).toBe("a")
+  })
+
+  test("treats nullish cover as cleared", () => {
+    expect(nextAlbumCoverAfterRemove(null, ["a"], ["a"])).toBe(null)
+    expect(nextAlbumCoverAfterRemove(undefined, ["a"], [])).toBe(null)
+  })
 })
 
 describe("albumMatchesQuery", () => {
