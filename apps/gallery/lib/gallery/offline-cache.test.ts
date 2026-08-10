@@ -5,6 +5,7 @@ import {
   GALLERY_SW_CACHE_URLS_TYPE,
   GALLERY_SW_VERSION,
   isGalleryStorageMediaUrl,
+  selectGalleryMediaCacheUrls,
 } from "@/lib/gallery/offline-cache"
 
 describe("isGalleryStorageMediaUrl", () => {
@@ -25,6 +26,21 @@ describe("isGalleryStorageMediaUrl", () => {
     expect(isGalleryStorageMediaUrl("https://example.com/photo.jpg")).toBe(
       false
     )
+  })
+})
+
+describe("selectGalleryMediaCacheUrls", () => {
+  test("drops non-gallery urls and dedupes", () => {
+    expect(
+      selectGalleryMediaCacheUrls([
+        "https://example.com/x.jpg",
+        "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+        "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+        "not-a-url",
+      ])
+    ).toEqual([
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
   })
 })
 
@@ -52,5 +68,15 @@ describe("buildGallerySwCacheMessage", () => {
         `https://x.supabase.co/storage/v1/object/public/gallery/u/${i}.jpg`
     )
     expect(buildGallerySwCacheMessage(urls, 3).urls).toHaveLength(3)
+  })
+
+  test("filters non-gallery urls before messaging", () => {
+    const message = buildGallerySwCacheMessage([
+      "https://example.com/skip.jpg",
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
+    expect(message.urls).toEqual([
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
   })
 })
