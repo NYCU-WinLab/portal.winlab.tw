@@ -7,3 +7,8 @@ export function describeZipPreparingProgress(input: {
   const { completed, total, noun } = input
   return `Preparing ${noun}… ${completed}/${total}`
 }
+
+/** Visible button label while a ZIP download is assembling. */
+export function describeZipBusyLabel(): string {
+  return "Preparing ZIP…"
+}

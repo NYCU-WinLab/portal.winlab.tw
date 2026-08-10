@@ -12,7 +12,10 @@ import {
   type AlbumZipSource,
 } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
-import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
+import {
+  describeZipBusyLabel,
+  describeZipPreparingProgress,
+} from "@/lib/gallery/zip-progress"
 
 type DownloadAlbumButtonProps = {
   items: AlbumZipSource[]
@@ -120,7 +123,7 @@ export function DownloadAlbumButton({
           className
         )}
       >
-        {busy ? "Preparing ZIP…" : buttonLabel}
+        {busy ? describeZipBusyLabel() : buttonLabel}
       </button>
     )
   }
@@ -137,7 +140,7 @@ export function DownloadAlbumButton({
       )}
     >
       <IconFileZip className="size-3.5" aria-hidden />
-      {busy ? "Preparing ZIP…" : buttonLabel}
+      {busy ? describeZipBusyLabel() : buttonLabel}
     </button>
   )
 }

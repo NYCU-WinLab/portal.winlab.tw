@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
+import {
+  describeZipBusyLabel,
+  describeZipPreparingProgress,
+} from "@/lib/gallery/zip-progress"
 
 describe("describeZipPreparingProgress", () => {
   test("formats album and selection progress", () => {
@@ -28,5 +31,11 @@ describe("describeZipPreparingProgress", () => {
         noun: "story",
       })
     ).toBe("Preparing story… 1/3")
+  })
+})
+
+describe("describeZipBusyLabel", () => {
+  test("returns the button busy label", () => {
+    expect(describeZipBusyLabel()).toBe("Preparing ZIP…")
   })
 })

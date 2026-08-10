@@ -11,7 +11,10 @@ import {
   buildSequenceZipFilename,
   type SequenceZipSource,
 } from "@/lib/gallery/zip-names"
-import { describeZipPreparingProgress } from "@/lib/gallery/zip-progress"
+import {
+  describeZipBusyLabel,
+  describeZipPreparingProgress,
+} from "@/lib/gallery/zip-progress"
 import { describeSequenceZipSaved } from "@/lib/gallery/sequence-zip-result"
 
 type DownloadSequenceButtonProps = {
@@ -109,7 +112,7 @@ export function DownloadSequenceButton({
           className
         )}
       >
-        {busy ? "Preparing ZIP…" : buttonLabel}
+        {busy ? describeZipBusyLabel() : buttonLabel}
       </button>
     )
   }
@@ -126,7 +129,7 @@ export function DownloadSequenceButton({
       )}
     >
       <IconFileZip className="size-3.5" aria-hidden />
-      {busy ? "Preparing ZIP…" : buttonLabel}
+      {busy ? describeZipBusyLabel() : buttonLabel}
     </button>
   )
 }
