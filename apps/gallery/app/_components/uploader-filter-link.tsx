@@ -1,7 +1,8 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useTransition, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -19,8 +20,10 @@ export function UploaderFilterLink({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [pending, startTransition] = useTransition()
 
   const applyFilter = () => {
+    if (pending) return
     const href = buildGalleryHomeHref({
       filters: {
         uploaderId,
@@ -34,13 +37,21 @@ export function UploaderFilterLink({
       photoId: searchParams.get("photo"),
       commentId: searchParams.get("comment"),
     })
-    router.push(href)
+    startTransition(() => {
+      try {
+        router.push(href)
+      } catch {
+        toast.error("Could not apply uploader filter.")
+      }
+    })
   }
 
   return (
     <span
       role="link"
-      tabIndex={0}
+      tabIndex={pending ? -1 : 0}
+      aria-busy={pending || undefined}
+      aria-disabled={pending || undefined}
       onClick={(event) => {
         event.stopPropagation()
         applyFilter()
@@ -54,6 +65,7 @@ export function UploaderFilterLink({
       className={cn(
         gallerySans(),
         "cursor-pointer rounded-sm underline-offset-2 transition-colors hover:text-foreground hover:underline",
+        pending && "pointer-events-none opacity-60",
         className
       )}
     >
