@@ -31,6 +31,7 @@ export function ManageTagsEditor({
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   function loadTags() {
+    if (pending) return
     setTags(null)
     setLoadError(null)
     startTransition(async () => {
@@ -62,6 +63,8 @@ export function ManageTagsEditor({
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
+        disabled={pending}
+        aria-busy={pending || undefined}
         aria-label={`Edit tags for ${imageName}`}
         className={cn(
           gallerySans(),
