@@ -42,11 +42,15 @@ export function GalleryImageTags({
   const [isPending, startTransition] = useTransition()
 
   const applyTagFilter = (slug: string) => {
-    router.push(
-      buildGalleryHomeHref({
-        filters: { ...EMPTY_GALLERY_HOME_FILTERS, tagSlug: slug },
-      })
-    )
+    try {
+      router.push(
+        buildGalleryHomeHref({
+          filters: { ...EMPTY_GALLERY_HOME_FILTERS, tagSlug: slug },
+        })
+      )
+    } catch {
+      toast.error("Could not open the tag filter.")
+    }
   }
 
   const onAdd = (event?: FormEvent) => {
