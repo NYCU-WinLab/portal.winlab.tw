@@ -23,4 +23,10 @@ describe("describeHangUploadLabel", () => {
       describeHangUploadLabel({ fileCount: 3, sequencesAvailable: false })
     ).toBe("Hang 3 shots")
   })
+
+  test("double-digit sequence count", () => {
+    expect(
+      describeHangUploadLabel({ fileCount: 12, sequencesAvailable: true })
+    ).toBe("Hang sequence (12)")
+  })
 })

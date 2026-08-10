@@ -49,6 +49,13 @@ export function describeAddToAlbumDialogTitle(count: number): string {
   return count > 1 ? `Add ${count} photos to album` : "Add to album"
 }
 
+/** Dialog description for the add-to-album picker. */
+export function describeAddToAlbumDialogDescription(count: number): string {
+  return count > 1
+    ? "Curate the selected wall covers into one of your collections."
+    : "Curate this shot into one of your collections. Share links live at /albums/<slug>."
+}
+
 /**
  * Error when create succeeded but add failed, and deleting the empty album
  * also failed — warn that an empty shell may remain.

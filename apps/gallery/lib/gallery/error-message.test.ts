@@ -11,4 +11,10 @@ describe("describeErrorMessage", () => {
     expect(describeErrorMessage("nope", "fallback")).toBe("fallback")
     expect(describeErrorMessage(null, "fallback")).toBe("fallback")
   })
+
+  test("uses message from Error subclasses", () => {
+    expect(describeErrorMessage(new TypeError("bad type"), "fallback")).toBe(
+      "bad type"
+    )
+  })
 })

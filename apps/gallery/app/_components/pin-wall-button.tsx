@@ -66,7 +66,7 @@ export function PinWallButton({
       try {
         router.refresh()
       } catch {
-        // Refresh is best-effort after a successful pin mutation.
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }

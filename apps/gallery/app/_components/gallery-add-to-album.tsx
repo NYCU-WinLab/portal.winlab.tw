@@ -25,6 +25,7 @@ import {
 import { gallerySans } from "@/components/gallery-chrome"
 import {
   describeAddToAlbumResult,
+  describeAddToAlbumDialogDescription,
   describeAddToAlbumDialogTitle,
   describeAddToAlbumTriggerLabel,
   describeAlbumCreateRollbackError,
@@ -104,10 +105,7 @@ export function GalleryAddToAlbum({
   const count = ids.length
   const dialogTitle = title ?? describeAddToAlbumDialogTitle(count)
   const dialogDescription =
-    description ??
-    (count > 1
-      ? "Curate the selected wall covers into one of your collections."
-      : "Curate this shot into one of your collections. Share links live at /albums/<slug>.")
+    description ?? describeAddToAlbumDialogDescription(count)
 
   const ensureAlbums = () => {
     if (albums !== null) return

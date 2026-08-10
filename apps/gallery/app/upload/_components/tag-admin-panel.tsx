@@ -45,6 +45,7 @@ import {
   describeSavingLabel,
   describeMergingLabel,
 } from "@/lib/gallery/busy-labels"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import {
   describeTagMergeTargetRequired,
   describeTagNameRequired,
@@ -133,7 +134,7 @@ export function TagAdminPanel() {
       try {
         router.refresh()
       } catch {
-        // Best-effort after a successful rename.
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }
@@ -171,7 +172,7 @@ export function TagAdminPanel() {
       try {
         router.refresh()
       } catch {
-        // Best-effort after a successful merge.
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }
