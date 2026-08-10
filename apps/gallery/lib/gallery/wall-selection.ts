@@ -39,6 +39,16 @@ export function describeWallSelectionCount(count: number): string {
   return `${count} photos selected`
 }
 
+/** Toggle label for wall multi-select mode. */
+export function describeWallSelectModeLabel(selectionMode: boolean): string {
+  return selectionMode ? "Cancel select" : "Select"
+}
+
+/** Toggle label for Manage multi-select mode. */
+export function describeManageSelectModeLabel(selectionMode: boolean): string {
+  return selectionMode ? "Cancel selection" : "Select"
+}
+
 /**
  * Add every wall id between `fromId` and `toId` (inclusive) to the selection.
  * If either id is missing from the wall order, falls back to toggling `toId`.

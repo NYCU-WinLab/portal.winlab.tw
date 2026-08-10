@@ -27,3 +27,8 @@ export function describeCouldNotDownload(): string {
 export function describeCouldNotBuildZip(): string {
   return "Could not build the ZIP"
 }
+
+/** aria-label for saving an original file. */
+export function describeSaveOriginalAriaLabel(): string {
+  return "Save original"
+}

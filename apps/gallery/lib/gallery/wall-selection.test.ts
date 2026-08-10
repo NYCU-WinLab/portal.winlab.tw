@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeManageSelectModeLabel,
+  describeWallSelectModeLabel,
   describeWallSelectionCount,
   orderedSelectedWallIds,
   selectWallIdRange,
@@ -71,6 +73,18 @@ describe("describeWallSelectionCount", () => {
   test("treats negative counts as nothing selected", () => {
     expect(describeWallSelectionCount(-1)).toBe("Nothing selected")
     expect(describeWallSelectionCount(-99)).toBe("Nothing selected")
+  })
+})
+
+describe("select mode labels", () => {
+  test("describeWallSelectModeLabel", () => {
+    expect(describeWallSelectModeLabel(false)).toBe("Select")
+    expect(describeWallSelectModeLabel(true)).toBe("Cancel select")
+  })
+
+  test("describeManageSelectModeLabel", () => {
+    expect(describeManageSelectModeLabel(false)).toBe("Select")
+    expect(describeManageSelectModeLabel(true)).toBe("Cancel selection")
   })
 })
 

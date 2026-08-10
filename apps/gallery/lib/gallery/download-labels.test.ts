@@ -5,6 +5,7 @@ import {
   describeCouldNotDownload,
   describeDownloadAlbumLabel,
   describeDownloadStoryLabel,
+  describeSaveOriginalAriaLabel,
   describeSequenceCompactingToast,
   describeSignInToFavorite,
 } from "@/lib/gallery/download-labels"
@@ -49,5 +50,11 @@ describe("download failure fallbacks", () => {
 
   test("describeCouldNotBuildZip", () => {
     expect(describeCouldNotBuildZip()).toBe("Could not build the ZIP")
+  })
+})
+
+describe("describeSaveOriginalAriaLabel", () => {
+  test("returns the save-original aria label", () => {
+    expect(describeSaveOriginalAriaLabel()).toBe("Save original")
   })
 })

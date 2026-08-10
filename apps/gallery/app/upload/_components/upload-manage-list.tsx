@@ -77,6 +77,7 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
+  describeManageSelectModeLabel,
   selectWallIdRange,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
@@ -1267,7 +1268,7 @@ export function UploadManageList({
           aria-pressed={selectionMode}
           className={galleryPillClass()}
         >
-          {selectionMode ? "Cancel selection" : "Select"}
+          {describeManageSelectModeLabel(selectionMode)}
         </button>
         {selectionMode ? (
           <span className={cn(gallerySans(), "text-xs text-muted-foreground")}>

@@ -19,6 +19,7 @@ import {
   describeTaggingLabel,
   describeUntaggingLabel,
   describeWorkingLabel,
+  describeSaveNameLabel,
 } from "@/lib/gallery/busy-labels"
 
 describe("busy labels", () => {
@@ -92,5 +93,9 @@ describe("busy labels", () => {
 
   test("describeCancelUploadLabel", () => {
     expect(describeCancelUploadLabel()).toBe("Cancel upload")
+  })
+
+  test("describeSaveNameLabel", () => {
+    expect(describeSaveNameLabel()).toBe("Save name")
   })
 })

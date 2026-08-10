@@ -58,7 +58,10 @@ import type { GallerySlideshowPhoto } from "@/lib/gallery/slideshow"
 import { shuffleSlideshowPhotos } from "@/lib/gallery/slideshow"
 import { describeAlbumFromSelection } from "@/lib/gallery/album-from-selection"
 import { describeWallAlbumPhotosRemoved } from "@/lib/gallery/wall-album-remove-toast"
-import { describeWallSelectionCount } from "@/lib/gallery/wall-selection"
+import {
+  describeWallSelectModeLabel,
+  describeWallSelectionCount,
+} from "@/lib/gallery/wall-selection"
 import {
   buildWallSelectionShareText,
   describeWallSelectionCopy,
@@ -463,7 +466,7 @@ export function GalleryWallSelectBar({
         ) : (
           <IconCheckbox className="size-3.5" aria-hidden />
         )}
-        {selectionMode ? "Cancel select" : "Select"}
+        {describeWallSelectModeLabel(selectionMode)}
       </button>
 
       {selectionMode ? (

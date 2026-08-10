@@ -43,7 +43,10 @@ import {
 } from "@/lib/gallery/comment-toast"
 import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
-import { describeSignInBeforeComment } from "@/lib/gallery/validation-toasts"
+import {
+  describeSignInBeforeComment,
+  describeSignInToCommentLabel,
+} from "@/lib/gallery/validation-toasts"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import {
@@ -601,7 +604,7 @@ export function GalleryComments({
                 ? replyTarget
                   ? "Write a reply… @ to mention"
                   : "Add a comment… @ to mention"
-                : "Sign in to comment"
+                : describeSignInToCommentLabel()
             }
             disabled={!isSignedIn || isPending}
             className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-28 text-sm"

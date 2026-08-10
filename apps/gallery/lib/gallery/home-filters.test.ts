@@ -5,6 +5,7 @@ import {
   buildGalleryHomeHref,
   describeGalleryFilterSummary,
   describeGalleryFilteredEmpty,
+  describeHomeSearchPlaceholder,
   hasActiveGalleryFilters,
   parseGalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
@@ -249,5 +250,12 @@ describe("describeGalleryFilteredEmpty", () => {
       title: "This album is empty",
       description: "Nothing is filed under lab-trip yet.",
     })
+  })
+})
+
+describe("describeHomeSearchPlaceholder", () => {
+  test("mentions tags when available", () => {
+    expect(describeHomeSearchPlaceholder(true)).toBe("Search titles & tags…")
+    expect(describeHomeSearchPlaceholder(false)).toBe("Search titles…")
   })
 })

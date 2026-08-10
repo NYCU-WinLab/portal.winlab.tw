@@ -30,4 +30,9 @@ describe("nextRadioIndex", () => {
     expect(nextRadioIndex(99, 3, "ArrowLeft")).toBe(1)
     expect(nextRadioIndex(-5, 3, "ArrowRight")).toBe(1)
   })
+
+  test("vertical arrows wrap the same as horizontal", () => {
+    expect(nextRadioIndex(0, 3, "ArrowUp")).toBe(2)
+    expect(nextRadioIndex(2, 3, "ArrowDown")).toBe(0)
+  })
 })

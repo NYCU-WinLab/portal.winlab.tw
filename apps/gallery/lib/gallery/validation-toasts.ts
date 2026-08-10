@@ -18,6 +18,11 @@ export function describeSignInBeforeComment(): string {
   return "Please sign in before commenting."
 }
 
+/** Placeholder when the comment box is locked for guests. */
+export function describeSignInToCommentLabel(): string {
+  return "Sign in to comment"
+}
+
 /** Auth gate before reacting. */
 export function describeSignInBeforeReact(): string {
   return "Please sign in before reacting."

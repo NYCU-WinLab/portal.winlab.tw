@@ -8,7 +8,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
 import { describeSavedOriginal } from "@/lib/gallery/photo-share-toast"
-import { describeCouldNotDownload } from "@/lib/gallery/download-labels"
+import {
+  describeCouldNotDownload,
+  describeSaveOriginalAriaLabel,
+} from "@/lib/gallery/download-labels"
 import { describeErrorMessage } from "@/lib/gallery/error-message"
 
 type DownloadOriginalButtonProps = {
@@ -45,7 +48,7 @@ export function DownloadOriginalButton({
       type="button"
       onClick={() => void run()}
       disabled={busy || disabled || !imagePath.trim()}
-      aria-label="Save original"
+      aria-label={describeSaveOriginalAriaLabel()}
       aria-busy={busy || undefined}
       className={cn(
         "inline-flex h-11 w-11 items-center justify-center rounded-full",

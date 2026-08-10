@@ -137,6 +137,11 @@ export function describeGalleryFilterSummary(
   return parts
 }
 
+/** Placeholder for the home wall search field. */
+export function describeHomeSearchPlaceholder(tagsAvailable: boolean): string {
+  return tagsAvailable ? "Search titles & tags…" : "Search titles…"
+}
+
 function isOnlyFilter(
   filters: GalleryHomeFilters,
   key: keyof GalleryHomeFilters

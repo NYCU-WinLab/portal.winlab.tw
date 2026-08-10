@@ -16,6 +16,7 @@ import {
   describeSelectAtLeastOnePhoto,
   describeSignInBeforeComment,
   describeSignInBeforeReact,
+  describeSignInToCommentLabel,
   describeTagLimitReached,
   describeTagMergeTargetRequired,
   describeTagNameRequired,
@@ -44,6 +45,7 @@ describe("validation toasts", () => {
     expect(describeSignInBeforeComment()).toBe(
       "Please sign in before commenting."
     )
+    expect(describeSignInToCommentLabel()).toBe("Sign in to comment")
     expect(describeSignInBeforeReact()).toBe("Please sign in before reacting.")
   })
 

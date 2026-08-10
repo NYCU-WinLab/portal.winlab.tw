@@ -87,3 +87,8 @@ export function describeLoadingTagsLabel(): string {
 export function describeCancelUploadLabel(): string {
   return "Cancel upload"
 }
+
+/** Idle label for tag-admin rename Save. */
+export function describeSaveNameLabel(): string {
+  return "Save name"
+}
