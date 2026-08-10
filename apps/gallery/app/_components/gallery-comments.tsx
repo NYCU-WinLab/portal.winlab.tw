@@ -35,6 +35,7 @@ import {
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { isCommentEdited } from "@/lib/gallery/comment-edit"
+import { applyExclusiveCommentPin } from "@/lib/gallery/comment-pin"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
@@ -291,16 +292,12 @@ export function GalleryComments({
         return
       }
       onCommentsChange(
-        comments.map((row) => {
-          if (row.image_id !== comment.image_id || row.parent_id) return row
-          if (row.id === comment.id) {
-            return { ...row, pinned_at: result.data.pinned_at }
-          }
-          if (nextPinned) {
-            return { ...row, pinned_at: null }
-          }
-          return row
-        })
+        applyExclusiveCommentPin(
+          comments,
+          comment,
+          nextPinned,
+          result.data.pinned_at
+        )
       )
       toast.success(nextPinned ? "Comment pinned." : "Comment unpinned.")
     })
