@@ -73,10 +73,13 @@ export function MemoriesDayView({
           ref={slideshowButtonRef}
           type="button"
           onClick={() => openSlideshowAtIndex(0)}
+          disabled={slideshowOpen}
+          aria-busy={slideshowOpen || undefined}
+          aria-expanded={slideshowOpen}
           className={cn(
             gallerySans(),
             "inline-flex h-9 w-fit items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
-            "hover:bg-accent hover:text-accent-foreground"
+            "hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
           )}
         >
           Slideshow
