@@ -24,6 +24,13 @@ export function useGalleryUpload({
   sequencesAvailable?: boolean
 } = {}) {
   const router = useRouter()
+  const softPush = (href: string, errorMessage: string) => {
+    try {
+      router.push(href)
+    } catch {
+      toast.error(errorMessage)
+    }
+  }
   const abortRef = useRef<AbortController | null>(null)
   const [pending, startTransition] = useTransition()
   const [failedUploads, setFailedUploads] = useState<UploadFailure[]>([])
@@ -74,7 +81,7 @@ export function useGalleryUpload({
       toast.success(`Uploaded ${successCount} work${suffix}.`, {
         action: {
           label: "View on wall",
-          onClick: () => router.push(href),
+          onClick: () => softPush(href, "Could not open the wall photo."),
         },
       })
     } else {
@@ -87,7 +94,7 @@ export function useGalleryUpload({
         {
           action: {
             label: "Manage",
-            onClick: () => router.push("/upload"),
+            onClick: () => softPush("/upload", "Could not open Manage."),
           },
         }
       )
@@ -97,7 +104,7 @@ export function useGalleryUpload({
         {
           action: {
             label: "Manage",
-            onClick: () => router.push("/upload"),
+            onClick: () => softPush("/upload", "Could not open Manage."),
           },
         }
       )
