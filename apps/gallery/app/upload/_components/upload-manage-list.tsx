@@ -136,6 +136,7 @@ import {
   describeSaveLabel,
   describeTagLabel,
 } from "@/lib/gallery/dialog-action-labels"
+import { describeAlbumTriggerLabel } from "@/lib/gallery/selection-action-labels"
 import {
   describeAlbumTitlePlaceholder,
   describeBulkTagExamplesPlaceholder,
@@ -1410,11 +1411,9 @@ export function UploadManageList({
                 <>
                   <GalleryAddToAlbum
                     imageIds={selectedItems.map((item) => item.id)}
-                    triggerLabel={
-                      selectedItems.length > 0
-                        ? `Album (${selectedItems.length})`
-                        : "Album"
-                    }
+                    triggerLabel={describeAlbumTriggerLabel(
+                      selectedItems.length
+                    )}
                     triggerClassName={cn(
                       galleryPillClass(),
                       "h-auto gap-0 !text-xs normal-case",

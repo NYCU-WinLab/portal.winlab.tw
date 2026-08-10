@@ -52,6 +52,10 @@ import {
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 import { describePinChromeLabel } from "@/lib/gallery/pin-toast"
 import {
+  describeEditLabel,
+  describePinnedBadgeLabel,
+} from "@/lib/gallery/selection-action-labels"
+import {
   describeSignInBeforeComment,
   describeSignInToCommentLabel,
 } from "@/lib/gallery/validation-toasts"
@@ -380,7 +384,7 @@ export function GalleryComments({
                     {comment.pinned_at ? (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                         <IconPin className="size-3" aria-hidden />
-                        Pinned
+                        {describePinnedBadgeLabel()}
                       </span>
                     ) : null}
                     <span aria-hidden>·</span>
@@ -491,7 +495,7 @@ export function GalleryComments({
                             aria-busy={isPending || undefined}
                             className={galleryPillClass()}
                           >
-                            Edit
+                            {describeEditLabel()}
                           </button>
                           <button
                             type="button"

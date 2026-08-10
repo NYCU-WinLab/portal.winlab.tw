@@ -19,6 +19,7 @@ import { gallerySans } from "@/components/gallery-chrome"
 import { describeCaptureDateUpdated } from "@/lib/gallery/manage-toast"
 import { describeSavingLabel } from "@/lib/gallery/busy-labels"
 import { describeSaveLabel } from "@/lib/gallery/dialog-action-labels"
+import { describeEditCaptureDateAriaLabel } from "@/lib/gallery/selection-action-labels"
 import { describeCaptureDateRequired } from "@/lib/gallery/validation-toasts"
 import {
   fromTaipeiDateInput,
@@ -82,11 +83,7 @@ export function TakenAtEditor({
         type="button"
         variant="ghost"
         onClick={() => openEditor(true)}
-        aria-label={
-          imageName
-            ? `Edit capture date for ${imageName}`
-            : "Edit capture date for this work"
-        }
+        aria-label={describeEditCaptureDateAriaLabel(imageName)}
         aria-busy={pending || undefined}
         className={cn(
           gallerySans(),

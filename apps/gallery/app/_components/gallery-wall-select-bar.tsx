@@ -84,9 +84,19 @@ import {
 } from "@/lib/gallery/busy-labels"
 import {
   describeCreateLabel,
+  describeCancelLabel,
+  describeRemoveLabel,
   describeSaveCountLabel,
   describeTagLabel,
 } from "@/lib/gallery/dialog-action-labels"
+import {
+  describePlayLabel,
+  describeRemoveSelectionFromAlbumDescription,
+  describeUnsaveLabel,
+  describeUnsaveSelectionDescription,
+  describeUntagLabel,
+  describeUntagSelectionDescription,
+} from "@/lib/gallery/selection-action-labels"
 import {
   describeAlbumTitlePlaceholder,
   describeMoreSelectionActionsAriaLabel,
@@ -583,7 +593,7 @@ export function GalleryWallSelectBar({
                   onClick={() => openSlideshow("covers")}
                 >
                   <IconPlayerPlay className="size-3.5" aria-hidden />
-                  Play
+                  {describePlayLabel()}
                 </Button>
                 {isSignedIn ? (
                   <>
@@ -869,15 +879,15 @@ export function GalleryWallSelectBar({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmKind === "tag"
-                ? "Detaches the active tag filter from the selection. Photos stay on the wall."
+                ? describeUntagSelectionDescription()
                 : confirmKind === "unsave"
-                  ? "Removes the selection from your Saved list. Photos stay on the wall."
-                  : "Removes the selection from this album only. Photos stay on the wall."}
+                  ? describeUnsaveSelectionDescription()
+                  : describeRemoveSelectionFromAlbumDescription()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={overflowBusy}>
-              Cancel
+              {describeCancelLabel()}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={overflowBusy}
@@ -891,10 +901,10 @@ export function GalleryWallSelectBar({
               {overflowBusy
                 ? describeWorkingLabel()
                 : confirmKind === "tag"
-                  ? "Untag"
+                  ? describeUntagLabel()
                   : confirmKind === "unsave"
-                    ? "Unsave"
-                    : "Remove"}
+                    ? describeUnsaveLabel()
+                    : describeRemoveLabel()}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
