@@ -21,6 +21,7 @@ import {
   toggleSelectAllWallIds,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
+import { describeWallLoadMoreError } from "@/lib/gallery/wall-load-more"
 import { expandWallSelectionZipItems } from "@/lib/gallery/wall-selection-zip"
 import {
   expandWallSelectionSlideshowPhotos,
@@ -198,8 +199,7 @@ export function GalleryInfiniteWall({
       }
       applyPage(result.images, result.page, result.hasMore)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load more photos."
+      const message = describeWallLoadMoreError(error)
       setLoadError(message)
       toast.error(message)
     } finally {
