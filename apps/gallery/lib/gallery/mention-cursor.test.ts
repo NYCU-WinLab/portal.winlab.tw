@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   applyMentionAtCursor,
+  insertMentionTriggerAtCursor,
   mentionQueryAtCursor,
 } from "@/lib/gallery/mention-cursor"
 
@@ -29,5 +30,28 @@ describe("applyMentionAtCursor", () => {
     const result = applyMentionAtCursor("hi @Ad thanks", 6, "Ada")
     expect(result.next).toBe("hi @Ada  thanks")
     expect(result.selection).toBe("hi @Ada ".length)
+  })
+})
+
+describe("insertMentionTriggerAtCursor", () => {
+  test("inserts @ at the start without a leading space", () => {
+    expect(insertMentionTriggerAtCursor("hello", 0)).toEqual({
+      next: "@hello",
+      selection: 1,
+    })
+  })
+
+  test("adds a space before @ when the cursor follows a word", () => {
+    expect(insertMentionTriggerAtCursor("hi", 2)).toEqual({
+      next: "hi @",
+      selection: 4,
+    })
+  })
+
+  test("does not double-space after existing whitespace", () => {
+    expect(insertMentionTriggerAtCursor("hi ", 3)).toEqual({
+      next: "hi @",
+      selection: 4,
+    })
   })
 })

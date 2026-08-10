@@ -40,6 +40,7 @@ import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import {
   applyMentionAtCursor,
+  insertMentionTriggerAtCursor,
   mentionQueryAtCursor,
 } from "@/lib/gallery/mention-cursor"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
@@ -598,16 +599,15 @@ export function GalleryComments({
                   const el = textareaRef.current
                   if (!el) return
                   const cursor = el.selectionStart ?? draft.length
-                  const before = draft.slice(0, cursor)
-                  const after = draft.slice(cursor)
-                  const needsSpace = before.length > 0 && !/\s$/.test(before)
-                  const next = `${before}${needsSpace ? " @" : "@"}${after}`
+                  const { next, selection } = insertMentionTriggerAtCursor(
+                    draft,
+                    cursor
+                  )
                   setDraft(next)
-                  const pos = before.length + (needsSpace ? 2 : 1)
                   requestAnimationFrame(() => {
                     el.focus()
-                    el.setSelectionRange(pos, pos)
-                    syncMentionQuery(next, pos)
+                    el.setSelectionRange(selection, selection)
+                    syncMentionQuery(next, selection)
                   })
                 }}
                 className={cn(

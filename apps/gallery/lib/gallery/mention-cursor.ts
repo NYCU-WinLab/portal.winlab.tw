@@ -23,3 +23,19 @@ export function applyMentionAtCursor(
     selection: before.length + name.length + 2,
   }
 }
+
+/** Insert a bare `@` trigger (with a leading space when needed). */
+export function insertMentionTriggerAtCursor(
+  value: string,
+  cursor: number
+): { next: string; selection: number } {
+  const safeCursor = Math.min(Math.max(cursor, 0), value.length)
+  const before = value.slice(0, safeCursor)
+  const after = value.slice(safeCursor)
+  const needsSpace = before.length > 0 && !/\s$/.test(before)
+  const insert = needsSpace ? " @" : "@"
+  return {
+    next: `${before}${insert}${after}`,
+    selection: before.length + insert.length,
+  }
+}
