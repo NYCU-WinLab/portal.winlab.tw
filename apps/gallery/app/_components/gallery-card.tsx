@@ -159,7 +159,11 @@ export function GalleryCard({
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    try {
+      router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    } catch {
+      toast.error("Could not close the photo.")
+    }
   }
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
