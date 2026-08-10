@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeCancelUploadLabel,
+  describeContinueWithKeycloakLabel,
   describeCreatingLabel,
   describeDevelopingLabel,
   describeInstallingLabel,
@@ -12,6 +13,7 @@ import {
   describeSavingLabel,
   describeScanningLabel,
   describeSharingLabel,
+  describeSignOutLabel,
   describeSigningOutLabel,
   describeTaggingLabel,
   describeUntaggingLabel,
@@ -25,6 +27,14 @@ describe("busy labels", () => {
 
   test("describeSigningOutLabel", () => {
     expect(describeSigningOutLabel()).toBe("Signing out…")
+  })
+
+  test("describeSignOutLabel", () => {
+    expect(describeSignOutLabel()).toBe("Sign out")
+  })
+
+  test("describeContinueWithKeycloakLabel", () => {
+    expect(describeContinueWithKeycloakLabel()).toBe("Continue with Keycloak")
   })
 
   test("describeSavingLabel", () => {

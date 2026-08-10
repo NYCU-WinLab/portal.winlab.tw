@@ -154,6 +154,21 @@ describe("albumMatchesQuery", () => {
     expect(albumMatchesQuery(album, "world-cup")).toBe(false)
   })
 
+  test("matches owner name only", () => {
+    expect(albumMatchesQuery(album, "Alice")).toBe(true)
+    expect(
+      albumMatchesQuery(
+        {
+          title: "Quiet",
+          slug: "quiet",
+          description: null,
+          owner_name: "Benedict",
+        },
+        "benedict"
+      )
+    ).toBe(true)
+  })
+
   test("matches unicode title text", () => {
     expect(
       albumMatchesQuery(

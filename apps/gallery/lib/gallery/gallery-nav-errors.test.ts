@@ -17,4 +17,12 @@ describe("describeGalleryNavError", () => {
       galleryNavErrors.refreshGalleryChrome
     )
   })
+
+  test("every nav error key has non-empty copy", () => {
+    for (const key of Object.keys(galleryNavErrors) as Array<
+      keyof typeof galleryNavErrors
+    >) {
+      expect(galleryNavErrors[key].length).toBeGreaterThan(0)
+    }
+  })
 })

@@ -8,7 +8,10 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
-import { describeSigningOutLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeSignOutLabel,
+  describeSigningOutLabel,
+} from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeCouldNotSignOut } from "@/lib/gallery/validation-toasts"
 
@@ -65,7 +68,7 @@ export function SignOutButton({
       ) : pending ? (
         describeSigningOutLabel()
       ) : (
-        "Sign out"
+        describeSignOutLabel()
       )}
     </button>
   )

@@ -32,4 +32,8 @@ describe("describeCouldNotLoadTags", () => {
       "Could not load tags — network down"
     )
   })
+
+  test("keeps an empty suffix", () => {
+    expect(describeCouldNotLoadTags("")).toBe("Could not load tags — ")
+  })
 })

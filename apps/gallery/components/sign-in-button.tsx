@@ -6,7 +6,10 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
-import { describeRedirectingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeContinueWithKeycloakLabel,
+  describeRedirectingLabel,
+} from "@/lib/gallery/busy-labels"
 import { describeCouldNotStartSignIn } from "@/lib/gallery/validation-toasts"
 
 const NEXT_STORAGE_KEY = "gallery:auth:next"
@@ -56,7 +59,9 @@ export function SignInButton({ next }: { next?: string }) {
       aria-busy={pending || undefined}
       className="w-full"
     >
-      {pending ? describeRedirectingLabel() : "Continue with Keycloak"}
+      {pending
+        ? describeRedirectingLabel()
+        : describeContinueWithKeycloakLabel()}
     </Button>
   )
 }

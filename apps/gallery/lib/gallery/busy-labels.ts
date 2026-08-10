@@ -8,6 +8,16 @@ export function describeSigningOutLabel(): string {
   return "Signing out…"
 }
 
+/** Idle label for the sign-out control. */
+export function describeSignOutLabel(): string {
+  return "Sign out"
+}
+
+/** Idle label for the Keycloak sign-in control. */
+export function describeContinueWithKeycloakLabel(): string {
+  return "Continue with Keycloak"
+}
+
 /** Visible label while a Save control is in flight. */
 export function describeSavingLabel(): string {
   return "Saving…"
