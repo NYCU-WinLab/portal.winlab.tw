@@ -318,6 +318,7 @@ export function GalleryLightboxSocialAside({
   counts,
   myReaction,
   canReact,
+  reactionBusy = false,
   onReact,
   comments,
   setComments,
@@ -355,6 +356,7 @@ export function GalleryLightboxSocialAside({
   counts: ReactionCounts
   myReaction: GalleryReaction | null
   canReact: boolean
+  reactionBusy?: boolean
   onReact: (reaction: GalleryReaction) => void
   comments: GalleryComment[]
   setComments: Dispatch<SetStateAction<GalleryComment[]>>

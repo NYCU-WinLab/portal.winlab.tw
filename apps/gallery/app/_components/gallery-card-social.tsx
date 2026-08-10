@@ -271,6 +271,7 @@ export function useGalleryCardSocial({
   }, [isDialogOpen, image.id, scheduleRefreshSocial])
 
   const onReact = (reaction: GalleryReaction) => {
+    if (isPending) return
     if (!isSignedIn) {
       toast.error("Please sign in before reacting.")
       return
@@ -306,6 +307,7 @@ export function useGalleryCardSocial({
     comments,
     setComments,
     canReact,
+    reactionBusy: isPending,
     reactionTotal,
     wallCommentCount,
     onReact,

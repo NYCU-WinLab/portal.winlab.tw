@@ -29,11 +29,14 @@ export function ReactionBar({
   counts,
   myReaction,
   canReact,
+  busy = false,
   onReact,
 }: {
   counts: ReactionCounts
   myReaction: GalleryReaction | null
   canReact: boolean
+  /** True while a reaction mutation is in flight. */
+  busy?: boolean
   onReact: (reaction: GalleryReaction) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -101,11 +104,12 @@ export function ReactionBar({
 
   const pickReaction = useCallback(
     (reaction: GalleryReaction) => {
+      if (busy || !canReact) return
       onReact(reaction)
       closePicker()
       suppressClick.current = true
     },
-    [closePicker, onReact]
+    [busy, canReact, closePicker, onReact]
   )
 
   useEffect(() => {
@@ -235,7 +239,7 @@ export function ReactionBar({
   }
 
   const onTriggerClick = () => {
-    if (!canReact || suppressClick.current) {
+    if (!canReact || busy || suppressClick.current) {
       suppressClick.current = false
       return
     }
@@ -284,7 +288,8 @@ export function ReactionBar({
               type="button"
               role="menuitem"
               data-reaction={reaction}
-              disabled={!canReact}
+              disabled={!canReact || busy}
+              aria-busy={busy || undefined}
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => {
                 if (e.pointerType !== "touch" || !pickerOpen) return
@@ -322,7 +327,8 @@ export function ReactionBar({
 
       <button
         type="button"
-        disabled={!canReact}
+        disabled={!canReact || busy}
+        aria-busy={busy || undefined}
         onClick={onTriggerClick}
         onContextMenu={(e) => e.preventDefault()}
         aria-expanded={pickerOpen}
@@ -338,7 +344,7 @@ export function ReactionBar({
           myReaction
             ? "border-foreground/20 bg-foreground/10 text-foreground"
             : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-          !canReact && "cursor-not-allowed opacity-70"
+          (!canReact || busy) && "cursor-not-allowed opacity-70"
         )}
       >
         <ReactionGlyph

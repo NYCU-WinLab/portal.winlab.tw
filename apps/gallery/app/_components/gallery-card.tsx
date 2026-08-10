@@ -177,6 +177,7 @@ export function GalleryCard({
     comments,
     setComments,
     canReact,
+    reactionBusy,
     reactionTotal,
     wallCommentCount,
     onReact,
@@ -706,6 +707,7 @@ export function GalleryCard({
                   counts={counts}
                   myReaction={myReaction}
                   canReact={canReact}
+                  reactionBusy={reactionBusy}
                   onReact={onReact}
                   comments={comments}
                   setComments={setComments}
@@ -758,6 +760,7 @@ export function GalleryCard({
                 counts={counts}
                 myReaction={myReaction}
                 canReact={canReact}
+                busy={reactionBusy}
                 onReact={onReact}
               />
             ) : null}
