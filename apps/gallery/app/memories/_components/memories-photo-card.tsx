@@ -18,11 +18,15 @@ export function MemoriesPhotoCard({
   photo,
   currentYear,
   onOpen,
+  onFocusPhoto,
+  focused = false,
   buttonRef,
 }: {
   photo: GalleryMemoryPhoto
   currentYear: number
   onOpen: () => void
+  onFocusPhoto?: () => void
+  focused?: boolean
   buttonRef?: (node: HTMLButtonElement | null) => void
 }) {
   const [thumbFailed, setThumbFailed] = useState(false)
@@ -44,7 +48,11 @@ export function MemoriesPhotoCard({
         type="button"
         ref={buttonRef}
         onClick={onOpen}
-        className="block w-full text-left focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none"
+        onFocus={onFocusPhoto}
+        className={cn(
+          "block w-full text-left focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none",
+          focused && "ring-2 ring-zinc-900/30"
+        )}
       >
         <div
           className={cn(

@@ -13,25 +13,28 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
+import { CuratedLightboxActions } from "@/app/_components/curated-lightbox-actions"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import {
   galleryPolaroidClass,
   gallerySans,
   gallerySerif,
 } from "@/components/gallery-chrome"
 import type { GalleryAlbumPhoto } from "@/lib/gallery/albums"
+import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import { adjacentListId, edgeListId } from "@/lib/gallery/lightbox-nav"
 import { describeAlbumLightboxPositionLabel } from "@/lib/gallery/lightbox-position-label"
+import { stepFocusIndex } from "@/lib/gallery/roving-focus"
 import {
   findSlideshowIndexByImageId,
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
 import {
   describeNextPhotoAriaLabel,
-  describeNextSlideAriaLabel,
   describePreviousPhotoAriaLabel,
-  describePreviousSlideAriaLabel,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
@@ -100,14 +103,18 @@ function AlbumThumb({
 export function GalleryAlbumPhotoGrid({
   photos,
   albumTitle,
+  signedIn = false,
 }: {
   photos: GalleryAlbumPhoto[]
   albumTitle: string
+  signedIn?: boolean
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
+  const [focusIndex, setFocusIndex] = useState(-1)
+  const [keyboardNavActive, setKeyboardNavActive] = useState(false)
   const photoButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const slideshowReturnIdRef = useRef<string | null>(null)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -128,6 +135,48 @@ export function GalleryAlbumPhotoGrid({
     setLightboxFailed(false)
     setOpenId(nextId)
   }
+
+  useEffect(() => {
+    if (!keyboardNavActive || focusIndex < 0 || openId || slideshowOpen) return
+    const photo = photos[focusIndex]
+    if (!photo) return
+    const node = photoButtonRefs.current.get(photo.image_id)
+    if (!node) return
+    node.scrollIntoView({
+      block: "nearest",
+      behavior: galleryScrollBehavior(),
+    })
+    node.focus({ preventScroll: true })
+  }, [focusIndex, keyboardNavActive, openId, photos, slideshowOpen])
+
+  useEffect(() => {
+    if (openId || slideshowOpen || photos.length === 0) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key === "j" || event.key === "ArrowRight") {
+        event.preventDefault()
+        setKeyboardNavActive(true)
+        setFocusIndex((index) => stepFocusIndex(index, photos.length, 1))
+        return
+      }
+      if (event.key === "k" || event.key === "ArrowLeft") {
+        event.preventDefault()
+        setKeyboardNavActive(true)
+        setFocusIndex((index) => stepFocusIndex(index, photos.length, -1))
+        return
+      }
+      if (event.key === "Enter" && focusIndex >= 0) {
+        event.preventDefault()
+        const photo = photos[focusIndex]
+        if (!photo) return
+        setLightboxFailed(false)
+        setOpenId(photo.image_id)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [focusIndex, openId, photos, slideshowOpen])
 
   useEffect(() => {
     if (!openId || photoIds.length <= 1) return
@@ -177,7 +226,6 @@ export function GalleryAlbumPhotoGrid({
   const handleSlideshowOpenChange = (open: boolean) => {
     setSlideshowOpen(open)
     if (!open) {
-      // Lightbox already closed — return keyboard focus to the polaroid.
       const returnId = slideshowReturnIdRef.current
       slideshowReturnIdRef.current = null
       queueMicrotask(() => {
@@ -208,8 +256,27 @@ export function GalleryAlbumPhotoGrid({
 
   return (
     <>
+      <div className="flex justify-end">
+        <GalleryKeyboardCheatsheet
+          lightboxOpen={Boolean(active)}
+          slideshowOpen={slideshowOpen}
+        />
+      </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {keyboardNavActive &&
+        focusIndex >= 0 &&
+        !openId &&
+        !slideshowOpen &&
+        photos[focusIndex]
+          ? describeFocusedPhotoAnnouncement(
+              photos[focusIndex]!.name,
+              focusIndex,
+              photos.length
+            )
+          : ""}
+      </p>
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
-        {photos.map((photo) => (
+        {photos.map((photo, index) => (
           <li key={photo.image_id}>
             <button
               type="button"
@@ -217,11 +284,23 @@ export function GalleryAlbumPhotoGrid({
                 if (node) photoButtonRefs.current.set(photo.image_id, node)
                 else photoButtonRefs.current.delete(photo.image_id)
               }}
+              onFocus={() => {
+                setKeyboardNavActive(true)
+                setFocusIndex(index)
+              }}
               onClick={() => {
                 setLightboxFailed(false)
                 setOpenId(photo.image_id)
+                setFocusIndex(index)
+                setKeyboardNavActive(true)
               }}
-              className="group/polaroid block w-full text-left focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+              className={cn(
+                "group/polaroid block w-full text-left focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none",
+                keyboardNavActive &&
+                  focusIndex === index &&
+                  !openId &&
+                  "ring-2 ring-ring/40"
+              )}
             >
               <figure className={cn(galleryPolaroidClass(), "p-2.5 pb-3")}>
                 <div className="relative aspect-[4/5] overflow-hidden rounded-[1px] bg-zinc-200/80">
@@ -345,7 +424,7 @@ export function GalleryAlbumPhotoGrid({
                   onError={() => setLightboxFailed(true)}
                 />
               )}
-              <div className="space-y-2 px-5 py-4">
+              <div className="space-y-3 px-5 py-4">
                 <p className={cn(gallerySerif(), "text-xl text-foreground")}>
                   {active.name}
                 </p>
@@ -365,6 +444,13 @@ export function GalleryAlbumPhotoGrid({
                     </>
                   ) : null}
                 </p>
+                <CuratedLightboxActions
+                  open={Boolean(active)}
+                  photoId={active.image_id}
+                  name={active.name}
+                  imagePath={active.image_path}
+                  signedIn={signedIn}
+                />
                 <button
                   type="button"
                   onClick={() => startSlideshowAt(active.image_id)}

@@ -13,13 +13,18 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
+import { CuratedLightboxActions } from "@/app/_components/curated-lightbox-actions"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
+import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
 import { adjacentListId, edgeListId } from "@/lib/gallery/lightbox-nav"
 import { describeAlbumLightboxPositionLabel } from "@/lib/gallery/lightbox-position-label"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
+import { setMemoriesOverlayState } from "@/lib/gallery/memories-overlay-store"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
+import { stepFocusIndex } from "@/lib/gallery/roving-focus"
 import {
   findSlideshowIndexByImageId,
   type GallerySlideshowPhoto,
@@ -29,23 +34,26 @@ import {
   describePreviousPhotoAriaLabel,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
-import { setMemoriesOverlayState } from "@/lib/gallery/memories-overlay-store"
 
 export function MemoriesDayView({
   groups,
   currentYear,
   slideshowPhotos,
   slideshowTitle,
+  signedIn = false,
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
   slideshowPhotos: GallerySlideshowPhoto[]
   slideshowTitle: string
+  signedIn?: boolean
 }) {
   const [slideshowOpen, setSlideshowOpen] = useState(false)
   const [slideshowStart, setSlideshowStart] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxFailed, setLightboxFailed] = useState(false)
+  const [focusIndex, setFocusIndex] = useState(-1)
+  const [keyboardNavActive, setKeyboardNavActive] = useState(false)
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
   const photoButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const lightboxReturnIdRef = useRef<string | null>(null)
@@ -81,6 +89,10 @@ export function MemoriesDayView({
     () => slideshowPhotos.map((photo) => photo.image_id),
     [slideshowPhotos]
   )
+  const photoNames = useMemo(
+    () => slideshowPhotos.map((photo) => photo.name),
+    [slideshowPhotos]
+  )
   const activeIndexLabel = active
     ? describeAlbumLightboxPositionLabel(
         active.name,
@@ -98,6 +110,60 @@ export function MemoriesDayView({
       setMemoriesOverlayState({ lightboxOpen: false, slideshowOpen: false })
     }
   }, [active, slideshowOpen])
+
+  useEffect(() => {
+    if (!keyboardNavActive || focusIndex < 0 || openId || slideshowOpen) return
+    const id = photoIds[focusIndex]
+    if (!id) return
+    const node = photoButtonRefs.current.get(id)
+    if (!node) return
+    node.scrollIntoView({
+      block: "nearest",
+      behavior: galleryScrollBehavior(),
+    })
+    node.focus({ preventScroll: true })
+  }, [focusIndex, keyboardNavActive, openId, photoIds, slideshowOpen])
+
+  // Grid focus when a photo is already focused — preventDefault so day nav yields.
+  useEffect(() => {
+    if (openId || slideshowOpen || photoIds.length === 0) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const gridArmed = keyboardNavActive && focusIndex >= 0
+      if (event.key === "Escape" && gridArmed) {
+        event.preventDefault()
+        setKeyboardNavActive(false)
+        setFocusIndex(-1)
+        ;(document.activeElement as HTMLElement | null)?.blur?.()
+        return
+      }
+      if (!gridArmed) return
+      if (
+        event.key === "j" ||
+        event.key === "J" ||
+        event.key === "ArrowRight"
+      ) {
+        event.preventDefault()
+        setFocusIndex((index) => stepFocusIndex(index, photoIds.length, 1))
+        return
+      }
+      if (event.key === "k" || event.key === "K" || event.key === "ArrowLeft") {
+        event.preventDefault()
+        setFocusIndex((index) => stepFocusIndex(index, photoIds.length, -1))
+        return
+      }
+      if (event.key === "Enter") {
+        event.preventDefault()
+        const id = photoIds[focusIndex]
+        if (!id) return
+        setLightboxFailed(false)
+        setOpenId(id)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [focusIndex, keyboardNavActive, openId, photoIds, slideshowOpen])
 
   const goLightbox = (direction: "prev" | "next") => {
     if (!openId) return
@@ -188,6 +254,20 @@ export function MemoriesDayView({
         ) : null}
       </div>
 
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {keyboardNavActive &&
+        focusIndex >= 0 &&
+        !openId &&
+        !slideshowOpen &&
+        photoNames[focusIndex]
+          ? describeFocusedPhotoAnnouncement(
+              photoNames[focusIndex]!,
+              focusIndex,
+              photoIds.length
+            )
+          : ""}
+      </p>
+
       <MemoriesYearSections
         groups={groups}
         currentYear={currentYear}
@@ -196,12 +276,28 @@ export function MemoriesDayView({
         onOpenPhoto={(imageId) => {
           setLightboxFailed(false)
           setOpenId(imageId)
+          const index = photoIds.indexOf(imageId)
+          if (index >= 0) {
+            setFocusIndex(index)
+            setKeyboardNavActive(true)
+          }
         }}
         onStartSlideshow={(startIndex) => openSlideshowAtIndex(startIndex)}
         registerPhotoButton={(imageId, node) => {
           if (node) photoButtonRefs.current.set(imageId, node)
           else photoButtonRefs.current.delete(imageId)
         }}
+        onPhotoFocus={(imageId) => {
+          const index = photoIds.indexOf(imageId)
+          if (index < 0) return
+          setFocusIndex(index)
+          setKeyboardNavActive(true)
+        }}
+        focusImageId={
+          keyboardNavActive && focusIndex >= 0 && !openId
+            ? (photoIds[focusIndex] ?? null)
+            : null
+        }
       />
 
       <Dialog
@@ -305,7 +401,7 @@ export function MemoriesDayView({
                   onError={() => setLightboxFailed(true)}
                 />
               )}
-              <div className="space-y-2 px-5 py-4">
+              <div className="space-y-3 px-5 py-4">
                 <p className={cn(gallerySerif(), "text-xl text-foreground")}>
                   {active.name}
                 </p>
@@ -321,6 +417,13 @@ export function MemoriesDayView({
                     Open on wall
                   </Link>
                 </p>
+                <CuratedLightboxActions
+                  open={Boolean(active)}
+                  photoId={active.id}
+                  name={active.name}
+                  imagePath={active.image_path}
+                  signedIn={signedIn}
+                />
                 {slideshowPhotos.length > 0 ? (
                   <button
                     type="button"

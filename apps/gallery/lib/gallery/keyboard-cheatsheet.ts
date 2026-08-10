@@ -68,6 +68,9 @@ export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
 export const GALLERY_MEMORIES_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["←", "K"], action: "Previous calendar day" },
   { keys: ["→", "J"], action: "Next calendar day" },
+  { keys: ["Tab"], action: "Focus a photo (then J/K move within the day)" },
+  { keys: ["Enter"], action: "Open focused photo" },
+  { keys: ["Esc"], action: "Clear photo focus / close overlays" },
   { keys: ["T"], action: "Jump to today" },
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]

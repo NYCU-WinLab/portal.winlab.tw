@@ -407,6 +407,20 @@ export function GalleryComments({
                       <Textarea
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault()
+                            cancelEdit()
+                            return
+                          }
+                          if (
+                            event.key === "Enter" &&
+                            (event.metaKey || event.ctrlKey)
+                          ) {
+                            event.preventDefault()
+                            saveEdit(comment.id)
+                          }
+                        }}
                         disabled={isPending}
                         className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-background text-sm"
                       />

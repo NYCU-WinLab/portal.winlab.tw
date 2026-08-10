@@ -22,6 +22,8 @@ export function MemoriesYearSections({
   onOpenPhoto,
   onStartSlideshow,
   registerPhotoButton,
+  onPhotoFocus,
+  focusImageId = null,
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
@@ -33,6 +35,8 @@ export function MemoriesYearSections({
     imageId: string,
     node: HTMLButtonElement | null
   ) => void
+  onPhotoFocus?: (imageId: string) => void
+  focusImageId?: string | null
 }) {
   if (groups.length === 0) return null
 
@@ -97,6 +101,8 @@ export function MemoriesYearSections({
                   photo={photo}
                   currentYear={currentYear}
                   onOpen={() => onOpenPhoto(photo.id)}
+                  onFocusPhoto={() => onPhotoFocus?.(photo.id)}
+                  focused={focusImageId === photo.id}
                   buttonRef={(node) => registerPhotoButton?.(photo.id, node)}
                 />
               ))}

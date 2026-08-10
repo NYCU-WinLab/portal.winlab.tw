@@ -117,6 +117,7 @@ export default async function MemoriesPage({
             currentYear={day.year}
             slideshowPhotos={slideshowPhotos}
             slideshowTitle={`Memories · ${label}`}
+            signedIn={Boolean(user)}
           />
         )}
       </div>

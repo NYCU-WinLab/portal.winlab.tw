@@ -43,9 +43,12 @@ import {
   describeCloseSlideshowAriaLabel,
   describeNextSlideAriaLabel,
   describePreviousSlideAriaLabel,
+  describeSlideshowIntervalAnnouncement,
+  describeSlideshowMuteAnnouncement,
   describeSlideshowMuteAriaLabel,
   describeSlideshowPlaybackAriaLabel,
   describeSlideshowProgressAriaLabel,
+  syncSlideshowVideoPlayback,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 
@@ -80,6 +83,7 @@ export function AlbumSlideshow({
   const [mediaFailed, setMediaFailed] = useState(false)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const pausedRef = useRef(paused)
   pausedRef.current = paused
 
@@ -97,6 +101,11 @@ export function AlbumSlideshow({
   useEffect(() => {
     setMediaFailed(false)
   }, [index])
+
+  useEffect(() => {
+    if (!open) return
+    syncSlideshowVideoPlayback(videoRef.current, paused)
+  }, [open, paused, index])
 
   const bumpInterval = (delta: number) => {
     setIntervalMs((ms) =>
@@ -286,6 +295,10 @@ export function AlbumSlideshow({
           {photo?.name ?? albumTitle}
           {photos.length > 0 ? ` · slide ${index + 1} of ${photos.length}` : ""}
           {paused ? " · paused" : ""}
+          {` · ${describeSlideshowIntervalAnnouncement(intervalMs)}`}
+          {photo.media_type === "video"
+            ? ` · ${describeSlideshowMuteAnnouncement(videoMuted)}`
+            : ""}
         </p>
 
         <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -501,6 +514,7 @@ export function AlbumSlideshow({
           ) : photo.media_type === "video" ? (
             <video
               key={photo.image_id}
+              ref={videoRef}
               src={getGalleryImageUrl(photo.image_path)}
               poster={
                 photo.poster_path
@@ -510,7 +524,7 @@ export function AlbumSlideshow({
               className="max-h-full max-w-full object-contain"
               controls
               playsInline
-              autoPlay
+              autoPlay={!paused}
               muted={videoMuted}
               onError={() => setMediaFailed(true)}
               onEnded={() => {

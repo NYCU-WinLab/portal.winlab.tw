@@ -6,9 +6,12 @@ import {
   describeNextSlideAriaLabel,
   describePreviousPhotoAriaLabel,
   describePreviousSlideAriaLabel,
+  describeSlideshowIntervalAnnouncement,
+  describeSlideshowMuteAnnouncement,
   describeSlideshowMuteAriaLabel,
   describeSlideshowPlaybackAriaLabel,
   describeSlideshowProgressAriaLabel,
+  syncSlideshowVideoPlayback,
 } from "@/lib/gallery/slideshow-labels"
 
 describe("slideshow labels", () => {
@@ -26,5 +29,34 @@ describe("slideshow labels", () => {
     expect(describeSlideshowPlaybackAriaLabel(false)).toBe("Pause slideshow")
     expect(describeSlideshowMuteAriaLabel(true)).toBe("Unmute video")
     expect(describeSlideshowMuteAriaLabel(false)).toBe("Mute video")
+  })
+
+  test("live-region mute and interval announcements", () => {
+    expect(describeSlideshowMuteAnnouncement(true)).toBe("muted")
+    expect(describeSlideshowMuteAnnouncement(false)).toBe("unmuted")
+    expect(describeSlideshowIntervalAnnouncement(3000)).toBe(
+      "3 seconds per slide"
+    )
+    expect(describeSlideshowIntervalAnnouncement(2500)).toBe(
+      "2.5 seconds per slide"
+    )
+  })
+
+  test("syncSlideshowVideoPlayback pauses and plays", () => {
+    const calls: string[] = []
+    const video = {
+      pause: () => {
+        calls.push("pause")
+      },
+      play: () => {
+        calls.push("play")
+        return Promise.resolve()
+      },
+    }
+    syncSlideshowVideoPlayback(null, true)
+    expect(calls).toEqual([])
+    syncSlideshowVideoPlayback(video, true)
+    syncSlideshowVideoPlayback(video, false)
+    expect(calls).toEqual(["pause", "play"])
   })
 })

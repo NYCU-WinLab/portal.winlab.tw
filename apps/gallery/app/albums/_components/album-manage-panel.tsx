@@ -1,6 +1,13 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react"
 import { useRouter } from "next/navigation"
 import {
   IconArrowDown,
@@ -37,6 +44,7 @@ import {
   updateGalleryAlbum,
 } from "@/app/actions/albums"
 import { DownloadAlbumButton } from "@/app/_components/download-album-button"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { ShareAlbumButton } from "@/app/_components/share-album-button"
 import {
   galleryPanelClass,
@@ -72,7 +80,11 @@ import {
   describeAlbumManageRemoveLabel,
   describeCancelLabel,
 } from "@/lib/gallery/dialog-action-labels"
+import { describeFocusedManageRowAnnouncement } from "@/lib/gallery/focus-announcement"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
+import { stepFocusIndex } from "@/lib/gallery/roving-focus"
 import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
@@ -129,11 +141,13 @@ export function GalleryAlbumManagePanel({
   const [photos, setPhotos] = useState(album.photos)
   const [coverImageId, setCoverImageId] = useState(album.cover_image_id)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [selectionFocusId, setSelectionFocusId] = useState<string | null>(null)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const deleteAlbumTriggerRef = useRef<HTMLButtonElement>(null)
   const removeSelectedTriggerRef = useRef<HTMLButtonElement>(null)
   const removePhotoTriggerRef = useRef<HTMLElement | null>(null)
+  const rowRefs = useRef(new Map<string, HTMLLIElement>())
   const confirmRemovePhoto = photos.find(
     (photo) => photo.image_id === confirmRemoveId
   )
@@ -167,6 +181,94 @@ export function GalleryAlbumManagePanel({
     }
     setSelected(new Set(photoIds))
   }
+
+  const focusManageRow = useCallback((id: string) => {
+    setSelectionFocusId(id)
+    const node = rowRefs.current.get(id)
+    if (!node) return
+    node.scrollIntoView({
+      block: "nearest",
+      behavior: galleryScrollBehavior(),
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!selectionFocusId) return
+    if (photos.some((photo) => photo.image_id === selectionFocusId)) return
+    setSelectionFocusId(null)
+  }, [photos, selectionFocusId])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (confirmRemoveId) return
+      if (
+        document.querySelector(
+          '[data-slot="dialog-content"][data-state="open"]'
+        )
+      ) {
+        return
+      }
+      if (photos.length === 0) return
+
+      if (event.key === "Escape") {
+        if (selected.size === 0 && !selectionFocusId) return
+        event.preventDefault()
+        setSelected(new Set())
+        setSelectionFocusId(null)
+        return
+      }
+      if (event.key === "a" || event.key === "A") {
+        event.preventDefault()
+        toggleSelectAll(!allSelected)
+        return
+      }
+      if (
+        event.key === "j" ||
+        event.key === "J" ||
+        event.key === "ArrowRight" ||
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault()
+        const current = selectionFocusId
+          ? photos.findIndex((photo) => photo.image_id === selectionFocusId)
+          : -1
+        const nextIndex = stepFocusIndex(current, photos.length, 1)
+        const next = photos[nextIndex]
+        if (next) focusManageRow(next.image_id)
+        return
+      }
+      if (
+        event.key === "k" ||
+        event.key === "K" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault()
+        const current = selectionFocusId
+          ? photos.findIndex((photo) => photo.image_id === selectionFocusId)
+          : 0
+        const nextIndex = stepFocusIndex(current, photos.length, -1)
+        const next = photos[nextIndex]
+        if (next) focusManageRow(next.image_id)
+        return
+      }
+      if ((event.key === " " || event.key === "Enter") && selectionFocusId) {
+        event.preventDefault()
+        toggleSelected(selectionFocusId, !selected.has(selectionFocusId))
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [
+    allSelected,
+    confirmRemoveId,
+    focusManageRow,
+    photos,
+    selected,
+    selectionFocusId,
+  ])
 
   const saveMeta = () => {
     if (pending) return
@@ -513,6 +615,26 @@ export function GalleryAlbumManagePanel({
           <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
             Order ({photoIds.length} photo{photoIds.length === 1 ? "" : "s"})
           </p>
+          <GalleryKeyboardCheatsheet manage />
+        </div>
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {selectionFocusId
+            ? (() => {
+                const index = photos.findIndex(
+                  (photo) => photo.image_id === selectionFocusId
+                )
+                const photo = photos[index]
+                return photo
+                  ? describeFocusedManageRowAnnouncement(
+                      photo.name,
+                      index,
+                      photos.length
+                    )
+                  : ""
+              })()
+            : ""}
+        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {photos.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
               <label
@@ -589,14 +711,22 @@ export function GalleryAlbumManagePanel({
           <ul ref={listRef} className="space-y-2">
             {photos.map((photo, index) => {
               const isSelected = selected.has(photo.image_id)
+              const isFocused = selectionFocusId === photo.image_id
               return (
                 <li
                   key={photo.image_id}
+                  ref={(node) => {
+                    if (node) rowRefs.current.set(photo.image_id, node)
+                    else rowRefs.current.delete(photo.image_id)
+                  }}
                   data-sequence-index={index}
+                  data-manage-id={photo.image_id}
+                  data-manage-focused={isFocused ? "true" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-md border border-border/60 bg-background/70 p-2",
                     "data-[sequence-drop-target=true]:border-foreground/35 data-[sequence-drop-target=true]:bg-foreground/[0.04]",
-                    isSelected && "border-zinc-900/25 bg-zinc-900/[0.03]"
+                    isSelected && "border-zinc-900/25 bg-zinc-900/[0.03]",
+                    isFocused && "ring-2 ring-ring/40"
                   )}
                 >
                   <button
@@ -619,9 +749,10 @@ export function GalleryAlbumManagePanel({
                   <Checkbox
                     checked={isSelected}
                     disabled={pending}
-                    onCheckedChange={(value) =>
+                    onCheckedChange={(value) => {
+                      setSelectionFocusId(photo.image_id)
                       toggleSelected(photo.image_id, value === true)
-                    }
+                    }}
                     aria-label={`Select ${photo.name}`}
                   />
                   <ManageAlbumThumb photo={photo} />

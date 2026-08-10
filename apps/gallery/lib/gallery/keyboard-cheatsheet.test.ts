@@ -62,7 +62,7 @@ describe("GALLERY_SLIDESHOW_SHORTCUTS", () => {
 })
 
 describe("GALLERY_MEMORIES_SHORTCUTS", () => {
-  test("covers prev/next calendar day", () => {
+  test("covers prev/next calendar day and grid focus", () => {
     const joined = GALLERY_MEMORIES_SHORTCUTS.flatMap((row) => row.keys).join(
       " "
     )
@@ -71,6 +71,9 @@ describe("GALLERY_MEMORIES_SHORTCUTS", () => {
     expect(joined).toContain("J")
     expect(joined).toContain("K")
     expect(joined).toContain("T")
+    expect(joined).toContain("Tab")
+    expect(joined).toContain("Enter")
+    expect(joined).toContain("Esc")
     expect(joined).toContain("?")
   })
 })
