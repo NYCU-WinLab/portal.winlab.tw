@@ -546,7 +546,8 @@ export function GalleryWallSelectBar({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!canSlideshow}
+                  disabled={!canSlideshow || slideshowOpen}
+                  aria-busy={slideshowOpen || undefined}
                   className={cn(
                     gallerySans(),
                     "h-8 gap-1.5 text-[11px] uppercase"

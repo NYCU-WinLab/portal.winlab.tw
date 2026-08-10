@@ -1404,7 +1404,8 @@ export function UploadManageList({
                 ref={slideshowButtonRef}
                 type="button"
                 onClick={() => openSlideshow("covers")}
-                disabled={!canSlideshow}
+                disabled={!canSlideshow || slideshowOpen}
+                aria-busy={slideshowOpen || undefined}
                 className={cn(galleryPillClass(), "disabled:opacity-40")}
               >
                 Play

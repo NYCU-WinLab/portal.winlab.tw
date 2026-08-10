@@ -567,6 +567,9 @@ export function AlbumSlideshowButton({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
+        disabled={open}
+        aria-busy={open || undefined}
+        aria-expanded={open}
         className={className}
       >
         {triggerLabel}
