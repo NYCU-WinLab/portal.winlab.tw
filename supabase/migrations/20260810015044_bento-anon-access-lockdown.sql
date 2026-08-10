@@ -45,3 +45,40 @@ revoke all privileges on public.bento_order_items from anon;
 --    auth-gated and this RPC is only ever called by authenticated users, so anon
 --    does not need EXECUTE. Keep authenticated + service_role.
 revoke execute on function public.add_bento_order_item(text, uuid, uuid[], boolean, uuid, text, text) from anon;
+
+-- 5. bento_ratings — same anti-pattern (PR-review #833). `"Anyone can view ratings"`
+--    is `to public using (true)` with a blanket anon grant, so anon can read every
+--    rating (user_id + score), joinable to names via the anon-readable
+--    user_profiles(id, name). Live-verified anon-readable (HTTP 200; 0 rows today,
+--    so latent, not yet leaking). The app never reads this table as anon (/bento is
+--    auth-gated). Scope SELECT to authenticated; the own-row insert/update/delete
+--    policies are unaffected. Revoke the over-broad anon grant.
+drop policy if exists "Anyone can view ratings" on public.bento_ratings;
+create policy "Authenticated can view ratings"
+  on public.bento_ratings
+  for select
+  to authenticated
+  using (true);
+revoke all privileges on public.bento_ratings from anon;
+
+-- 6. SECURITY DEFINER views bento_order_stats / bento_user_rankings (PR-review #833).
+--    The baseline grants anon SELECT on both (they run as owner and bypass RLS, so
+--    they would re-expose member name + spending). Live check 2026-08-10: both are
+--    404 / not in the PostgREST schema cache on prod — NOT a current leak (dropped
+--    or unexposed since the baseline snapshot). Revoke defensively, guarded by
+--    to_regclass so this is a no-op if the view no longer exists (won't fail replay).
+do $$
+begin
+  if to_regclass('public.bento_order_stats') is not null then
+    execute 'revoke all privileges on public.bento_order_stats from anon';
+  end if;
+  if to_regclass('public.bento_user_rankings') is not null then
+    execute 'revoke all privileges on public.bento_user_rankings from anon';
+  end if;
+end $$;
+
+-- Deliberately NOT changed (PR-review #833 triage): bento_menus, bento_menu_items,
+-- and the bento_option_* tables remain anon-grantable. They hold menu content, not
+-- member PII; the only sensitive-ish field is restaurant phone/google_map_link on
+-- bento_menus (public contact info). Left readable by design; flagged as a separate
+-- low-priority decision for the bento owner rather than folded in here.
