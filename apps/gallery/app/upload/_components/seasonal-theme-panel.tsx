@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useTransition, type KeyboardEvent } from "react"
+import { useRouter } from "next/navigation"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
@@ -46,6 +47,7 @@ export function SeasonalThemePanel({
   activeThemeId: GallerySeasonalThemeId | null
   settingsReady?: boolean
 }) {
+  const router = useRouter()
   const [selected, setSelected] = useState<ThemeChoice>(activeThemeId ?? "off")
   const [isPending, startTransition] = useTransition()
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -64,6 +66,11 @@ export function SeasonalThemePanel({
         return
       }
       toast.success(describeSeasonalThemeToast(themeId))
+      try {
+        router.refresh()
+      } catch {
+        // Best-effort so SSR chrome picks up the new theme.
+      }
     })
   }
 
