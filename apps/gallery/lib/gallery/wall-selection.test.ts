@@ -57,6 +57,11 @@ describe("describeWallSelectionCount", () => {
     expect(describeWallSelectionCount(1)).toBe("1 photo selected")
     expect(describeWallSelectionCount(4)).toBe("4 photos selected")
   })
+
+  test("treats negative counts as nothing selected", () => {
+    expect(describeWallSelectionCount(-1)).toBe("Nothing selected")
+    expect(describeWallSelectionCount(-99)).toBe("Nothing selected")
+  })
 })
 
 describe("selectWallIdRange", () => {
