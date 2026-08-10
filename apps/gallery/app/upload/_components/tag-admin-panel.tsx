@@ -100,7 +100,7 @@ export function TagAdminPanel() {
   }
 
   const submitRename = () => {
-    if (!renameId) return
+    if (!renameId || pending) return
     const name = normalizeGalleryTagName(renameDraft)
     if (!name) {
       toast.error("Give the tag a usable name.")
@@ -130,6 +130,7 @@ export function TagAdminPanel() {
   }
 
   const submitMerge = () => {
+    if (pending) return
     if (!mergeSourceId || !mergeTargetId) {
       toast.error("Pick a target tag to merge into.")
       return
