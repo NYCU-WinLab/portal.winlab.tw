@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { IconSearch, IconX } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -23,26 +24,29 @@ export function GalleryAlbumsSearch({
     setDraft(initialQuery)
   }, [initialQuery])
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
+  const navigate = (nextDraft: string) => {
     const params = new URLSearchParams()
     if (mineOnly) params.set("mine", "1")
-    const q = draft.trim()
+    const q = nextDraft.trim()
     if (q) params.set("q", q)
     const qs = params.toString()
     startTransition(() => {
-      router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
+      try {
+        router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
+      } catch {
+        toast.error("Could not update album search.")
+      }
     })
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    navigate(draft)
   }
 
   const clear = () => {
     setDraft("")
-    const params = new URLSearchParams()
-    if (mineOnly) params.set("mine", "1")
-    const qs = params.toString()
-    startTransition(() => {
-      router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
-    })
+    navigate("")
   }
 
   useEffect(() => {
@@ -53,12 +57,7 @@ export function GalleryAlbumsSearch({
       if (!hasQuery) return
       event.preventDefault()
       setDraft("")
-      const params = new URLSearchParams()
-      if (mineOnly) params.set("mine", "1")
-      const qs = params.toString()
-      startTransition(() => {
-        router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
-      })
+      navigate("")
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
@@ -70,6 +69,7 @@ export function GalleryAlbumsSearch({
       className="flex w-full max-w-md items-center gap-2"
       role="search"
       aria-label="Search albums"
+      aria-busy={pending || undefined}
     >
       <div className="relative min-w-0 flex-1">
         <IconSearch
@@ -102,6 +102,7 @@ export function GalleryAlbumsSearch({
       <button
         type="submit"
         disabled={pending}
+        aria-busy={pending || undefined}
         className={cn(
           gallerySans(),
           "inline-flex h-10 shrink-0 items-center rounded-md border border-input bg-background px-3 text-sm shadow-xs",
