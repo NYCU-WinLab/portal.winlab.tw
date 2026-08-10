@@ -17,6 +17,7 @@ import {
   IconTag,
   IconX,
 } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import {
   DropdownMenu,
@@ -41,7 +42,10 @@ import {
   type GalleryMediaFilter,
 } from "@/lib/gallery/home-filters"
 import type { GalleryMember } from "@/lib/gallery/types"
-import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
+import {
+  normalizeGalleryTagSlug,
+  type GalleryTagSuggestion,
+} from "@/lib/gallery/tags"
 
 const MEDIA_OPTIONS: { value: GalleryMediaFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -154,7 +158,11 @@ export function GalleryHomeFiltersBar({
       commentId: comment,
     })
     startTransition(() => {
-      router.replace(href, { scroll: false })
+      try {
+        router.replace(href, { scroll: false })
+      } catch {
+        toast.error("Could not update gallery filters.")
+      }
     })
   }
 
@@ -222,12 +230,16 @@ export function GalleryHomeFiltersBar({
   }
 
   const applyTagDraft = () => {
-    const slug = tagDraft.trim().toLowerCase().replace(/\s+/g, "-")
-    if (!slug) {
+    const raw = tagDraft.trim()
+    if (!raw) {
       apply({ ...filters, tagSlug: null })
       return
     }
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return
+    const slug = normalizeGalleryTagSlug(raw)
+    if (!slug) {
+      toast.error("Use letters, numbers, or hyphens for a tag slug.")
+      return
+    }
     setTagDraft("")
     apply({ ...filters, tagSlug: slug })
   }
@@ -280,6 +292,7 @@ export function GalleryHomeFiltersBar({
           <form
             onSubmit={onSearchSubmit}
             className="flex w-full max-w-md items-center gap-2"
+            aria-busy={isPending || undefined}
           >
             <div className="relative min-w-0 flex-1">
               <IconSearch
@@ -315,6 +328,7 @@ export function GalleryHomeFiltersBar({
             <button
               type="submit"
               disabled={isPending}
+              aria-busy={isPending || undefined}
               className={cn(
                 galleryFilterChipClass(false),
                 "shrink-0 border-zinc-800/25 bg-zinc-900/[0.06] font-medium text-foreground",
