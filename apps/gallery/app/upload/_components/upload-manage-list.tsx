@@ -120,6 +120,9 @@ import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
 import {
   describeCouldNotCopyClipboard,
   describeCouldNotCopyLinks,
+  describeCaptureDateRequired,
+  describeEnterATag,
+  describeEnterATagSlugToRemove,
 } from "@/lib/gallery/validation-toasts"
 import { buildAlbumZipFilename } from "@/lib/gallery/zip-names"
 import { describeZipDownloadResult } from "@/lib/gallery/zip-result"
@@ -955,7 +958,7 @@ export function UploadManageList({
   const confirmBulkDate = () => {
     if (isPending) return
     if (!bulkDateDraft.trim()) {
-      toast.error("Pick a capture date.")
+      toast.error(describeCaptureDateRequired())
       return
     }
     startTransition(async () => {
@@ -977,7 +980,7 @@ export function UploadManageList({
     if (isPending) return
     const name = bulkTagDraft.trim()
     if (!name) {
-      toast.error("Enter a tag.")
+      toast.error(describeEnterATag())
       return
     }
     startTransition(async () => {
@@ -1006,7 +1009,7 @@ export function UploadManageList({
     if (isPending) return
     const slug = bulkUntagDraft.trim()
     if (!slug) {
-      toast.error("Enter a tag slug to remove.")
+      toast.error(describeEnterATagSlugToRemove())
       return
     }
     startTransition(async () => {

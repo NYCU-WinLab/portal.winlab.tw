@@ -47,3 +47,48 @@ export function describeUploadFileEmpty(): string {
 export function describeNothingToDownload(): string {
   return "Nothing to download."
 }
+
+/** Selection gate before album/add actions. */
+export function describeSelectAtLeastOnePhoto(): string {
+  return "Select at least one photo."
+}
+
+/** Media-health delete gate. */
+export function describeSelectAtLeastOneBrokenShot(): string {
+  return "Select at least one broken shot."
+}
+
+/** Capture-date editor empty draft. */
+export function describeCaptureDateRequired(): string {
+  return "Pick a capture date."
+}
+
+/** Manage bulk tag empty draft. */
+export function describeEnterATag(): string {
+  return "Enter a tag."
+}
+
+/** Manage bulk untag empty slug. */
+export function describeEnterATagSlugToRemove(): string {
+  return "Enter a tag slug to remove."
+}
+
+/** Memories teaser with nothing to play. */
+export function describeNoMemoriesToPlay(): string {
+  return "No memories to play right now."
+}
+
+/** Sign-out failure. */
+export function describeCouldNotSignOut(): string {
+  return "Could not sign out."
+}
+
+/** Sign-in OAuth start failure. */
+export function describeCouldNotStartSignIn(): string {
+  return "Could not start sign-in."
+}
+
+/** Home filters invalid tag slug. */
+export function describeInvalidTagSlug(): string {
+  return "Use letters, numbers, or hyphens for a tag slug."
+}

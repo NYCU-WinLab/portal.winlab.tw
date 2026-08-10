@@ -33,7 +33,10 @@ import {
 } from "@/lib/gallery/albums"
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
 import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
-import { describeAlbumTitleRequired } from "@/lib/gallery/validation-toasts"
+import {
+  describeAlbumTitleRequired,
+  describeSelectAtLeastOnePhoto,
+} from "@/lib/gallery/validation-toasts"
 
 type MyAlbumOption = {
   id: string
@@ -120,7 +123,7 @@ export function GalleryAddToAlbum({
   const addTo = (album: MyAlbumOption) => {
     if (pending) return
     if (ids.length === 0) {
-      toast.error("Select at least one photo.")
+      toast.error(describeSelectAtLeastOnePhoto())
       return
     }
     startTransition(async () => {
@@ -165,7 +168,7 @@ export function GalleryAddToAlbum({
       return
     }
     if (ids.length === 0) {
-      toast.error("Select at least one photo.")
+      toast.error(describeSelectAtLeastOnePhoto())
       return
     }
     startTransition(async () => {

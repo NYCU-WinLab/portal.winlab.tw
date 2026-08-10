@@ -10,6 +10,7 @@ import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import type { GalleryMemoryPhoto } from "@/lib/gallery/memories"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
+import { describeNoMemoriesToPlay } from "@/lib/gallery/validation-toasts"
 
 /** Compact home teaser when past-year shots match today. */
 export function GalleryMemoriesTeaser({
@@ -108,7 +109,7 @@ export function GalleryMemoriesTeaser({
               type="button"
               onClick={() => {
                 if (slideshowPhotos.length === 0) {
-                  toast.error("No memories to play right now.")
+                  toast.error(describeNoMemoriesToPlay())
                   return
                 }
                 setSlideshowOpen(true)

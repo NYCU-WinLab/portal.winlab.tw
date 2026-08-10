@@ -27,6 +27,7 @@ import {
   describeMediaHealthDeleted,
   describeMediaHealthFoundBroken,
 } from "@/lib/gallery/media-health-toast"
+import { describeSelectAtLeastOneBrokenShot } from "@/lib/gallery/validation-toasts"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
 import {
   AlertDialog,
@@ -135,7 +136,7 @@ export function MediaHealthPanel() {
       }))
 
     if (items.length === 0) {
-      toast.error("Select at least one broken shot.")
+      toast.error(describeSelectAtLeastOneBrokenShot())
       return
     }
 

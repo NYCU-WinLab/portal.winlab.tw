@@ -10,6 +10,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { describeSigningOutLabel } from "@/lib/gallery/busy-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeCouldNotSignOut } from "@/lib/gallery/validation-toasts"
 
 export function SignOutButton({
   className,
@@ -28,7 +29,7 @@ export function SignOutButton({
         const supabase = createClient()
         const { error } = await supabase.auth.signOut()
         if (error) {
-          toast.error(error.message || "Could not sign out.")
+          toast.error(error.message || describeCouldNotSignOut())
           return
         }
         try {
@@ -42,7 +43,7 @@ export function SignOutButton({
           // Best-effort after a successful sign-out.
         }
       } catch {
-        toast.error("Could not sign out.")
+        toast.error(describeCouldNotSignOut())
       }
     })
   }

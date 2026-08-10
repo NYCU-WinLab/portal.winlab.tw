@@ -17,6 +17,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { updateGalleryImageTakenAt } from "@/app/upload/actions"
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeCaptureDateUpdated } from "@/lib/gallery/manage-toast"
+import { describeCaptureDateRequired } from "@/lib/gallery/validation-toasts"
 import {
   fromTaipeiDateInput,
   toTaipeiDateInput,
@@ -54,7 +55,7 @@ export function TakenAtEditor({
 
   function onSave() {
     if (!draft.trim()) {
-      toast.error("Pick a capture date.")
+      toast.error(describeCaptureDateRequired())
       return
     }
     startTransition(async () => {

@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
+import { describeCouldNotStartSignIn } from "@/lib/gallery/validation-toasts"
 
 const NEXT_STORAGE_KEY = "gallery:auth:next"
 
@@ -39,10 +40,10 @@ export function SignInButton({ next }: { next?: string }) {
           },
         })
         if (error) {
-          toast.error(error.message || "Could not start sign-in.")
+          toast.error(error.message || describeCouldNotStartSignIn())
         }
       } catch {
-        toast.error("Could not start sign-in.")
+        toast.error(describeCouldNotStartSignIn())
       }
     })
   }

@@ -42,6 +42,7 @@ import {
   type GalleryMediaFilter,
 } from "@/lib/gallery/home-filters"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeInvalidTagSlug } from "@/lib/gallery/validation-toasts"
 import type { GalleryMember } from "@/lib/gallery/types"
 import {
   normalizeGalleryTagSlug,
@@ -238,7 +239,7 @@ export function GalleryHomeFiltersBar({
     }
     const slug = normalizeGalleryTagSlug(raw)
     if (!slug) {
-      toast.error("Use letters, numbers, or hyphens for a tag slug.")
+      toast.error(describeInvalidTagSlug())
       return
     }
     setTagDraft("")
