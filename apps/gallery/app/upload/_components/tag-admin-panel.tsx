@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { IconGitMerge, IconPencil } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -47,6 +47,7 @@ export function TagAdminPanel() {
   const [renameDraft, setRenameDraft] = useState("")
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null)
   const [mergeTargetId, setMergeTargetId] = useState<string>("")
+  const dialogTriggerRef = useRef<HTMLElement | null>(null)
 
   const refresh = () => {
     startTransition(async () => {
@@ -83,9 +84,19 @@ export function TagAdminPanel() {
     [tags, mergeSourceId]
   )
 
-  const openRename = (tag: GalleryTagSuggestion) => {
+  const openRename = (
+    tag: GalleryTagSuggestion,
+    trigger?: HTMLElement | null
+  ) => {
+    dialogTriggerRef.current = trigger ?? null
     setRenameId(tag.id)
     setRenameDraft(tag.name)
+  }
+
+  const restoreDialogFocus = () => {
+    const trigger = dialogTriggerRef.current
+    dialogTriggerRef.current = null
+    queueMicrotask(() => trigger?.focus())
   }
 
   const submitRename = () => {
@@ -109,7 +120,11 @@ export function TagAdminPanel() {
     })
   }
 
-  const openMerge = (tag: GalleryTagSuggestion) => {
+  const openMerge = (
+    tag: GalleryTagSuggestion,
+    trigger?: HTMLElement | null
+  ) => {
+    dialogTriggerRef.current = trigger ?? null
     setMergeSourceId(tag.id)
     setMergeTargetId("")
   }
@@ -219,7 +234,7 @@ export function TagAdminPanel() {
                   size="sm"
                   variant="ghost"
                   disabled={pending}
-                  onClick={() => openRename(tag)}
+                  onClick={(event) => openRename(tag, event.currentTarget)}
                 >
                   <IconPencil className="size-3.5" aria-hidden />
                   Rename
@@ -229,7 +244,7 @@ export function TagAdminPanel() {
                   size="sm"
                   variant="ghost"
                   disabled={pending || tags.length < 2}
-                  onClick={() => openMerge(tag)}
+                  onClick={(event) => openMerge(tag, event.currentTarget)}
                 >
                   <IconGitMerge className="size-3.5" aria-hidden />
                   Merge
@@ -246,6 +261,7 @@ export function TagAdminPanel() {
           if (!open) {
             setRenameId(null)
             setRenameDraft("")
+            restoreDialogFocus()
           }
         }}
       >
@@ -286,6 +302,7 @@ export function TagAdminPanel() {
           if (!open) {
             setMergeSourceId(null)
             setMergeTargetId("")
+            restoreDialogFocus()
           }
         }}
       >
