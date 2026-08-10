@@ -283,6 +283,7 @@ export function GalleryCard({
   const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
   const favoriteBusyRef = useRef(false)
   const shareBusyRef = useRef(false)
+  const downloadBusyRef = useRef(false)
 
   useEffect(() => {
     setFavorited(Boolean(image.is_favorited))
@@ -335,12 +336,14 @@ export function GalleryCard({
   }, [favorited, image.id, isSignedIn])
 
   const downloadOriginalFromKeyboard = useCallback(async () => {
+    if (downloadBusyRef.current) return
     const path = activeItem?.image_path ?? image.image_path
     const name = activeItem?.name ?? image.name
     if (!path) {
       toast.error("Nothing to download.")
       return
     }
+    downloadBusyRef.current = true
     try {
       await downloadGalleryOriginal({ displayName: name, imagePath: path })
       toast.success("Saved original")
@@ -348,6 +351,8 @@ export function GalleryCard({
       const message =
         error instanceof Error ? error.message : "Could not download"
       toast.error(message)
+    } finally {
+      downloadBusyRef.current = false
     }
   }, [activeItem?.image_path, activeItem?.name, image.image_path, image.name])
 
