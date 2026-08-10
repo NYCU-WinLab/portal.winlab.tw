@@ -290,8 +290,12 @@ export function TagAdminPanel() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={submitRename} disabled={pending}>
-              Save name
+            <AlertDialogAction
+              onClick={submitRename}
+              disabled={pending}
+              aria-busy={pending || undefined}
+            >
+              {pending ? "Saving…" : "Save name"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -345,8 +349,9 @@ export function TagAdminPanel() {
             <AlertDialogAction
               onClick={submitMerge}
               disabled={pending || !mergeTargetId}
+              aria-busy={pending || undefined}
             >
-              Merge tags
+              {pending ? "Merging…" : "Merge tags"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
