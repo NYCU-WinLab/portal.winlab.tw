@@ -141,6 +141,7 @@ export function GalleryAlbumManagePanel({
   }
 
   const saveMeta = () => {
+    if (pending) return
     const normalized = normalizeGalleryAlbumTitle(title)
     if (!normalized) {
       toast.error("Give the album a name with letters or numbers.")
@@ -166,6 +167,7 @@ export function GalleryAlbumManagePanel({
   }
 
   const movePhoto = (index: number, direction: -1 | 1) => {
+    if (pending) return
     const nextIndex = index + direction
     if (nextIndex < 0 || nextIndex >= photos.length) return
     const next = [...photos]
@@ -189,6 +191,7 @@ export function GalleryAlbumManagePanel({
 
   const applyReorder = useCallback(
     (fromIndex: number, toIndex: number) => {
+      if (pending) return
       setPhotos((prev) => {
         if (
           fromIndex < 0 ||
@@ -219,7 +222,7 @@ export function GalleryAlbumManagePanel({
         return next
       })
     },
-    [album.id, router]
+    [album.id, pending, router]
   )
 
   const {
@@ -235,6 +238,7 @@ export function GalleryAlbumManagePanel({
   })
 
   const removePhoto = (imageId: string) => {
+    if (pending) return
     setConfirmRemoveId(null)
     const previousPhotos = photos
     const previousCover = coverImageId
@@ -302,6 +306,7 @@ export function GalleryAlbumManagePanel({
   }
 
   const setCover = (imageId: string) => {
+    if (pending) return
     const previous = coverImageId
     setCoverImageId(imageId)
     startTransition(async () => {
@@ -402,7 +407,12 @@ export function GalleryAlbumManagePanel({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={saveMeta} disabled={pending}>
+        <Button
+          type="button"
+          onClick={saveMeta}
+          disabled={pending}
+          aria-busy={pending || undefined}
+        >
           Save details
         </Button>
         {photos.length > 0 ? (
