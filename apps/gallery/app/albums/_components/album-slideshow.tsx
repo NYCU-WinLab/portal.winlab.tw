@@ -320,6 +320,7 @@ export function AlbumSlideshow({
                 )}
                 aria-pressed={videoMuted}
                 aria-label={describeSlideshowMuteAriaLabel(videoMuted)}
+                aria-keyshortcuts="M"
               >
                 {videoMuted ? (
                   <IconVolumeOff className="size-5" aria-hidden />

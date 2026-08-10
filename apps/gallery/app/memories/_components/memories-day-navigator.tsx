@@ -4,10 +4,12 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   isMemoriesViewingToday,
@@ -27,6 +29,17 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
   const prev = shiftGalleryCalendarDay(day.month, day.day, -1)
   const next = shiftGalleryCalendarDay(day.month, day.day, 1)
   const viewingToday = isMemoriesViewingToday(day)
+
+  const softPush = (
+    href: string,
+    errorKey: "memoriesPreviousDay" | "memoriesNextDay"
+  ) => {
+    try {
+      router.push(href)
+    } catch {
+      toast.error(describeGalleryNavError(errorKey))
+    }
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -49,12 +62,12 @@ export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
       const key = event.key
       if (key === "ArrowLeft" || key === "k" || key === "K") {
         event.preventDefault()
-        router.push(memoriesDayHref(prev.month, prev.day))
+        softPush(memoriesDayHref(prev.month, prev.day), "memoriesPreviousDay")
         return
       }
       if (key === "ArrowRight" || key === "j" || key === "J") {
         event.preventDefault()
-        router.push(memoriesDayHref(next.month, next.day))
+        softPush(memoriesDayHref(next.month, next.day), "memoriesNextDay")
       }
     }
 

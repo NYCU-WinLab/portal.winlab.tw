@@ -77,6 +77,7 @@ import {
 import { downloadAlbumZip } from "@/lib/gallery/download-album"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { galleryScrollBehavior } from "@/lib/gallery/motion"
+import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
 import {
   describeManageSelectAllLabel,
   describeManageSelectAllShortLabel,
@@ -1449,340 +1450,376 @@ export function UploadManageList({
       </div>
 
       {selectionMode ? (
-        <div
-          className={cn(
-            "fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[min(100%,48rem)] flex-wrap items-center justify-between gap-3 px-4",
-            "sm:px-6"
-          )}
-        >
+        <>
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {selectionFocusId
+              ? (() => {
+                  const index = visibleSelectableItems.findIndex(
+                    (item) => item.id === selectionFocusId
+                  )
+                  const item = visibleSelectableItems[index]
+                  return item
+                    ? describeFocusedPhotoAnnouncement(
+                        item.name,
+                        index,
+                        visibleSelectableItems.length
+                      )
+                    : ""
+                })()
+              : ""}
+          </p>
           <div
             className={cn(
-              "flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-900/15 bg-card/95 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.45)] backdrop-blur-md"
+              "fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[min(100%,48rem)] flex-wrap items-center justify-between gap-3 px-4",
+              "sm:px-6"
             )}
-            role="status"
-            aria-live="polite"
           >
-            <p className={cn(gallerySans(), "text-sm text-foreground")}>
-              {selectionStatusText}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (allSelected) {
-                    clearSelection()
-                    return
-                  }
-                  setSelectedIds(
-                    new Set(visibleSelectableItems.map((item) => item.id))
-                  )
-                  selectionAnchorIdRef.current =
-                    visibleSelectableItems[visibleSelectableItems.length - 1]
-                      ?.id ?? null
-                }}
-                aria-pressed={allSelected}
-                aria-label={describeManageSelectAllTitle(
-                  allSelected,
-                  visibleSelectableItems.length
-                )}
-                className={galleryPillClass()}
-              >
-                {describeManageSelectAllShortLabel(allSelected)}
-              </button>
-              {albumsAvailable ? (
-                <>
-                  <GalleryAddToAlbum
-                    imageIds={selectedItems.map((item) => item.id)}
-                    triggerLabel={describeAlbumTriggerLabel(
-                      selectedItems.length
-                    )}
-                    triggerClassName={cn(
-                      galleryPillClass(),
-                      "h-auto gap-0 !text-xs normal-case",
-                      (isPending || selectedItems.length === 0) && "opacity-40"
-                    )}
-                    onAdded={() => {
-                      endSelectionMode()
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      rememberBulkTrigger(event.currentTarget)
-                      setBulkAlbumDraft("")
-                      setBulkAlbumOpen(true)
-                    }}
-                    disabled={isPending || selectedItems.length === 0}
-                    className={cn(galleryPillClass(), "disabled:opacity-40")}
-                  >
-                    New album
-                    {selectedItems.length > 0
-                      ? ` (${selectedItems.length})`
-                      : ""}
-                  </button>
-                </>
-              ) : null}
-              <button
-                ref={slideshowButtonRef}
-                type="button"
-                onClick={() => openSlideshow("covers")}
-                disabled={!canSlideshow || slideshowOpen}
-                aria-busy={slideshowOpen || undefined}
-                className={cn(galleryPillClass(), "disabled:opacity-40")}
-              >
-                Play
-                {canSlideshow ? ` (${selectedSlideshowPhotos.length})` : ""}
-              </button>
-              {tagsAvailable ? (
+            <div
+              className={cn(
+                "flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-900/15 bg-card/95 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(24,24,27,0.45)] backdrop-blur-md"
+              )}
+              role="status"
+              aria-live="polite"
+            >
+              <p className={cn(gallerySans(), "text-sm text-foreground")}>
+                {selectionStatusText}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={(event) => {
-                    rememberBulkTrigger(event.currentTarget)
-                    setBulkTagDraft("")
-                    setBulkTagOpen(true)
+                  onClick={() => {
+                    if (allSelected) {
+                      clearSelection()
+                      return
+                    }
+                    setSelectedIds(
+                      new Set(visibleSelectableItems.map((item) => item.id))
+                    )
+                    selectionAnchorIdRef.current =
+                      visibleSelectableItems[visibleSelectableItems.length - 1]
+                        ?.id ?? null
                   }}
-                  disabled={isPending || selectedItems.length === 0}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
+                  aria-pressed={allSelected}
+                  aria-label={describeManageSelectAllTitle(
+                    allSelected,
+                    visibleSelectableItems.length
+                  )}
+                  className={galleryPillClass()}
                 >
-                  Tag
-                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                  {describeManageSelectAllShortLabel(allSelected)}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={(event) => {
-                  rememberBulkTrigger(event.currentTarget)
-                  setConfirmOpen(true)
-                }}
-                disabled={isPending || selectedItems.length === 0}
-                className={cn(
-                  galleryPillClass(),
-                  "border-destructive/30 text-destructive disabled:opacity-40"
-                )}
-              >
-                Delete
-                {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
-              </button>
-              <div className="hidden flex-wrap items-center gap-2 sm:flex">
-                {takenAtAvailable ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      rememberBulkTrigger(event.currentTarget)
-                      openBulkDate()
-                    }}
-                    disabled={isPending || selectedItems.length === 0}
-                    className={cn(galleryPillClass(), "disabled:opacity-40")}
-                  >
-                    Set date
-                    {selectedItems.length > 0
-                      ? ` (${selectedItems.length})`
-                      : ""}
-                  </button>
+                {albumsAvailable ? (
+                  <>
+                    <GalleryAddToAlbum
+                      imageIds={selectedItems.map((item) => item.id)}
+                      triggerLabel={describeAlbumTriggerLabel(
+                        selectedItems.length
+                      )}
+                      triggerClassName={cn(
+                        galleryPillClass(),
+                        "h-auto gap-0 !text-xs normal-case",
+                        (isPending || selectedItems.length === 0) &&
+                          "opacity-40"
+                      )}
+                      onAdded={() => {
+                        endSelectionMode()
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        rememberBulkTrigger(event.currentTarget)
+                        setBulkAlbumDraft("")
+                        setBulkAlbumOpen(true)
+                      }}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
+                    >
+                      New album
+                      {selectedItems.length > 0
+                        ? ` (${selectedItems.length})`
+                        : ""}
+                    </button>
+                  </>
                 ) : null}
                 <button
+                  ref={slideshowButtonRef}
                   type="button"
-                  onClick={() => void downloadSelectedZip()}
-                  disabled={isPending || zipBusy || selectedZipCount === 0}
-                  aria-busy={zipBusy || undefined}
+                  onClick={() => openSlideshow("covers")}
+                  disabled={!canSlideshow || slideshowOpen}
+                  aria-busy={slideshowOpen || undefined}
                   className={cn(galleryPillClass(), "disabled:opacity-40")}
                 >
-                  {zipBusy
-                    ? "ZIP…"
-                    : selectedZipCount > 0
-                      ? `ZIP (${selectedZipCount})`
-                      : "ZIP"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void copySelectedLinks()}
-                  disabled={isPending || selectedWallLinkCount === 0}
-                  aria-busy={isPending || undefined}
-                  className={cn(galleryPillClass(), "disabled:opacity-40")}
-                >
-                  Links
-                  {selectedWallLinkCount > 0
-                    ? ` (${selectedWallLinkCount})`
-                    : ""}
+                  Play
+                  {canSlideshow ? ` (${selectedSlideshowPhotos.length})` : ""}
                 </button>
                 {tagsAvailable ? (
                   <button
                     type="button"
                     onClick={(event) => {
                       rememberBulkTrigger(event.currentTarget)
-                      setBulkUntagDraft("")
-                      setBulkUntagOpen(true)
+                      setBulkTagDraft("")
+                      setBulkTagOpen(true)
                     }}
                     disabled={isPending || selectedItems.length === 0}
                     className={cn(galleryPillClass(), "disabled:opacity-40")}
                   >
-                    Untag
+                    Tag
                     {selectedItems.length > 0
                       ? ` (${selectedItems.length})`
                       : ""}
                   </button>
                 ) : null}
-                {favoritesAvailable ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFavorites(true)}
-                      disabled={isPending || selectedItems.length === 0}
-                      aria-busy={isPending || undefined}
-                      className={cn(galleryPillClass(), "disabled:opacity-40")}
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFavorites(false)}
-                      disabled={isPending || selectedItems.length === 0}
-                      aria-busy={isPending || undefined}
-                      className={cn(galleryPillClass(), "disabled:opacity-40")}
-                    >
-                      Unsave
-                    </button>
-                  </>
-                ) : null}
-                {isAdmin && pinAvailable ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => pinSelected(true)}
-                      disabled={isPending || selectedItems.length === 0}
-                      aria-busy={isPending || undefined}
-                      className={cn(galleryPillClass(), "disabled:opacity-40")}
-                    >
-                      Pin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => pinSelected(false)}
-                      disabled={isPending || selectedItems.length === 0}
-                      aria-busy={isPending || undefined}
-                      className={cn(galleryPillClass(), "disabled:opacity-40")}
-                    >
-                      Unpin
-                    </button>
-                  </>
-                ) : null}
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={isPending || selectedItems.length === 0}
-                    className={cn(
-                      galleryPillClass(),
-                      "disabled:opacity-40 sm:hidden"
-                    )}
-                    aria-label={describeMoreSelectionActionsAriaLabel()}
-                    onClick={(event) =>
-                      rememberBulkTrigger(event.currentTarget)
-                    }
-                  >
-                    More
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
-                  {albumsAvailable ? (
-                    <DropdownMenuItem
-                      disabled={isPending || selectedItems.length === 0}
-                      onSelect={() => {
-                        setBulkAlbumDraft("")
-                        setBulkAlbumOpen(true)
-                      }}
-                    >
-                      New album…
-                    </DropdownMenuItem>
-                  ) : null}
-                  <DropdownMenuItem
-                    disabled={!canSlideshow}
-                    onSelect={() => openSlideshow("shuffled")}
-                  >
-                    Play shuffled
-                  </DropdownMenuItem>
-                  {canStorySlideshow &&
-                  selectedStorySlideshowPhotos.length !==
-                    selectedSlideshowPhotos.length ? (
-                    <DropdownMenuItem
-                      disabled={!canStorySlideshow}
-                      onSelect={() => openSlideshow("stories")}
-                    >
-                      Play with stories
-                    </DropdownMenuItem>
-                  ) : null}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    rememberBulkTrigger(event.currentTarget)
+                    setConfirmOpen(true)
+                  }}
+                  disabled={isPending || selectedItems.length === 0}
+                  className={cn(
+                    galleryPillClass(),
+                    "border-destructive/30 text-destructive disabled:opacity-40"
+                  )}
+                >
+                  Delete
+                  {selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+                </button>
+                <div className="hidden flex-wrap items-center gap-2 sm:flex">
                   {takenAtAvailable ? (
-                    <DropdownMenuItem
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        rememberBulkTrigger(event.currentTarget)
+                        openBulkDate()
+                      }}
                       disabled={isPending || selectedItems.length === 0}
-                      onSelect={openBulkDate}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Set date
-                    </DropdownMenuItem>
+                      {selectedItems.length > 0
+                        ? ` (${selectedItems.length})`
+                        : ""}
+                    </button>
                   ) : null}
-                  <DropdownMenuItem
+                  <button
+                    type="button"
+                    onClick={() => void downloadSelectedZip()}
                     disabled={isPending || zipBusy || selectedZipCount === 0}
                     aria-busy={zipBusy || undefined}
-                    onSelect={() => void downloadSelectedZip()}
+                    className={cn(galleryPillClass(), "disabled:opacity-40")}
                   >
-                    {selectedZipCount > 0 ? `ZIP (${selectedZipCount})` : "ZIP"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
+                    {zipBusy
+                      ? "ZIP…"
+                      : selectedZipCount > 0
+                        ? `ZIP (${selectedZipCount})`
+                        : "ZIP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void copySelectedLinks()}
                     disabled={isPending || selectedWallLinkCount === 0}
-                    onSelect={() => void copySelectedLinks()}
+                    aria-busy={isPending || undefined}
+                    className={cn(galleryPillClass(), "disabled:opacity-40")}
                   >
+                    Links
                     {selectedWallLinkCount > 0
-                      ? `Links (${selectedWallLinkCount})`
-                      : "Links"}
-                  </DropdownMenuItem>
+                      ? ` (${selectedWallLinkCount})`
+                      : ""}
+                  </button>
                   {tagsAvailable ? (
-                    <DropdownMenuItem
-                      disabled={isPending || selectedItems.length === 0}
-                      onSelect={() => {
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        rememberBulkTrigger(event.currentTarget)
                         setBulkUntagDraft("")
                         setBulkUntagOpen(true)
                       }}
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Untag
-                    </DropdownMenuItem>
+                      {selectedItems.length > 0
+                        ? ` (${selectedItems.length})`
+                        : ""}
+                    </button>
                   ) : null}
                   {favoritesAvailable ? (
                     <>
-                      <DropdownMenuItem
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFavorites(true)}
                         disabled={isPending || selectedItems.length === 0}
-                        onSelect={() => setSelectedFavorites(true)}
+                        aria-busy={isPending || undefined}
+                        className={cn(
+                          galleryPillClass(),
+                          "disabled:opacity-40"
+                        )}
                       >
                         Save
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFavorites(false)}
                         disabled={isPending || selectedItems.length === 0}
-                        onSelect={() => setSelectedFavorites(false)}
+                        aria-busy={isPending || undefined}
+                        className={cn(
+                          galleryPillClass(),
+                          "disabled:opacity-40"
+                        )}
                       >
                         Unsave
-                      </DropdownMenuItem>
+                      </button>
                     </>
                   ) : null}
                   {isAdmin && pinAvailable ? (
                     <>
-                      <DropdownMenuItem
+                      <button
+                        type="button"
+                        onClick={() => pinSelected(true)}
                         disabled={isPending || selectedItems.length === 0}
-                        onSelect={() => pinSelected(true)}
+                        aria-busy={isPending || undefined}
+                        className={cn(
+                          galleryPillClass(),
+                          "disabled:opacity-40"
+                        )}
                       >
                         Pin
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => pinSelected(false)}
                         disabled={isPending || selectedItems.length === 0}
-                        onSelect={() => pinSelected(false)}
+                        aria-busy={isPending || undefined}
+                        className={cn(
+                          galleryPillClass(),
+                          "disabled:opacity-40"
+                        )}
                       >
                         Unpin
-                      </DropdownMenuItem>
+                      </button>
                     </>
                   ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={isPending || selectedItems.length === 0}
+                      className={cn(
+                        galleryPillClass(),
+                        "disabled:opacity-40 sm:hidden"
+                      )}
+                      aria-label={describeMoreSelectionActionsAriaLabel()}
+                      onClick={(event) =>
+                        rememberBulkTrigger(event.currentTarget)
+                      }
+                    >
+                      More
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-44">
+                    {albumsAvailable ? (
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => {
+                          setBulkAlbumDraft("")
+                          setBulkAlbumOpen(true)
+                        }}
+                      >
+                        New album…
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem
+                      disabled={!canSlideshow}
+                      onSelect={() => openSlideshow("shuffled")}
+                    >
+                      Play shuffled
+                    </DropdownMenuItem>
+                    {canStorySlideshow &&
+                    selectedStorySlideshowPhotos.length !==
+                      selectedSlideshowPhotos.length ? (
+                      <DropdownMenuItem
+                        disabled={!canStorySlideshow}
+                        onSelect={() => openSlideshow("stories")}
+                      >
+                        Play with stories
+                      </DropdownMenuItem>
+                    ) : null}
+                    {takenAtAvailable ? (
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={openBulkDate}
+                      >
+                        Set date
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem
+                      disabled={isPending || zipBusy || selectedZipCount === 0}
+                      aria-busy={zipBusy || undefined}
+                      onSelect={() => void downloadSelectedZip()}
+                    >
+                      {selectedZipCount > 0
+                        ? `ZIP (${selectedZipCount})`
+                        : "ZIP"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={isPending || selectedWallLinkCount === 0}
+                      onSelect={() => void copySelectedLinks()}
+                    >
+                      {selectedWallLinkCount > 0
+                        ? `Links (${selectedWallLinkCount})`
+                        : "Links"}
+                    </DropdownMenuItem>
+                    {tagsAvailable ? (
+                      <DropdownMenuItem
+                        disabled={isPending || selectedItems.length === 0}
+                        onSelect={() => {
+                          setBulkUntagDraft("")
+                          setBulkUntagOpen(true)
+                        }}
+                      >
+                        Untag
+                      </DropdownMenuItem>
+                    ) : null}
+                    {favoritesAvailable ? (
+                      <>
+                        <DropdownMenuItem
+                          disabled={isPending || selectedItems.length === 0}
+                          onSelect={() => setSelectedFavorites(true)}
+                        >
+                          Save
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={isPending || selectedItems.length === 0}
+                          onSelect={() => setSelectedFavorites(false)}
+                        >
+                          Unsave
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                    {isAdmin && pinAvailable ? (
+                      <>
+                        <DropdownMenuItem
+                          disabled={isPending || selectedItems.length === 0}
+                          onSelect={() => pinSelected(true)}
+                        >
+                          Pin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={isPending || selectedItems.length === 0}
+                          onSelect={() => pinSelected(false)}
+                        >
+                          Unpin
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       ) : null}
 
       {visibleTimeline.length === 0 && incompleteOnly && sequencesAvailable ? (

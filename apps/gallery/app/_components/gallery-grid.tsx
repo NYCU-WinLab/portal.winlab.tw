@@ -19,6 +19,7 @@ import {
   type GalleryHomeFilters,
 } from "@/lib/gallery/home-filters"
 import { describeGalleryWallAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { describeFocusedPhotoAnnouncement } from "@/lib/gallery/focus-announcement"
 import {
   describeNothingOnWallYetDescription,
   describeNothingOnWallYetTitle,
@@ -352,6 +353,18 @@ export function GalleryGrid({
       className="grid grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:grid-cols-3 lg:gap-x-9 lg:gap-y-14"
       aria-label={describeGalleryWallAriaLabel()}
     >
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {keyboardNavActive &&
+        focusIndex >= 0 &&
+        openIndex === null &&
+        images[focusIndex]
+          ? describeFocusedPhotoAnnouncement(
+              images[focusIndex]!.name,
+              focusIndex,
+              images.length
+            )
+          : ""}
+      </p>
       {images.map((image, index) => (
         <div
           key={image.id}

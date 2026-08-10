@@ -14,6 +14,7 @@ import {
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
 import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { shouldStopLightboxEscape } from "@/lib/gallery/reaction-escape"
 import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 
 const HOVER_SHOW_MS = 400
@@ -155,7 +156,7 @@ export function ReactionBar({
   useEffect(() => {
     if (!pickerOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && shouldStopLightboxEscape(pickerOpen)) {
         event.preventDefault()
         event.stopPropagation()
         closePicker()

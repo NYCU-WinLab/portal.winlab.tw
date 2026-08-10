@@ -116,6 +116,22 @@ export function MemoriesDayView({
         if (!nextId) return
         setLightboxFailed(false)
         setOpenId(nextId)
+        return
+      }
+      if (event.key === "Home") {
+        event.preventDefault()
+        const first = photoIds[0]
+        if (!first || first === openId) return
+        setLightboxFailed(false)
+        setOpenId(first)
+        return
+      }
+      if (event.key === "End") {
+        event.preventDefault()
+        const last = photoIds[photoIds.length - 1]
+        if (!last || last === openId) return
+        setLightboxFailed(false)
+        setOpenId(last)
       }
     }
     window.addEventListener("keydown", onKeyDown, true)
