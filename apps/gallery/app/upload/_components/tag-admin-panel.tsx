@@ -116,7 +116,11 @@ export function TagAdminPanel() {
       setRenameId(null)
       setRenameDraft("")
       refresh()
-      router.refresh()
+      try {
+        router.refresh()
+      } catch {
+        // Best-effort after a successful rename.
+      }
     })
   }
 
@@ -147,7 +151,11 @@ export function TagAdminPanel() {
       setMergeSourceId(null)
       setMergeTargetId("")
       refresh()
-      router.refresh()
+      try {
+        router.refresh()
+      } catch {
+        // Best-effort after a successful merge.
+      }
     })
   }
 
