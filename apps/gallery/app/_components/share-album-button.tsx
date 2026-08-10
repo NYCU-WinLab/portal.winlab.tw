@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
+import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
 import { gallerySans } from "@/components/gallery-chrome"
 
 type ShareAlbumButtonProps = {
@@ -43,7 +44,7 @@ export function ShareAlbumButton({
         return
       }
       if (result.mode === "copied") {
-        toast.success("Share link copied")
+        toast.success(describeAlbumShareCopied())
       }
     } finally {
       setBusy(false)

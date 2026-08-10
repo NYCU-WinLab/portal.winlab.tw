@@ -32,6 +32,7 @@ import {
   normalizeGalleryAlbumTitle,
 } from "@/lib/gallery/albums"
 import { shareOrCopyAlbumLink } from "@/lib/gallery/album-share"
+import { describeAlbumShareCopied } from "@/lib/gallery/album-share-toast"
 
 type MyAlbumOption = {
   id: string
@@ -50,7 +51,7 @@ function copyLinkAction(album: { slug: string; title: string }) {
           toast.error(result.message)
           return
         }
-        if (result.mode === "copied") toast.success("Share link copied")
+        if (result.mode === "copied") toast.success(describeAlbumShareCopied())
       })
     },
   }
