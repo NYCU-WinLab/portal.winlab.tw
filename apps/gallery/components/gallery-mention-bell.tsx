@@ -27,6 +27,7 @@ import {
 } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import {
   notificationSummary,
   truncateNotificationBody,
@@ -254,7 +255,7 @@ export function GalleryMentionBell({
           })
         )
       } catch {
-        toast.error("Could not open the mentioned photo.")
+        toast.error(describeGalleryNavError("openMentionedPhoto"))
       }
     })
   }

@@ -11,6 +11,7 @@ import {
   GalleryEmptyState,
   galleryNavLinkClass,
 } from "@/components/gallery-chrome"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import {
   buildGalleryHomeHref,
   describeGalleryFilteredEmpty,
@@ -129,7 +130,7 @@ export function GalleryGrid({
           photoId: nextImage.id,
           commentId: null,
         }),
-        "Could not open the next photo."
+        describeGalleryNavError("openNextPhoto")
       )
     }, 0)
     return () => window.clearTimeout(timer)
@@ -155,7 +156,7 @@ export function GalleryGrid({
         photoId: nextImage.id,
         commentId: null,
       }),
-      "Could not open that photo."
+      describeGalleryNavError("openPhoto")
     )
   }
 
@@ -165,7 +166,7 @@ export function GalleryGrid({
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
-    softReplace(qs ? `/?${qs}` : "/", "Could not close the photo.")
+    softReplace(qs ? `/?${qs}` : "/", describeGalleryNavError("closePhoto"))
   }
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export function GalleryGrid({
         event.preventDefault()
         softReplace(
           buildGalleryHomeHref({}),
-          "Could not clear gallery filters."
+          describeGalleryNavError("clearFilters")
         )
         return
       }
@@ -288,7 +289,7 @@ export function GalleryGrid({
               onClick={() =>
                 softReplace(
                   buildGalleryHomeHref({}),
-                  "Could not clear gallery filters."
+                  describeGalleryNavError("clearFilters")
                 )
               }
             >
@@ -362,7 +363,7 @@ export function GalleryGrid({
                       commentId:
                         openPhotoId === image.id ? openCommentId : null,
                     }),
-                    "Could not open that photo."
+                    describeGalleryNavError("openPhoto")
                   )
                 } else {
                   closeLightbox()

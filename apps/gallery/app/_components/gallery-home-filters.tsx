@@ -41,6 +41,7 @@ import {
   type GalleryHomeFilters,
   type GalleryMediaFilter,
 } from "@/lib/gallery/home-filters"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import type { GalleryMember } from "@/lib/gallery/types"
 import {
   normalizeGalleryTagSlug,
@@ -161,7 +162,7 @@ export function GalleryHomeFiltersBar({
       try {
         router.replace(href, { scroll: false })
       } catch {
-        toast.error("Could not update gallery filters.")
+        toast.error(describeGalleryNavError("updateGalleryFilters"))
       }
     })
   }

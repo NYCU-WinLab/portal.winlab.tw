@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
 import { buildGalleryHomeHref } from "@/lib/gallery/home-filters"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 export function UploaderFilterLink({
   uploaderId,
@@ -41,7 +42,7 @@ export function UploaderFilterLink({
       try {
         router.push(href)
       } catch {
-        toast.error("Could not apply uploader filter.")
+        toast.error(describeGalleryNavError("applyUploaderFilter"))
       }
     })
   }

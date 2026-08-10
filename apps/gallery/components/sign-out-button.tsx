@@ -9,6 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
 import { describeSigningOutLabel } from "@/lib/gallery/busy-labels"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 export function SignOutButton({
   className,
@@ -33,7 +34,7 @@ export function SignOutButton({
         try {
           router.replace("/")
         } catch {
-          toast.error("Signed out, but could not open the home page.")
+          toast.error(describeGalleryNavError("signedOutHome"))
         }
         try {
           router.refresh()

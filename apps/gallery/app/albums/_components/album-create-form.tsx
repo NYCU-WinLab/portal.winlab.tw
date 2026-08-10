@@ -26,6 +26,7 @@ import {
   shareOrCopyAlbumLink,
 } from "@/lib/gallery/album-share"
 import { describeAlbumCreateReady } from "@/lib/gallery/album-share-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 export function GalleryAlbumCreateForm({ className }: { className?: string }) {
   const router = useRouter()
@@ -86,7 +87,7 @@ export function GalleryAlbumCreateForm({ className }: { className?: string }) {
       try {
         router.push(`/albums/${result.data.slug}`)
       } catch {
-        toast.error("Could not open the new album.")
+        toast.error(describeGalleryNavError("openNewAlbum"))
       }
       try {
         router.refresh()

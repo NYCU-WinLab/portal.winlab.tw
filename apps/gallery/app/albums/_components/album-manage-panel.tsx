@@ -61,6 +61,7 @@ import {
   describeAlbumPhotosRemoved,
   describeAlbumUpdated,
 } from "@/lib/gallery/album-manage-copy"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { getGalleryThumbUrl } from "@/lib/gallery/url"
 
 function thumbFor(photo: GalleryAlbumPhoto): string {
@@ -177,7 +178,7 @@ export function GalleryAlbumManagePanel({
         try {
           router.replace(`/albums/${result.data.slug}`)
         } catch {
-          toast.error("Could not open the renamed album.")
+          toast.error(describeGalleryNavError("openRenamedAlbum"))
           softRefresh()
         }
       } else {
@@ -352,7 +353,7 @@ export function GalleryAlbumManagePanel({
       try {
         router.push("/albums")
       } catch {
-        toast.error("Could not open the albums list.")
+        toast.error(describeGalleryNavError("openAlbumsList"))
       }
       softRefresh()
     })

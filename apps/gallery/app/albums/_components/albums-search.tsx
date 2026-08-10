@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 export function GalleryAlbumsSearch({
   initialQuery,
@@ -34,7 +35,7 @@ export function GalleryAlbumsSearch({
       try {
         router.replace(qs ? `/albums?${qs}` : "/albums", { scroll: false })
       } catch {
-        toast.error("Could not update album search.")
+        toast.error(describeGalleryNavError("updateAlbumSearch"))
       }
     })
   }

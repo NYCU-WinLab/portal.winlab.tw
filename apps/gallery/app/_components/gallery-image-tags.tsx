@@ -19,6 +19,7 @@ import {
   buildGalleryHomeHref,
   EMPTY_GALLERY_HOME_FILTERS,
 } from "@/lib/gallery/home-filters"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import {
   GALLERY_TAGS_PER_IMAGE_MAX,
   normalizeGalleryTagName,
@@ -49,7 +50,7 @@ export function GalleryImageTags({
         })
       )
     } catch {
-      toast.error("Could not open the tag filter.")
+      toast.error(describeGalleryNavError("openTagFilter"))
     }
   }
 

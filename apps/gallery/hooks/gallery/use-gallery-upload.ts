@@ -14,6 +14,7 @@ import {
   type UploadStatus,
 } from "@/lib/gallery/upload-pipeline"
 import { describeUploadWorksToast } from "@/lib/gallery/upload-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 type RunOptions = {
   onAllSucceeded?: () => void
@@ -81,7 +82,8 @@ export function useGalleryUpload({
       toast.success(describeUploadWorksToast(successCount), {
         action: {
           label: "View on wall",
-          onClick: () => softPush(href, "Could not open the wall photo."),
+          onClick: () =>
+            softPush(href, describeGalleryNavError("openWallPhoto")),
         },
       })
     } else {
@@ -94,7 +96,8 @@ export function useGalleryUpload({
         {
           action: {
             label: "Manage",
-            onClick: () => softPush("/upload", "Could not open Manage."),
+            onClick: () =>
+              softPush("/upload", describeGalleryNavError("openManage")),
           },
         }
       )
@@ -104,7 +107,8 @@ export function useGalleryUpload({
         {
           action: {
             label: "Manage",
-            onClick: () => softPush("/upload", "Could not open Manage."),
+            onClick: () =>
+              softPush("/upload", describeGalleryNavError("openManage")),
           },
         }
       )
