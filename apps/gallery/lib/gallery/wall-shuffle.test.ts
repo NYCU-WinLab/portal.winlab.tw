@@ -63,4 +63,11 @@ describe("restoreGalleryWallOrder", () => {
       restoreGalleryWallOrder(images, ["a", "b", "c"]).map((i) => i.id)
     ).toEqual(["a", "b", "c"])
   })
+
+  test("skips unknown ids and appends leftovers", () => {
+    const images = [{ id: "a" }, { id: "b" }, { id: "c" }]
+    expect(
+      restoreGalleryWallOrder(images, ["b", "missing", "b"]).map((i) => i.id)
+    ).toEqual(["b", "a", "c"])
+  })
 })
