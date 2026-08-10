@@ -42,6 +42,16 @@ describe("selectGalleryMediaCacheUrls", () => {
       "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
     ])
   })
+
+  test("empty input yields empty list", () => {
+    expect(selectGalleryMediaCacheUrls([])).toEqual([])
+  })
+
+  test("all invalid urls yield empty list", () => {
+    expect(
+      selectGalleryMediaCacheUrls(["https://example.com/a.jpg", "", "nope"])
+    ).toEqual([])
+  })
 })
 
 describe("GALLERY_SW_VERSION", () => {
