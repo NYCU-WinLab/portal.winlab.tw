@@ -1452,6 +1452,7 @@ export function UploadManageList({
                       type="button"
                       onClick={() => setSelectedFavorites(true)}
                       disabled={isPending || selectedItems.length === 0}
+                      aria-busy={isPending || undefined}
                       className={cn(galleryPillClass(), "disabled:opacity-40")}
                     >
                       Save
@@ -1733,8 +1734,9 @@ export function UploadManageList({
               type="button"
               onClick={confirmBulkDate}
               disabled={isPending}
+              aria-busy={isPending || undefined}
             >
-              Save
+              {isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1780,8 +1782,13 @@ export function UploadManageList({
             >
               Cancel
             </Button>
-            <Button type="button" onClick={confirmBulkTag} disabled={isPending}>
-              Tag
+            <Button
+              type="button"
+              onClick={confirmBulkTag}
+              disabled={isPending}
+              aria-busy={isPending || undefined}
+            >
+              {isPending ? "Tagging…" : "Tag"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1831,8 +1838,9 @@ export function UploadManageList({
               type="button"
               onClick={confirmBulkUntag}
               disabled={isPending}
+              aria-busy={isPending || undefined}
             >
-              Untag
+              {isPending ? "Untagging…" : "Untag"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1882,8 +1890,9 @@ export function UploadManageList({
               type="button"
               onClick={createAlbumFromSelection}
               disabled={isPending || !bulkAlbumDraft.trim()}
+              aria-busy={isPending || undefined}
             >
-              Create
+              {isPending ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
