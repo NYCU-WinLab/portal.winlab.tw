@@ -22,6 +22,7 @@ import {
 import {
   describeUploadFileEmpty,
   describeUploadFileRequired,
+  describePickUploadMedia,
 } from "@/lib/gallery/validation-toasts"
 
 /** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
@@ -84,7 +85,7 @@ export function UploadForm({
       return false
     })
     if (next.length === 0) {
-      toast.error(videoAvailable ? "Pick a photo or clip." : "Pick a photo.")
+      toast.error(describePickUploadMedia(videoAvailable))
       return
     }
     setFailedUploads([])

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  describeCouldNotBuildZip,
+  describeCouldNotDownload,
   describeDownloadAlbumLabel,
   describeDownloadStoryLabel,
   describeSequenceCompactingToast,
@@ -37,5 +39,15 @@ describe("describeDownloadStoryLabel", () => {
 describe("describeSignInToFavorite", () => {
   test("returns the auth prompt", () => {
     expect(describeSignInToFavorite()).toBe("Sign in to save favorites.")
+  })
+})
+
+describe("download failure fallbacks", () => {
+  test("describeCouldNotDownload", () => {
+    expect(describeCouldNotDownload()).toBe("Could not download")
+  })
+
+  test("describeCouldNotBuildZip", () => {
+    expect(describeCouldNotBuildZip()).toBe("Could not build the ZIP")
   })
 })

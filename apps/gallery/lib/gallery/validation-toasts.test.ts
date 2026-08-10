@@ -21,6 +21,7 @@ import {
   describeTagNameRequired,
   describeUploadFileEmpty,
   describeUploadFileRequired,
+  describePickUploadMedia,
 } from "@/lib/gallery/validation-toasts"
 
 describe("validation toasts", () => {
@@ -58,6 +59,8 @@ describe("validation toasts", () => {
     expect(describeUploadFileEmpty()).toBe(
       "One of the selected files is empty."
     )
+    expect(describePickUploadMedia(true)).toBe("Pick a photo or clip.")
+    expect(describePickUploadMedia(false)).toBe("Pick a photo.")
   })
 
   test("download", () => {

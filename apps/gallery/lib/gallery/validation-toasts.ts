@@ -43,6 +43,11 @@ export function describeUploadFileEmpty(): string {
   return "One of the selected files is empty."
 }
 
+/** Upload picker: no usable media after mime/size filter. */
+export function describePickUploadMedia(videoAvailable: boolean): string {
+  return videoAvailable ? "Pick a photo or clip." : "Pick a photo."
+}
+
 /** Lightbox download when the active shot has no path. */
 export function describeNothingToDownload(): string {
   return "Nothing to download."

@@ -8,6 +8,12 @@ describe("getPolaroidFrame", () => {
     expect(getPolaroidFrame(id)).toEqual(getPolaroidFrame(id))
   })
 
+  test("empty id still returns a frame", () => {
+    const frame = getPolaroidFrame("")
+    expect(frame.aspectClass.length).toBeGreaterThan(0)
+    expect(frame.maxWidthClass.length).toBeGreaterThan(0)
+  })
+
   test("assigns different aspect classes across a sample of ids", () => {
     const ids = [
       "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
@@ -27,6 +33,10 @@ describe("getPolaroidTape", () => {
     const id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
     expect(getPolaroidTape(id)).toBe(getPolaroidTape(id))
     expect(["tl", "tr", "clip", "none"]).toContain(getPolaroidTape(id))
+  })
+
+  test("empty id still returns a known tape", () => {
+    expect(["tl", "tr", "clip", "none"]).toContain(getPolaroidTape(""))
   })
 
   test("assigns accents to a majority of a sample of ids", () => {

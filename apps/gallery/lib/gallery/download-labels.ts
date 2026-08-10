@@ -17,3 +17,13 @@ export function describeDownloadStoryLabel(shotCount: number): string {
 export function describeSignInToFavorite(): string {
   return "Sign in to save favorites."
 }
+
+/** Fallback when an original download throws a non-Error. */
+export function describeCouldNotDownload(): string {
+  return "Could not download"
+}
+
+/** Fallback when ZIP assembly throws a non-Error. */
+export function describeCouldNotBuildZip(): string {
+  return "Could not build the ZIP"
+}

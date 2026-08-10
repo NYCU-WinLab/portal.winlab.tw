@@ -48,7 +48,10 @@ import {
   describeSavedOriginal,
 } from "@/lib/gallery/photo-share-toast"
 import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
-import { describeSignInToFavorite } from "@/lib/gallery/download-labels"
+import {
+  describeSignInToFavorite,
+  describeCouldNotDownload,
+} from "@/lib/gallery/download-labels"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { describeNothingToDownload } from "@/lib/gallery/validation-toasts"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
@@ -360,7 +363,7 @@ export function GalleryCard({
       toast.success(describeSavedOriginal())
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not download"
+        error instanceof Error ? error.message : describeCouldNotDownload()
       toast.error(message)
     } finally {
       downloadBusyRef.current = false

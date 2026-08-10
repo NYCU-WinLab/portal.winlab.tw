@@ -16,7 +16,10 @@ import {
   describeZipPreparingProgress,
 } from "@/lib/gallery/zip-progress"
 import { describeSequenceZipSaved } from "@/lib/gallery/sequence-zip-result"
-import { describeDownloadStoryLabel } from "@/lib/gallery/download-labels"
+import {
+  describeCouldNotBuildZip,
+  describeDownloadStoryLabel,
+} from "@/lib/gallery/download-labels"
 
 type DownloadSequenceButtonProps = {
   items: SequenceZipSource[]
@@ -70,7 +73,7 @@ export function DownloadSequenceButton({
       toast.success(describeSequenceZipSaved(result.count), { id: toastId })
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not build the ZIP"
+        error instanceof Error ? error.message : describeCouldNotBuildZip()
       toast.error(message, { id: toastId })
     } finally {
       setBusy(false)

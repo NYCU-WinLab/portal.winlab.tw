@@ -70,6 +70,7 @@ import {
   describeCouldNotCopyClipboard,
   describeCouldNotCopyLinks,
 } from "@/lib/gallery/validation-toasts"
+import { describeCouldNotBuildZip } from "@/lib/gallery/download-labels"
 import {
   describeCreatingLabel,
   describeTaggingLabel,
@@ -416,7 +417,7 @@ export function GalleryWallSelectBar({
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not build the ZIP"
+        error instanceof Error ? error.message : describeCouldNotBuildZip()
       toast.error(message, { id: toastId })
     } finally {
       setZipBusy(false)

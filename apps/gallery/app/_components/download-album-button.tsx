@@ -16,7 +16,10 @@ import {
   describeZipBusyLabel,
   describeZipPreparingProgress,
 } from "@/lib/gallery/zip-progress"
-import { describeDownloadAlbumLabel } from "@/lib/gallery/download-labels"
+import {
+  describeDownloadAlbumLabel,
+  describeCouldNotBuildZip,
+} from "@/lib/gallery/download-labels"
 
 type DownloadAlbumButtonProps = {
   items: AlbumZipSource[]
@@ -81,7 +84,7 @@ export function DownloadAlbumButton({
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not build the ZIP"
+        error instanceof Error ? error.message : describeCouldNotBuildZip()
       toast.error(message, { id: toastId })
     } finally {
       setBusy(false)

@@ -122,7 +122,10 @@ import {
   describeTaggingLabel,
   describeUntaggingLabel,
 } from "@/lib/gallery/busy-labels"
-import { describeSequenceCompactingToast } from "@/lib/gallery/download-labels"
+import {
+  describeSequenceCompactingToast,
+  describeCouldNotBuildZip,
+} from "@/lib/gallery/download-labels"
 import {
   describeCouldNotCopyClipboard,
   describeCouldNotCopyLinks,
@@ -1082,7 +1085,7 @@ export function UploadManageList({
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not build the ZIP"
+        error instanceof Error ? error.message : describeCouldNotBuildZip()
       toast.error(message, { id: toastId })
     } finally {
       setZipBusy(false)

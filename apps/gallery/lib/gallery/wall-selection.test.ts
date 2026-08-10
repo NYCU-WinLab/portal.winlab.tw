@@ -82,4 +82,10 @@ describe("selectWallIdRange", () => {
       ...selectWallIdRange(new Set(), ["a", "b"], "missing", "b"),
     ]).toEqual(["b"])
   })
+
+  test("falls back to toggle when target missing", () => {
+    expect([
+      ...selectWallIdRange(new Set(["a"]), ["a", "b"], "a", "missing"),
+    ]).toEqual(["a", "missing"])
+  })
 })

@@ -25,4 +25,8 @@ describe("removeCommentWithDescendants", () => {
   test("no-ops when the id is missing", () => {
     expect(removeCommentWithDescendants(tree, "missing")).toEqual(tree)
   })
+
+  test("returns empty for empty list", () => {
+    expect(removeCommentWithDescendants([], "a")).toEqual([])
+  })
 })

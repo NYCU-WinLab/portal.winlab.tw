@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
 import { describeSavedOriginal } from "@/lib/gallery/photo-share-toast"
+import { describeCouldNotDownload } from "@/lib/gallery/download-labels"
 
 type DownloadOriginalButtonProps = {
   displayName: string
@@ -33,7 +34,7 @@ export function DownloadOriginalButton({
       toast.success(describeSavedOriginal())
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not download"
+        error instanceof Error ? error.message : describeCouldNotDownload()
       toast.error(message)
     } finally {
       setBusy(false)
