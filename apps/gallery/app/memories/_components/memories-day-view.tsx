@@ -24,8 +24,8 @@ import {
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
 import {
-  describeNextSlideAriaLabel,
-  describePreviousSlideAriaLabel,
+  describeNextPhotoAriaLabel,
+  describePreviousPhotoAriaLabel,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
 import { setMemoriesOverlayState } from "@/lib/gallery/memories-overlay-store"
@@ -247,7 +247,7 @@ export function MemoriesDayView({
                 <>
                   <button
                     type="button"
-                    aria-label={describePreviousSlideAriaLabel()}
+                    aria-label={describePreviousPhotoAriaLabel()}
                     aria-keyshortcuts="ArrowLeft"
                     onClick={() => goLightbox("prev")}
                     className={cn(
@@ -259,7 +259,7 @@ export function MemoriesDayView({
                   </button>
                   <button
                     type="button"
-                    aria-label={describeNextSlideAriaLabel()}
+                    aria-label={describeNextPhotoAriaLabel()}
                     aria-keyshortcuts="ArrowRight"
                     onClick={() => goLightbox("next")}
                     className={cn(

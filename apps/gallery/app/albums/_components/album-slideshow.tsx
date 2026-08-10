@@ -461,12 +461,14 @@ export function AlbumSlideshow({
                   "size-11 items-center justify-center rounded-full text-zinc-200",
                   "bg-black/25 hover:bg-black/45"
                 )}
+                aria-keyshortcuts="ArrowLeft"
               >
                 <IconChevronLeft className="size-6" aria-hidden />
               </button>
               <button
                 type="button"
                 aria-label={describeNextSlideAriaLabel()}
+                aria-keyshortcuts="ArrowRight"
                 onClick={() =>
                   setIndex((current) =>
                     nextSlideshowIndex(current, photos.length)

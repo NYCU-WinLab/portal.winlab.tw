@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import {
   describeCloseSlideshowAriaLabel,
+  describeNextPhotoAriaLabel,
   describeNextSlideAriaLabel,
+  describePreviousPhotoAriaLabel,
   describePreviousSlideAriaLabel,
   describeSlideshowMuteAriaLabel,
   describeSlideshowPlaybackAriaLabel,
@@ -15,6 +17,8 @@ describe("slideshow labels", () => {
     expect(describeSlideshowProgressAriaLabel()).toBe("Slideshow progress")
     expect(describePreviousSlideAriaLabel()).toBe("Previous slide")
     expect(describeNextSlideAriaLabel()).toBe("Next slide")
+    expect(describePreviousPhotoAriaLabel()).toBe("Previous photo")
+    expect(describeNextPhotoAriaLabel()).toBe("Next photo")
   })
 
   test("playback and mute toggles", () => {

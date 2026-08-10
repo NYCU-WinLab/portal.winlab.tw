@@ -258,6 +258,10 @@ export function GalleryGrid({
           if (image) {
             onToggleSelected(image.id, { shiftKey: event.shiftKey })
           }
+          return
+        }
+        if (event.key === " ") {
+          event.preventDefault()
         }
         return
       }

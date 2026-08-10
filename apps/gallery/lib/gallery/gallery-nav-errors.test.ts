@@ -37,5 +37,8 @@ describe("describeGalleryNavError", () => {
     expect(describeGalleryNavError("signedOutHome")).toBe(
       galleryNavErrors.signedOutHome
     )
+    expect(describeGalleryNavError("memoriesToday")).toBe(
+      galleryNavErrors.memoriesToday
+    )
   })
 })

@@ -21,4 +21,13 @@ describe("memories overlay store", () => {
     })
     setMemoriesOverlayState({ lightboxOpen: false, slideshowOpen: false })
   })
+
+  test("cleanup-style reset clears both flags", () => {
+    setMemoriesOverlayState({ lightboxOpen: true, slideshowOpen: true })
+    setMemoriesOverlayState({ lightboxOpen: false, slideshowOpen: false })
+    expect(getMemoriesOverlayState()).toEqual({
+      lightboxOpen: false,
+      slideshowOpen: false,
+    })
+  })
 })

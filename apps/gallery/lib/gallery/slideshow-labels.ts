@@ -27,3 +27,13 @@ export function describeSlideshowPlaybackAriaLabel(paused: boolean): string {
 export function describeSlideshowMuteAriaLabel(muted: boolean): string {
   return muted ? "Unmute video" : "Mute video"
 }
+
+/** aria-label for previous photo in album/Memories lightbox. */
+export function describePreviousPhotoAriaLabel(): string {
+  return "Previous photo"
+}
+
+/** aria-label for next photo in album/Memories lightbox. */
+export function describeNextPhotoAriaLabel(): string {
+  return "Next photo"
+}

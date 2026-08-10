@@ -27,7 +27,9 @@ import {
   type GallerySlideshowPhoto,
 } from "@/lib/gallery/slideshow"
 import {
+  describeNextPhotoAriaLabel,
   describeNextSlideAriaLabel,
+  describePreviousPhotoAriaLabel,
   describePreviousSlideAriaLabel,
 } from "@/lib/gallery/slideshow-labels"
 import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
@@ -285,7 +287,7 @@ export function GalleryAlbumPhotoGrid({
                 <>
                   <button
                     type="button"
-                    aria-label={describePreviousSlideAriaLabel()}
+                    aria-label={describePreviousPhotoAriaLabel()}
                     aria-keyshortcuts="ArrowLeft"
                     onClick={() => goLightbox("prev")}
                     className={cn(
@@ -297,7 +299,7 @@ export function GalleryAlbumPhotoGrid({
                   </button>
                   <button
                     type="button"
-                    aria-label={describeNextSlideAriaLabel()}
+                    aria-label={describeNextPhotoAriaLabel()}
                     aria-keyshortcuts="ArrowRight"
                     onClick={() => goLightbox("next")}
                     className={cn(
