@@ -90,6 +90,16 @@ export function describeManageSelectAllTitle(
   return "Select all works"
 }
 
+/** aria-label while selecting works on the manage list. */
+export function describeSelectWorksAriaLabel(): string {
+  return "Select works"
+}
+
+/** aria-label while selecting works inside a sequence group. */
+export function describeSelectWorksInSequenceAriaLabel(): string {
+  return "Select works in this sequence"
+}
+
 /**
  * Add every wall id between `fromId` and `toId` (inclusive) to the selection.
  * If either id is missing from the wall order, falls back to toggling `toId`.

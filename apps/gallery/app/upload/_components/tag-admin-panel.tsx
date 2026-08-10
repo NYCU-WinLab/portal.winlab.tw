@@ -36,7 +36,10 @@ import {
   normalizeGalleryTagName,
   type GalleryTagSuggestion,
 } from "@/lib/gallery/tags"
-import { describeCancelLabel } from "@/lib/gallery/dialog-action-labels"
+import {
+  describeCancelLabel,
+  describeRetryLabel,
+} from "@/lib/gallery/dialog-action-labels"
 import {
   describeTagMerged,
   describeTagRenamed,
@@ -225,7 +228,7 @@ export function TagAdminPanel() {
             onClick={refresh}
             className={gallerySans()}
           >
-            {pending ? describeRetryingLabel() : "Retry"}
+            {pending ? describeRetryingLabel() : describeRetryLabel()}
           </Button>
         </div>
       ) : tags.length === 0 ? (

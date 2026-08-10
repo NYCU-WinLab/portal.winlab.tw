@@ -18,7 +18,10 @@ import { Button } from "@workspace/ui/components/button"
 
 import { deleteGalleryImage } from "@/app/upload/actions"
 import { describeArtworkDeleted } from "@/lib/gallery/delete-toast"
-import { describeCancelLabel } from "@/lib/gallery/dialog-action-labels"
+import {
+  describeCancelLabel,
+  describeDeleteLabel,
+} from "@/lib/gallery/dialog-action-labels"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 
 export function DeleteButton({
@@ -93,7 +96,7 @@ export function DeleteButton({
             aria-busy={pending || undefined}
             onClick={onConfirm}
           >
-            {pending ? describeDeletingLabel() : "Delete"}
+            {pending ? describeDeletingLabel() : describeDeleteLabel()}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

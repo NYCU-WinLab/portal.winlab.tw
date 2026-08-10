@@ -18,6 +18,7 @@ import { updateGalleryImageTakenAt } from "@/app/upload/actions"
 import { gallerySans } from "@/components/gallery-chrome"
 import { describeCaptureDateUpdated } from "@/lib/gallery/manage-toast"
 import { describeSavingLabel } from "@/lib/gallery/busy-labels"
+import { describeSaveLabel } from "@/lib/gallery/dialog-action-labels"
 import { describeCaptureDateRequired } from "@/lib/gallery/validation-toasts"
 import {
   fromTaipeiDateInput,
@@ -137,7 +138,7 @@ export function TakenAtEditor({
             disabled={pending}
             aria-busy={pending || undefined}
           >
-            {pending ? describeSavingLabel() : "Save"}
+            {pending ? describeSavingLabel() : describeSaveLabel()}
           </Button>
         </DialogFooter>
       </DialogContent>

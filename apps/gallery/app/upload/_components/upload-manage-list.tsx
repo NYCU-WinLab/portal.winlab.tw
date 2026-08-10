@@ -81,6 +81,8 @@ import {
   describeManageSelectAllShortLabel,
   describeManageSelectAllTitle,
   describeManageSelectModeLabel,
+  describeSelectWorksAriaLabel,
+  describeSelectWorksInSequenceAriaLabel,
   selectWallIdRange,
   toggleWallSelection,
 } from "@/lib/gallery/wall-selection"
@@ -129,6 +131,11 @@ import {
   describeTaggingLabel,
   describeUntaggingLabel,
 } from "@/lib/gallery/busy-labels"
+import {
+  describeCreateLabel,
+  describeSaveLabel,
+  describeTagLabel,
+} from "@/lib/gallery/dialog-action-labels"
 import {
   describeAlbumTitlePlaceholder,
   describeBulkTagExamplesPlaceholder,
@@ -521,7 +528,9 @@ function UploadSequenceGroup({
         className="flex flex-col gap-3"
         role={selectionMode ? "listbox" : undefined}
         aria-multiselectable={selectionMode ? true : undefined}
-        aria-label={selectionMode ? "Select works in this sequence" : undefined}
+        aria-label={
+          selectionMode ? describeSelectWorksInSequenceAriaLabel() : undefined
+        }
       >
         {timelineSlots.map((slot) => {
           if (slot.kind === "gap") {
@@ -1762,7 +1771,9 @@ export function UploadManageList({
             className="flex flex-col gap-3"
             role={selectionMode ? "listbox" : undefined}
             aria-multiselectable={selectionMode ? true : undefined}
-            aria-label={selectionMode ? "Select works" : undefined}
+            aria-label={
+              selectionMode ? describeSelectWorksAriaLabel() : undefined
+            }
           >
             <UploadListItem
               image={entry.row}
@@ -1831,7 +1842,7 @@ export function UploadManageList({
               disabled={isPending}
               aria-busy={isPending || undefined}
             >
-              {isPending ? describeSavingLabel() : "Save"}
+              {isPending ? describeSavingLabel() : describeSaveLabel()}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1886,7 +1897,7 @@ export function UploadManageList({
               disabled={isPending}
               aria-busy={isPending || undefined}
             >
-              {isPending ? describeTaggingLabel() : "Tag"}
+              {isPending ? describeTaggingLabel() : describeTagLabel()}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1996,7 +2007,7 @@ export function UploadManageList({
               disabled={isPending || !bulkAlbumDraft.trim()}
               aria-busy={isPending || undefined}
             >
-              {isPending ? describeCreatingLabel() : "Create"}
+              {isPending ? describeCreatingLabel() : describeCreateLabel()}
             </Button>
           </DialogFooter>
         </DialogContent>

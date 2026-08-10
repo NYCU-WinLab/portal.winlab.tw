@@ -7,7 +7,10 @@ import {
   normalizeGalleryFavoriteImageIds,
 } from "@/lib/gallery/favorites-bulk"
 import { isGalleryFavoritesUnavailable } from "@/lib/gallery/favorites"
-import { describePleaseSignInFirst } from "@/lib/gallery/action-errors"
+import {
+  describeFavoritesUnavailableError,
+  describePleaseSignInFirst,
+} from "@/lib/gallery/action-errors"
 import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -56,8 +59,7 @@ export async function setGalleryFavorites(
       if (isGalleryFavoritesUnavailable(error)) {
         return {
           ok: false,
-          error:
-            "Favorites are not available yet — apply the gallery favorites migration.",
+          error: describeFavoritesUnavailableError(),
         }
       }
       return { ok: false, error: error.message }
@@ -84,8 +86,7 @@ export async function setGalleryFavorites(
     if (isGalleryFavoritesUnavailable(existingError)) {
       return {
         ok: false,
-        error:
-          "Favorites are not available yet — apply the gallery favorites migration.",
+        error: describeFavoritesUnavailableError(),
       }
     }
     return { ok: false, error: existingError.message }
@@ -111,8 +112,7 @@ export async function setGalleryFavorites(
     if (isGalleryFavoritesUnavailable(error)) {
       return {
         ok: false,
-        error:
-          "Favorites are not available yet — apply the gallery favorites migration.",
+        error: describeFavoritesUnavailableError(),
       }
     }
     return { ok: false, error: error.message }

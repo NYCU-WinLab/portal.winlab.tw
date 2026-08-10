@@ -33,6 +33,7 @@ import {
   describeCreateAlbumStarted,
   describeNewAlbumTitlePlaceholder,
 } from "@/lib/gallery/add-to-album-result"
+import { describeCopyLinkLabel } from "@/lib/gallery/dialog-action-labels"
 import {
   GALLERY_ALBUM_TITLE_MAX,
   normalizeGalleryAlbumTitle,
@@ -53,7 +54,7 @@ type MyAlbumOption = {
 
 function copyLinkAction(album: { slug: string; title: string }) {
   return {
-    label: "Copy link",
+    label: describeCopyLinkLabel(),
     onClick: () => {
       void shareOrCopyAlbumLink(album).then((result) => {
         if (!result.ok) {

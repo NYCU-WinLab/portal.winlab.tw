@@ -45,8 +45,12 @@ import {
   describeReplyCommentPlaceholder,
 } from "@/lib/gallery/comment-toast"
 import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
+import {
+  describeCancelLabel,
+  describeDeleteLabel,
+} from "@/lib/gallery/dialog-action-labels"
 import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
-import { describeCancelLabel } from "@/lib/gallery/dialog-action-labels"
+import { describePinChromeLabel } from "@/lib/gallery/pin-toast"
 import {
   describeSignInBeforeComment,
   describeSignInToCommentLabel,
@@ -475,7 +479,7 @@ export function GalleryComments({
                             comment.pinned_at && "text-amber-800"
                           )}
                         >
-                          {comment.pinned_at ? "Unpin" : "Pin"}
+                          {describePinChromeLabel(Boolean(comment.pinned_at))}
                         </button>
                       ) : null}
                       {mine ? (
@@ -502,7 +506,7 @@ export function GalleryComments({
                               "text-destructive/90 hover:text-destructive"
                             )}
                           >
-                            Delete
+                            {describeDeleteLabel()}
                           </button>
                         </>
                       ) : null}
@@ -687,7 +691,7 @@ export function GalleryComments({
                 setDeleteTargetId(null)
               }}
             >
-              {isPending ? describeDeletingLabel() : "Delete"}
+              {isPending ? describeDeletingLabel() : describeDeleteLabel()}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

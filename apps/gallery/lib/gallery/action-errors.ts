@@ -86,3 +86,8 @@ export function describePickDifferentTagsToMergeError(): string {
 export function describeSelectAtMost100WorksError(): string {
   return "Select at most 100 works at a time."
 }
+
+/** Favorites RPCs / tables not migrated yet. */
+export function describeFavoritesUnavailableError(): string {
+  return "Favorites are not available yet — apply the gallery favorites migration."
+}

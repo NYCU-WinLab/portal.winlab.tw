@@ -6,7 +6,10 @@ import { toast } from "sonner"
 
 import { setGalleryImagePin } from "@/app/actions"
 import { galleryPillClass } from "@/components/gallery-chrome"
-import { describePinToast } from "@/lib/gallery/pin-toast"
+import {
+  describePinChromeLabel,
+  describePinToast,
+} from "@/lib/gallery/pin-toast"
 import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -84,7 +87,7 @@ export function PinWallButton({
         className
       )}
     >
-      {pinnedAt ? "Unpin" : "Pin"}
+      {describePinChromeLabel(Boolean(pinnedAt))}
     </button>
   )
 }

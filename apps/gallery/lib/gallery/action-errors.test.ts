@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   describeCouldNotAttachTagError,
   describeFailedToLoadMorePhotos,
+  describeFavoritesUnavailableError,
   describeMissingImageError,
   describeMissingImageOrTagIdError,
   describeMissingSourceOrTargetTagError,
@@ -61,6 +62,9 @@ describe("action errors", () => {
     )
     expect(describeSelectAtMost100WorksError()).toBe(
       "Select at most 100 works at a time."
+    )
+    expect(describeFavoritesUnavailableError()).toBe(
+      "Favorites are not available yet — apply the gallery favorites migration."
     )
   })
 })

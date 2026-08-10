@@ -14,6 +14,7 @@ import {
   describeEditTitleNamedAriaLabel,
 } from "@/lib/gallery/manage-toast"
 import { describeSavingLabel } from "@/lib/gallery/busy-labels"
+import { describeSaveLabel } from "@/lib/gallery/dialog-action-labels"
 import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
 
@@ -158,7 +159,7 @@ export function GalleryTitleEditor({
             className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             <IconCheck className="size-3.5" aria-hidden />
-            {pending ? describeSavingLabel() : "Save"}
+            {pending ? describeSavingLabel() : describeSaveLabel()}
           </button>
           <button
             type="button"

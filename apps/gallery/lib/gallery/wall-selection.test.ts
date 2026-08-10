@@ -5,6 +5,8 @@ import {
   describeManageSelectAllShortLabel,
   describeManageSelectAllTitle,
   describeManageSelectModeLabel,
+  describeSelectWorksAriaLabel,
+  describeSelectWorksInSequenceAriaLabel,
   describeWallSelectAllLabel,
   describeWallSelectAllTitle,
   describeWallSelectModeLabel,
@@ -105,6 +107,10 @@ describe("select mode labels", () => {
       "Select all 12 visible works"
     )
     expect(describeManageSelectAllTitle(true)).toBe("Clear all selected works")
+    expect(describeSelectWorksAriaLabel()).toBe("Select works")
+    expect(describeSelectWorksInSequenceAriaLabel()).toBe(
+      "Select works in this sequence"
+    )
   })
 })
 

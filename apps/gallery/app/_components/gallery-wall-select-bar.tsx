@@ -83,6 +83,11 @@ import {
   describeWorkingLabel,
 } from "@/lib/gallery/busy-labels"
 import {
+  describeCreateLabel,
+  describeSaveCountLabel,
+  describeTagLabel,
+} from "@/lib/gallery/dialog-action-labels"
+import {
   describeAlbumTitlePlaceholder,
   describeMoreSelectionActionsAriaLabel,
   describeNewAlbumTitleAriaLabel,
@@ -595,7 +600,7 @@ export function GalleryWallSelectBar({
                         onClick={saveSelected}
                       >
                         <IconBookmark className="size-3.5" aria-hidden />
-                        {selectedCount > 0 ? `Save ${selectedCount}` : "Save"}
+                        {describeSaveCountLabel(selectedCount)}
                       </Button>
                     ) : null}
                     {albumsAvailable ? (
@@ -662,7 +667,7 @@ export function GalleryWallSelectBar({
                     )}
                   >
                     <IconTag className="size-3.5" aria-hidden />
-                    {pending ? describeTaggingLabel() : "Tag"}
+                    {pending ? describeTaggingLabel() : describeTagLabel()}
                   </Button>
                   <Button
                     type="button"
@@ -706,7 +711,7 @@ export function GalleryWallSelectBar({
                     aria-busy={pending || undefined}
                     className={cn(gallerySans(), "h-8 text-[11px] uppercase")}
                   >
-                    {pending ? describeCreatingLabel() : "Create"}
+                    {pending ? describeCreatingLabel() : describeCreateLabel()}
                   </Button>
                   <Button
                     type="button"
