@@ -25,9 +25,8 @@ export function cacheGalleryMediaUrls(urls: string[]) {
   if (typeof window === "undefined") return
   if (!("serviceWorker" in navigator)) return
   try {
-    const filtered = urls.filter(isGalleryStorageMediaUrl)
-    if (filtered.length === 0) return
-    const message = buildGallerySwCacheMessage(filtered)
+    const message = buildGallerySwCacheMessage(urls)
+    if (message.urls.length === 0) return
     const controller = navigator.serviceWorker.controller
     if (controller) {
       controller.postMessage(message)

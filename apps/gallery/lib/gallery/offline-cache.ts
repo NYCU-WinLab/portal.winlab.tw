@@ -23,12 +23,23 @@ export function isGalleryStorageMediaUrl(url: string): boolean {
   }
 }
 
+/** Filter + dedupe storage media URLs for a soft-fail SW cache warm. */
+export function selectGalleryMediaCacheUrls(
+  urls: string[],
+  limit = 64
+): string[] {
+  return Array.from(new Set(urls.filter(isGalleryStorageMediaUrl))).slice(
+    0,
+    limit
+  )
+}
+
 export function buildGallerySwCacheMessage(
   urls: string[],
   limit = 64
 ): GallerySwCacheUrlsMessage {
   return {
     type: GALLERY_SW_CACHE_URLS_TYPE,
-    urls: Array.from(new Set(urls.filter(Boolean))).slice(0, limit),
+    urls: selectGalleryMediaCacheUrls(urls, limit),
   }
 }
