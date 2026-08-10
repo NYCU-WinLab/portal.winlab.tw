@@ -192,10 +192,11 @@ export function TagAdminPanel() {
             size="sm"
             variant="outline"
             disabled={pending}
+            aria-busy={pending || undefined}
             onClick={refresh}
             className={gallerySans()}
           >
-            Retry
+            {pending ? "Retrying…" : "Retry"}
           </Button>
         </div>
       ) : tags.length === 0 ? (
