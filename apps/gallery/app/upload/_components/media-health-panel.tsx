@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 
 import { IconAlertTriangle, IconRefresh, IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -48,6 +48,7 @@ export function MediaHealthPanel() {
   const [progress, setProgress] = useState<ScanProgress | null>(null)
   const [hasScanned, setHasScanned] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null)
 
   const summary = summarizeFindings(findings)
   const selectedCount = selected.size
@@ -217,6 +218,7 @@ export function MediaHealthPanel() {
                   Clear
                 </Button>
                 <Button
+                  ref={deleteTriggerRef}
                   type="button"
                   variant="destructive"
                   size="sm"
@@ -333,8 +335,16 @@ export function MediaHealthPanel() {
         </div>
       ) : null}
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open)
+          if (!open) {
+            queueMicrotask(() => deleteTriggerRef.current?.focus())
+          }
+        }}
+      >
+        <AlertDialogContent aria-busy={isPending || undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Permanently delete {selectedCount} broken shot
@@ -352,9 +362,10 @@ export function MediaHealthPanel() {
             <AlertDialogAction
               onClick={runDelete}
               disabled={isPending}
+              aria-busy={isPending || undefined}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Delete forever
+              {isPending ? "Deleting…" : "Delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
