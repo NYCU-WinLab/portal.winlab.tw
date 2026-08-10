@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
 import {
   isMemoriesViewingToday,
   memoriesDayHref,
@@ -20,9 +23,37 @@ import {
 
 /** Prev / next / today controls for the Memories calendar day. */
 export function MemoriesDayNavigator({ day }: { day: GalleryCalendarDay }) {
+  const router = useRouter()
   const prev = shiftGalleryCalendarDay(day.month, day.day, -1)
   const next = shiftGalleryCalendarDay(day.month, day.day, 1)
   const viewingToday = isMemoriesViewingToday(day)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      )
+        return
+      if (isTypingTarget(event.target)) return
+
+      const key = event.key
+      if (key === "ArrowLeft" || key === "k" || key === "K") {
+        event.preventDefault()
+        router.push(memoriesDayHref(prev.month, prev.day))
+        return
+      }
+      if (key === "ArrowRight" || key === "j" || key === "J") {
+        event.preventDefault()
+        router.push(memoriesDayHref(next.month, next.day))
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [next.day, next.month, prev.day, prev.month, router])
 
   return (
     <nav

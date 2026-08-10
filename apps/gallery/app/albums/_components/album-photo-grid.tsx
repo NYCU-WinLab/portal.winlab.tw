@@ -174,8 +174,12 @@ export function GalleryAlbumPhotoGrid({
         open={Boolean(active)}
         onOpenChange={(open) => {
           if (!open) {
+            const returnId = openId
             setOpenId(null)
             setLightboxFailed(false)
+            queueMicrotask(() => {
+              if (returnId) photoButtonRefs.current.get(returnId)?.focus()
+            })
           }
         }}
       >

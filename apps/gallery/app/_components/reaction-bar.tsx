@@ -14,6 +14,7 @@ import {
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
 import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 
 const HOVER_SHOW_MS = 400
 const HOVER_HIDE_MS = 250
@@ -149,14 +150,48 @@ export function ReactionBar({
   useEffect(() => {
     if (!pickerOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        closePicker()
+        return
+      }
+
+      const navKey =
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "Home" ||
+        event.key === "End"
+          ? event.key
+          : null
+      if (!navKey) return
+
       event.preventDefault()
       event.stopPropagation()
-      closePicker()
+      const current =
+        hoveredReaction != null
+          ? GALLERY_REACTIONS.indexOf(hoveredReaction)
+          : myReaction
+            ? GALLERY_REACTIONS.indexOf(myReaction)
+            : 0
+      const next = nextRadioIndex(
+        current < 0 ? 0 : current,
+        GALLERY_REACTIONS.length,
+        navKey
+      )
+      const reaction = GALLERY_REACTIONS[next]
+      if (!reaction) return
+      setHoveredReaction(reaction)
+      const button = zoneRef.current?.querySelector<HTMLButtonElement>(
+        `[data-reaction="${reaction}"]`
+      )
+      button?.focus()
     }
     window.addEventListener("keydown", onKeyDown, true)
     return () => window.removeEventListener("keydown", onKeyDown, true)
-  }, [pickerOpen, closePicker])
+  }, [pickerOpen, closePicker, hoveredReaction, myReaction])
 
   const onZoneEnter = (e: React.PointerEvent) => {
     if (!canReact || e.pointerType === "touch" || touchAwaitingPick.current)

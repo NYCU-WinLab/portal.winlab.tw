@@ -19,12 +19,17 @@ export function MemoriesYearSections({
   canSlideshow,
   onOpenPhoto,
   onStartSlideshow,
+  registerPhotoButton,
 }: {
   groups: GalleryMemoryYearGroup[]
   currentYear: number
   canSlideshow: boolean
   onOpenPhoto: (imageId: string) => void
   onStartSlideshow: (startIndex: number) => void
+  registerPhotoButton?: (
+    imageId: string,
+    node: HTMLButtonElement | null
+  ) => void
 }) {
   if (groups.length === 0) return null
 
@@ -83,6 +88,7 @@ export function MemoriesYearSections({
                   photo={photo}
                   currentYear={currentYear}
                   onOpen={() => onOpenPhoto(photo.id)}
+                  buttonRef={(node) => registerPhotoButton?.(photo.id, node)}
                 />
               ))}
             </div>

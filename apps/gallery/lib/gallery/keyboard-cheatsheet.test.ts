@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   GALLERY_MANAGE_SHORTCUTS,
+  GALLERY_MEMORIES_SHORTCUTS,
   GALLERY_SLIDESHOW_SHORTCUTS,
   GALLERY_WALL_SHORTCUTS,
   isCheatSheetToggleKey,
@@ -54,5 +55,18 @@ describe("GALLERY_SLIDESHOW_SHORTCUTS", () => {
     expect(joined).toContain("Home")
     expect(joined).toContain("End")
     expect(joined).toContain("Esc")
+  })
+})
+
+describe("GALLERY_MEMORIES_SHORTCUTS", () => {
+  test("covers prev/next calendar day", () => {
+    const joined = GALLERY_MEMORIES_SHORTCUTS.flatMap((row) => row.keys).join(
+      " "
+    )
+    expect(joined).toContain("←")
+    expect(joined).toContain("→")
+    expect(joined).toContain("J")
+    expect(joined).toContain("K")
+    expect(joined).toContain("?")
   })
 })

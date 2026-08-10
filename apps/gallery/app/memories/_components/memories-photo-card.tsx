@@ -18,10 +18,12 @@ export function MemoriesPhotoCard({
   photo,
   currentYear,
   onOpen,
+  buttonRef,
 }: {
   photo: GalleryMemoryPhoto
   currentYear: number
   onOpen: () => void
+  buttonRef?: (node: HTMLButtonElement | null) => void
 }) {
   const [thumbFailed, setThumbFailed] = useState(false)
   const frame = getPolaroidFrame(photo.id)
@@ -40,6 +42,7 @@ export function MemoriesPhotoCard({
     >
       <button
         type="button"
+        ref={buttonRef}
         onClick={onOpen}
         className="block w-full text-left focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:outline-none"
       >

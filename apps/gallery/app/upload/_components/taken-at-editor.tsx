@@ -7,6 +7,7 @@ import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -69,7 +70,7 @@ export function TakenAtEditor({
       if (result.ok) {
         onUpdated?.(result.takenAt)
         toast.success(describeCaptureDateUpdated())
-        setOpen(false)
+        openEditor(false)
       } else {
         toast.error(result.error)
       }
@@ -97,6 +98,9 @@ export function TakenAtEditor({
           <DialogTitle className="font-serif text-2xl italic">
             Capture date
           </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Asia/Taipei calendar day used by Memories · On this day.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">
           <label
@@ -110,6 +114,12 @@ export function TakenAtEditor({
             type="date"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                onSave()
+              }
+            }}
             disabled={pending}
             className="text-base"
           />

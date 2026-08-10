@@ -58,7 +58,7 @@ export function DeleteButton({
         } else {
           toast.success(describeArtworkDeleted(name))
         }
-        setOpen(false)
+        onOpenChange(false)
       } else {
         toast.error(result.error)
       }

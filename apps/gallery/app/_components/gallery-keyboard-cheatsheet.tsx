@@ -9,6 +9,7 @@ import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import {
   GALLERY_LIGHTBOX_SHORTCUTS,
   GALLERY_MANAGE_SHORTCUTS,
+  GALLERY_MEMORIES_SHORTCUTS,
   GALLERY_SLIDESHOW_SHORTCUTS,
   GALLERY_WALL_SHORTCUTS,
   isCheatSheetToggleKey,
@@ -62,6 +63,7 @@ export function GalleryKeyboardCheatsheet({
   lightboxOpen = false,
   slideshowOpen = false,
   manage = false,
+  memories = false,
   dark = false,
   className,
 }: {
@@ -69,6 +71,8 @@ export function GalleryKeyboardCheatsheet({
   slideshowOpen?: boolean
   /** Use on /upload Manage Select shortcuts. */
   manage?: boolean
+  /** Use on /memories calendar-day shortcuts. */
+  memories?: boolean
   /** Use on the dark fullscreen slideshow chrome. */
   dark?: boolean
   className?: string
@@ -110,7 +114,9 @@ export function GalleryKeyboardCheatsheet({
       ? GALLERY_LIGHTBOX_SHORTCUTS
       : manage
         ? GALLERY_MANAGE_SHORTCUTS
-        : GALLERY_WALL_SHORTCUTS
+        : memories
+          ? GALLERY_MEMORIES_SHORTCUTS
+          : GALLERY_WALL_SHORTCUTS
 
   const contextLabel = slideshowOpen
     ? "During slideshow"
@@ -118,7 +124,9 @@ export function GalleryKeyboardCheatsheet({
       ? "While viewing a photo"
       : manage
         ? "On Manage (Select mode)"
-        : "On the wall"
+        : memories
+          ? "On Memories"
+          : "On the wall"
 
   return (
     <>

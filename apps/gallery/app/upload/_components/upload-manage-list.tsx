@@ -973,7 +973,7 @@ export function UploadManageList({
           toast.success(message)
         }
         endSelectionMode()
-        setConfirmOpen(false)
+        handleBulkDialogOpenChange(setConfirmOpen)(false)
       } else {
         toast.error(result.error)
       }
@@ -1001,7 +1001,7 @@ export function UploadManageList({
       )
       if (result.ok) {
         toast.success(describeBulkTakenAtSet(result.updated))
-        setBulkDateOpen(false)
+        handleBulkDialogOpenChange(setBulkDateOpen)(false)
         endSelectionMode()
       } else {
         toast.error(result.error)
@@ -1032,7 +1032,7 @@ export function UploadManageList({
           selected: selectedItems.length,
         })
       )
-      setBulkTagOpen(false)
+      handleBulkDialogOpenChange(setBulkTagOpen)(false)
       setBulkTagDraft("")
       endSelectionMode()
     })
@@ -1060,7 +1060,7 @@ export function UploadManageList({
           detached: result.data.detached,
         })
       )
-      setBulkUntagOpen(false)
+      handleBulkDialogOpenChange(setBulkUntagOpen)(false)
       setBulkUntagDraft("")
       endSelectionMode()
     })
@@ -1203,7 +1203,7 @@ export function UploadManageList({
         },
       })
       setBulkAlbumDraft("")
-      setBulkAlbumOpen(false)
+      handleBulkDialogOpenChange(setBulkAlbumOpen)(false)
       selectionAnchorIdRef.current = null
       endSelectionMode()
     })

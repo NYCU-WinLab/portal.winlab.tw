@@ -11,6 +11,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AlbumSlideshow } from "@/app/albums/_components/album-slideshow"
+import { GalleryKeyboardCheatsheet } from "@/app/_components/gallery-keyboard-cheatsheet"
 import { MemoriesYearSections } from "@/app/memories/_components/memories-year-sections"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import type { GalleryMemoryYearGroup } from "@/lib/gallery/memories"
@@ -36,11 +37,21 @@ export function MemoriesDayView({
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const slideshowButtonRef = useRef<HTMLButtonElement>(null)
+  const photoButtonRefs = useRef(new Map<string, HTMLButtonElement>())
+  const lightboxReturnIdRef = useRef<string | null>(null)
 
   const onSlideshowOpenChange = (open: boolean) => {
     setSlideshowOpen(open)
     if (!open) {
-      queueMicrotask(() => slideshowButtonRef.current?.focus())
+      const returnId = lightboxReturnIdRef.current
+      lightboxReturnIdRef.current = null
+      queueMicrotask(() => {
+        if (returnId) {
+          photoButtonRefs.current.get(returnId)?.focus()
+          return
+        }
+        slideshowButtonRef.current?.focus()
+      })
     }
   }
 
@@ -56,35 +67,46 @@ export function MemoriesDayView({
 
   const active = openId ? (photoById.get(openId) ?? null) : null
 
-  const openSlideshowAtIndex = (index: number) => {
+  const openSlideshowAtIndex = (index: number, returnPhotoId?: string) => {
     setSlideshowStart(index)
+    lightboxReturnIdRef.current = returnPhotoId ?? openId
     setOpenId(null)
     setSlideshowOpen(true)
   }
 
   const openSlideshowFromPhoto = (imageId: string) => {
-    openSlideshowAtIndex(findSlideshowIndexByImageId(slideshowPhotos, imageId))
+    openSlideshowAtIndex(
+      findSlideshowIndexByImageId(slideshowPhotos, imageId),
+      imageId
+    )
   }
 
   return (
     <div className="flex flex-col gap-10 sm:gap-12">
-      {slideshowPhotos.length > 0 ? (
-        <button
-          ref={slideshowButtonRef}
-          type="button"
-          onClick={() => openSlideshowAtIndex(0)}
-          disabled={slideshowOpen}
-          aria-busy={slideshowOpen || undefined}
-          aria-expanded={slideshowOpen}
-          className={cn(
-            gallerySans(),
-            "inline-flex h-9 w-fit items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
-            "hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-          )}
-        >
-          Slideshow
-        </button>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {slideshowPhotos.length > 0 ? (
+          <button
+            ref={slideshowButtonRef}
+            type="button"
+            onClick={() => openSlideshowAtIndex(0)}
+            disabled={slideshowOpen}
+            aria-busy={slideshowOpen || undefined}
+            aria-expanded={slideshowOpen}
+            className={cn(
+              gallerySans(),
+              "inline-flex h-9 w-fit items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm shadow-xs",
+              "hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+            )}
+          >
+            Slideshow
+          </button>
+        ) : null}
+        <GalleryKeyboardCheatsheet
+          memories
+          slideshowOpen={slideshowOpen}
+          lightboxOpen={Boolean(active)}
+        />
+      </div>
 
       <MemoriesYearSections
         groups={groups}
@@ -94,15 +116,23 @@ export function MemoriesDayView({
           setLightboxFailed(false)
           setOpenId(imageId)
         }}
-        onStartSlideshow={openSlideshowAtIndex}
+        onStartSlideshow={(startIndex) => openSlideshowAtIndex(startIndex)}
+        registerPhotoButton={(imageId, node) => {
+          if (node) photoButtonRefs.current.set(imageId, node)
+          else photoButtonRefs.current.delete(imageId)
+        }}
       />
 
       <Dialog
         open={Boolean(active)}
         onOpenChange={(open) => {
           if (!open) {
+            const returnId = openId
             setOpenId(null)
             setLightboxFailed(false)
+            queueMicrotask(() => {
+              if (returnId) photoButtonRefs.current.get(returnId)?.focus()
+            })
           }
         }}
       >

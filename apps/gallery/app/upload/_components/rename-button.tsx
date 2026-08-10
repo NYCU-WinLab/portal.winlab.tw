@@ -7,6 +7,7 @@ import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -49,7 +50,7 @@ export function RenameButton({
           result.names.find((patch) => patch.id === id)?.name ?? draft
         onRenamed?.(applied)
         toast.success(describeArtworkNameUpdated())
-        setOpen(false)
+        openEditor(false)
       } else {
         toast.error(result.error)
       }
@@ -74,6 +75,9 @@ export function RenameButton({
           <DialogTitle className="font-serif text-2xl italic">
             Rename work
           </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Update the title shown on the wall and in Manage.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">
           <label

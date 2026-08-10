@@ -57,6 +57,13 @@ export const GALLERY_SLIDESHOW_SHORTCUTS: GalleryShortcutRow[] = [
   { keys: ["?"], action: "Toggle this cheat sheet" },
 ]
 
+/** Memories calendar-day shortcuts (lightbox/slideshow closed). */
+export const GALLERY_MEMORIES_SHORTCUTS: GalleryShortcutRow[] = [
+  { keys: ["←", "K"], action: "Previous calendar day" },
+  { keys: ["→", "J"], action: "Next calendar day" },
+  { keys: ["?"], action: "Toggle this cheat sheet" },
+]
+
 export function isCheatSheetToggleKey(key: string, shiftKey: boolean): boolean {
   // "?" comes through as Shift+/ on most layouts; some send key === "?"
   return key === "?" || (key === "/" && shiftKey)

@@ -7,6 +7,7 @@ import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
@@ -82,6 +83,9 @@ export function ManageTagsEditor({
       <DialogContent className="gap-6" aria-busy={pending || undefined}>
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl italic">Tags</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Add or remove tags on this work. Changes save as you go.
+          </DialogDescription>
         </DialogHeader>
         {pending && tags == null && !loadError ? (
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
