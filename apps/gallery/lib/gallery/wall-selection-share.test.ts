@@ -26,4 +26,9 @@ describe("describeWallSelectionCopy", () => {
     expect(describeWallSelectionCopy(1)).toBe("Copied 1 link.")
     expect(describeWallSelectionCopy(3)).toBe("Copied 3 links.")
   })
+
+  test("treats empty and negative as nothing to copy", () => {
+    expect(describeWallSelectionCopy(0)).toBe("Nothing to copy.")
+    expect(describeWallSelectionCopy(-2)).toBe("Nothing to copy.")
+  })
 })
