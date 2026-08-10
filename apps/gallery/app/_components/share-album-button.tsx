@@ -57,7 +57,7 @@ export function ShareAlbumButton({
         onClick={() => void runShare()}
         disabled={busy || disabled}
         aria-label={buttonLabel}
-        aria-busy={busy}
+        aria-busy={busy || undefined}
         className={cn(
           "inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-xs",
           "hover:bg-accent hover:text-accent-foreground disabled:opacity-50",
@@ -75,7 +75,7 @@ export function ShareAlbumButton({
         type="button"
         onClick={() => void runShare()}
         disabled={busy || disabled}
-        aria-busy={busy}
+        aria-busy={busy || undefined}
         className={cn(
           gallerySans(),
           "inline-flex items-center gap-1 text-[11px] text-muted-foreground/80 underline-offset-2",
