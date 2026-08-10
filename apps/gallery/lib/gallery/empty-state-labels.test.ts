@@ -7,6 +7,8 @@ import {
   describeBackToTheWallLabel,
   describeBrowseTheWallLabel,
   describeClearSearchLabel,
+  describeNoSavedPhotosDescription,
+  describeNoSavedPhotosTitle,
   describeMemoriesEmptyTrayTitle,
   describeMemoriesNotReadyTitle,
   describeNothingOnWallYetTitle,
@@ -53,6 +55,8 @@ describe("empty-state labels", () => {
     expect(describeSignInToUploadLabel()).toBe("Sign in to upload")
     expect(describeBrowseTheWallLabel()).toBe("Browse the wall")
     expect(describeClearSearchLabel()).toBe("Clear search")
+    expect(describeNoSavedPhotosTitle()).toBe("No saved photos yet")
+    expect(describeNoSavedPhotosDescription()).toContain("bookmark")
     expect(describeShowAllAlbumsLabel()).toBe("Show all albums")
     expect(describePaperWallThemeLabel()).toBe("Paper wall")
     expect(describeAlbumStillEmptyDescription(true)).toContain("Add to album")
