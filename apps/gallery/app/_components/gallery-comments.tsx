@@ -36,6 +36,11 @@ import {
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
 import { isCommentEdited } from "@/lib/gallery/comment-edit"
 import { applyExclusiveCommentPin } from "@/lib/gallery/comment-pin"
+import {
+  describeCommentDeleted,
+  describeCommentPosted,
+  describeCommentUpdated,
+} from "@/lib/gallery/comment-toast"
 import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
 import {
@@ -205,7 +210,7 @@ export function GalleryComments({
       setDraft("")
       setReplyTarget(null)
       setMentionQuery(null)
-      toast.success("Comment posted.")
+      toast.success(describeCommentPosted())
     })
   }
 
@@ -222,7 +227,7 @@ export function GalleryComments({
         setEditingId(null)
         setEditDraft("")
       }
-      toast.success("Comment deleted.")
+      toast.success(describeCommentDeleted())
     })
   }
 
@@ -262,7 +267,7 @@ export function GalleryComments({
       )
       setEditingId(null)
       setEditDraft("")
-      toast.success("Comment updated.")
+      toast.success(describeCommentUpdated())
     })
   }
 
