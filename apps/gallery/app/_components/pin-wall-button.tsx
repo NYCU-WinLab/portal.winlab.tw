@@ -6,6 +6,11 @@ import { toast } from "sonner"
 
 import { setGalleryImagePin } from "@/app/actions"
 import { galleryPillClass } from "@/components/gallery-chrome"
+import {
+  describePinChromeLabel,
+  describePinToast,
+} from "@/lib/gallery/pin-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 import { cn } from "@workspace/ui/lib/utils"
 
 export function PinWallButton({
@@ -38,6 +43,7 @@ export function PinWallButton({
       event?.preventDefault()
       event?.stopPropagation()
     }
+    if (isPending) return
 
     startTransition(async () => {
       const nextPinned = !pinnedAt
@@ -48,15 +54,23 @@ export function PinWallButton({
       }
       setPinnedAt(result.data.pinned_at)
       onPinnedChange?.(result.data.pinned_at)
-      toast.success(nextPinned ? "Pinned to wall top." : "Unpinned.")
+      toast.success(describePinToast(nextPinned))
       if (nextPinned && navigateHomeOnPin) {
-        router.push("/")
+        try {
+          router.push("/")
+        } catch {
+          toast.error(describeGalleryNavError("openWallHome"))
+        }
         return
       }
       if (nextPinned && scrollToWallTop) {
         window.scrollTo({ top: 0, behavior: "smooth" })
       }
-      router.refresh()
+      try {
+        router.refresh()
+      } catch {
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
+      }
     })
   }
 
@@ -65,13 +79,15 @@ export function PinWallButton({
       type="button"
       onClick={toggle}
       disabled={isPending}
+      aria-pressed={Boolean(pinnedAt)}
+      aria-busy={isPending || undefined}
       className={cn(
         galleryPillClass(),
         pinnedAt && "text-amber-800",
         className
       )}
     >
-      {pinnedAt ? "Unpin" : "Pin"}
+      {describePinChromeLabel(Boolean(pinnedAt))}
     </button>
   )
 }

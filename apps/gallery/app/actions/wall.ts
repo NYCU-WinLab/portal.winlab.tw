@@ -1,5 +1,6 @@
 "use server"
 
+import { describeFailedToLoadMorePhotos } from "@/lib/gallery/action-errors"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
 import { loadGalleryHomePage } from "@/lib/gallery/load-home-page"
 import { createClient } from "@/lib/supabase/server"
@@ -11,6 +12,9 @@ export type GalleryWallFiltersInput = {
   media?: string
   after?: string
   q?: string
+  tag?: string
+  saved?: string
+  album?: string
 }
 
 export async function fetchGalleryWallPage(
@@ -40,7 +44,7 @@ export async function fetchGalleryWallPage(
     }
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to load more photos."
+      error instanceof Error ? error.message : describeFailedToLoadMorePhotos()
     return { ok: false, error: message }
   }
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition, type KeyboardEvent } from "react"
+import { useRouter } from "next/navigation"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
@@ -12,19 +13,37 @@ import {
   gallerySectionLeadClass,
   gallerySectionTitleClass,
 } from "@/components/gallery-chrome"
+import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 import {
   GALLERY_SEASONAL_THEME_IDS,
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
+import { describeSeasonalThemeToast } from "@/lib/gallery/seasonal-theme-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeSeasonalSiteThemeAriaLabel } from "@/lib/gallery/install-theme-labels"
+import {
+  describeLimitedSeasonalThemeHint,
+  describePaperWallThemeHint,
+} from "@/lib/gallery/chrome-hints"
+import { describePaperWallThemeLabel } from "@/lib/gallery/empty-state-labels"
 
 type ThemeChoice = GallerySeasonalThemeId | "off"
 
-const THEME_OPTIONS: Array<{ value: ThemeChoice; label: string }> = [
-  { value: "off", label: "Off" },
+const THEME_OPTIONS: Array<{
+  value: ThemeChoice
+  label: string
+  hint?: string
+}> = [
+  {
+    value: "off",
+    label: describePaperWallThemeLabel(),
+    hint: describePaperWallThemeHint(),
+  },
   ...GALLERY_SEASONAL_THEME_IDS.map((id) => ({
-    value: id,
+    value: id as ThemeChoice,
     label: GALLERY_SEASONAL_THEMES[id].label,
+    hint: describeLimitedSeasonalThemeHint(),
   })),
 ]
 
@@ -35,10 +54,14 @@ export function SeasonalThemePanel({
   activeThemeId: GallerySeasonalThemeId | null
   settingsReady?: boolean
 }) {
+  const router = useRouter()
   const [selected, setSelected] = useState<ThemeChoice>(activeThemeId ?? "off")
   const [isPending, startTransition] = useTransition()
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   const onSelect = (next: ThemeChoice) => {
+    if (isPending || !settingsReady) return
+    if (next === selected) return
     const previous = selected
     setSelected(next)
     startTransition(async () => {
@@ -49,10 +72,11 @@ export function SeasonalThemePanel({
         toast.error(result.error)
         return
       }
-      if (themeId) {
-        toast.success(`${GALLERY_SEASONAL_THEMES[themeId].label} theme is on.`)
-      } else {
-        toast.success("Seasonal theme off.")
+      toast.success(describeSeasonalThemeToast(themeId))
+      try {
+        router.refresh()
+      } catch {
+        toast.error(describeGalleryNavError("refreshGalleryChrome"))
       }
     })
   }
@@ -64,7 +88,8 @@ export function SeasonalThemePanel({
           Site theme
         </h2>
         <p className={gallerySectionLeadClass()}>
-          Pick a limited-time look for everyone visiting the gallery wall.
+          Paper wall is the committed look. Seasonal themes add a light overlay
+          — they never replace the darkroom renewal.
         </p>
       </div>
 
@@ -74,27 +99,66 @@ export function SeasonalThemePanel({
           "mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
         )}
         role="radiogroup"
-        aria-label="Seasonal site theme"
+        aria-label={describeSeasonalSiteThemeAriaLabel()}
+        aria-busy={isPending || undefined}
+        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+          if (isPending || !settingsReady) return
+          const key = event.key
+          if (
+            key !== "ArrowLeft" &&
+            key !== "ArrowRight" &&
+            key !== "ArrowUp" &&
+            key !== "ArrowDown" &&
+            key !== "Home" &&
+            key !== "End"
+          ) {
+            return
+          }
+          event.preventDefault()
+          const current = Math.max(
+            0,
+            THEME_OPTIONS.findIndex((option) => option.value === selected)
+          )
+          const nextIndex = nextRadioIndex(current, THEME_OPTIONS.length, key)
+          const next = THEME_OPTIONS[nextIndex]
+          if (!next) return
+          onSelect(next.value)
+          queueMicrotask(() => optionRefs.current[nextIndex]?.focus())
+        }}
       >
-        {THEME_OPTIONS.map((option) => {
+        {THEME_OPTIONS.map((option, index) => {
           const checked = selected === option.value
+          const isDefault = option.value === "off"
 
           return (
             <button
               key={option.value}
+              ref={(node) => {
+                optionRefs.current[index] = node
+              }}
               type="button"
               role="radio"
               aria-checked={checked}
-              disabled={isPending}
+              tabIndex={checked ? 0 : -1}
+              disabled={isPending || !settingsReady}
+              aria-busy={isPending || undefined}
               onClick={() => onSelect(option.value)}
               className={cn(
                 "min-w-[8.5rem] flex-1 rounded-xl border px-4 py-3 text-left transition-colors",
+                "disabled:cursor-not-allowed disabled:opacity-50",
                 checked
-                  ? "border-foreground/25 bg-foreground/[0.07] text-foreground"
+                  ? isDefault
+                    ? "border-zinc-800/35 bg-zinc-900/[0.09] text-foreground ring-1 ring-zinc-900/10"
+                    : "border-foreground/25 bg-foreground/[0.07] text-foreground"
                   : "border-border/60 bg-muted/20 text-muted-foreground hover:border-foreground/15 hover:bg-muted/40 hover:text-foreground"
               )}
             >
-              <span className="text-sm font-medium">{option.label}</span>
+              <span className="block text-sm font-medium">{option.label}</span>
+              {option.hint ? (
+                <span className="mt-0.5 block text-[11px] opacity-75">
+                  {option.hint}
+                </span>
+              ) : null}
             </button>
           )
         })}

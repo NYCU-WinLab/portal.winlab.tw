@@ -10,7 +10,7 @@ export type WallPhotoSource = {
  */
 export function resolveWallPhotoId(
   image: WallPhotoSource,
-  siblings: WallPhotoSource[]
+  siblings: readonly WallPhotoSource[]
 ): string {
   if (!image.sequence_id) return image.id
 

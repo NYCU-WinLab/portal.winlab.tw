@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 
 import { IconDownload, IconShare2, IconX } from "@tabler/icons-react"
@@ -9,11 +9,17 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { gallerySans } from "@/components/gallery-chrome"
+import { describeInstallingLabel } from "@/lib/gallery/busy-labels"
+import {
+  describeDismissInstallPromptAriaLabel,
+  describeInstallLabel,
+} from "@/lib/gallery/install-theme-labels"
 import {
   GALLERY_PWA_INSTALL_DISMISS_KEY,
   isIosDevice,
   isStandaloneDisplayMode,
 } from "@/lib/gallery/pwa"
+import { readStorageItem, writeStorageItem } from "@/lib/gallery/safe-storage"
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -25,9 +31,15 @@ export function GalleryInstallPrompt() {
   const [iosHint, setIosHint] = useState(false)
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null)
+  const [busy, setBusy] = useState(false)
+  const primaryActionRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (window.localStorage.getItem(GALLERY_PWA_INSTALL_DISMISS_KEY) === "1") {
+    if (
+      readStorageItem(window.localStorage, GALLERY_PWA_INSTALL_DISMISS_KEY) ===
+      "1"
+    ) {
       return
     }
 
@@ -63,15 +75,49 @@ export function GalleryInstallPrompt() {
   }, [])
 
   const dismiss = () => {
-    window.localStorage.setItem(GALLERY_PWA_INSTALL_DISMISS_KEY, "1")
+    if (busy) return
+    writeStorageItem(window.localStorage, GALLERY_PWA_INSTALL_DISMISS_KEY, "1")
     setVisible(false)
     setDeferredPrompt(null)
   }
 
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      dismiss()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [visible, busy])
+
+  useEffect(() => {
+    if (!visible) return
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    restoreFocusRef.current = previous
+    queueMicrotask(() => primaryActionRef.current?.focus())
+    return () => {
+      const restore = restoreFocusRef.current
+      restoreFocusRef.current = null
+      queueMicrotask(() => restore?.focus())
+    }
+  }, [visible])
+
   const install = async () => {
-    if (!deferredPrompt) return
-    await deferredPrompt.prompt()
-    await deferredPrompt.userChoice
+    if (!deferredPrompt || busy) return
+    setBusy(true)
+    try {
+      await deferredPrompt.prompt()
+      await deferredPrompt.userChoice
+    } catch {
+      // Browser cancelled / blocked the install sheet — still dismiss.
+    } finally {
+      setBusy(false)
+    }
     dismiss()
   }
 
@@ -79,6 +125,9 @@ export function GalleryInstallPrompt() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gallery-install-prompt-title"
       className={cn(
         gallerySans(),
         "fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(env(safe-area-inset-bottom),1rem)]"
@@ -95,7 +144,10 @@ export function GalleryInstallPrompt() {
           unoptimized
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">
+          <p
+            id="gallery-install-prompt-title"
+            className="text-sm font-medium text-foreground"
+          >
             Keep Gallery in your pocket
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -113,16 +165,26 @@ export function GalleryInstallPrompt() {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {!iosHint ? (
-            <Button type="button" size="sm" onClick={() => void install()}>
+            <Button
+              ref={primaryActionRef}
+              type="button"
+              size="sm"
+              disabled={busy}
+              aria-busy={busy || undefined}
+              onClick={() => void install()}
+            >
               <IconDownload className="h-4 w-4" />
-              Install
+              {busy ? describeInstallingLabel() : describeInstallLabel()}
             </Button>
           ) : null}
           <Button
+            ref={iosHint ? primaryActionRef : undefined}
             type="button"
             size="icon-sm"
             variant="ghost"
-            aria-label="Dismiss install prompt"
+            disabled={busy}
+            aria-busy={busy || undefined}
+            aria-label={describeDismissInstallPromptAriaLabel()}
             onClick={dismiss}
           >
             <IconX className="h-4 w-4" />

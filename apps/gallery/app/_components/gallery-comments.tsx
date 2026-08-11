@@ -34,7 +34,40 @@ import {
   updateGalleryComment,
 } from "@/app/actions"
 import { galleryPillClass, gallerySans } from "@/components/gallery-chrome"
+import { isCommentEdited } from "@/lib/gallery/comment-edit"
+import { applyExclusiveCommentPin } from "@/lib/gallery/comment-pin"
+import {
+  describeAddCommentPlaceholder,
+  describeCommentDeleted,
+  describeCommentPosted,
+  describeCommentUpdated,
+  describeMentionSomeoneAriaLabel,
+  describeReplyCommentPlaceholder,
+} from "@/lib/gallery/comment-toast"
+import { describeCommentPinToast } from "@/lib/gallery/comment-pin-toast"
+import {
+  describeCancelLabel,
+  describeDeleteLabel,
+} from "@/lib/gallery/dialog-action-labels"
+import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
+import { galleryScrollBehavior } from "@/lib/gallery/motion"
+import { describePinChromeLabel } from "@/lib/gallery/pin-toast"
+import {
+  describeEditLabel,
+  describePinnedBadgeLabel,
+} from "@/lib/gallery/selection-action-labels"
+import {
+  describeSignInBeforeComment,
+  describeSignInToCommentLabel,
+} from "@/lib/gallery/validation-toasts"
+import { removeCommentWithDescendants } from "@/lib/gallery/comment-tree"
 import { FormattedCommentMentions } from "@/lib/gallery/format-comment-mentions"
+import {
+  applyMentionAtCursor,
+  insertMentionTriggerAtCursor,
+  mentionQueryAtCursor,
+} from "@/lib/gallery/mention-cursor"
+import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { flattenGalleryComments } from "@/lib/gallery/sort-comments"
 import type { GalleryComment, GalleryMember } from "@/lib/gallery/types"
 
@@ -49,6 +82,8 @@ export function GalleryComments({
   isAdmin = false,
   highlightCommentId = null,
   loading = false,
+  commentPinAvailable = true,
+  commentLikesAvailable = true,
 }: {
   imageId: string
   comments: GalleryComment[]
@@ -60,6 +95,8 @@ export function GalleryComments({
   isAdmin?: boolean
   highlightCommentId?: string | null
   loading?: boolean
+  commentPinAvailable?: boolean
+  commentLikesAvailable?: boolean
 }) {
   const [draft, setDraft] = useState("")
   const [replyTarget, setReplyTarget] = useState<string | null>(null)
@@ -72,6 +109,7 @@ export function GalleryComments({
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const deleteTriggerRef = useRef<HTMLElement | null>(null)
 
   const flattened = useMemo(() => flattenGalleryComments(comments), [comments])
 
@@ -86,7 +124,10 @@ export function GalleryComments({
       const node = listRef.current?.querySelector<HTMLElement>(
         `[data-comment-id="${highlightCommentId}"]`
       )
-      node?.scrollIntoView({ behavior: "smooth", block: "center" })
+      node?.scrollIntoView({
+        behavior: galleryScrollBehavior(),
+        block: "center",
+      })
       setHighlightedId(highlightCommentId)
     })
 
@@ -115,9 +156,7 @@ export function GalleryComments({
   }
 
   const syncMentionQuery = (value: string, cursor: number) => {
-    const before = value.slice(0, cursor)
-    const match = before.match(/@([\p{L}\p{N}._-]*)$/u)
-    setMentionQuery(match ? (match[1] ?? "") : null)
+    setMentionQuery(mentionQueryAtCursor(value, cursor))
   }
 
   const showMentionPicker = mentionQuery !== null
@@ -127,15 +166,12 @@ export function GalleryComments({
     const name = member.name
     if (!name) return
     const cursor = textareaRef.current?.selectionStart ?? draft.length
-    const before = draft.slice(0, cursor).replace(/@[\p{L}\p{N}._-]*$/u, "")
-    const after = draft.slice(cursor)
-    const next = `${before}@${name} ${after}`
+    const { next, selection } = applyMentionAtCursor(draft, cursor, name)
     setDraft(next)
     setMentionQuery(null)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
-      const pos = before.length + name.length + 2
-      textareaRef.current?.setSelectionRange(pos, pos)
+      textareaRef.current?.setSelectionRange(selection, selection)
     })
   }
 
@@ -144,6 +180,15 @@ export function GalleryComments({
     if (event.key === "Escape") {
       event.preventDefault()
       setMentionQuery(null)
+      return
+    }
+    if (
+      event.key === "Enter" &&
+      (event.metaKey || event.ctrlKey) &&
+      mentionQuery == null
+    ) {
+      event.preventDefault()
+      submit()
       return
     }
     if (mentionPickerEmpty) return
@@ -168,8 +213,9 @@ export function GalleryComments({
   }
 
   const submit = () => {
+    if (isPending) return
     if (!isSignedIn) {
-      toast.error("Please sign in before commenting.")
+      toast.error(describeSignInBeforeComment())
       return
     }
     const body = draft.trim()
@@ -195,11 +241,12 @@ export function GalleryComments({
       setDraft("")
       setReplyTarget(null)
       setMentionQuery(null)
-      toast.success("Comment posted.")
+      toast.success(describeCommentPosted())
     })
   }
 
   const removeComment = (commentId: string) => {
+    if (isPending) return
     startTransition(async () => {
       const result = await deleteGalleryComment(commentId)
       if (!result.ok) {
@@ -211,7 +258,7 @@ export function GalleryComments({
         setEditingId(null)
         setEditDraft("")
       }
-      toast.success("Comment deleted.")
+      toast.success(describeCommentDeleted())
     })
   }
 
@@ -228,6 +275,7 @@ export function GalleryComments({
   }
 
   const saveEdit = (commentId: string) => {
+    if (isPending) return
     const body = editDraft.trim()
     if (!body) return
 
@@ -250,11 +298,12 @@ export function GalleryComments({
       )
       setEditingId(null)
       setEditDraft("")
-      toast.success("Comment updated.")
+      toast.success(describeCommentUpdated())
     })
   }
 
   const toggleLike = (commentId: string) => {
+    if (isPending) return
     startTransition(async () => {
       const result = await toggleGalleryCommentLike(commentId)
       if (!result.ok) {
@@ -276,6 +325,7 @@ export function GalleryComments({
   }
 
   const togglePin = (comment: GalleryComment) => {
+    if (isPending) return
     const nextPinned = !comment.pinned_at
     startTransition(async () => {
       const result = await setGalleryCommentPin(comment.id, nextPinned)
@@ -284,18 +334,14 @@ export function GalleryComments({
         return
       }
       onCommentsChange(
-        comments.map((row) => {
-          if (row.image_id !== comment.image_id || row.parent_id) return row
-          if (row.id === comment.id) {
-            return { ...row, pinned_at: result.data.pinned_at }
-          }
-          if (nextPinned) {
-            return { ...row, pinned_at: null }
-          }
-          return row
-        })
+        applyExclusiveCommentPin(
+          comments,
+          comment,
+          nextPinned,
+          result.data.pinned_at
+        )
       )
-      toast.success(nextPinned ? "Comment pinned." : "Comment unpinned.")
+      toast.success(describeCommentPinToast(nextPinned))
     })
   }
 
@@ -306,11 +352,19 @@ export function GalleryComments({
         className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5"
       >
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="py-6 text-center text-xs text-muted-foreground"
+          >
             Loading comments…
           </p>
         ) : flattened.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
+          <p
+            role="status"
+            aria-live="polite"
+            className="py-6 text-center text-xs text-muted-foreground"
+          >
             No comments yet — say something?
           </p>
         ) : (
@@ -320,7 +374,10 @@ export function GalleryComments({
               const isEditing = editingId === comment.id
               const edited = isCommentEdited(comment)
               const canPin =
-                isAdmin && comment.parent_id === null && comment.depth === 0
+                isAdmin &&
+                commentPinAvailable &&
+                comment.parent_id === null &&
+                comment.depth === 0
               return (
                 <li
                   key={comment.id}
@@ -340,15 +397,12 @@ export function GalleryComments({
                     {comment.pinned_at ? (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                         <IconPin className="size-3" aria-hidden />
-                        Pinned
+                        {describePinnedBadgeLabel()}
                       </span>
                     ) : null}
                     <span aria-hidden>·</span>
                     <time dateTime={comment.created_at}>
-                      {new Date(comment.created_at).toLocaleString(undefined, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
+                      {formatUploadedAt(comment.created_at)}
                     </time>
                     {edited ? (
                       <>
@@ -362,6 +416,20 @@ export function GalleryComments({
                       <Textarea
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault()
+                            cancelEdit()
+                            return
+                          }
+                          if (
+                            event.key === "Enter" &&
+                            (event.metaKey || event.ctrlKey)
+                          ) {
+                            event.preventDefault()
+                            saveEdit(comment.id)
+                          }
+                        }}
                         disabled={isPending}
                         className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-background text-sm"
                       />
@@ -398,26 +466,29 @@ export function GalleryComments({
                   )}
                   {!isEditing ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleLike(comment.id)}
-                        disabled={!isSignedIn || isPending}
-                        className={cn(
-                          galleryPillClass(),
-                          "inline-flex items-center gap-1",
-                          comment.liked_by_me && "text-foreground"
-                        )}
-                        aria-pressed={comment.liked_by_me}
-                      >
-                        <IconThumbUp
+                      {commentLikesAvailable ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleLike(comment.id)}
+                          disabled={!isSignedIn || isPending}
+                          aria-busy={isPending || undefined}
                           className={cn(
-                            "size-3.5",
-                            comment.liked_by_me && "fill-current"
+                            galleryPillClass(),
+                            "inline-flex items-center gap-1",
+                            comment.liked_by_me && "text-foreground"
                           )}
-                          aria-hidden
-                        />
-                        {comment.like_count > 0 ? comment.like_count : "Like"}
-                      </button>
+                          aria-pressed={comment.liked_by_me}
+                        >
+                          <IconThumbUp
+                            className={cn(
+                              "size-3.5",
+                              comment.liked_by_me && "fill-current"
+                            )}
+                            aria-hidden
+                          />
+                          {comment.like_count > 0 ? comment.like_count : "Like"}
+                        </button>
+                      ) : null}
                       {isSignedIn ? (
                         <button
                           type="button"
@@ -432,12 +503,14 @@ export function GalleryComments({
                           type="button"
                           onClick={() => togglePin(comment)}
                           disabled={isPending}
+                          aria-pressed={Boolean(comment.pinned_at)}
+                          aria-busy={isPending || undefined}
                           className={cn(
                             galleryPillClass(),
                             comment.pinned_at && "text-amber-800"
                           )}
                         >
-                          {comment.pinned_at ? "Unpin" : "Pin"}
+                          {describePinChromeLabel(Boolean(comment.pinned_at))}
                         </button>
                       ) : null}
                       {mine ? (
@@ -445,19 +518,26 @@ export function GalleryComments({
                           <button
                             type="button"
                             onClick={() => startEdit(comment)}
+                            disabled={isPending}
+                            aria-busy={isPending || undefined}
                             className={galleryPillClass()}
                           >
-                            Edit
+                            {describeEditLabel()}
                           </button>
                           <button
                             type="button"
-                            onClick={() => setDeleteTargetId(comment.id)}
+                            onClick={(event) => {
+                              deleteTriggerRef.current = event.currentTarget
+                              setDeleteTargetId(comment.id)
+                            }}
+                            disabled={isPending}
+                            aria-busy={isPending || undefined}
                             className={cn(
                               galleryPillClass(),
                               "text-destructive/90 hover:text-destructive"
                             )}
                           >
-                            Delete
+                            {describeDeleteLabel()}
                           </button>
                         </>
                       ) : null}
@@ -472,16 +552,28 @@ export function GalleryComments({
 
       <div className="relative mt-3 shrink-0 border-t border-border/50 pt-3">
         {replyTarget ? (
-          <button
-            type="button"
-            onClick={() => setReplyTarget(null)}
-            className={cn(
-              gallerySans(),
-              "mb-2 text-[11px] text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Cancel reply
-          </button>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                gallerySans(),
+                "rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[11px] text-foreground"
+              )}
+            >
+              Replying to{" "}
+              {flattened.find((c) => c.id === replyTarget)?.commenter_name ??
+                "comment"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setReplyTarget(null)}
+              className={cn(
+                gallerySans(),
+                "text-[11px] text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Cancel
+            </button>
+          </div>
         ) : null}
         {showMentionPicker ? (
           <div className="absolute right-0 bottom-full left-0 z-50 mb-1 flex max-h-56 flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-md">
@@ -500,8 +592,8 @@ export function GalleryComments({
                   )}
                 >
                   {mentionBrowseAll
-                    ? `Lab members (${filteredMembers.length})`
-                    : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"}`}
+                    ? `Lab members (${filteredMembers.length}) · ↑↓ Enter`
+                    : `${filteredMembers.length} match${filteredMembers.length === 1 ? "" : "es"} · ↑↓ Enter · Esc`}
                 </p>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {filteredMembers.map((m, index) => (
@@ -546,29 +638,73 @@ export function GalleryComments({
                 e.currentTarget.selectionStart ?? e.currentTarget.value.length
               )
             }
-            placeholder={isSignedIn ? "Add a comment… @" : "Sign in to comment"}
+            placeholder={
+              isSignedIn
+                ? replyTarget
+                  ? describeReplyCommentPlaceholder()
+                  : describeAddCommentPlaceholder()
+                : describeSignInToCommentLabel()
+            }
             disabled={!isSignedIn || isPending}
-            className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-20 text-sm"
+            className="min-h-[3.25rem] resize-none rounded-xl border-border/60 bg-muted/20 pr-28 text-sm"
           />
-          <Button
-            type="button"
-            size="sm"
-            className={cn(
-              gallerySans(),
-              "absolute right-2 bottom-2 h-8 rounded-full px-3 text-xs"
-            )}
-            disabled={!isSignedIn || isPending || !draft.trim()}
-            onClick={submit}
-          >
-            Post
-          </Button>
+          <div className="absolute right-2 bottom-2 flex items-center gap-1">
+            {isSignedIn ? (
+              <button
+                type="button"
+                aria-label={describeMentionSomeoneAriaLabel()}
+                disabled={isPending}
+                onClick={() => {
+                  const el = textareaRef.current
+                  if (!el) return
+                  const cursor = el.selectionStart ?? draft.length
+                  const { next, selection } = insertMentionTriggerAtCursor(
+                    draft,
+                    cursor
+                  )
+                  setDraft(next)
+                  requestAnimationFrame(() => {
+                    el.focus()
+                    el.setSelectionRange(selection, selection)
+                    syncMentionQuery(next, selection)
+                  })
+                }}
+                className={cn(
+                  gallerySans(),
+                  "inline-flex h-8 items-center rounded-full px-2.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                )}
+              >
+                @
+              </button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              className={cn(gallerySans(), "h-8 rounded-full px-3 text-xs")}
+              disabled={!isSignedIn || isPending || !draft.trim()}
+              aria-busy={isPending || undefined}
+              onClick={submit}
+            >
+              Post
+            </Button>
+          </div>
         </div>
+        {isSignedIn ? (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            ⌘/Ctrl+Enter to post · Shift+Enter for a new line
+          </p>
+        ) : null}
       </div>
 
       <AlertDialog
         open={deleteTargetId !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTargetId(null)
+          if (!open) {
+            setDeleteTargetId(null)
+            const trigger = deleteTriggerRef.current
+            deleteTriggerRef.current = null
+            queueMicrotask(() => trigger?.focus())
+          }
         }}
       >
         <AlertDialogContent>
@@ -579,52 +715,23 @@ export function GalleryComments({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>
+              {describeCancelLabel()}
+            </AlertDialogCancel>
             <AlertDialogAction
+              disabled={isPending}
+              aria-busy={isPending || undefined}
               onClick={() => {
-                if (!deleteTargetId) return
+                if (!deleteTargetId || isPending) return
                 removeComment(deleteTargetId)
                 setDeleteTargetId(null)
               }}
             >
-              Delete
+              {isPending ? describeDeletingLabel() : describeDeleteLabel()}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   )
-}
-
-function isCommentEdited(comment: GalleryComment): boolean {
-  if (!comment.updated_at) return false
-  return (
-    new Date(comment.updated_at).getTime() >
-    new Date(comment.created_at).getTime()
-  )
-}
-
-function removeCommentWithDescendants(
-  comments: GalleryComment[],
-  targetId: string
-): GalleryComment[] {
-  const childrenByParent = new Map<string, string[]>()
-  for (const c of comments) {
-    if (!c.parent_id) continue
-    const bucket = childrenByParent.get(c.parent_id) ?? []
-    bucket.push(c.id)
-    childrenByParent.set(c.parent_id, bucket)
-  }
-
-  const toDelete = new Set<string>()
-  const queue = [targetId]
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (!current || toDelete.has(current)) continue
-    toDelete.add(current)
-    const children = childrenByParent.get(current) ?? []
-    for (const childId of children) queue.push(childId)
-  }
-
-  return comments.filter((c) => !toDelete.has(c.id))
 }

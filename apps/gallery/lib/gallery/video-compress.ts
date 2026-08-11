@@ -175,10 +175,11 @@ export function captureVideoPoster(
 
 export function formatCompressError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
-  if (/failed to fetch/i.test(raw)) {
+  if (/failed to fetch|networkerror|load failed/i.test(raw)) {
     return (
-      "Could not load the browser encoder — run `bun run sync-ffmpeg` in apps/gallery, " +
-      "restart dev, and check network / ad blockers."
+      "Could not load the browser encoder (CDN blocked or offline) — " +
+      "run `bun run sync-ffmpeg` in apps/gallery, restart dev, " +
+      "or allow unpkg / disable the ad blocker."
     )
   }
   if (/memory access out of bounds/i.test(raw)) {

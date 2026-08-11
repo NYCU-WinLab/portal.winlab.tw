@@ -9,6 +9,10 @@ import type { GalleryComment } from "@/lib/gallery/types"
 
 const COMMENT_SELECT_FULL =
   "id, image_id, parent_id, body, created_by, created_at, updated_at, pinned_at"
+const COMMENT_SELECT_WITH_EDIT =
+  "id, image_id, parent_id, body, created_by, created_at, updated_at"
+const COMMENT_SELECT_BASE =
+  "id, image_id, parent_id, body, created_by, created_at"
 
 export type CommentLikeRow = {
   comment_id: string
@@ -60,16 +64,35 @@ export function buildGalleryComments(
   }))
 }
 
+export type CommentSocialLoadResult =
+  | {
+      rows: GalleryCommentRow[]
+      likes: CommentLikeRow[]
+      error: null
+      commentPinAvailable: boolean
+      commentLikesAvailable: boolean
+    }
+  | {
+      rows: []
+      likes: []
+      error: string
+      commentPinAvailable: false
+      commentLikesAvailable: false
+    }
+
 export async function loadGalleryCommentRowsWithSocial(
   supabase: SupabaseClient,
   imageIds: string[],
   viewerId: string | null
-): Promise<
-  | { rows: GalleryCommentRow[]; likes: CommentLikeRow[]; error: null }
-  | { rows: []; likes: []; error: string }
-> {
+): Promise<CommentSocialLoadResult> {
   if (imageIds.length === 0) {
-    return { rows: [], likes: [], error: null }
+    return {
+      rows: [],
+      likes: [],
+      error: null,
+      commentPinAvailable: true,
+      commentLikesAvailable: true,
+    }
   }
 
   const commentResult = await supabase
@@ -78,67 +101,116 @@ export async function loadGalleryCommentRowsWithSocial(
     .in("image_id", imageIds)
     .order("created_at", { ascending: true })
 
-  if (commentResult.error) {
-    if (!isGalleryCommentEditUnavailable(commentResult.error)) {
-      return {
-        rows: [],
-        likes: [],
-        error: formatGallerySupabaseError(commentResult.error),
-      }
-    }
+  let rows: GalleryCommentRow[] = []
+  let commentPinAvailable = true
 
-    const fallback = await supabase
+  if (!commentResult.error) {
+    rows = (commentResult.data ?? []) as GalleryCommentRow[]
+  } else if (isGalleryCommentEditUnavailable(commentResult.error)) {
+    // pinned_at and/or updated_at missing — peel columns until the select works.
+    const withEdit = await supabase
       .from("gallery_comments")
-      .select(
-        "id, image_id, parent_id, body, created_by, created_at, updated_at"
-      )
+      .select(COMMENT_SELECT_WITH_EDIT)
       .in("image_id", imageIds)
       .order("created_at", { ascending: true })
 
-    if (fallback.error) {
+    if (!withEdit.error) {
+      commentPinAvailable = false
+      rows = ((withEdit.data ?? []) as GalleryCommentRow[]).map((row) => ({
+        ...row,
+        pinned_at: null,
+      }))
+    } else if (isGalleryCommentEditUnavailable(withEdit.error)) {
+      commentPinAvailable = false
+      const base = await supabase
+        .from("gallery_comments")
+        .select(COMMENT_SELECT_BASE)
+        .in("image_id", imageIds)
+        .order("created_at", { ascending: true })
+
+      if (base.error) {
+        return {
+          rows: [],
+          likes: [],
+          error: formatGallerySupabaseError(base.error),
+          commentPinAvailable: false,
+          commentLikesAvailable: false,
+        }
+      }
+
+      rows = ((base.data ?? []) as GalleryCommentRow[]).map((row) => ({
+        ...row,
+        updated_at: null,
+        pinned_at: null,
+      }))
+    } else {
       return {
         rows: [],
         likes: [],
-        error: formatGallerySupabaseError(fallback.error),
+        error: formatGallerySupabaseError(withEdit.error),
+        commentPinAvailable: false,
+        commentLikesAvailable: false,
       }
     }
-
-    const rows = ((fallback.data ?? []) as GalleryCommentRow[]).map((row) => ({
-      ...row,
-      updated_at: row.updated_at ?? null,
-      pinned_at: null,
-    }))
-
-    const likes = await loadCommentLikes(
-      supabase,
-      rows.map((row) => row.id)
-    )
-    if (likes.error) {
-      return { rows: [], likes: [], error: likes.error }
+  } else {
+    return {
+      rows: [],
+      likes: [],
+      error: formatGallerySupabaseError(commentResult.error),
+      commentPinAvailable: false,
+      commentLikesAvailable: false,
     }
-
-    return { rows, likes: likes.data, error: null }
   }
 
-  const rows = (commentResult.data ?? []) as GalleryCommentRow[]
   const likes = await loadCommentLikes(
     supabase,
     rows.map((row) => row.id)
   )
   if (likes.error) {
-    return { rows: [], likes: [], error: likes.error }
+    return {
+      rows: [],
+      likes: [],
+      error: likes.error,
+      commentPinAvailable: false,
+      commentLikesAvailable: false,
+    }
   }
 
-  return { rows, likes: likes.data, error: null }
+  return {
+    rows,
+    likes: likes.data,
+    error: null,
+    commentPinAvailable,
+    commentLikesAvailable: likes.available,
+  }
+}
+
+export function isGalleryCommentLikesUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_comment_likes/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
 }
 
 async function loadCommentLikes(
   supabase: SupabaseClient,
   commentIds: string[]
 ): Promise<
-  { data: CommentLikeRow[]; error: null } | { data: []; error: string }
+  | { data: CommentLikeRow[]; error: null; available: boolean }
+  | { data: []; error: string; available: false }
 > {
-  if (commentIds.length === 0) return { data: [], error: null }
+  if (commentIds.length === 0) {
+    return { data: [], error: null, available: true }
+  }
 
   const { data, error } = await supabase
     .from("gallery_comment_likes")
@@ -146,14 +218,19 @@ async function loadCommentLikes(
     .in("comment_id", commentIds)
 
   if (error) {
-    if (
-      error.code === "42P01" ||
-      /gallery_comment_likes/i.test(error.message)
-    ) {
-      return { data: [], error: null }
+    if (isGalleryCommentLikesUnavailable(error)) {
+      return { data: [], error: null, available: false }
     }
-    return { data: [], error: formatGallerySupabaseError(error) }
+    return {
+      data: [],
+      error: formatGallerySupabaseError(error),
+      available: false,
+    }
   }
 
-  return { data: (data ?? []) as CommentLikeRow[], error: null }
+  return {
+    data: (data ?? []) as CommentLikeRow[],
+    error: null,
+    available: true,
+  }
 }

@@ -1,10 +1,16 @@
 "use client"
 
 import { useTransition } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
+import {
+  describeContinueWithKeycloakLabel,
+  describeRedirectingLabel,
+} from "@/lib/gallery/busy-labels"
+import { describeCouldNotStartSignIn } from "@/lib/gallery/validation-toasts"
 
 const NEXT_STORAGE_KEY = "gallery:auth:next"
 
@@ -19,28 +25,43 @@ export function SignInButton({ next }: { next?: string }) {
   const [pending, startTransition] = useTransition()
 
   function onClick() {
+    if (pending) return
     startTransition(async () => {
-      if (typeof window !== "undefined" && next && next.startsWith("/")) {
-        try {
-          sessionStorage.setItem(NEXT_STORAGE_KEY, next)
-        } catch {
-          /* private mode etc — fine, callback just sends to "/" */
+      try {
+        if (typeof window !== "undefined" && next && next.startsWith("/")) {
+          try {
+            sessionStorage.setItem(NEXT_STORAGE_KEY, next)
+          } catch {
+            /* private mode etc — fine, callback just sends to "/" */
+          }
         }
+        const supabase = createClient()
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "keycloak",
+          options: {
+            scopes: "openid",
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        })
+        if (error) {
+          toast.error(error.message || describeCouldNotStartSignIn())
+        }
+      } catch {
+        toast.error(describeCouldNotStartSignIn())
       }
-      const supabase = createClient()
-      await supabase.auth.signInWithOAuth({
-        provider: "keycloak",
-        options: {
-          scopes: "openid",
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
     })
   }
 
   return (
-    <Button onClick={onClick} disabled={pending} className="w-full">
-      {pending ? "Redirecting…" : "Continue with Keycloak"}
+    <Button
+      onClick={onClick}
+      disabled={pending}
+      aria-busy={pending || undefined}
+      className="w-full"
+    >
+      {pending
+        ? describeRedirectingLabel()
+        : describeContinueWithKeycloakLabel()}
     </Button>
   )
 }

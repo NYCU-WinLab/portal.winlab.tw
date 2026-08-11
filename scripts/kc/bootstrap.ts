@@ -43,17 +43,17 @@ type ClientSpec = {
 const CLIENTS: ClientSpec[] = [
   {
     clientId: "winlab-portal-admin",
-    name: "WinLab Portal (admin API)",
+    name: "WinLab admin tooling (write)",
     description:
-      "Service account for portal.winlab.tw — /profile self-service edits and user attribute writes.",
+      "Service account for administrative tooling — `kc import-attributes` and other deliberate writes. NOT used by the deployed portal, which holds a read-only credential (see issue #416).",
     role: "manage-users",
     envPrefix: "KEYCLOAK_ADMIN_CLIENT",
   },
   {
     clientId: "winlab-kc-cli",
-    name: "WinLab Keycloak CLI (read-only)",
+    name: "WinLab Keycloak read-only",
     description:
-      "Read-only service account for local tooling and coding agents. view-users only.",
+      "Read-only service account for local tooling, coding agents, and the deployed portal. view-users only.",
     role: "view-users",
     envPrefix: "KEYCLOAK_CLI_CLIENT",
   },
@@ -468,7 +468,8 @@ async function writeConfigFile(
     "# Managed by `bun run kc bootstrap --apply`; hand-edits to other keys are preserved.",
     "# Two profiles, split by blast radius:",
     "#   KEYCLOAK_CLI_*   — view-users only. Default for local tooling and agents.",
-    "#   KEYCLOAK_ADMIN_* — manage-users. The credential the deployed portal uses.",
+    "#   KEYCLOAK_ADMIN_* — manage-users. Admin tooling only; the deployed portal",
+    "#                      never holds a credential that can write.",
     "",
     ...Object.entries(merged).map(([key, value]) => `${key}=${value}`),
     "",
@@ -485,7 +486,7 @@ async function writeConfigFile(
       )
     }
     report.info(
-      "Remaining manual step: the deployed portal needs KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID and KEYCLOAK_ADMIN_CLIENT_SECRET in its hosting environment — that is outside Keycloak and cannot be provisioned from here."
+      "Remaining manual step: the deployed portal needs KEYCLOAK_URL, KEYCLOAK_REALM, and the READ-ONLY client's id/secret as KEYCLOAK_READ_CLIENT_ID / KEYCLOAK_READ_CLIENT_SECRET in its hosting environment. Never give it the manage-users pair — see issue #416. Hosting env is outside Keycloak and cannot be provisioned from here."
     )
   } catch (err) {
     report.fail(`Could not write ${path}`, describeError(err))

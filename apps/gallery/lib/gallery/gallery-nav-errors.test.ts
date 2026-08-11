@@ -1,0 +1,44 @@
+import { describe, expect, test } from "bun:test"
+
+import {
+  describeGalleryNavError,
+  galleryNavErrors,
+} from "@/lib/gallery/gallery-nav-errors"
+
+describe("describeGalleryNavError", () => {
+  test("returns known soft-fail copy", () => {
+    expect(describeGalleryNavError("closePhoto")).toBe(
+      galleryNavErrors.closePhoto
+    )
+    expect(describeGalleryNavError("openMentionedPhoto")).toBe(
+      "Could not open the mentioned photo."
+    )
+    expect(describeGalleryNavError("refreshGalleryChrome")).toBe(
+      galleryNavErrors.refreshGalleryChrome
+    )
+  })
+
+  test("every nav error key has non-empty copy", () => {
+    for (const key of Object.keys(galleryNavErrors) as Array<
+      keyof typeof galleryNavErrors
+    >) {
+      expect(galleryNavErrors[key].length).toBeGreaterThan(0)
+    }
+  })
+
+  test("keeps a stable minimum key count", () => {
+    expect(Object.keys(galleryNavErrors).length).toBeGreaterThanOrEqual(20)
+  })
+
+  test("covers home and wall soft-fail keys", () => {
+    expect(describeGalleryNavError("openWallHome")).toBe(
+      galleryNavErrors.openWallHome
+    )
+    expect(describeGalleryNavError("signedOutHome")).toBe(
+      galleryNavErrors.signedOutHome
+    )
+    expect(describeGalleryNavError("memoriesToday")).toBe(
+      galleryNavErrors.memoriesToday
+    )
+  })
+})

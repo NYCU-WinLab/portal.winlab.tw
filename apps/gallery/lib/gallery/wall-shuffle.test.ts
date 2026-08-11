@@ -42,6 +42,18 @@ describe("mergeGalleryWallPage", () => {
       "e",
     ])
   })
+
+  test("returns prev copy when incoming is empty or all duplicates", () => {
+    const prev = [{ id: "a" }]
+    const empty = mergeGalleryWallPage(prev, [], false)
+    expect(empty.images).toEqual(prev)
+    expect(empty.images).not.toBe(prev)
+    expect(empty.addedIds).toEqual([])
+
+    const dupes = mergeGalleryWallPage(prev, [{ id: "a" }, { id: "a" }], true)
+    expect(dupes.images.map((i) => i.id)).toEqual(["a"])
+    expect(dupes.addedIds).toEqual([])
+  })
 })
 
 describe("restoreGalleryWallOrder", () => {
@@ -50,5 +62,19 @@ describe("restoreGalleryWallOrder", () => {
     expect(
       restoreGalleryWallOrder(images, ["a", "b", "c"]).map((i) => i.id)
     ).toEqual(["a", "b", "c"])
+  })
+
+  test("skips unknown ids and appends leftovers", () => {
+    const images = [{ id: "a" }, { id: "b" }, { id: "c" }]
+    expect(
+      restoreGalleryWallOrder(images, ["b", "missing", "b"]).map((i) => i.id)
+    ).toEqual(["b", "a", "c"])
+  })
+
+  test("empty images or empty order", () => {
+    expect(restoreGalleryWallOrder([], ["a", "b"])).toEqual([])
+    expect(
+      restoreGalleryWallOrder([{ id: "a" }, { id: "b" }], []).map((i) => i.id)
+    ).toEqual(["a", "b"])
   })
 })

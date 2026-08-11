@@ -8,6 +8,7 @@ import { GalleryHeaderPitchline } from "@/components/gallery-header-pitchline"
 import { GalleryHeaderSeasonal } from "@/components/gallery-header-seasonal"
 import { GalleryHeaderWaterline } from "@/components/gallery-header-waterline"
 import { GalleryZongziSeeds } from "@/components/gallery-zongzi-seeds"
+import { GalleryJumpToTop } from "@/app/_components/gallery-jump-to-top"
 import { GalleryPaperParallax } from "@/app/_components/gallery-paper-parallax"
 import {
   GalleryBrandMark,
@@ -20,13 +21,18 @@ import {
   GalleryShellNav,
   type GalleryShellActive,
 } from "@/components/gallery-shell-nav"
-import type { GalleryNotification } from "@/lib/gallery/notifications"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import { isGalleryMemoriesReady } from "@/lib/gallery/load-memories"
+import {
+  isGalleryNotificationsReady,
+  loadUnreadGalleryNotifications,
+  type GalleryNotification,
+} from "@/lib/gallery/notifications"
 import {
   GALLERY_SEASONAL_THEMES,
   type GallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { getGallerySeasonalThemeId } from "@/lib/gallery/settings"
-import { loadUnreadGalleryNotifications } from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -39,6 +45,9 @@ export function GalleryShell({
   viewerId = null,
   seasonalThemeId = null,
   mentionNotifications = [],
+  albumsAvailable = true,
+  memoriesAvailable = true,
+  notificationsAvailable = true,
   containerClassName,
 }: {
   children: ReactNode
@@ -47,6 +56,9 @@ export function GalleryShell({
   viewerId?: string | null
   seasonalThemeId?: GallerySeasonalThemeId | null
   mentionNotifications?: GalleryNotification[]
+  albumsAvailable?: boolean
+  memoriesAvailable?: boolean
+  notificationsAvailable?: boolean
   containerClassName?: string
 }) {
   const theme = seasonalThemeId
@@ -98,6 +110,9 @@ export function GalleryShell({
                 signedIn={signedIn}
                 viewerId={viewerId}
                 mentionNotifications={mentionNotifications}
+                albumsAvailable={albumsAvailable}
+                memoriesAvailable={memoriesAvailable}
+                notificationsAvailable={notificationsAvailable}
               />
             </div>
           </div>
@@ -106,8 +121,11 @@ export function GalleryShell({
         {seasonalThemeId === "world-cup" ? <GalleryHeaderPitchline /> : null}
       </header>
       <main
+        id="gallery-main"
+        tabIndex={-1}
         className={cn(
           "gallery-shell-main relative z-10 mx-auto w-full max-w-6xl overflow-x-clip px-4 pb-10 sm:px-6",
+          "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
           containerClassName
         )}
       >
@@ -118,6 +136,7 @@ export function GalleryShell({
       </main>
       {seasonalThemeId === "dragon-boat" ? <GalleryZongziSeeds /> : null}
       {seasonalThemeId === "world-cup" ? <GalleryFootballSeeds /> : null}
+      <GalleryJumpToTop />
     </div>
   )
 }
@@ -135,11 +154,20 @@ export async function GalleryThemedShell({
 }) {
   const supabase = await createClient()
   const user = await getCurrentUser()
-  const [seasonalThemeId, mentionNotifications] = await Promise.all([
+  const [
+    seasonalThemeId,
+    mentionNotifications,
+    albumsAvailable,
+    memoriesAvailable,
+    notificationsAvailable,
+  ] = await Promise.all([
     getGallerySeasonalThemeId(supabase),
     user
       ? loadUnreadGalleryNotifications(supabase, user.id)
       : Promise.resolve([]),
+    isGalleryAlbumsReady(supabase),
+    isGalleryMemoriesReady(supabase),
+    isGalleryNotificationsReady(supabase),
   ])
 
   return (
@@ -148,7 +176,10 @@ export async function GalleryThemedShell({
       signedIn={Boolean(user)}
       viewerId={user?.id ?? null}
       seasonalThemeId={seasonalThemeId}
-      mentionNotifications={mentionNotifications}
+      mentionNotifications={notificationsAvailable ? mentionNotifications : []}
+      albumsAvailable={albumsAvailable}
+      memoriesAvailable={memoriesAvailable}
+      notificationsAvailable={notificationsAvailable}
       containerClassName={containerClassName}
     >
       {children}

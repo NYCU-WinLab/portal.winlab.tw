@@ -13,6 +13,11 @@ import {
   type GalleryReaction,
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
+import { describeChooseReactionAriaLabel } from "@/lib/gallery/reaction-wall-labels"
+import { describeReactTriggerAriaLabel } from "@/lib/gallery/reaction-trigger-label"
+import { shouldOpenReactionFromSignal } from "@/lib/gallery/keyboard-hint-labels"
+import { shouldStopLightboxEscape } from "@/lib/gallery/reaction-escape"
+import { nextRadioIndex } from "@/lib/gallery/radio-nav"
 
 const HOVER_SHOW_MS = 400
 const HOVER_HIDE_MS = 250
@@ -29,11 +34,17 @@ export function ReactionBar({
   counts,
   myReaction,
   canReact,
+  busy = false,
+  openSignal = 0,
   onReact,
 }: {
   counts: ReactionCounts
   myReaction: GalleryReaction | null
   canReact: boolean
+  /** True while a reaction mutation is in flight. */
+  busy?: boolean
+  /** Increment to open the picker from an external keyboard shortcut. */
+  openSignal?: number
   onReact: (reaction: GalleryReaction) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -41,6 +52,7 @@ export function ReactionBar({
     useState<GalleryReaction | null>(null)
 
   const zoneRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const hoverShowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,6 +100,7 @@ export function ReactionBar({
     activePointerId.current = null
     setHoveredReaction(null)
     setPickerOpen(false)
+    queueMicrotask(() => triggerRef.current?.focus())
   }, [clearHoverShow, clearHoverHide, clearLongPress])
 
   const scheduleClose = useCallback(() => {
@@ -101,11 +114,12 @@ export function ReactionBar({
 
   const pickReaction = useCallback(
     (reaction: GalleryReaction) => {
+      if (busy || !canReact) return
       onReact(reaction)
       closePicker()
       suppressClick.current = true
     },
-    [closePicker, onReact]
+    [busy, canReact, closePicker, onReact]
   )
 
   useEffect(() => {
@@ -137,15 +151,104 @@ export function ReactionBar({
     }
 
     document.addEventListener("pointerdown", onDocPointerDown, true)
-    return () => document.removeEventListener("pointerdown", onDocPointerDown, true)
+    return () =>
+      document.removeEventListener("pointerdown", onDocPointerDown, true)
   }, [pickerOpen, closePicker])
 
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && shouldStopLightboxEscape(pickerOpen)) {
+        event.preventDefault()
+        event.stopPropagation()
+        closePicker()
+        return
+      }
+
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault()
+        event.stopPropagation()
+        const reaction =
+          hoveredReaction ?? myReaction ?? GALLERY_REACTIONS[0] ?? null
+        if (reaction) pickReaction(reaction)
+        return
+      }
+
+      const navKey =
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "Home" ||
+        event.key === "End"
+          ? event.key
+          : null
+      if (!navKey) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const current =
+        hoveredReaction != null
+          ? GALLERY_REACTIONS.indexOf(hoveredReaction)
+          : myReaction
+            ? GALLERY_REACTIONS.indexOf(myReaction)
+            : 0
+      const next = nextRadioIndex(
+        current < 0 ? 0 : current,
+        GALLERY_REACTIONS.length,
+        navKey
+      )
+      const reaction = GALLERY_REACTIONS[next]
+      if (!reaction) return
+      setHoveredReaction(reaction)
+      const button = zoneRef.current?.querySelector<HTMLButtonElement>(
+        `[data-reaction="${reaction}"]`
+      )
+      button?.focus()
+    }
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [pickerOpen, closePicker, hoveredReaction, myReaction, pickReaction])
+
+  const focusReactionButton = (reaction: GalleryReaction) => {
+    queueMicrotask(() => {
+      const button = zoneRef.current?.querySelector<HTMLButtonElement>(
+        `[data-reaction="${reaction}"]`
+      )
+      button?.focus()
+    })
+  }
+
+  const openPickerFromKeyboard = () => {
+    if (!canReact || busy) return
+    openPicker()
+    const reaction = myReaction ?? GALLERY_REACTIONS[0]
+    if (reaction) {
+      setHoveredReaction(reaction)
+      focusReactionButton(reaction)
+    }
+  }
+
+  const openSignalSeen = useRef(0)
+  useEffect(() => {
+    if (!shouldOpenReactionFromSignal(openSignalSeen.current, openSignal)) {
+      return
+    }
+    openSignalSeen.current = openSignal
+    if (!canReact || busy) return
+    openPicker()
+    const reaction = myReaction ?? GALLERY_REACTIONS[0]
+    if (!reaction) return
+    setHoveredReaction(reaction)
+    queueMicrotask(() => {
+      zoneRef.current
+        ?.querySelector<HTMLButtonElement>(`[data-reaction="${reaction}"]`)
+        ?.focus()
+    })
+  }, [openSignal, canReact, busy, myReaction, openPicker])
+
   const onZoneEnter = (e: React.PointerEvent) => {
-    if (
-      !canReact ||
-      e.pointerType === "touch" ||
-      touchAwaitingPick.current
-    )
+    if (!canReact || e.pointerType === "touch" || touchAwaitingPick.current)
       return
     clearHoverHide()
     clearHoverShow()
@@ -226,7 +329,7 @@ export function ReactionBar({
   }
 
   const onTriggerClick = () => {
-    if (!canReact || suppressClick.current) {
+    if (!canReact || busy || suppressClick.current) {
       suppressClick.current = false
       return
     }
@@ -243,7 +346,7 @@ export function ReactionBar({
   return (
     <div
       ref={zoneRef}
-      className="relative shrink-0 touch-manipulation select-none [-webkit-touch-callout:none] not-italic"
+      className="relative shrink-0 touch-manipulation not-italic select-none [-webkit-touch-callout:none]"
       onPointerEnter={onZoneEnter}
       onPointerLeave={onZoneLeave}
       onPointerDown={onZonePointerDown}
@@ -253,10 +356,10 @@ export function ReactionBar({
     >
       <div
         role="menu"
-        aria-label="Choose a reaction"
+        aria-label={describeChooseReactionAriaLabel()}
         aria-hidden={!pickerOpen}
         className={cn(
-          "absolute right-0 bottom-full z-20 mb-1 flex select-none items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg",
+          "absolute right-0 bottom-full z-20 mb-1 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-1 shadow-lg select-none",
           "transition-all duration-200 ease-out",
           pickerOpen
             ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
@@ -275,7 +378,8 @@ export function ReactionBar({
               type="button"
               role="menuitem"
               data-reaction={reaction}
-              disabled={!canReact}
+              disabled={!canReact || busy}
+              aria-busy={busy || undefined}
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => {
                 if (e.pointerType !== "touch" || !pickerOpen) return
@@ -297,10 +401,8 @@ export function ReactionBar({
               }
               aria-pressed={active}
               className={cn(
-                "flex select-none items-center justify-center rounded-full transition-transform",
-                reaction === "point"
-                  ? "h-11 w-[3.25rem] px-1"
-                  : "h-11 w-11",
+                "flex items-center justify-center rounded-full transition-transform select-none",
+                reaction === "point" ? "h-11 w-[3.25rem] px-1" : "h-11 w-11",
                 (active || highlighted) && "scale-125 bg-foreground/10"
               )}
             >
@@ -314,21 +416,34 @@ export function ReactionBar({
       </div>
 
       <button
+        ref={triggerRef}
         type="button"
-        disabled={!canReact}
+        disabled={!canReact || busy}
+        aria-busy={busy || undefined}
         onClick={onTriggerClick}
         onContextMenu={(e) => e.preventDefault()}
-        aria-label={
-          myReaction
-            ? `Your reaction ${REACTION_EMOJI[myReaction]}. Hold or hover for more`
-            : "React. Hold or hover for more"
-        }
+        onKeyDown={(event) => {
+          if (!canReact || busy || pickerOpen) return
+          if (
+            event.key === "ArrowUp" ||
+            (event.key === "Enter" && event.altKey)
+          ) {
+            event.preventDefault()
+            openPickerFromKeyboard()
+          }
+        }}
+        aria-expanded={pickerOpen}
+        aria-haspopup="menu"
+        aria-pressed={Boolean(myReaction)}
+        aria-label={describeReactTriggerAriaLabel(
+          myReaction ? REACTION_EMOJI[myReaction] : null
+        )}
         className={cn(
-          "inline-flex select-none items-center gap-1 rounded-full border px-2.5 py-1 transition-colors",
+          "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors select-none",
           myReaction
             ? "border-foreground/20 bg-foreground/10 text-foreground"
             : "border-foreground/20 bg-background/80 text-foreground hover:bg-foreground/10",
-          !canReact && "cursor-not-allowed opacity-70"
+          (!canReact || busy) && "cursor-not-allowed opacity-70"
         )}
       >
         <ReactionGlyph

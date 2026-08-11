@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import {
@@ -17,6 +17,12 @@ import {
 import { Button } from "@workspace/ui/components/button"
 
 import { deleteGalleryImage } from "@/app/upload/actions"
+import { describeArtworkDeleted } from "@/lib/gallery/delete-toast"
+import {
+  describeCancelLabel,
+  describeDeleteLabel,
+} from "@/lib/gallery/dialog-action-labels"
+import { describeDeletingLabel } from "@/lib/gallery/media-health-toast"
 
 export function DeleteButton({
   id,
@@ -30,12 +36,29 @@ export function DeleteButton({
   name: string
 }) {
   const [pending, startTransition] = useTransition()
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  function onOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
+  }
 
   function onConfirm() {
+    if (pending) return
     startTransition(async () => {
       const result = await deleteGalleryImage(id, imagePath, posterPath)
       if (result.ok) {
-        toast.success(`Deleted "${name}"`)
+        if (result.warning) {
+          toast.warning(describeArtworkDeleted(name), {
+            description: result.warning,
+          })
+        } else {
+          toast.success(describeArtworkDeleted(name))
+        }
+        onOpenChange(false)
       } else {
         toast.error(result.error)
       }
@@ -43,17 +66,20 @@ export function DeleteButton({
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="ghost"
           disabled={pending}
+          aria-busy={pending || undefined}
+          aria-label={`Delete ${name}`}
           className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
         >
           Delete
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent aria-busy={pending || undefined}>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{name}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -62,8 +88,16 @@ export function DeleteButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Delete</AlertDialogAction>
+          <AlertDialogCancel disabled={pending}>
+            {describeCancelLabel()}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            disabled={pending}
+            aria-busy={pending || undefined}
+            onClick={onConfirm}
+          >
+            {pending ? describeDeletingLabel() : describeDeleteLabel()}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

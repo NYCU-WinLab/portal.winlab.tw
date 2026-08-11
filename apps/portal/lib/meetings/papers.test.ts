@@ -7,7 +7,9 @@ import {
   type PaperAssignment,
 } from "./papers"
 
-function assign(partial: Partial<PaperAssignment> & { meetingId: string }): PaperAssignment {
+function assign(
+  partial: Partial<PaperAssignment> & { meetingId: string }
+): PaperAssignment {
   return {
     scheduledDate: "2026-01-01",
     presenter: "someone",
@@ -17,7 +19,9 @@ function assign(partial: Partial<PaperAssignment> & { meetingId: string }): Pape
   }
 }
 
-const opts = (o: Partial<Parameters<typeof paperAvailabilityForMeeting>[2]> = {}) => ({
+const opts = (
+  o: Partial<Parameters<typeof paperAvailabilityForMeeting>[2]> = {}
+) => ({
   forDate: "2026-07-10",
   presenterUserId: "me",
   currentMeetingId: "current",
@@ -32,11 +36,19 @@ describe("addDays", () => {
 
 describe("paperAvailabilityForMeeting — cooldown", () => {
   it("is available when nothing else holds the paper", () => {
-    expect(paperAvailabilityForMeeting("paper-1", [], opts()).available).toBe(true)
+    expect(paperAvailabilityForMeeting("paper-1", [], opts()).available).toBe(
+      true
+    )
   })
 
   it("blocks a paper presented less than 365 days earlier", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-04-01", presenterUserId: "other" })]
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-04-01",
+        presenterUserId: "other",
+      }),
+    ]
     const r = paperAvailabilityForMeeting("paper-1", a, opts())
     expect(r.available).toBe(false)
     expect(r.reason).toBe("cooldown")
@@ -44,48 +56,110 @@ describe("paperAvailabilityForMeeting — cooldown", () => {
   })
 
   it("frees the paper at exactly 365 days (half-open window)", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-07-01", presenterUserId: "other" })]
-    const at365 = paperAvailabilityForMeeting("paper-1", a, opts({ forDate: "2027-07-01" }))
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-07-01",
+        presenterUserId: "other",
+      }),
+    ]
+    const at365 = paperAvailabilityForMeeting(
+      "paper-1",
+      a,
+      opts({ forDate: "2027-07-01" })
+    )
     expect(at365.available).toBe(true)
-    const at364 = paperAvailabilityForMeeting("paper-1", a, opts({ forDate: "2027-06-30" }))
+    const at364 = paperAvailabilityForMeeting(
+      "paper-1",
+      a,
+      opts({ forDate: "2027-06-30" })
+    )
     expect(at364.available).toBe(false)
   })
 
   it("blocks a future booking within the window too (symmetric)", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-09-01", presenterUserId: "other" })]
-    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(false)
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-09-01",
+        presenterUserId: "other",
+      }),
+    ]
+    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(
+      false
+    )
   })
 
   it("does not block a meeting against its own current pick", () => {
-    const a = [assign({ meetingId: "current", scheduledDate: "2026-07-10", presenterUserId: "me" })]
-    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(true)
+    const a = [
+      assign({
+        meetingId: "current",
+        scheduledDate: "2026-07-10",
+        presenterUserId: "me",
+      }),
+    ]
+    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(
+      true
+    )
   })
 
   it("reports the latest blocker's release date when several exist", () => {
     const a = [
-      assign({ meetingId: "m1", scheduledDate: "2026-05-01", presenterUserId: "a" }),
-      assign({ meetingId: "m2", scheduledDate: "2026-06-01", presenterUserId: "b" }),
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-05-01",
+        presenterUserId: "a",
+      }),
+      assign({
+        meetingId: "m2",
+        scheduledDate: "2026-06-01",
+        presenterUserId: "b",
+      }),
     ]
-    expect(paperAvailabilityForMeeting("paper-1", a, opts()).cooldownUntil).toBe("2027-06-01")
+    expect(
+      paperAvailabilityForMeeting("paper-1", a, opts()).cooldownUntil
+    ).toBe("2027-06-01")
   })
 })
 
 describe("paperAvailabilityForMeeting — self-repeat", () => {
   it("blocks the same student forever, even outside the cooldown window", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2020-01-01", presenterUserId: "me" })]
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2020-01-01",
+        presenterUserId: "me",
+      }),
+    ]
     const r = paperAvailabilityForMeeting("paper-1", a, opts())
     expect(r.available).toBe(false)
     expect(r.reason).toBe("self-repeat")
   })
 
   it("lets a different student pick it once the cooldown has passed", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2020-01-01", presenterUserId: "someone-else" })]
-    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(true)
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2020-01-01",
+        presenterUserId: "someone-else",
+      }),
+    ]
+    expect(paperAvailabilityForMeeting("paper-1", a, opts()).available).toBe(
+      true
+    )
   })
 
   it("prefers the self-repeat reason over cooldown", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-06-01", presenterUserId: "me" })]
-    expect(paperAvailabilityForMeeting("paper-1", a, opts()).reason).toBe("self-repeat")
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-06-01",
+        presenterUserId: "me",
+      }),
+    ]
+    expect(paperAvailabilityForMeeting("paper-1", a, opts()).reason).toBe(
+      "self-repeat"
+    )
   })
 })
 
@@ -98,7 +172,13 @@ describe("paperCooldownStatus", () => {
   })
 
   it("is on cooldown when presented recently, and reports the release date", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-07-01", presenter: "昱宏" })]
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-07-01",
+        presenter: "昱宏",
+      }),
+    ]
     const s = paperCooldownStatus("paper-1", a, today)
     expect(s.inCooldown).toBe(true)
     expect(s.cooldownUntil).toBe("2027-07-01")
@@ -106,7 +186,13 @@ describe("paperCooldownStatus", () => {
   })
 
   it("ignores assignments for other papers", () => {
-    const a = [assign({ meetingId: "m1", scheduledDate: "2026-07-01", teacherPaperId: "paper-2" })]
+    const a = [
+      assign({
+        meetingId: "m1",
+        scheduledDate: "2026-07-01",
+        teacherPaperId: "paper-2",
+      }),
+    ]
     expect(paperCooldownStatus("paper-1", a, today).inCooldown).toBe(false)
   })
 })

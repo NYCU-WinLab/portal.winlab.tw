@@ -1,5 +1,7 @@
 "use client"
 
+import { toast } from "sonner"
+
 import { registerGalleryImage } from "@/app/upload/actions"
 import {
   describeUploadFailure,
@@ -19,6 +21,7 @@ import {
   GALLERY_STORAGE_MAX_BYTES,
   resolveStorageExtension,
 } from "@/lib/gallery/upload-path"
+import { extractTakenAtFromFile } from "@/lib/gallery/extract-taken-at-client"
 import { resolveMediaMimeType, type ResolvedMime } from "@/lib/gallery/mime"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -63,6 +66,7 @@ type UploadCtx = {
   labelPrefix: string
   sequenceId: string | null
   sequenceIndex: number | null
+  tagNames?: string[]
   signal?: AbortSignal
 }
 
@@ -115,6 +119,9 @@ async function registerOrCleanup(
     const stage = stageFromRegisterError(result.error)
     throw new UploadFailureError(stage, result.error)
   }
+  if (result.warning) {
+    toast.warning(result.warning)
+  }
   return result.id
 }
 
@@ -156,6 +163,14 @@ export async function uploadImageFile(
 
   setStatus({
     kind: "working",
+    label: `${labelPrefix}Reading capture time`,
+    ratio: 0.15,
+  })
+  const takenAt = await extractTakenAtFromFile(file)
+  throwIfAborted(signal)
+
+  setStatus({
+    kind: "working",
     label: `${labelPrefix}Uploading ${file.name}`,
     ratio: 0.4,
   })
@@ -180,6 +195,8 @@ export async function uploadImageFile(
     mediaType: "image",
     sequenceId,
     sequenceIndex,
+    tagNames: ctx.tagNames,
+    takenAt,
   })
 }
 
@@ -298,6 +315,7 @@ export async function uploadVideoFile(ctx: UploadCtx): Promise<string> {
     durationSeconds: compressed.durationSeconds,
     sequenceId,
     sequenceIndex,
+    tagNames: ctx.tagNames,
   })
 }
 
@@ -306,6 +324,9 @@ export type RunUploadOptions = {
   baseName: string
   setStatus: (s: UploadStatus) => void
   signal: AbortSignal
+  tagNames?: string[]
+  /** When false, multi-file uploads stay independent singles. */
+  sequencesAvailable?: boolean
   /** When retrying, preserve prior sequence metadata per file. */
   sequenceMeta?: Array<{
     sequenceId: string | null
@@ -318,6 +339,8 @@ export async function runGalleryUpload({
   baseName,
   setStatus,
   signal,
+  tagNames,
+  sequencesAvailable = true,
   sequenceMeta,
 }: RunUploadOptions): Promise<UploadRunResult> {
   const supabase = createClient()
@@ -334,7 +357,9 @@ export async function runGalleryUpload({
   let cancelled = false
 
   const sharedSequenceId =
-    !sequenceMeta && files.length > 1 ? crypto.randomUUID() : null
+    sequencesAvailable && !sequenceMeta && files.length > 1
+      ? crypto.randomUUID()
+      : null
 
   for (let i = 0; i < files.length; i++) {
     if (signal.aborted) {
@@ -401,6 +426,7 @@ export async function runGalleryUpload({
           labelPrefix,
           sequenceId,
           sequenceIndex,
+          tagNames,
           signal,
         })
       } else {
@@ -413,6 +439,7 @@ export async function runGalleryUpload({
           labelPrefix,
           sequenceId,
           sequenceIndex,
+          tagNames,
           signal,
         })
       }

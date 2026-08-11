@@ -58,6 +58,22 @@ export function isGalleryMentionReadAtUnavailable(
   )
 }
 
+/** True when gallery_comment_mentions is missing from the schema cache. */
+export function isGalleryMentionsTableUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    (/gallery_comment_mentions/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
 export async function loadUnreadGalleryMentions(
   supabase: SupabaseClient,
   userId: string
@@ -69,7 +85,12 @@ export async function loadUnreadGalleryMentions(
     .is("read_at", null)
 
   if (error) {
-    if (isGalleryMentionReadAtUnavailable(error)) return []
+    if (
+      isGalleryMentionReadAtUnavailable(error) ||
+      isGalleryMentionsTableUnavailable(error)
+    ) {
+      return []
+    }
     console.error("[gallery] failed to load mention notifications", error)
     return []
   }
