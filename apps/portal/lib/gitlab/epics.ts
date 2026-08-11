@@ -37,31 +37,60 @@ export function deliverablesFromLabels(
   ) as Deliverable[]
 }
 
-/**
- * What a meeting owes, read off the issues linked under its epic.
- *
- * Unlike the picker, this does NOT skip confidential issues. The picker hides
- * them because it would print their titles; this reads only which of four
- * fixed, publicly-known label values appear anywhere under the epic, and the
- * result names no issue. Skipping them would instead drop a real deliverable
- * from the meeting's own summary — wrong in the direction that matters here.
- */
-export function deliverablesFromIssues(body: unknown): Deliverable[] {
-  if (!Array.isArray(body)) return []
-  const labels = body.flatMap((row) =>
-    typeof row === "object" &&
-    row !== null &&
-    Array.isArray((row as { labels?: unknown }).labels)
-      ? ((row as { labels: unknown[] }).labels.filter(
-          (l): l is string => typeof l === "string"
-        ) as string[])
-      : []
-  )
-  return deliverablesFromLabels(labels)
+/** One issue under an epic, reduced to what the booking form shows. */
+export interface EpicIssue {
+  /**
+   * Null when the issue is confidential.
+   *
+   * The deliverable still counts — it's one of four fixed, publicly-known
+   * label values and naming it discloses nothing — but the title is the
+   * issue's actual content and stays behind the same fail-closed rule the
+   * epic picker uses. So a confidential issue contributes "this meeting owes
+   * a 投影片" without contributing what the 投影片 is about.
+   */
+  title: string | null
+  deliverables: Deliverable[]
+}
+
+function labelsOf(row: unknown): string[] {
+  if (typeof row !== "object" || row === null) return []
+  const labels = (row as { labels?: unknown }).labels
+  return Array.isArray(labels)
+    ? labels.filter((l): l is string => typeof l === "string")
+    : []
 }
 
 /**
- * Whether an epic may be shown in the picker.
+ * The issues under an epic that owe something, newest-first as GitLab
+ * returned them.
+ *
+ * Issues with no `Deliverable::*` label are dropped: they're work under the
+ * epic, not deliverables of the meeting.
+ */
+export function readEpicIssues(body: unknown): EpicIssue[] {
+  if (!Array.isArray(body)) return []
+  return body
+    .map((row): EpicIssue | null => {
+      const deliverables = deliverablesFromLabels(labelsOf(row))
+      if (deliverables.length === 0) return null
+
+      const raw = row as { title?: unknown; confidential?: unknown }
+      const title =
+        isPublicItem(raw) && typeof raw.title === "string" && raw.title.trim()
+          ? raw.title.trim()
+          : null
+      return { title, deliverables }
+    })
+    .filter((issue): issue is EpicIssue => issue !== null)
+}
+
+/** Every deliverable an epic's issues carry, de-duplicated and canonical. */
+export function deliverablesOf(issues: readonly EpicIssue[]): Deliverable[] {
+  return deliverablesFromLabels(issues.flatMap((i) => i.deliverables))
+}
+
+/**
+ * Whether an epic's or issue's own text may be shown.
  *
  * Fail-closed, and deliberately not "exclude the ones marked true": the token
  * this is read with can see confidential epics, and confidential is also the
@@ -71,7 +100,7 @@ export function deliverablesFromIssues(body: unknown): Deliverable[] {
  * treated as confidential. The cost of being wrong in this direction is a
  * shorter list; the other direction has no floor.
  */
-export function isPublicEpic(raw: { confidential?: unknown }): boolean {
+export function isPublicItem(raw: { confidential?: unknown }): boolean {
   return raw.confidential === false
 }
 
@@ -90,7 +119,7 @@ interface RawEpic {
  * group shouldn't take the whole picker down with it.
  */
 export function readEpic(raw: RawEpic): GitLabEpic | null {
-  if (!isPublicEpic(raw)) return null
+  if (!isPublicItem(raw)) return null
 
   const iid = typeof raw.iid === "number" ? raw.iid : Number(raw.iid)
   if (!Number.isInteger(iid) || iid <= 0) return null

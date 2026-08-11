@@ -5,7 +5,10 @@ import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import type { EpicDeliverablesResult } from "@/lib/gitlab/client"
+import type { EpicIssue } from "@/lib/gitlab/epics"
 import { DELIVERABLES } from "@/lib/rooms/deliverables"
+
+const LABELS = new Map(DELIVERABLES.map((d) => [d.value, d]))
 
 /**
  * What this meeting is expected to produce — read-only, on purpose.
@@ -15,6 +18,10 @@ import { DELIVERABLES } from "@/lib/rooms/deliverables"
  * labelled with. A meeting with no epic is ad-hoc and owes nothing — as
  * N0Ball put it, a meeting with a deliverable isn't ad-hoc — so a tick box on
  * an unlinked booking would create a state the model doesn't have.
+ *
+ * Listed one row per issue rather than as a bare set of badges. "投影片" alone
+ * says a slide deck is owed; "投影片 · 月會進度報告 (2026-08)" says which one,
+ * which is the difference between a label and a commitment someone can act on.
  *
  * Every empty case says which empty it is. "No deliverables" first shipped as
  * one message covering a read that failed, an epic with no issues, and issues
@@ -31,27 +38,33 @@ export function DeliverablesField({
   /** Whether an epic is picked, which decides what "none" means. */
   hasEpic?: boolean
 }) {
-  const values = result?.status === "ok" ? result.deliverables : []
-  const chosen = DELIVERABLES.filter((d) => values.includes(d.value))
+  const issues = result?.status === "ok" ? result.issues : []
 
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs">交付物</Label>
       {loading ? (
-        <Skeleton className="h-5 w-32" />
-      ) : chosen.length > 0 ? (
+        <Skeleton className="h-5 w-40" />
+      ) : issues.length > 0 ? (
         <>
-          <div className="flex flex-wrap gap-1.5">
-            {chosen.map((d) => (
-              <Badge
-                key={d.value}
-                variant="secondary"
-                title={d.hint || undefined}
-              >
-                {d.label}
-              </Badge>
+          <ul className="flex flex-col gap-1.5">
+            {issues.map((issue, i) => (
+              <li key={i} className="flex flex-wrap items-center gap-1.5">
+                {issue.deliverables.map((value) => (
+                  <Badge
+                    key={value}
+                    variant="secondary"
+                    title={LABELS.get(value)?.hint || undefined}
+                  >
+                    {LABELS.get(value)?.label ?? value}
+                  </Badge>
+                ))}
+                <span className="text-xs text-muted-foreground">
+                  {issueLabel(issue)}
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
           <p className="text-xs text-muted-foreground">
             來自這個 epic 底下 issue 的 Deliverable 標籤,要改請改 GitLab。
           </p>
@@ -63,6 +76,14 @@ export function DeliverablesField({
       )}
     </div>
   )
+}
+
+/**
+ * A confidential issue still shows what it owes, but not what it is — the
+ * same fail-closed rule the epic picker uses, applied one level down.
+ */
+function issueLabel(issue: EpicIssue): string {
+  return issue.title ?? "(不公開的 issue)"
 }
 
 function emptyReason(

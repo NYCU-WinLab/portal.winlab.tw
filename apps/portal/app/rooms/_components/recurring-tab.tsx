@@ -140,25 +140,27 @@ export function RecurringTab() {
           onSuffixChange={setTitleSuffix}
         />
 
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs">與會人員</Label>
+          <AttendeeSelect
+            users={labUsers ?? []}
+            groups={
+              groupsQuery.data?.status === "ok" ? groupsQuery.data.groups : []
+            }
+            value={attendees}
+            onChange={setAttendees}
+            advisorIncluded={includeAdvisor}
+            onAdvisorIncludedChange={setIncludeAdvisor}
+            onGroupPicked={(group) => setGroupName(group.name)}
+          />
+        </div>
+
         <EpicField
           id="recurring-epic"
           epics={epicsQuery.data}
           value={epic?.iid ?? null}
           onChange={handleEpicChange}
         />
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="recurring-agenda" className="text-xs">
-            討論事項（可不填）
-          </Label>
-          <Textarea
-            id="recurring-agenda"
-            value={agenda}
-            onChange={(e) => setAgenda(e.target.value)}
-            placeholder="每次會議固定要討論的事項"
-            rows={3}
-          />
-        </div>
 
         <DeliverablesField
           result={deliverablesQuery.data}
@@ -243,17 +245,15 @@ export function RecurringTab() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">與會人員</Label>
-          <AttendeeSelect
-            users={labUsers ?? []}
-            groups={
-              groupsQuery.data?.status === "ok" ? groupsQuery.data.groups : []
-            }
-            value={attendees}
-            onChange={setAttendees}
-            advisorIncluded={includeAdvisor}
-            onAdvisorIncludedChange={setIncludeAdvisor}
-            onGroupPicked={(group) => setGroupName(group.name)}
+          <Label htmlFor="recurring-agenda" className="text-xs">
+            討論事項（可不填）
+          </Label>
+          <Textarea
+            id="recurring-agenda"
+            value={agenda}
+            onChange={(e) => setAgenda(e.target.value)}
+            placeholder="每次會議固定要討論的事項"
+            rows={3}
           />
         </div>
 

@@ -10,7 +10,13 @@
 
 import "server-only"
 
-import { deliverablesFromIssues, readEpics, type GitLabEpic } from "./epics"
+import {
+  deliverablesOf,
+  readEpicIssues,
+  readEpics,
+  type EpicIssue,
+  type GitLabEpic,
+} from "./epics"
 import type { Deliverable } from "@/lib/rooms/deliverables"
 
 const DEFAULT_BASE_URL = "https://gitlab.winlab.tw"
@@ -135,11 +141,14 @@ export async function fetchEpic(
 export type EpicDeliverablesResult =
   | {
       status: "ok"
+      /** The union, for storing and forwarding to the pipeline. */
       deliverables: Deliverable[]
+      /** Per-issue, for showing a person which issue owes which thing. */
+      issues: EpicIssue[]
       /**
-       * How many issues GitLab returned. Zero with `status: "ok"` says the
-       * epic has no child issues at all, which is a different fix from
-       * "it has issues and none of them are labelled".
+       * How many issues GitLab returned, labelled or not. Zero with
+       * `status: "ok"` says the epic has no child issues at all, which is a
+       * different fix from "it has issues and none of them are labelled".
        */
       issueCount: number
     }
@@ -165,9 +174,11 @@ export async function fetchEpicDeliverables(
   )
   if (!read.ok) return { status: "error", detail: read.detail }
 
+  const issues = readEpicIssues(read.body)
   return {
     status: "ok",
-    deliverables: deliverablesFromIssues(read.body),
+    deliverables: deliverablesOf(issues),
+    issues,
     issueCount: Array.isArray(read.body) ? read.body.length : 0,
   }
 }
