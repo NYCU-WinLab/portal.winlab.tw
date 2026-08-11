@@ -56,8 +56,8 @@ export function MemoriesPhotoCard({
       >
         <div
           className={cn(
-            "relative overflow-hidden bg-[#f7f7f5] p-3 pb-10 shadow-[0_18px_40px_-28px_rgba(24,24,27,0.55)] ring-1 ring-zinc-900/8 transition duration-300",
-            "group-hover:-translate-y-0.5 group-hover:shadow-[0_22px_44px_-24px_rgba(24,24,27,0.6)]"
+            "relative overflow-hidden bg-[#f7f7f5] p-3 pb-10 shadow-[0_1px_2px_rgba(24,24,27,0.05),0_6px_16px_-10px_rgba(24,24,27,0.2)] ring-1 ring-zinc-900/8 transition duration-300",
+            "group-hover:-translate-y-0.5 group-hover:shadow-[0_2px_4px_rgba(24,24,27,0.06),0_10px_22px_-12px_rgba(24,24,27,0.26)]"
           )}
         >
           {tape === "tl" || tape === "tr" ? (
