@@ -27,6 +27,13 @@ export interface PickableGroup {
   name: string
   description: string | null
   path: string
+  /**
+   * Whether this group is linked to a GitLab group at all. The path itself
+   * stays server-side: the browser only needs to know whether to offer an
+   * epic picker, and the action resolves the path again from Keycloak so a
+   * caller can't point it at some other group.
+   */
+  gitlabLinked: boolean
   members: AttendeeContact[]
   /**
    * Group members Keycloak gave us with no email address — they can't be
@@ -62,6 +69,7 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
         name: group.name,
         description: group.description,
         path: group.path,
+        gitlabLinked: !!group.gitlabPath,
         members,
         unmailable,
       }

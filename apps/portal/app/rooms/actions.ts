@@ -19,11 +19,20 @@ import {
   computeDayAvailability,
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
-import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
+import {
+  fetchAttendeeGroups,
+  gitlabPathForGroup,
+} from "@/lib/rooms/keycloak-groups"
+import {
+  fetchEpic,
+  fetchEpicDeliverables,
+  fetchOpenEpics,
+  type EpicsResult,
+} from "@/lib/gitlab/client"
+import { parseEpicRef } from "@/lib/rooms/epic-refs"
 import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
-import { sanitizeIssueRefs } from "@/lib/rooms/epic-refs"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import {
   meetingPipelineConfigured,
@@ -107,6 +116,92 @@ export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
       0,
       5
     ),
+  }
+}
+
+/**
+ * The open epics of the group a booking is being made for.
+ *
+ * Takes the Keycloak group leaf, not a GitLab path: the path is resolved from
+ * that group's `gitlab_path` attribute server-side, so this can only ever read
+ * a group the caller was already booking under.
+ */
+export async function getGroupEpics(
+  groupName: string | null
+): Promise<EpicsResult> {
+  const user = await getCurrentUser()
+  if (!user) return { status: "error", detail: "請先登入" }
+
+  return fetchOpenEpics(await gitlabPathForGroup(groupName))
+}
+
+/**
+ * What this meeting owes, for the form to show before anyone commits to it.
+ *
+ * Takes the Keycloak group leaf for the same reason `getGroupEpics` does: the
+ * GitLab path is resolved server-side, so this can't be pointed at an epic in
+ * some group the caller isn't booking under.
+ */
+export async function getEpicDeliverables(
+  groupName: string | null,
+  iid: number
+): Promise<string[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const groupPath = await gitlabPathForGroup(groupName)
+  if (!groupPath) return []
+  return fetchEpicDeliverables(groupPath, iid)
+}
+
+/**
+ * What a booking's chosen epics actually are, and what they say this meeting
+ * owes.
+ *
+ * Both halves are resolved from GitLab rather than taken from the form. The
+ * references are pinned to the group being booked under — a reference to
+ * anything else is dropped rather than forwarded, since it would put a marker
+ * comment on some other project's epic. The deliverables then come from the
+ * issues linked under those epics, because the epic is the meeting and owes
+ * nothing itself. An ad-hoc meeting has no epic and therefore none.
+ *
+ * Never throws. A GitLab outage costs the booking its epic link, not the
+ * room — the pipeline's fallback for a booking with no ISSUE_REFS is to open
+ * a standalone epic, which is recoverable by hand.
+ */
+async function resolveEpicLink(
+  groupName: string | null | undefined,
+  requested: readonly string[]
+): Promise<{ issueRefs: string[]; deliverables: string[] }> {
+  const empty = { issueRefs: [], deliverables: [] }
+  if (requested.length === 0) return empty
+
+  const groupPath = await gitlabPathForGroup(groupName)
+  if (!groupPath) return empty
+
+  const refs = requested
+    .map((raw) => parseEpicRef(raw, groupPath))
+    .filter((ref) => ref !== null)
+    .filter((ref) => ref.groupPath === groupPath)
+
+  if (refs.length === 0) return empty
+
+  // Confirms each epic exists and is readable before it's stored. An epic
+  // that comes back null is dropped rather than failing the booking — the
+  // marker is worth losing, the room isn't.
+  const epics = (
+    await Promise.all(refs.map((ref) => fetchEpic(groupPath, ref.iid)))
+  ).filter((epic) => epic !== null)
+
+  const deliverables = await Promise.all(
+    epics.map((epic) => fetchEpicDeliverables(groupPath, epic.iid))
+  )
+
+  return {
+    issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
+    // Re-normalised rather than concatenated: two epics can each be in
+    // canonical order and still interleave when joined.
+    deliverables: sanitizeDeliverables(deliverables.flat()),
   }
 }
 
@@ -267,11 +362,13 @@ export interface ConfirmBookingInput {
   groupName?: string | null
   /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
   agenda?: string | null
-  /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
-  deliverables?: string[]
   /**
    * Epics this meeting belongs to. Any form the picker or a person produces;
-   * canonicalised here. Empty means the pipeline opens a standalone epic.
+   * resolved against GitLab here. Empty means the pipeline opens a standalone
+   * epic for what is, by definition, an ad-hoc meeting.
+   *
+   * No `deliverables` field on purpose — they come from the epic, never from
+   * the form. A meeting with deliverables and no epic isn't ad-hoc.
    */
   issueRefs?: string[]
 }
@@ -308,6 +405,8 @@ export async function confirmBooking(
   })
   const title = composeTopic(prefix, input.titleSuffix)
 
+  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+
   const supabase = await createClient()
   try {
     const outcome = await placeBooking(supabase, requireServiceAccount(), {
@@ -324,13 +423,11 @@ export async function confirmBooking(
       meetingPrefix: prefix,
       groupName: input.groupName ?? null,
       agenda: input.agenda?.trim() || null,
-      // Sanitised here rather than trusted: these become labels on a real
-      // GitLab issue, so an arbitrary string from a browser can't be one.
-      deliverables: sanitizeDeliverables(input.deliverables ?? []),
-      // Same reasoning as deliverables: this decides which epic a marker
-      // comment lands on, so an unparseable string from a browser is dropped
-      // rather than forwarded.
-      issueRefs: sanitizeIssueRefs(input.issueRefs ?? []),
+      // Both read back from GitLab rather than trusted from the form: the
+      // refs decide which epic a marker comment lands on, and the
+      // deliverables become labels on it.
+      deliverables: epicLink.deliverables,
+      issueRefs: epicLink.issueRefs,
     })
 
     revalidatePath("/rooms")
@@ -514,9 +611,10 @@ export interface CreateRecurringInput {
   groupName?: string | null
   /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
   agenda?: string | null
-  /** GitLab `Deliverable::*` labels. Validated server-side, not trusted. */
-  deliverables?: string[]
-  /** Epics every occurrence of this series belongs to. */
+  /**
+   * Epics every occurrence of this series belongs to. Deliverables follow
+   * from them, as with a one-off booking.
+   */
   issueRefs?: string[]
 }
 
@@ -542,6 +640,11 @@ export async function createRecurringMeeting(
   // form happened to be submitted.
   const anchorDate = nextWeekdayOnOrAfter(todayInTaipei(), input.weekday)
 
+  // Frozen at creation for the same reason the prefix is: the epic a standing
+  // series reports into shouldn't change under it because someone relabelled
+  // something in GitLab midway through a term.
+  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+
   const supabase = await createClient()
   const { error } = await supabase.from("rooms_recurring_meetings").insert({
     title,
@@ -556,8 +659,8 @@ export async function createRecurringMeeting(
     meeting_prefix: prefix,
     group_name: input.groupName ?? null,
     agenda: input.agenda?.trim() || null,
-    deliverables: sanitizeDeliverables(input.deliverables ?? []),
-    issue_refs: sanitizeIssueRefs(input.issueRefs ?? []),
+    deliverables: epicLink.deliverables,
+    issue_refs: epicLink.issueRefs,
   })
   if (error) throw new Error(`建立固定會議失敗:${error.message}`)
 

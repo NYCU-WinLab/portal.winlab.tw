@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -30,7 +30,13 @@ import {
 } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
+import {
+  useAttendeeGroups,
+  useEpicDeliverables,
+  useGroupEpics,
+  useLabUsers,
+} from "@/hooks/rooms/use-lab-users"
+import type { GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCancelBooking,
   useConfirmBooking,
@@ -39,6 +45,7 @@ import {
 
 import { AttendeeSelect } from "./_components/attendee-select"
 import { DeliverablesField } from "./_components/deliverables-field"
+import { EpicField } from "./_components/epic-field"
 import { MeetingStatus } from "./_components/meeting-status"
 import { OnlineMeetings } from "./_components/online-meetings"
 import { RecurringTab } from "./_components/recurring-tab"
@@ -242,10 +249,30 @@ function BookingSuggestion({
   // Free text handed straight to GitLab, which opens the meeting's issue with
   // it. Optional — a booking with no agenda is still a booking.
   const [agenda, setAgenda] = useState("")
-  const [deliverables, setDeliverables] = useState<string[]>([])
   // Which Keycloak group the attendees came from, if a group button was used.
   // Drives the topic prefix, which the user can see but not edit.
   const [groupName, setGroupName] = useState<string | null>(null)
+  // The epic this meeting reports into, if any. Picking one makes it the
+  // first kind of meeting: the pipeline marks that epic instead of opening a
+  // new one, and the agenda and deliverables come from it.
+  const [epic, setEpic] = useState<GitLabEpic | null>(null)
+  const epicsQuery = useGroupEpics(groupName)
+  const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
+
+  // An epic belongs to exactly one group, so switching groups invalidates the
+  // pick. Left in place it would be silently dropped server-side (the ref
+  // wouldn't match the new group's path) while the form still showed it.
+  useEffect(() => setEpic(null), [groupName])
+
+  /**
+   * Picking an epic pre-fills the agenda from its description, but only into
+   * an empty box — someone who has already typed something means it, and
+   * having it vanish on a dropdown change would be worse than no pre-fill.
+   */
+  function handleEpicChange(next: GitLabEpic | null) {
+    setEpic(next)
+    if (next?.description && !agenda.trim()) setAgenda(next.description)
+  }
   // Online-only: still a date and a time, just no room reserved.
   const [onlineOnly, setOnlineOnly] = useState(false)
   // On by default: the advisor attends essentially every meeting, and
@@ -297,7 +324,9 @@ function BookingSuggestion({
         endTime: endSlot.end,
         titleSuffix,
         agenda,
-        deliverables,
+        // Just the iid: the server resolves it against the group's own
+        // gitlab_path, so a reference to anything else can't be smuggled in.
+        issueRefs: epic ? [`&${epic.iid}`] : [],
         attendees: finalAttendees,
         groupName,
       },
@@ -373,6 +402,13 @@ function BookingSuggestion({
                 onSuffixChange={setTitleSuffix}
               />
 
+              <EpicField
+                id="booking-epic"
+                epics={epicsQuery.data}
+                value={epic?.iid ?? null}
+                onChange={handleEpicChange}
+              />
+
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="booking-agenda" className="text-xs">
                   討論事項（可不填）
@@ -385,14 +421,16 @@ function BookingSuggestion({
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                  會一併帶到 GitLab,成為這場會議 issue 的內容。
+                  {epic
+                    ? "從 epic 帶進來的,可以改。會一併送到 GitLab。"
+                    : "會一併帶到 GitLab,成為這場會議 epic 的內容。"}
                 </p>
               </div>
 
               <DeliverablesField
-                id="booking-deliverables"
-                value={deliverables}
-                onChange={setDeliverables}
+                value={deliverablesQuery.data ?? []}
+                loading={deliverablesQuery.isFetching}
+                hasEpic={!!epic}
               />
 
               <div className="flex flex-col gap-1.5">
