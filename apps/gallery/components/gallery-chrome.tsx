@@ -81,9 +81,9 @@ export function galleryPolaroidClass() {
   return cn(
     "gallery-polaroid w-full overflow-visible bg-[#f7f7f5]",
     "rounded-[2px] border-[3px] border-[#f7f7f5]",
-    "shadow-[0_2px_4px_rgba(24,24,27,0.08),0_18px_42px_-14px_rgba(24,24,27,0.38),0_0_0_1px_rgba(24,24,27,0.06)]",
+    "shadow-[0_1px_2px_rgba(24,24,27,0.05),0_6px_16px_-10px_rgba(24,24,27,0.2)]",
     "transition-[box-shadow,transform] duration-500 ease-out",
-    "group-hover/polaroid:shadow-[0_4px_10px_rgba(24,24,27,0.1),0_28px_56px_-12px_rgba(24,24,27,0.42),0_0_0_1px_rgba(24,24,27,0.08)]"
+    "group-hover/polaroid:shadow-[0_2px_4px_rgba(24,24,27,0.06),0_10px_22px_-12px_rgba(24,24,27,0.26)]"
   )
 }
 
