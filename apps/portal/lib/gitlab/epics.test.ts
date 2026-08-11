@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test"
 import {
   deliverablesFromLabels,
   deliverablesOf,
-  isPublicItem,
   readEpic,
   readEpicIssues,
   readEpics,
@@ -43,26 +42,6 @@ describe("deliverablesFromLabels", () => {
   })
 })
 
-describe("isPublicItem", () => {
-  // The token can read confidential epics, and confidential is the channel
-  // the deliverables bot is triggered on. Anything that isn't an explicit
-  // `false` is treated as confidential.
-  test("only an explicit false is public", () => {
-    expect(isPublicItem({ confidential: false })).toBe(true)
-    expect(isPublicItem({ confidential: true })).toBe(false)
-  })
-
-  test("a missing field is confidential, not public", () => {
-    expect(isPublicItem({})).toBe(false)
-  })
-
-  test("a non-boolean is confidential", () => {
-    expect(isPublicItem({ confidential: "false" })).toBe(false)
-    expect(isPublicItem({ confidential: 0 })).toBe(false)
-    expect(isPublicItem({ confidential: null })).toBe(false)
-  })
-})
-
 describe("readEpic", () => {
   test("reads a well-formed epic", () => {
     expect(readEpic(raw())).toEqual({
@@ -73,8 +52,11 @@ describe("readEpic", () => {
     })
   })
 
-  test("drops a confidential epic", () => {
-    expect(readEpic(raw({ confidential: true }))).toBeNull()
+  // `confidential` is the deliverables bot's trigger channel here, not a
+  // secrecy marker, so filtering on it hid ordinary work from the people
+  // whose meeting it is.
+  test("keeps a confidential epic — the flag isn't about secrecy", () => {
+    expect(readEpic(raw({ confidential: true }))?.iid).toBe(4)
   })
 
   test("an empty description reads as absent, not as an empty agenda", () => {
@@ -106,7 +88,7 @@ describe("readEpics", () => {
       raw({ iid: 6, title: "Ground station" }),
       "not an epic",
     ])
-    expect(epics.map((e) => e.iid)).toEqual([4, 6])
+    expect(epics.map((e) => e.iid)).toEqual([4, 5, 6])
   })
 
   test("a non-array response is no epics, not a crash", () => {
@@ -147,25 +129,22 @@ describe("readEpicIssues", () => {
     ).toEqual(["Deliverable::Presentation", "Deliverable::Demo"])
   })
 
-  // The deliverable is one of four fixed public values, so it still counts;
-  // the title is the issue's actual content and stays behind the same
-  // fail-closed rule the picker uses.
-  test("a confidential issue owes its deliverable but keeps its title", () => {
+  // Confidential marks the deliverables bot's trigger channel here, not NDA
+  // material, so the title reads like any other.
+  test("a confidential issue shows its title like any other", () => {
     expect(
       readEpicIssues([
-        issue(["Deliverable::Demo"], { confidential: true, title: "secret" }),
+        issue(["Deliverable::Demo"], { confidential: true, title: "月會簡報" }),
       ])
-    ).toEqual([{ title: null, deliverables: ["Deliverable::Demo"] }])
+    ).toEqual([{ title: "月會簡報", deliverables: ["Deliverable::Demo"] }])
   })
 
-  test("a missing or non-boolean confidential flag hides the title too", () => {
+  test("a title is null only when GitLab sent nothing usable", () => {
     expect(
-      readEpicIssues([{ labels: ["Deliverable::Code"], title: "x" }])[0]!.title
+      readEpicIssues([issue(["Deliverable::Code"], { title: "  " })])[0]!.title
     ).toBeNull()
     expect(
-      readEpicIssues([
-        issue(["Deliverable::Code"], { confidential: "false" }),
-      ])[0]!.title
+      readEpicIssues([{ labels: ["Deliverable::Code"] }])[0]!.title
     ).toBeNull()
   })
 

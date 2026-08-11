@@ -78,12 +78,9 @@ export function DeliverablesField({
   )
 }
 
-/**
- * A confidential issue still shows what it owes, but not what it is — the
- * same fail-closed rule the epic picker uses, applied one level down.
- */
+/** Only for an issue GitLab handed back without a usable title. */
 function issueLabel(issue: EpicIssue): string {
-  return issue.title ?? "(不公開的 issue)"
+  return issue.title ?? "(沒有標題的 issue)"
 }
 
 function emptyReason(

@@ -8,6 +8,14 @@
 // meeting owes is on the issues linked under it, so the deliverables are the
 // union of those issues' `Deliverable::*` labels. Reading the epic's own
 // labels instead looks almost right and is always empty.
+//
+// Nothing here filters on `confidential`, and that is deliberate rather than
+// an oversight. An earlier version dropped confidential epics from the picker
+// and blanked confidential issue titles, on the reading that the flag marked
+// NDA material. N0Ball corrected it: in this lab `confidential` is the
+// deliverables bot's trigger channel, not a secrecy marker, so filtering on it
+// hid ordinary work from the people whose meeting it is. Everything here is
+// already behind Portal's login and reaches lab members only.
 
 import { DELIVERABLES, type Deliverable } from "@/lib/rooms/deliverables"
 
@@ -39,15 +47,7 @@ export function deliverablesFromLabels(
 
 /** One issue under an epic, reduced to what the booking form shows. */
 export interface EpicIssue {
-  /**
-   * Null when the issue is confidential.
-   *
-   * The deliverable still counts — it's one of four fixed, publicly-known
-   * label values and naming it discloses nothing — but the title is the
-   * issue's actual content and stays behind the same fail-closed rule the
-   * epic picker uses. So a confidential issue contributes "this meeting owes
-   * a 投影片" without contributing what the 投影片 is about.
-   */
+  /** Null only when GitLab sent no usable title, never for confidentiality. */
   title: string | null
   deliverables: Deliverable[]
 }
@@ -74,9 +74,9 @@ export function readEpicIssues(body: unknown): EpicIssue[] {
       const deliverables = deliverablesFromLabels(labelsOf(row))
       if (deliverables.length === 0) return null
 
-      const raw = row as { title?: unknown; confidential?: unknown }
+      const raw = row as { title?: unknown }
       const title =
-        isPublicItem(raw) && typeof raw.title === "string" && raw.title.trim()
+        typeof raw.title === "string" && raw.title.trim()
           ? raw.title.trim()
           : null
       return { title, deliverables }
@@ -89,27 +89,11 @@ export function deliverablesOf(issues: readonly EpicIssue[]): Deliverable[] {
   return deliverablesFromLabels(issues.flatMap((i) => i.deliverables))
 }
 
-/**
- * Whether an epic's or issue's own text may be shown.
- *
- * Fail-closed, and deliberately not "exclude the ones marked true": the token
- * this is read with can see confidential epics, and confidential is also the
- * channel the deliverables bot is triggered on — so a title leaking into a
- * dropdown is a real disclosure, not a cosmetic bug. A response that omits the
- * field, renames it, or sends something other than a boolean `false` is
- * treated as confidential. The cost of being wrong in this direction is a
- * shorter list; the other direction has no floor.
- */
-export function isPublicItem(raw: { confidential?: unknown }): boolean {
-  return raw.confidential === false
-}
-
 interface RawEpic {
   iid?: unknown
   title?: unknown
   description?: unknown
   web_url?: unknown
-  confidential?: unknown
 }
 
 /**
@@ -119,8 +103,6 @@ interface RawEpic {
  * group shouldn't take the whole picker down with it.
  */
 export function readEpic(raw: RawEpic): GitLabEpic | null {
-  if (!isPublicItem(raw)) return null
-
   const iid = typeof raw.iid === "number" ? raw.iid : Number(raw.iid)
   if (!Number.isInteger(iid) || iid <= 0) return null
 

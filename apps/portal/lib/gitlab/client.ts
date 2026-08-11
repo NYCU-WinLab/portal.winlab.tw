@@ -1,9 +1,9 @@
 // Read-only GitLab access, server-side only.
 //
 // `GITLAB_API_TOKEN` is a `read_api` token with no `NEXT_PUBLIC_` prefix, and
-// it must stay that way: it can read confidential epics, which are also the
-// deliverables bot's trigger channel. Nothing in this file is importable from
-// a client component — the booking form reaches it through a server action.
+// it must stay that way — it reads every group the lab has. Nothing in this
+// file is importable from a client component; the booking form reaches it
+// through a server action.
 //
 // This is the only direction the integration runs in. Portal reads GitLab;
 // GitLab writes GitLab. See the Portal/GitLab boundary in CLAUDE.md.
@@ -133,8 +133,8 @@ export async function fetchEpic(
     `/groups/${encodeURIComponent(groupPath)}/epics/${iid}`
   )
   if (!read.ok) return null
-  // Reuses the list reader so a single epic gets the same fail-closed
-  // confidential check as one in a list.
+  // Reuses the list reader so a single epic is validated the same way as one
+  // that arrived in a list.
   return readEpics([read.body])[0] ?? null
 }
 
