@@ -428,7 +428,7 @@ function BookingSuggestion({
               </div>
 
               <DeliverablesField
-                value={deliverablesQuery.data ?? []}
+                result={deliverablesQuery.data}
                 loading={deliverablesQuery.isFetching}
                 hasEpic={!!epic}
               />

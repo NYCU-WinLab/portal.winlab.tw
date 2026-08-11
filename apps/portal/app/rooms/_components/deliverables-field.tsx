@@ -4,44 +4,42 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
+import type { EpicDeliverablesResult } from "@/lib/gitlab/client"
 import { DELIVERABLES } from "@/lib/rooms/deliverables"
 
 /**
  * What this meeting is expected to produce — read-only, on purpose.
  *
  * These used to be checkboxes. They aren't a choice: the epic is the meeting,
- * and what the meeting owes is whatever the issues linked under that epic are
+ * and what the meeting owes is whatever the issues under that epic are
  * labelled with. A meeting with no epic is ad-hoc and owes nothing — as
  * N0Ball put it, a meeting with a deliverable isn't ad-hoc — so a tick box on
  * an unlinked booking would create a state the model doesn't have.
  *
- * The server reads these from GitLab and never from this form, so this is a
- * display of a decision made over there, not an input.
+ * Every empty case says which empty it is. "No deliverables" first shipped as
+ * one message covering a read that failed, an epic with no issues, and issues
+ * with no labels, which made the first real report of it undiagnosable from
+ * the screen alone.
  */
 export function DeliverablesField({
-  value,
+  result,
   loading = false,
   hasEpic = false,
 }: {
-  value: readonly string[]
+  result: EpicDeliverablesResult | undefined
   loading?: boolean
   /** Whether an epic is picked, which decides what "none" means. */
   hasEpic?: boolean
 }) {
-  const chosen = DELIVERABLES.filter((d) => value.includes(d.value))
+  const values = result?.status === "ok" ? result.deliverables : []
+  const chosen = DELIVERABLES.filter((d) => values.includes(d.value))
 
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs">交付物</Label>
       {loading ? (
         <Skeleton className="h-5 w-32" />
-      ) : chosen.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {hasEpic
-            ? "這個 epic 底下的 issue 沒有標任何 Deliverable。"
-            : "臨時會議沒有交付物。掛上 epic 後,會顯示它底下 issue 的 Deliverable 標籤。"}
-        </p>
-      ) : (
+      ) : chosen.length > 0 ? (
         <>
           <div className="flex flex-wrap gap-1.5">
             {chosen.map((d) => (
@@ -58,7 +56,29 @@ export function DeliverablesField({
             來自這個 epic 底下 issue 的 Deliverable 標籤,要改請改 GitLab。
           </p>
         </>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {emptyReason(result, hasEpic)}
+        </p>
       )}
     </div>
   )
+}
+
+function emptyReason(
+  result: EpicDeliverablesResult | undefined,
+  hasEpic: boolean
+): string {
+  if (!hasEpic) {
+    return "臨時會議沒有交付物。掛上 epic 後,會顯示它底下 issue 的 Deliverable 標籤。"
+  }
+  if (!result) return "尚未讀取。"
+  if (result.status === "error") {
+    return `讀不到這個 epic 底下的 issue:${result.detail}`
+  }
+  // Zero issues and unlabelled issues need different fixes — one is "attach
+  // the issues to the epic", the other is "label them" — so they say so.
+  return result.issueCount === 0
+    ? "這個 epic 底下沒有任何 issue(child item)。如果 issue 是用「Linked items」關聯的,API 讀不到,要改成 epic 的子項目。"
+    : `這個 epic 底下有 ${result.issueCount} 張 issue,但都沒有標 Deliverable 標籤。`
 }

@@ -27,6 +27,7 @@ import {
   fetchEpic,
   fetchEpicDeliverables,
   fetchOpenEpics,
+  type EpicDeliverablesResult,
   type EpicsResult,
 } from "@/lib/gitlab/client"
 import { parseEpicRef } from "@/lib/rooms/epic-refs"
@@ -145,12 +146,14 @@ export async function getGroupEpics(
 export async function getEpicDeliverables(
   groupName: string | null,
   iid: number
-): Promise<string[]> {
+): Promise<EpicDeliverablesResult> {
   const user = await getCurrentUser()
-  if (!user) return []
+  if (!user) return { status: "error", detail: "請先登入" }
 
   const groupPath = await gitlabPathForGroup(groupName)
-  if (!groupPath) return []
+  if (!groupPath) {
+    return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
+  }
   return fetchEpicDeliverables(groupPath, iid)
 }
 
@@ -193,6 +196,9 @@ async function resolveEpicLink(
     await Promise.all(refs.map((ref) => fetchEpic(groupPath, ref.iid)))
   ).filter((epic) => epic !== null)
 
+  // A failed read leaves the booking's deliverables empty rather than
+  // stopping it. The epic link is the part that matters and it survives; the
+  // labels are a summary that GitLab can restate later.
   const deliverables = await Promise.all(
     epics.map((epic) => fetchEpicDeliverables(groupPath, epic.iid))
   )
@@ -201,7 +207,9 @@ async function resolveEpicLink(
     issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
     // Re-normalised rather than concatenated: two epics can each be in
     // canonical order and still interleave when joined.
-    deliverables: sanitizeDeliverables(deliverables.flat()),
+    deliverables: sanitizeDeliverables(
+      deliverables.flatMap((d) => (d.status === "ok" ? d.deliverables : []))
+    ),
   }
 }
 
