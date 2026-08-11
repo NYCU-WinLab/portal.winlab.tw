@@ -30,6 +30,30 @@ function group(
 }
 
 describe("toPickableGroups", () => {
+  // The realm also carries role groups (Master Students, Teacher). Booking
+  // under one would produce a `master-students` topic prefix and send the
+  // epic picker looking for a `gitlab_path` a role group will never have.
+  test("offers project groups only, not role groups", () => {
+    const roleGroup: AttendeeGroup = {
+      ...group("master-students", [{ email: "a@winlab.tw" }]),
+      path: "/winlab-members/master-students",
+    }
+    const projectGroup = group("tasa-satsim", [{ email: "b@winlab.tw" }])
+
+    expect(
+      toPickableGroups([roleGroup, projectGroup]).map((g) => g.name)
+    ).toEqual(["tasa-satsim"])
+  })
+
+  // A top-level group is a container, not something anyone books under.
+  test("the projects container itself is not a project group", () => {
+    const container: AttendeeGroup = {
+      ...group("winlab-projects", [{ email: "c@winlab.tw" }]),
+      path: "/winlab-projects",
+    }
+    expect(toPickableGroups([container])).toEqual([])
+  })
+
   // The browser learns whether an epic picker is worth offering, not the
   // path itself — the action resolves that again from Keycloak so a caller
   // can't point it at a group they aren't booking under.

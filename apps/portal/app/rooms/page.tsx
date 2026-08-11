@@ -402,11 +402,35 @@ function BookingSuggestion({
                 onSuffixChange={setTitleSuffix}
               />
 
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">與會人員</Label>
+                <AttendeeSelect
+                  users={labUsers ?? []}
+                  groups={
+                    attendeeGroups?.status === "ok" ? attendeeGroups.groups : []
+                  }
+                  groupsNote={groupsNote(attendeeGroupsQuery)}
+                  value={attendees}
+                  onChange={setAttendees}
+                  advisorIncluded={includeAdvisor}
+                  onAdvisorIncludedChange={setIncludeAdvisor}
+                  onGroupPicked={(group: PickableGroup) =>
+                    setGroupName(group.name)
+                  }
+                />
+              </div>
+
               <EpicField
                 id="booking-epic"
                 epics={epicsQuery.data}
                 value={epic?.iid ?? null}
                 onChange={handleEpicChange}
+              />
+
+              <DeliverablesField
+                result={deliverablesQuery.data}
+                loading={deliverablesQuery.isFetching}
+                hasEpic={!!epic}
               />
 
               <div className="flex flex-col gap-1.5">
@@ -425,30 +449,6 @@ function BookingSuggestion({
                     ? "從 epic 帶進來的,可以改。會一併送到 GitLab。"
                     : "會一併帶到 GitLab,成為這場會議 epic 的內容。"}
                 </p>
-              </div>
-
-              <DeliverablesField
-                value={deliverablesQuery.data ?? []}
-                loading={deliverablesQuery.isFetching}
-                hasEpic={!!epic}
-              />
-
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">與會人員</Label>
-                <AttendeeSelect
-                  users={labUsers ?? []}
-                  groups={
-                    attendeeGroups?.status === "ok" ? attendeeGroups.groups : []
-                  }
-                  groupsNote={groupsNote(attendeeGroupsQuery)}
-                  value={attendees}
-                  onChange={setAttendees}
-                  advisorIncluded={includeAdvisor}
-                  onAdvisorIncludedChange={setIncludeAdvisor}
-                  onGroupPicked={(group: PickableGroup) =>
-                    setGroupName(group.name)
-                  }
-                />
               </div>
 
               <p className="rounded-md border bg-muted/50 p-2 text-xs text-muted-foreground">

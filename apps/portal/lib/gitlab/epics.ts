@@ -8,6 +8,14 @@
 // meeting owes is on the issues linked under it, so the deliverables are the
 // union of those issues' `Deliverable::*` labels. Reading the epic's own
 // labels instead looks almost right and is always empty.
+//
+// Nothing here filters on `confidential`, and that is deliberate rather than
+// an oversight. An earlier version dropped confidential epics from the picker
+// and blanked confidential issue titles, on the reading that the flag marked
+// NDA material. N0Ball corrected it: in this lab `confidential` is the
+// deliverables bot's trigger channel, not a secrecy marker, so filtering on it
+// hid ordinary work from the people whose meeting it is. Everything here is
+// already behind Portal's login and reaches lab members only.
 
 import { DELIVERABLES, type Deliverable } from "@/lib/rooms/deliverables"
 
@@ -37,42 +45,48 @@ export function deliverablesFromLabels(
   ) as Deliverable[]
 }
 
-/**
- * What a meeting owes, read off the issues linked under its epic.
- *
- * Unlike the picker, this does NOT skip confidential issues. The picker hides
- * them because it would print their titles; this reads only which of four
- * fixed, publicly-known label values appear anywhere under the epic, and the
- * result names no issue. Skipping them would instead drop a real deliverable
- * from the meeting's own summary — wrong in the direction that matters here.
- */
-export function deliverablesFromIssues(body: unknown): Deliverable[] {
-  if (!Array.isArray(body)) return []
-  const labels = body.flatMap((row) =>
-    typeof row === "object" &&
-    row !== null &&
-    Array.isArray((row as { labels?: unknown }).labels)
-      ? ((row as { labels: unknown[] }).labels.filter(
-          (l): l is string => typeof l === "string"
-        ) as string[])
-      : []
-  )
-  return deliverablesFromLabels(labels)
+/** One issue under an epic, reduced to what the booking form shows. */
+export interface EpicIssue {
+  /** Null only when GitLab sent no usable title, never for confidentiality. */
+  title: string | null
+  deliverables: Deliverable[]
+}
+
+function labelsOf(row: unknown): string[] {
+  if (typeof row !== "object" || row === null) return []
+  const labels = (row as { labels?: unknown }).labels
+  return Array.isArray(labels)
+    ? labels.filter((l): l is string => typeof l === "string")
+    : []
 }
 
 /**
- * Whether an epic may be shown in the picker.
+ * The issues under an epic that owe something, newest-first as GitLab
+ * returned them.
  *
- * Fail-closed, and deliberately not "exclude the ones marked true": the token
- * this is read with can see confidential epics, and confidential is also the
- * channel the deliverables bot is triggered on — so a title leaking into a
- * dropdown is a real disclosure, not a cosmetic bug. A response that omits the
- * field, renames it, or sends something other than a boolean `false` is
- * treated as confidential. The cost of being wrong in this direction is a
- * shorter list; the other direction has no floor.
+ * Issues with no `Deliverable::*` label are dropped: they're work under the
+ * epic, not deliverables of the meeting.
  */
-export function isPublicEpic(raw: { confidential?: unknown }): boolean {
-  return raw.confidential === false
+export function readEpicIssues(body: unknown): EpicIssue[] {
+  if (!Array.isArray(body)) return []
+  return body
+    .map((row): EpicIssue | null => {
+      const deliverables = deliverablesFromLabels(labelsOf(row))
+      if (deliverables.length === 0) return null
+
+      const raw = row as { title?: unknown }
+      const title =
+        typeof raw.title === "string" && raw.title.trim()
+          ? raw.title.trim()
+          : null
+      return { title, deliverables }
+    })
+    .filter((issue): issue is EpicIssue => issue !== null)
+}
+
+/** Every deliverable an epic's issues carry, de-duplicated and canonical. */
+export function deliverablesOf(issues: readonly EpicIssue[]): Deliverable[] {
+  return deliverablesFromLabels(issues.flatMap((i) => i.deliverables))
 }
 
 interface RawEpic {
@@ -80,7 +94,6 @@ interface RawEpic {
   title?: unknown
   description?: unknown
   web_url?: unknown
-  confidential?: unknown
 }
 
 /**
@@ -90,8 +103,6 @@ interface RawEpic {
  * group shouldn't take the whole picker down with it.
  */
 export function readEpic(raw: RawEpic): GitLabEpic | null {
-  if (!isPublicEpic(raw)) return null
-
   const iid = typeof raw.iid === "number" ? raw.iid : Number(raw.iid)
   if (!Number.isInteger(iid) || iid <= 0) return null
 
