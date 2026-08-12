@@ -240,4 +240,39 @@ describe("suggestRoom", () => {
   test("returns null when the duration runs past the end of the day", () => {
     expect(suggestRoom(daySlots, 4, 2)).toBeNull()
   })
+
+  // The suffix breaks ties in reverse — 600B beats 600A — but only within one
+  // room number. It must never pull a lower-priority number ahead.
+  describe("suffix tie-break", () => {
+    const oneSlot = (freeRooms: string[]): AvailabilitySlot[] => [
+      { start: "09:00", end: "09:30", freeRooms, paidRooms: [], labRooms: [] },
+    ]
+    const pick = (rooms: string[]) => suggestRoom(oneSlot(rooms), 0, 1)?.room
+
+    test("later letter wins inside the same room number", () => {
+      expect(pick(["600A", "600B"])).toBe("600B")
+      expect(pick(["600B", "600A"])).toBe("600B")
+      expect(pick(["600A", "600C", "600B"])).toBe("600C")
+    })
+
+    test("the room number still decides first", () => {
+      expect(pick(["700B", "600A"])).toBe("600A")
+      expect(pick(["500B", "600A"])).toBe("600A")
+    })
+
+    test("a suffixed room beats the bare number it shares", () => {
+      expect(pick(["600", "600A"])).toBe("600A")
+    })
+
+    test("rooms the priority list doesn't name stay in a stable order", () => {
+      expect(pick(["513", "345"])).toBe("345")
+      expect(pick(["ES705", "345"])).toBe("345")
+      // …and still lose to one it does name.
+      expect(pick(["345", "700A"])).toBe("700A")
+    })
+
+    test("a single candidate is returned whatever it looks like", () => {
+      expect(pick(["ES705"])).toBe("ES705")
+    })
+  })
 })
