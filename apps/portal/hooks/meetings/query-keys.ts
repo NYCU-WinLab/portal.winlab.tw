@@ -2,6 +2,7 @@ export const queryKeys = {
   meetings: {
     all: ["meetings", "schedule"] as const,
     byYear: (year: number) => ["meetings", "schedule", year] as const,
+    years: ["meetings", "schedule", "years"] as const,
   },
   teacherPapers: {
     all: ["meetings", "teacher-papers"] as const,
