@@ -8,6 +8,7 @@ import {
 import {
   aggregateReactions,
   isGalleryReaction,
+  isGalleryReactionsUnavailable,
   EMPTY_REACTION_COUNTS,
   EMPTY_REACTION_NAMES,
 } from "@/lib/gallery/reactions"
@@ -27,7 +28,14 @@ export async function loadLightboxSocial(
   ])
 
   const commentRows = commentLoad.error ? [] : commentLoad.rows
-  const voteRows = voteResult.data ?? []
+  const reactionsAvailable = !voteResult.error
+  const voteRows = voteResult.error ? [] : (voteResult.data ?? [])
+  if (voteResult.error && !isGalleryReactionsUnavailable(voteResult.error)) {
+    console.error(
+      "[gallery] failed to load lightbox reactions",
+      voteResult.error
+    )
+  }
 
   const profileIds = Array.from(
     new Set([
@@ -76,5 +84,12 @@ export async function loadLightboxSocial(
     reaction_counts: counts,
     reaction_names: names,
     my_reaction: myReaction,
+    commentPinAvailable: commentLoad.error
+      ? false
+      : commentLoad.commentPinAvailable,
+    commentLikesAvailable: commentLoad.error
+      ? false
+      : commentLoad.commentLikesAvailable,
+    reactionsAvailable,
   }
 }

@@ -113,6 +113,8 @@ export function describeUploadFailure(error: unknown): {
     lower.includes("poster") ||
     lower.includes("encoder") ||
     lower.includes("ffmpeg") ||
+    lower.includes("cdn blocked") ||
+    lower.includes("unpkg") ||
     lower.includes("video too") ||
     lower.includes("browser cannot decode") ||
     lower.includes("memory access")
@@ -170,6 +172,9 @@ export function userMessageForStage(
     case "type":
       return `Unsupported file type. Use JPEG/PNG/WebP/GIF/HEIC or MP4/MOV/WebM. (${shortDetail(detail)})`
     case "video-processing":
+      if (/cdn|unpkg|encoder|ffmpeg|ad blocker/i.test(detail)) {
+        return "Video compress is unavailable here (encoder CDN blocked). Upload may continue without compress, or sync ffmpeg locally."
+      }
       return `Could not process this video on your phone. Try a shorter clip (≤60s) or export as 720p MP4. (${shortDetail(detail)})`
     case "storage-upload":
       return `Upload to storage failed — check Wi‑Fi/cellular and retry. (${shortDetail(detail)})`

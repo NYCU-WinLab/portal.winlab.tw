@@ -13,13 +13,26 @@ import {
   runGalleryUpload,
   type UploadStatus,
 } from "@/lib/gallery/upload-pipeline"
+import { describeUploadWorksToast } from "@/lib/gallery/upload-toast"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
 
 type RunOptions = {
   onAllSucceeded?: () => void
 }
 
-export function useGalleryUpload() {
+export function useGalleryUpload({
+  sequencesAvailable = true,
+}: {
+  sequencesAvailable?: boolean
+} = {}) {
   const router = useRouter()
+  const softPush = (href: string, errorMessage: string) => {
+    try {
+      router.push(href)
+    } catch {
+      toast.error(errorMessage)
+    }
+  }
   const abortRef = useRef<AbortController | null>(null)
   const [pending, startTransition] = useTransition()
   const [failedUploads, setFailedUploads] = useState<UploadFailure[]>([])
@@ -64,17 +77,17 @@ export function useGalleryUpload() {
     failures: UploadFailure[]
   ) {
     if (successCount <= 0) return
-    const suffix = successCount > 1 ? "s" : ""
     if (wallPhotoId) {
       const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-      toast.success(`Uploaded ${successCount} work${suffix}.`, {
+      toast.success(describeUploadWorksToast(successCount), {
         action: {
           label: "View on wall",
-          onClick: () => router.push(href),
+          onClick: () =>
+            softPush(href, describeGalleryNavError("openWallPhoto")),
         },
       })
     } else {
-      toast.success(`Uploaded ${successCount} work${suffix}.`)
+      toast.success(describeUploadWorksToast(successCount))
     }
 
     if (sequenceId && failures.length > 0) {
@@ -83,7 +96,8 @@ export function useGalleryUpload() {
         {
           action: {
             label: "Manage",
-            onClick: () => router.push("/upload"),
+            onClick: () =>
+              softPush("/upload", describeGalleryNavError("openManage")),
           },
         }
       )
@@ -93,14 +107,19 @@ export function useGalleryUpload() {
         {
           action: {
             label: "Manage",
-            onClick: () => router.push("/upload"),
+            onClick: () =>
+              softPush("/upload", describeGalleryNavError("openManage")),
           },
         }
       )
     }
   }
 
-  function runUpload(files: File[], baseName: string, opts?: RunOptions) {
+  function runUpload(
+    files: File[],
+    baseName: string,
+    opts?: RunOptions & { tagNames?: string[] }
+  ) {
     startTransition(async () => {
       const controller = beginAbortableRun()
       try {
@@ -109,6 +128,8 @@ export function useGalleryUpload() {
           baseName,
           setStatus,
           signal: controller.signal,
+          tagNames: opts?.tagNames,
+          sequencesAvailable,
         })
 
         if (abortRef.current === controller) abortRef.current = null
@@ -161,6 +182,7 @@ export function useGalleryUpload() {
           baseName,
           setStatus,
           signal: controller.signal,
+          sequencesAvailable,
           sequenceMeta: failures.map((f) => ({
             sequenceId: f.sequenceId,
             sequenceIndex: f.sequenceIndex,

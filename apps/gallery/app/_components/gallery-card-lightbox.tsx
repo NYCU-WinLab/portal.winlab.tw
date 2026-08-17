@@ -1,13 +1,12 @@
 "use client"
 
 import type { Dispatch, SetStateAction } from "react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
-  IconDownload,
   IconLink,
   IconPin,
   IconX,
@@ -16,8 +15,14 @@ import {
 import { DialogClose } from "@workspace/ui/components/dialog"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { DownloadOriginalButton } from "@/app/_components/download-original-button"
+import { DownloadSequenceButton } from "@/app/_components/download-sequence-button"
+import { FavoritePhotoButton } from "@/app/_components/favorite-photo-button"
+import { GalleryAddToAlbum } from "@/app/_components/gallery-add-to-album"
 import { ReactionBar } from "@/app/_components/reaction-bar"
 import { GalleryComments } from "@/app/_components/gallery-comments"
+import { GalleryImageTags } from "@/app/_components/gallery-image-tags"
+import { GalleryTitleEditor } from "@/app/_components/gallery-title-editor"
 import { PinWallButton } from "@/app/_components/pin-wall-button"
 import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
 import {
@@ -26,19 +31,63 @@ import {
 } from "@/app/_components/gallery-card-media"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
+import { describeLightboxHintLabel } from "@/lib/gallery/keyboard-hint-labels"
 import { resolveLightboxSwipe } from "@/lib/gallery/lightbox-gestures"
+import {
+  describeLightboxCloseAriaLabel,
+  describeLightboxNextAriaLabel,
+  describeLightboxPreviousAriaLabel,
+  describeLightboxShareAriaLabel,
+} from "@/lib/gallery/lightbox-labels"
 import {
   formatReactionSummary,
   totalReactions,
   type GalleryReaction,
   type ReactionCounts,
 } from "@/lib/gallery/reactions"
+import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import type {
   GalleryComment,
   GalleryImage,
   GalleryMember,
   GallerySequenceItem,
 } from "@/lib/gallery/types"
+
+function SequenceStripThumb({ item }: { item: GallerySequenceItem }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <span
+        aria-hidden
+        className="flex h-full w-full items-center justify-center bg-zinc-800/80"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/mark.png"
+          alt=""
+          width={16}
+          height={16}
+          className="size-4 object-contain opacity-40 grayscale"
+          draggable={false}
+        />
+      </span>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={thumbUrlFromItem(item)}
+      alt=""
+      className="h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  )
+}
 
 /** Lightbox media plane: image/video, chrome buttons, sequence dots. */
 export function GalleryLightboxMediaPane({
@@ -80,12 +129,14 @@ export function GalleryLightboxMediaPane({
   setLightboxFailed: (v: boolean) => void
   goLightboxPrev: () => void
   goLightboxNext: () => void
-  copyShareLink: () => void
+  copyShareLink: () => void | Promise<void>
 }) {
+  const [shareBusy, setShareBusy] = useState(false)
+
   return (
     <div {...gestureProps} className="gallery-lightbox-media relative">
       <DialogClose
-        aria-label="Close"
+        aria-label={describeLightboxCloseAriaLabel()}
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
@@ -98,36 +149,45 @@ export function GalleryLightboxMediaPane({
       </DialogClose>
       <button
         type="button"
-        onClick={() => void copyShareLink()}
-        aria-label="Share"
+        onClick={() => {
+          if (shareBusy) return
+          setShareBusy(true)
+          void Promise.resolve(copyShareLink()).finally(() => {
+            setShareBusy(false)
+          })
+        }}
+        disabled={shareBusy}
+        aria-busy={shareBusy || undefined}
+        aria-label={describeLightboxShareAriaLabel()}
         className={cn(
           "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
           isSignedIn
-            ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
+            ? isSequence
+              ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+9rem)]"
+              : "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
             : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
           "inline-flex h-11 w-11 items-center justify-center rounded-full",
           "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-          "transition-colors hover:bg-white",
+          "transition-colors hover:bg-white disabled:opacity-60",
           "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
         )}
       >
         <IconLink className="h-5 w-5" />
       </button>
+      {isSignedIn && isSequence ? (
+        <DownloadSequenceButton
+          variant="icon"
+          items={sequenceMedia}
+          coverName={image.name}
+          className="absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)] z-20"
+        />
+      ) : null}
       {isSignedIn ? (
-        <a
-          href={mediaUrl}
-          download
-          aria-label="Save original"
-          className={cn(
-            "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
-            "inline-flex h-11 w-11 items-center justify-center rounded-full",
-            "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-            "transition-colors hover:bg-white",
-            "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-          )}
-        >
-          <IconDownload className="h-5 w-5" />
-        </a>
+        <DownloadOriginalButton
+          displayName={activeItem?.name ?? image.name}
+          imagePath={activeItem?.image_path ?? image.image_path}
+          className="absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20"
+        />
       ) : null}
       {!mediaLoaded && !lightboxFailed ? (
         <div
@@ -177,7 +237,7 @@ export function GalleryLightboxMediaPane({
           type="button"
           onClick={goLightboxPrev}
           className="absolute top-1/2 left-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:left-3 sm:h-10 sm:w-10"
-          aria-label="Previous"
+          aria-label={describeLightboxPreviousAriaLabel()}
         >
           <IconChevronLeft className="h-5 w-5" />
         </button>
@@ -187,7 +247,7 @@ export function GalleryLightboxMediaPane({
           type="button"
           onClick={goLightboxNext}
           className="absolute top-1/2 right-2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:right-3 sm:h-10 sm:w-10"
-          aria-label="Next"
+          aria-label={describeLightboxNextAriaLabel()}
         >
           <IconChevronRight className="h-5 w-5" />
         </button>
@@ -217,16 +277,7 @@ export function GalleryLightboxMediaPane({
                     : "border-white/35 opacity-75 hover:opacity-100"
                 )}
               >
-                {/* Tiny strip thumbs — next/image is overkill in lightbox chrome */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbUrlFromItem(item)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                  draggable={false}
-                />
+                <SequenceStripThumb item={item} />
               </button>
             ))}
           </div>
@@ -239,7 +290,7 @@ export function GalleryLightboxMediaPane({
             "gallery-lightbox-hint pointer-events-none absolute bottom-3 left-3 z-10 hidden rounded-full bg-black/40 px-2.5 py-1 text-[10px] tracking-wide text-white/80 uppercase backdrop-blur-sm sm:block"
           )}
         >
-          ← → navigate · S share · ? keys
+          {describeLightboxHintLabel()}
         </p>
       ) : null}
     </div>
@@ -254,8 +305,14 @@ export function GalleryLightboxSocialAside({
   isSequence,
   activeIndex,
   sequenceLength,
+  sequenceMedia,
   isSignedIn,
   isAdmin,
+  pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
+  isOwner = false,
   viewerId,
   viewerName,
   members,
@@ -268,9 +325,18 @@ export function GalleryLightboxSocialAside({
   counts,
   myReaction,
   canReact,
+  reactionBusy = false,
   onReact,
+  reactionOpenSignal = 0,
   comments,
   setComments,
+  onArtworkRenamed,
+  favorited,
+  onFavoritedChange,
+  commentPinAvailable = true,
+  commentLikesAvailable = true,
+  reactionsAvailable = true,
+  commentsAvailable = true,
 }: {
   image: GalleryImage
   activeItem: GallerySequenceItem | undefined
@@ -278,8 +344,14 @@ export function GalleryLightboxSocialAside({
   isSequence: boolean
   activeIndex: number
   sequenceLength: number
+  sequenceMedia: GallerySequenceItem[]
   isSignedIn: boolean
   isAdmin: boolean
+  pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
+  isOwner?: boolean
   viewerId: string | null
   viewerName: string
   members: GalleryMember[]
@@ -292,9 +364,18 @@ export function GalleryLightboxSocialAside({
   counts: ReactionCounts
   myReaction: GalleryReaction | null
   canReact: boolean
+  reactionBusy?: boolean
   onReact: (reaction: GalleryReaction) => void
+  reactionOpenSignal?: number
   comments: GalleryComment[]
   setComments: Dispatch<SetStateAction<GalleryComment[]>>
+  onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
+  favorited?: boolean
+  onFavoritedChange?: (favorited: boolean) => void
+  commentPinAvailable?: boolean
+  commentLikesAvailable?: boolean
+  reactionsAvailable?: boolean
+  commentsAvailable?: boolean
 }) {
   const sheetTouchStart = useRef<{ x: number; y: number } | null>(null)
   const reactionPeek = formatReactionSummary(counts)
@@ -361,7 +442,7 @@ export function GalleryLightboxSocialAside({
                   : "Reactions & comments · swipe up"}
             </span>
           </button>
-          {isAdmin ? (
+          {isAdmin && pinAvailable ? (
             <PinWallButton
               imageId={image.id}
               pinnedAt={pinnedAt}
@@ -410,20 +491,20 @@ export function GalleryLightboxSocialAside({
           On the wall
         </p>
         <div className="gallery-lightbox-aside-title-block min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2
-              className={cn(
-                gallerySerif(),
-                "text-2xl leading-none tracking-tight text-foreground sm:text-[1.75rem]"
-              )}
-            >
-              {activeItem?.name ?? image.name}
-            </h2>
+          <div className="flex flex-wrap items-start gap-2">
+            <GalleryTitleEditor
+              imageId={activeItem?.id ?? image.id}
+              name={activeItem?.name ?? image.name}
+              canEdit={isOwner}
+              variant="lightbox"
+              className="min-w-0 flex-1"
+              onRenamed={onArtworkRenamed}
+            />
             {pinnedAt ? (
               <span
                 className={cn(
                   gallerySans(),
-                  "inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+                  "mt-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800"
                 )}
               >
                 <IconPin className="size-3" aria-hidden />
@@ -450,17 +531,35 @@ export function GalleryLightboxSocialAside({
             ) : null}
           </p>
           {isSequence ? (
-            <p
-              className={cn(
-                gallerySans(),
-                "text-[11px] text-muted-foreground/70"
-              )}
-            >
-              Shot {activeIndex + 1} of {sequenceLength}
-            </p>
+            <div className="space-y-1">
+              <p
+                className={cn(
+                  gallerySans(),
+                  "text-[11px] text-muted-foreground/70"
+                )}
+              >
+                Shot {activeIndex + 1} of {sequenceLength}
+              </p>
+              {isSignedIn ? (
+                <DownloadSequenceButton
+                  variant="text"
+                  items={sequenceMedia}
+                  coverName={image.name}
+                  className={gallerySans()}
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
-        {isAdmin ? (
+        {tagsAvailable ? (
+          <GalleryImageTags
+            key={activeItem?.id ?? image.id}
+            imageId={activeItem?.id ?? image.id}
+            tags={activeItem?.tags ?? image.tags ?? []}
+            canEdit={isSignedIn}
+          />
+        ) : null}
+        {isAdmin && pinAvailable ? (
           <div className="gallery-lightbox-aside-pin flex justify-end">
             <PinWallButton
               imageId={image.id}
@@ -470,25 +569,51 @@ export function GalleryLightboxSocialAside({
             />
           </div>
         ) : null}
-        <ReactionBar
-          counts={counts}
-          myReaction={myReaction}
-          canReact={canReact}
-          onReact={onReact}
-        />
+        {isSignedIn ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {favoritesAvailable ? (
+              <FavoritePhotoButton
+                imageId={image.id}
+                initialFavorited={favorited ?? Boolean(image.is_favorited)}
+                onChanged={onFavoritedChange}
+              />
+            ) : null}
+            {albumsAvailable ? (
+              <GalleryAddToAlbum imageIds={[activeItem?.id ?? image.id]} />
+            ) : null}
+          </div>
+        ) : null}
+        {reactionsAvailable ? (
+          <ReactionBar
+            counts={counts}
+            myReaction={myReaction}
+            canReact={canReact}
+            busy={reactionBusy}
+            openSignal={reactionOpenSignal}
+            onReact={onReact}
+          />
+        ) : null}
       </div>
       <div className="gallery-lightbox-aside-comments flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-        <GalleryComments
-          imageId={image.id}
-          comments={comments}
-          onCommentsChange={setComments}
-          isSignedIn={isSignedIn}
-          viewerId={viewerId}
-          viewerName={viewerName}
-          members={members}
-          isAdmin={isAdmin}
-          highlightCommentId={highlightCommentId}
-        />
+        {commentsAvailable ? (
+          <GalleryComments
+            imageId={image.id}
+            comments={comments}
+            onCommentsChange={setComments}
+            isSignedIn={isSignedIn}
+            viewerId={viewerId}
+            viewerName={viewerName}
+            members={members}
+            isAdmin={isAdmin}
+            highlightCommentId={highlightCommentId}
+            commentPinAvailable={commentPinAvailable}
+            commentLikesAvailable={commentLikesAvailable}
+          />
+        ) : (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            Comments are not available yet.
+          </p>
+        )}
       </div>
     </aside>
   )

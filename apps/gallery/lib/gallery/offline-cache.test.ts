@@ -3,7 +3,9 @@ import { describe, expect, test } from "bun:test"
 import {
   buildGallerySwCacheMessage,
   GALLERY_SW_CACHE_URLS_TYPE,
+  GALLERY_SW_VERSION,
   isGalleryStorageMediaUrl,
+  selectGalleryMediaCacheUrls,
 } from "@/lib/gallery/offline-cache"
 
 describe("isGalleryStorageMediaUrl", () => {
@@ -27,6 +29,37 @@ describe("isGalleryStorageMediaUrl", () => {
   })
 })
 
+describe("selectGalleryMediaCacheUrls", () => {
+  test("drops non-gallery urls and dedupes", () => {
+    expect(
+      selectGalleryMediaCacheUrls([
+        "https://example.com/x.jpg",
+        "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+        "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+        "not-a-url",
+      ])
+    ).toEqual([
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
+  })
+
+  test("empty input yields empty list", () => {
+    expect(selectGalleryMediaCacheUrls([])).toEqual([])
+  })
+
+  test("all invalid urls yield empty list", () => {
+    expect(
+      selectGalleryMediaCacheUrls(["https://example.com/a.jpg", "", "nope"])
+    ).toEqual([])
+  })
+})
+
+describe("GALLERY_SW_VERSION", () => {
+  test("tracks the active service-worker cache generation", () => {
+    expect(GALLERY_SW_VERSION).toBe("gallery-sw-v5")
+  })
+})
+
 describe("buildGallerySwCacheMessage", () => {
   test("dedupes urls", () => {
     const message = buildGallerySwCacheMessage([
@@ -45,5 +78,15 @@ describe("buildGallerySwCacheMessage", () => {
         `https://x.supabase.co/storage/v1/object/public/gallery/u/${i}.jpg`
     )
     expect(buildGallerySwCacheMessage(urls, 3).urls).toHaveLength(3)
+  })
+
+  test("filters non-gallery urls before messaging", () => {
+    const message = buildGallerySwCacheMessage([
+      "https://example.com/skip.jpg",
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
+    expect(message.urls).toEqual([
+      "https://x.supabase.co/storage/v1/object/public/gallery/u/a.jpg",
+    ])
   })
 })

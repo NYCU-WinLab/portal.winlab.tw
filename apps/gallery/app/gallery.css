@@ -89,6 +89,22 @@ body:not([data-gallery-theme]) {
   }
 }
 
+@keyframes gallery-slideshow-segment-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.gallery-slideshow-segment-fill {
+  transform-origin: left center;
+  animation-name: gallery-slideshow-segment-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 .gallery-home-hero-mark,
 .gallery-home-hero-title {
   animation: gallery-hero-enter 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -164,6 +180,8 @@ body:not([data-gallery-theme]) {
 
 .gallery-wall-card {
   animation: gallery-polaroid-settle 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  content-visibility: auto;
+  contain-intrinsic-size: 420px 520px;
 }
 
 .gallery-cheatsheet-enter {
@@ -177,8 +195,15 @@ body:not([data-gallery-theme]) {
   .gallery-home-hero-title,
   .gallery-home-filters-sheet,
   .gallery-lightbox-aside--expanded .gallery-lightbox-aside-header,
-  .gallery-lightbox-aside--expanded .gallery-lightbox-aside-comments {
+  .gallery-lightbox-aside--expanded .gallery-lightbox-aside-comments,
+  .gallery-comment-highlight,
+  .gallery-slideshow-segment-fill,
+  .gallery-lightbox-hint {
     animation: none;
+  }
+
+  [data-slot="dialog-content"].gallery-lightbox[data-state="open"] {
+    animation: none !important;
   }
 }
 
@@ -526,7 +551,7 @@ html::-webkit-scrollbar {
 
 @media (prefers-reduced-motion: no-preference) {
   .group\/polaroid:hover .gallery-polaroid {
-    transform: translateY(-6px);
+    transform: translateY(-3px);
   }
 
   .gallery-empty-polaroid {
@@ -972,8 +997,8 @@ html[data-gallery-theme="dragon-boat"] .gallery-seasonal-decor {
 html[data-gallery-theme="dragon-boat"] .gallery-polaroid {
   border-color: rgba(30, 120, 75, 0.32);
   box-shadow:
-    0 1px 2px rgba(30, 120, 75, 0.12),
-    0 12px 32px -14px rgba(30, 120, 75, 0.34);
+    0 1px 2px rgba(30, 120, 75, 0.08),
+    0 6px 16px -10px rgba(30, 120, 75, 0.2);
 }
 
 /* Caption only — barely off-white mint so it blends with the page */
@@ -985,8 +1010,8 @@ html[data-gallery-theme="dragon-boat"]
   .group\/polaroid:hover
   .gallery-polaroid {
   box-shadow:
-    0 2px 4px rgba(30, 120, 75, 0.14),
-    0 18px 40px -12px rgba(30, 120, 75, 0.38);
+    0 2px 4px rgba(30, 120, 75, 0.1),
+    0 10px 22px -12px rgba(30, 120, 75, 0.26);
 }
 
 html[data-gallery-theme="dragon-boat"] .gallery-footer::after {
@@ -1345,8 +1370,8 @@ html[data-gallery-theme="world-cup"] .gallery-seasonal-decor {
 html[data-gallery-theme="world-cup"] .gallery-polaroid {
   border-color: rgba(34, 120, 55, 0.32);
   box-shadow:
-    0 1px 2px rgba(34, 120, 55, 0.12),
-    0 12px 32px -14px rgba(34, 120, 55, 0.34);
+    0 1px 2px rgba(34, 120, 55, 0.08),
+    0 6px 16px -10px rgba(34, 120, 55, 0.2);
 }
 
 html[data-gallery-theme="world-cup"] .gallery-polaroid-caption {
@@ -1355,8 +1380,8 @@ html[data-gallery-theme="world-cup"] .gallery-polaroid-caption {
 
 html[data-gallery-theme="world-cup"] .group\/polaroid:hover .gallery-polaroid {
   box-shadow:
-    0 2px 4px rgba(34, 120, 55, 0.14),
-    0 18px 40px -12px rgba(34, 120, 55, 0.38);
+    0 2px 4px rgba(34, 120, 55, 0.1),
+    0 10px 22px -12px rgba(34, 120, 55, 0.26);
 }
 
 html[data-gallery-theme="world-cup"] .gallery-footer::after {

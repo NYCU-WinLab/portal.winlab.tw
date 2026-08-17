@@ -2,18 +2,39 @@
 
 import { revalidatePath } from "next/cache"
 
+import {
+  describeNothingSelectedError,
+  describeSelectAtLeastOneWorkError,
+  describeSelectAtMost100WorksError,
+  describeStorageDeleteLeftoverWarning,
+} from "@/lib/gallery/action-errors"
+import { attachGalleryTagsToImage } from "@/app/actions/tags"
+import { sanitizeClientTakenAt } from "@/lib/gallery/extract-taken-at"
+import {
+  isGallerySequenceUnavailable,
+  isGalleryTakenAtUnavailable,
+  isGalleryVideoColumnsUnavailable,
+} from "@/lib/gallery/manage-uploads"
 import { isValidClientObjectPath } from "@/lib/gallery/object-path"
+import {
+  buildSequenceRenamePatches,
+  normalizeArtworkRenameDraft,
+  shouldCascadeSequenceRename,
+} from "@/lib/gallery/rename-artwork"
 import {
   allObjectNamesPresent,
   DEFAULT_VERIFY_PLAN,
   objectNamesFromPaths,
   storageSearchOptions,
 } from "@/lib/gallery/storage-verify"
+import { parseGalleryTagList } from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type ActionResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string }
 export type RegisterResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; warning?: string }
   | { ok: false; error: string }
 
 export type RegisterMediaInput = {
@@ -24,6 +45,9 @@ export type RegisterMediaInput = {
   durationSeconds?: number | null
   sequenceId?: string | null
   sequenceIndex?: number | null
+  tagNames?: string[]
+  /** ISO capture time from EXIF when known; server falls back to now(). */
+  takenAt?: string | null
 }
 
 /**
@@ -133,6 +157,8 @@ export async function registerGalleryImage(
     }
   }
 
+  const takenAt = sanitizeClientTakenAt(input.takenAt)
+
   const insertPayload: Record<string, unknown> = {
     name: trimmed,
     image_path: input.imagePath,
@@ -145,6 +171,7 @@ export async function registerGalleryImage(
     created_by: userId,
     sequence_id: input.sequenceId ?? null,
     sequence_index: input.sequenceIndex ?? null,
+    ...(takenAt ? { taken_at: takenAt } : {}),
   }
 
   // Idempotent retry: if this sequence slot already exists for the uploader,
@@ -162,15 +189,88 @@ export async function registerGalleryImage(
       await supabase.storage.from("gallery").remove(expectedPaths)
       revalidatePath("/")
       revalidatePath("/upload")
+      revalidatePath("/memories")
       return { ok: true, id: existingSlot.id }
     }
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  let { data: inserted, error: insertError } = await supabase
     .from("gallery_images")
     .insert(insertPayload)
     .select("id")
     .single()
+
+  // Soft-fail: Memories migration not applied yet — register without taken_at.
+  if (
+    insertError &&
+    takenAt &&
+    "taken_at" in insertPayload &&
+    isGalleryTakenAtUnavailable(insertError)
+  ) {
+    const { taken_at: _dropped, ...withoutTakenAt } = insertPayload
+    void _dropped
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutTakenAt)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
+
+  // Soft-fail: sequence columns missing — singles still register; bursts abort.
+  if (insertError && isGallerySequenceUnavailable(insertError)) {
+    if (input.sequenceId != null || input.sequenceIndex != null) {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      return {
+        ok: false,
+        error:
+          "Sequences are not available yet — apply the gallery sequence migration.",
+      }
+    }
+    const {
+      sequence_id: _seqId,
+      sequence_index: _seqIndex,
+      ...withoutSequence
+    } = insertPayload
+    void _seqId
+    void _seqIndex
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutSequence)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
+
+  // Soft-fail: video columns missing — images peel fields; videos abort.
+  if (insertError && isGalleryVideoColumnsUnavailable(insertError)) {
+    if (input.mediaType === "video") {
+      await supabase.storage.from("gallery").remove(expectedPaths)
+      return {
+        ok: false,
+        error:
+          "Video uploads are not available yet — apply the gallery video migration.",
+      }
+    }
+    const {
+      media_type: _mediaType,
+      poster_path: _posterPath,
+      duration_seconds: _duration,
+      ...withoutVideo
+    } = insertPayload
+    void _mediaType
+    void _posterPath
+    void _duration
+    const retry = await supabase
+      .from("gallery_images")
+      .insert(withoutVideo)
+      .select("id")
+      .single()
+    inserted = retry.data
+    insertError = retry.error
+  }
 
   if (insertError || !inserted) {
     // Unique slot race: another request won — resolve to that row.
@@ -190,6 +290,7 @@ export async function registerGalleryImage(
         await supabase.storage.from("gallery").remove(expectedPaths)
         revalidatePath("/")
         revalidatePath("/upload")
+        revalidatePath("/memories")
         return { ok: true, id: raced.id }
       }
     }
@@ -200,9 +301,29 @@ export async function registerGalleryImage(
     }
   }
 
+  let warning: string | undefined
+  const tagNames = parseGalleryTagList(input.tagNames)
+  if (tagNames.length > 0) {
+    const attached = await attachGalleryTagsToImage(
+      inserted.id,
+      tagNames,
+      userId,
+      supabase
+    )
+    if (attached.failed > 0) {
+      warning =
+        attached.failed === 1
+          ? "Hung on the wall, but one tag could not be attached."
+          : `Hung on the wall, but ${attached.failed} tags could not be attached.`
+    }
+  }
+
   revalidatePath("/")
   revalidatePath("/upload")
-  return { ok: true, id: inserted.id }
+  revalidatePath("/memories")
+  return warning
+    ? { ok: true, id: inserted.id, warning }
+    : { ok: true, id: inserted.id }
 }
 
 export async function deleteGalleryImage(
@@ -228,6 +349,12 @@ export async function deleteGalleryImage(
     .remove(targets)
   if (storageError) {
     console.error("[gallery] storage delete failed", storageError)
+    revalidatePath("/")
+    revalidatePath("/upload")
+    return {
+      ok: true,
+      warning: describeStorageDeleteLeftoverWarning(),
+    }
   }
 
   revalidatePath("/")
@@ -243,7 +370,7 @@ export async function deleteGalleryImages(
   }[]
 ): Promise<ActionResult> {
   if (items.length === 0) {
-    return { ok: false, error: "Nothing selected." }
+    return { ok: false, error: describeNothingSelectedError() }
   }
 
   const supabase = await createClient()
@@ -265,6 +392,7 @@ export async function deleteGalleryImages(
     return { ok: false, error: "Some selected works could not be deleted." }
   }
 
+  let warning: string | undefined
   for (const item of items) {
     const result = await deleteGalleryImage(
       item.id,
@@ -272,9 +400,10 @@ export async function deleteGalleryImages(
       item.posterPath
     )
     if (!result.ok) return result
+    if (result.warning) warning = result.warning
   }
 
-  return { ok: true }
+  return warning ? { ok: true, warning } : { ok: true }
 }
 
 export async function updateGallerySequenceOrder(
@@ -303,6 +432,13 @@ export async function updateGallerySequenceOrder(
     .eq("created_by", userId)
 
   if (fetchError) {
+    if (isGallerySequenceUnavailable(fetchError)) {
+      return {
+        ok: false,
+        error:
+          "Sequences are not available yet — apply the gallery sequence migration.",
+      }
+    }
     return { ok: false, error: `Sequence load failed: ${fetchError.message}` }
   }
 
@@ -326,6 +462,13 @@ export async function updateGallerySequenceOrder(
       .eq("sequence_id", sequenceId)
 
     if (error) {
+      if (isGallerySequenceUnavailable(error)) {
+        return {
+          ok: false,
+          error:
+            "Sequences are not available yet — apply the gallery sequence migration.",
+        }
+      }
       return {
         ok: false,
         error: `Could not reorder sequence: ${error.message}`,
@@ -338,14 +481,15 @@ export async function updateGallerySequenceOrder(
   return { ok: true }
 }
 
+export type RenameGalleryImageResult =
+  | { ok: true; names: { id: string; name: string }[] }
+  | { ok: false; error: string }
+
 export async function renameGalleryImage(
   id: string,
   newName: string
-): Promise<ActionResult> {
-  const trimmed = newName.trim()
-  if (!trimmed) {
-    return { ok: false, error: "Name is required." }
-  }
+): Promise<RenameGalleryImageResult> {
+  const nextName = normalizeArtworkRenameDraft(newName)
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
@@ -360,18 +504,34 @@ export async function renameGalleryImage(
     .single()
 
   if (currentRowError) {
+    if (isGallerySequenceUnavailable(currentRowError)) {
+      const { error: updateError } = await supabase
+        .from("gallery_images")
+        .update({ name: nextName })
+        .eq("id", id)
+        .eq("created_by", userId)
+
+      if (updateError) {
+        return { ok: false, error: `Rename failed: ${updateError.message}` }
+      }
+
+      revalidatePath("/")
+      revalidatePath("/upload")
+      return { ok: true, names: [{ id, name: nextName }] }
+    }
     return {
       ok: false,
       error: `Could not load this work: ${currentRowError.message}`,
     }
   }
 
-  // If renaming the cover shot of a burst sequence, apply the base name to
-  // the whole sequence so users see consistent names.
-  const shouldRenameSequence =
-    Boolean(currentRow?.sequence_id) && currentRow.sequence_index === 0
-
-  if (shouldRenameSequence) {
+  // Cover rename cascades across the burst so wall + strip stay consistent.
+  if (
+    shouldCascadeSequenceRename(
+      currentRow?.sequence_id,
+      currentRow?.sequence_index
+    )
+  ) {
     const sequenceId = currentRow.sequence_id as string
 
     const { data: sequenceRows, error: seqLoadError } = await supabase
@@ -382,42 +542,154 @@ export async function renameGalleryImage(
       .order("sequence_index", { ascending: true })
 
     if (seqLoadError) {
+      if (isGallerySequenceUnavailable(seqLoadError)) {
+        const { error: updateError } = await supabase
+          .from("gallery_images")
+          .update({ name: nextName })
+          .eq("id", id)
+          .eq("created_by", userId)
+
+        if (updateError) {
+          return { ok: false, error: `Rename failed: ${updateError.message}` }
+        }
+
+        revalidatePath("/")
+        revalidatePath("/upload")
+        return { ok: true, names: [{ id, name: nextName }] }
+      }
       return {
         ok: false,
         error: `Rename sequence failed: ${seqLoadError.message}`,
       }
     }
 
-    for (let idx = 0; idx < (sequenceRows ?? []).length; idx++) {
-      const row = sequenceRows[idx]!
-      const sequenceIndex =
-        typeof row.sequence_index === "number" ? row.sequence_index : idx
-      const nextName =
-        sequenceIndex === 0 ? trimmed : `${trimmed}${sequenceIndex}`
+    const patches = buildSequenceRenamePatches(sequenceRows ?? [], nextName)
 
+    for (const patch of patches) {
       const { error: updateError } = await supabase
         .from("gallery_images")
-        .update({ name: nextName })
-        .eq("id", row.id)
+        .update({ name: patch.name })
+        .eq("id", patch.id)
         .eq("created_by", userId)
 
       if (updateError) {
         return { ok: false, error: `Rename failed: ${updateError.message}` }
       }
     }
-  } else {
-    const { error: updateError } = await supabase
-      .from("gallery_images")
-      .update({ name: trimmed })
-      .eq("id", id)
-      .eq("created_by", userId)
 
-    if (updateError) {
-      return { ok: false, error: `Rename failed: ${updateError.message}` }
+    revalidatePath("/")
+    revalidatePath("/upload")
+    return { ok: true, names: patches }
+  }
+
+  const { error: updateError } = await supabase
+    .from("gallery_images")
+    .update({ name: nextName })
+    .eq("id", id)
+    .eq("created_by", userId)
+
+  if (updateError) {
+    return { ok: false, error: `Rename failed: ${updateError.message}` }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  return { ok: true, names: [{ id, name: nextName }] }
+}
+
+export type UpdateGalleryImageTakenAtResult =
+  | { ok: true; takenAt: string }
+  | { ok: false; error: string }
+
+export async function updateGalleryImageTakenAt(
+  id: string,
+  rawTakenAt: string
+): Promise<UpdateGalleryImageTakenAtResult> {
+  const takenAt = sanitizeClientTakenAt(rawTakenAt)
+  if (!takenAt) {
+    return { ok: false, error: "That capture date does not look valid." }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const { error } = await supabase
+    .from("gallery_images")
+    .update({ taken_at: takenAt })
+    .eq("id", id)
+    .eq("created_by", userId)
+
+  if (error) {
+    if (isGalleryTakenAtUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Capture dates need the gallery Memories migration. Ask an admin to apply it.",
+      }
+    }
+    return {
+      ok: false,
+      error: `Could not update capture date: ${error.message}`,
     }
   }
 
   revalidatePath("/")
   revalidatePath("/upload")
-  return { ok: true }
+  revalidatePath("/memories")
+  return { ok: true, takenAt }
+}
+
+export type UpdateGalleryImagesTakenAtResult =
+  | { ok: true; takenAt: string; updated: number }
+  | { ok: false; error: string }
+
+/** Set one capture date across many Manage rows (Memories repair). */
+export async function updateGalleryImagesTakenAt(
+  ids: string[],
+  rawTakenAt: string
+): Promise<UpdateGalleryImagesTakenAtResult> {
+  const takenAt = sanitizeClientTakenAt(rawTakenAt)
+  if (!takenAt) {
+    return { ok: false, error: "That capture date does not look valid." }
+  }
+
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))]
+  if (uniqueIds.length === 0) {
+    return { ok: false, error: describeSelectAtLeastOneWorkError() }
+  }
+  if (uniqueIds.length > 100) {
+    return { ok: false, error: describeSelectAtMost100WorksError() }
+  }
+
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (!userId) return { ok: false, error: "Not signed in." }
+
+  const { error, count } = await supabase
+    .from("gallery_images")
+    .update({ taken_at: takenAt }, { count: "exact" })
+    .in("id", uniqueIds)
+    .eq("created_by", userId)
+
+  if (error) {
+    if (isGalleryTakenAtUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Capture dates need the gallery Memories migration. Ask an admin to apply it.",
+      }
+    }
+    return {
+      ok: false,
+      error: `Could not update capture dates: ${error.message}`,
+    }
+  }
+
+  revalidatePath("/")
+  revalidatePath("/upload")
+  revalidatePath("/memories")
+  return { ok: true, takenAt, updated: count ?? uniqueIds.length }
 }

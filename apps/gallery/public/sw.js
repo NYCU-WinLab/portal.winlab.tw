@@ -2,7 +2,7 @@
  * Precaches the app shell; runtime-caches Supabase gallery media after first view.
  * No offline write queue.
  */
-const VERSION = "gallery-sw-v4"
+const VERSION = "gallery-sw-v5"
 const SHELL_CACHE = `${VERSION}-shell`
 const MEDIA_CACHE = `${VERSION}-media`
 
@@ -22,8 +22,20 @@ const SHELL_URLS = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(SHELL_CACHE)
-      await cache.addAll(SHELL_URLS)
+      try {
+        const cache = await caches.open(SHELL_CACHE)
+        await Promise.all(
+          SHELL_URLS.map(async (url) => {
+            try {
+              await cache.add(url)
+            } catch {
+              // Best-effort precache — one missing asset must not block install.
+            }
+          })
+        )
+      } catch {
+        // Cache API unavailable (private mode / quota).
+      }
       await self.skipWaiting()
     })()
   )
@@ -86,19 +98,30 @@ self.addEventListener("message", (event) => {
 })
 
 async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-  if (cached) return cached
+  let cache
+  try {
+    cache = await caches.open(cacheName)
+    const cached = await cache.match(request)
+    if (cached) return cached
+  } catch {
+    cache = null
+  }
   try {
     const response = await fetch(request)
-    if (response.ok) {
-      await cache.put(request, response.clone())
-      await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
+    if (response.ok && cache) {
+      try {
+        await cache.put(request, response.clone())
+        await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
+      } catch {
+        // Quota / private mode — still return the network response.
+      }
     }
     return response
   } catch (error) {
-    const fallback = await cache.match(request)
-    if (fallback) return fallback
+    if (cache) {
+      const fallback = await cache.match(request)
+      if (fallback) return fallback
+    }
     throw error
   }
 }
@@ -132,21 +155,32 @@ async function networkFirstNavigation(request) {
 }
 
 async function cacheMediaUrls(urls) {
-  const cache = await caches.open(MEDIA_CACHE)
-  const unique = [...new Set(urls.filter((url) => typeof url === "string"))]
-  // Cap warm batch so we don't thrash storage on long walls.
-  const batch = unique.filter(isGalleryMedia).slice(0, 64)
-  await Promise.all(
-    batch.map(async (url) => {
-      try {
-        const existing = await cache.match(url)
-        if (existing) return
-        const response = await fetch(url, { mode: "cors", credentials: "omit" })
-        if (response.ok) await cache.put(url, response.clone())
-      } catch {
-        // Best-effort cache warm; ignore network failures.
-      }
-    })
-  )
-  await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
+  try {
+    const cache = await caches.open(MEDIA_CACHE)
+    const unique = [...new Set(urls.filter((url) => typeof url === "string"))]
+    // Cap warm batch so we don't thrash storage on long walls.
+    const batch = unique.filter(isGalleryMedia).slice(0, 64)
+    await Promise.all(
+      batch.map(async (url) => {
+        try {
+          const existing = await cache.match(url)
+          if (existing) return
+          const response = await fetch(url, {
+            mode: "cors",
+            credentials: "omit",
+          })
+          if (response.ok) await cache.put(url, response.clone())
+        } catch {
+          // Best-effort cache warm; ignore network / quota failures.
+        }
+      })
+    )
+    try {
+      await trimCache(cache, MEDIA_CACHE_MAX_ENTRIES)
+    } catch {
+      // trim is best-effort
+    }
+  } catch {
+    // Cache API unavailable — offline warm is optional.
+  }
 }

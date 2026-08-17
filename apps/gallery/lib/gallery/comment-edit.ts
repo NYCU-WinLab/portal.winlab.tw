@@ -15,6 +15,18 @@ export type GalleryCommentRow = {
   pinned_at?: string | null
 }
 
+/** True when updated_at is strictly after created_at (user edited). */
+export function isCommentEdited(comment: {
+  created_at: string
+  updated_at?: string | null
+}): boolean {
+  if (!comment.updated_at) return false
+  return (
+    new Date(comment.updated_at).getTime() >
+    new Date(comment.created_at).getTime()
+  )
+}
+
 export function isGalleryCommentEditUnavailable(
   error: { code?: string; message?: string } | null
 ): boolean {
@@ -47,6 +59,35 @@ export function formatGallerySupabaseError(
     error.hint ? `hint=${error.hint}` : null,
   ].filter(Boolean)
   return parts.join(" | ") || "Unknown error"
+}
+
+export function isGalleryCommentsUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_comments/i.test(message) &&
+      !/updated_at/i.test(message) &&
+      !/pinned_at/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
+export async function isGalleryCommentsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_comments")
+    .select("id")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryCommentsUnavailable(error)
 }
 
 export async function loadGalleryCommentRows(

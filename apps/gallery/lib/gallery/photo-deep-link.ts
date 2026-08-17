@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { GALLERY_PAGE_SIZE } from "@/lib/gallery/load-home-page"
+import { isGallerySequenceUnavailable } from "@/lib/gallery/manage-uploads"
 
 export function galleryPhotoPageFromRank(
   rank: number,
@@ -56,6 +57,20 @@ async function resolveWallCoverRank(
     .gt("created_at", sortCreatedAt)
 
   if (countError) {
+    if (isGallerySequenceUnavailable(countError)) {
+      const fallback = await supabase
+        .from("gallery_images")
+        .select("id", { count: "exact", head: true })
+        .gt("created_at", sortCreatedAt)
+      if (fallback.error) {
+        console.error(
+          "[gallery] failed to count newer wall photos",
+          fallback.error
+        )
+        return 1
+      }
+      return (fallback.count ?? 0) + 1
+    }
     console.error("[gallery] failed to count newer wall photos", countError)
     return 1
   }
@@ -76,14 +91,37 @@ export async function resolveGalleryPhotoDeepLink(
     .eq("id", photoId)
     .maybeSingle()
 
-  if (error || !row) {
-    if (error) {
-      console.error("[gallery] failed to resolve photo deep link", error)
+  let image: ImageRow | null = (row as ImageRow | null) ?? null
+  if (error || !image) {
+    if (error && isGallerySequenceUnavailable(error)) {
+      const fallback = await supabase
+        .from("gallery_images")
+        .select("id, created_at")
+        .eq("id", photoId)
+        .maybeSingle()
+      if (fallback.error || !fallback.data) {
+        if (fallback.error) {
+          console.error(
+            "[gallery] failed to resolve photo deep link",
+            fallback.error
+          )
+        }
+        return null
+      }
+      image = {
+        id: fallback.data.id,
+        created_at: fallback.data.created_at,
+        sequence_id: null,
+        sequence_index: null,
+      }
+    } else {
+      if (error) {
+        console.error("[gallery] failed to resolve photo deep link", error)
+      }
+      return null
     }
-    return null
   }
 
-  const image = row as ImageRow
   let coverId = image.id
   let sortCreatedAt = image.created_at
 

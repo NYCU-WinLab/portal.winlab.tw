@@ -31,23 +31,40 @@ import {
   ReactionSummary,
   useGalleryCardSocial,
 } from "@/app/_components/gallery-card-social"
+import { GalleryTitleEditor } from "@/app/_components/gallery-title-editor"
 import {
   galleryPillClass,
   galleryPolaroidClass,
   gallerySans,
-  gallerySerif,
 } from "@/components/gallery-chrome"
 import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
 import { isTypingTarget } from "@/lib/gallery/keyboard"
 import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
 import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { shareOrCopyPhotoLink } from "@/lib/gallery/photo-share"
+import {
+  describePhotoLinkCopied,
+  describeSavedOriginal,
+} from "@/lib/gallery/photo-share-toast"
+import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
+import {
+  describeSignInToFavorite,
+  describeCouldNotDownload,
+} from "@/lib/gallery/download-labels"
+import { describeErrorMessage } from "@/lib/gallery/error-message"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeNothingToDownload } from "@/lib/gallery/validation-toasts"
+import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
   resolveLightboxNextStep,
   resolveLightboxPrevStep,
 } from "@/lib/gallery/lightbox-nav"
+import { resolveLightboxShortcut } from "@/lib/gallery/lightbox-shortcuts"
+import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
 import { getRotation } from "@/lib/gallery/rotation"
+import { toggleGalleryFavorite } from "@/app/actions/favorites"
 import type {
   GalleryImage,
   GalleryMember,
@@ -66,15 +83,26 @@ export function GalleryCard({
   viewerName,
   members,
   isAdmin = false,
+  pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
+  reactionsAvailable = true,
+  commentsAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
   open,
   onOpenChange,
   gridFocused = false,
+  wallFocusRef,
   hasWallPrev = false,
   hasWallNext = false,
   onWallNavigate,
+  onArtworkRenamed,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -82,16 +110,29 @@ export function GalleryCard({
   viewerName: string
   members: GalleryMember[]
   isAdmin?: boolean
+  pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
+  reactionsAvailable?: boolean
+  commentsAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
   open?: boolean
   onOpenChange?: (open: boolean) => void
   gridFocused?: boolean
+  /** Registers the polaroid open/select trigger for wall J/K focus. */
+  wallFocusRef?: (node: HTMLButtonElement | null) => void
   hasWallPrev?: boolean
   hasWallNext?: boolean
   onWallNavigate?: (direction: "prev" | "next") => void
+  onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
 }) {
+  const isOwner = Boolean(viewerId && image.created_by === viewerId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const rotation = getRotation(image.id)
@@ -109,6 +150,7 @@ export function GalleryCard({
             poster_path: image.poster_path,
             created_at: image.created_at,
             sequence_index: image.sequence_index,
+            tags: image.tags ?? [],
           },
         ]
   const isSequence = sequenceMedia.length > 1
@@ -128,7 +170,11 @@ export function GalleryCard({
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    try {
+      router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    } catch {
+      toast.error(describeGalleryNavError("closePhoto"))
+    }
   }
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -150,9 +196,13 @@ export function GalleryCard({
     comments,
     setComments,
     canReact,
+    reactionBusy,
     reactionTotal,
     wallCommentCount,
     onReact,
+    commentPinAvailable,
+    commentLikesAvailable,
+    reactionsAvailable: lightboxReactionsAvailable,
   } = useGalleryCardSocial({
     image,
     viewerId,
@@ -250,61 +300,145 @@ export function GalleryCard({
     onSwipeDown: () => setMobileDetailsOpen(false),
   })
 
-  const copyShareLink = useCallback(async () => {
-    const href = buildGalleryPhotoHref({
-      photoId: image.id,
-      commentId: highlightCommentId,
-    })
-    const url = `${window.location.origin}${href}`
-    const title = activeItem?.name ?? image.name
+  const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
+  const favoriteBusyRef = useRef(false)
+  const shareBusyRef = useRef(false)
+  const downloadBusyRef = useRef(false)
 
+  useEffect(() => {
+    setFavorited(Boolean(image.is_favorited))
+  }, [image.id, image.is_favorited])
+
+  const copyShareLink = useCallback(async () => {
+    if (shareBusyRef.current) return
+    shareBusyRef.current = true
     try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ title, url })
+      const href = buildGalleryPhotoHref({
+        photoId: image.id,
+        commentId: highlightCommentId,
+      })
+      const url = `${window.location.origin}${href}`
+      const title = activeItem?.name ?? image.name
+      const result = await shareOrCopyPhotoLink({ url, title })
+      if (!result.ok) {
+        if (result.reason === "aborted") return
+        toast.error(result.message)
         return
       }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return
-    }
-
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success("Link copied.")
-    } catch {
-      toast.error("Could not copy link.")
+      if (result.mode === "copied") toast.success(describePhotoLinkCopied())
+    } finally {
+      shareBusyRef.current = false
     }
   }, [activeItem?.name, highlightCommentId, image.id, image.name])
+
+  const toggleFavoriteFromKeyboard = useCallback(async () => {
+    if (!isSignedIn) {
+      toast.error(describeSignInToFavorite())
+      return
+    }
+    if (favoriteBusyRef.current) return
+    favoriteBusyRef.current = true
+    const next = !favorited
+    setFavorited(next)
+    try {
+      const result = await toggleGalleryFavorite(image.id, next)
+      if (!result.ok) {
+        setFavorited(!next)
+        toast.error(result.error)
+        return
+      }
+      toast.success(describeFavoriteToast(result.favorited))
+    } finally {
+      favoriteBusyRef.current = false
+    }
+  }, [favorited, image.id, isSignedIn])
+
+  const downloadOriginalFromKeyboard = useCallback(async () => {
+    if (downloadBusyRef.current) return
+    const path = activeItem?.image_path ?? image.image_path
+    const name = activeItem?.name ?? image.name
+    if (!path) {
+      toast.error(describeNothingToDownload())
+      return
+    }
+    downloadBusyRef.current = true
+    try {
+      await downloadGalleryOriginal({ displayName: name, imagePath: path })
+      toast.success(describeSavedOriginal())
+    } catch (error) {
+      toast.error(describeErrorMessage(error, describeCouldNotDownload()))
+    } finally {
+      downloadBusyRef.current = false
+    }
+  }, [activeItem?.image_path, activeItem?.name, image.image_path, image.name])
+
+  const [reactionOpenSignal, setReactionOpenSignal] = useState(0)
 
   useEffect(() => {
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      if (event.key === "ArrowLeft") {
-        event.preventDefault()
+      const action = resolveLightboxShortcut(event.key, {
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+      })
+      if (!action) return
+      event.preventDefault()
+      if (action === "prev") {
         goLightboxPrev()
         return
       }
-      if (event.key === "ArrowRight") {
-        event.preventDefault()
+      if (action === "next") {
         goLightboxNext()
         return
       }
-      if (event.key === "i" || event.key === "I") {
-        event.preventDefault()
+      if (action === "first") {
+        setActiveIndex(0)
+        return
+      }
+      if (action === "last") {
+        setActiveIndex(Math.max(0, sequenceMedia.length - 1))
+        return
+      }
+      if (action === "toggle-details") {
         setMobileDetailsOpen((open) => !open)
         return
       }
-      if (event.key === "s" || event.key === "S") {
-        event.preventDefault()
+      if (action === "share") {
         void copyShareLink()
+        return
+      }
+      if (action === "favorite") {
+        void toggleFavoriteFromKeyboard()
+        return
+      }
+      if (action === "download") {
+        // Click path busy state lives on DownloadOriginalButton; keyboard
+        // download is a one-shot toast flow without a dedicated control.
+        void downloadOriginalFromKeyboard()
+        return
+      }
+      if (action === "react") {
+        if (!lightboxReactionsAvailable || !canReact) return
+        setReactionOpenSignal((n) => n + 1)
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [copyShareLink, goLightboxNext, goLightboxPrev, isDialogOpen])
+  }, [
+    canReact,
+    copyShareLink,
+    downloadOriginalFromKeyboard,
+    goLightboxNext,
+    goLightboxPrev,
+    isDialogOpen,
+    lightboxReactionsAvailable,
+    sequenceMedia.length,
+    toggleFavoriteFromKeyboard,
+  ])
 
   // Prefetch adjacent sequence full-res for snappier story browsing.
   useEffect(() => {
@@ -335,7 +469,10 @@ export function GalleryCard({
         "mx-auto w-full sm:max-w-none",
         frame.maxWidthClass,
         gridFocused &&
-          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background"
+          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background",
+        selectionMode &&
+          selected &&
+          "rounded-sm ring-2 ring-foreground/40 ring-offset-2 ring-offset-background"
       )}
     >
       <div className="flex justify-center px-3 py-3 sm:px-4 sm:py-4">
@@ -352,7 +489,10 @@ export function GalleryCard({
             } as React.CSSProperties
           }
         >
-          <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
+          <Dialog
+            open={selectionMode ? false : isDialogOpen}
+            onOpenChange={selectionMode ? undefined : handleDialogOpenChange}
+          >
             <div
               className={cn(
                 galleryPolaroidClass(),
@@ -360,13 +500,25 @@ export function GalleryCard({
                   "gallery-polaroid-tape gallery-polaroid-tape--tl",
                 tape === "tr" &&
                   "gallery-polaroid-tape gallery-polaroid-tape--tr",
-                tape === "clip" && "gallery-polaroid-clip"
+                tape === "clip" && "gallery-polaroid-clip",
+                selectionMode && selected && "ring-2 ring-foreground/30"
               )}
             >
-              <DialogTrigger asChild>
+              {selectionMode ? (
                 <button
                   type="button"
-                  className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  ref={wallFocusRef}
+                  data-wall-focused={gridFocused ? "true" : undefined}
+                  aria-pressed={selected}
+                  aria-label={
+                    selected
+                      ? `Deselect ${activeItem?.name ?? image.name}`
+                      : `Select ${activeItem?.name ?? image.name}`
+                  }
+                  onClick={(event) =>
+                    onToggleSelected?.(image.id, { shiftKey: event.shiftKey })
+                  }
+                  className="relative block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {thumbFailed ? (
                     <div
@@ -411,43 +563,109 @@ export function GalleryCard({
                         onError={() => setThumbFailed(true)}
                       />
                       {activeIsVideo ? <PlayBadge /> : null}
-                      {pinnedAt ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
-                          )}
-                        >
-                          <IconPin className="size-3" aria-hidden />
-                          Pinned
-                        </div>
-                      ) : null}
-                      {showSequenceBadge ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
-                          )}
-                        >
-                          {sequenceGapLabel
-                            ? `Incomplete · ${image.sequence_count}`
-                            : `${image.sequence_count} shots`}
-                        </div>
-                      ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
-                    <p
-                      className={cn(
-                        gallerySerif(),
-                        "truncate text-center text-[0.95rem] leading-snug text-foreground/90 sm:text-base"
-                      )}
-                    >
-                      {image.name}
-                    </p>
-                  </div>
+                  <span
+                    className={cn(
+                      "absolute top-4 left-4 flex size-6 items-center justify-center rounded-md border text-[11px] shadow-sm backdrop-blur-sm",
+                      selected
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border/80 bg-background/85 text-muted-foreground"
+                    )}
+                    aria-hidden
+                  >
+                    {selected ? "✓" : ""}
+                  </span>
                 </button>
-              </DialogTrigger>
+              ) : (
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    ref={wallFocusRef}
+                    data-wall-focused={gridFocused ? "true" : undefined}
+                    className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {thumbFailed ? (
+                      <div
+                        className={cn(
+                          "mx-2.5 mt-2.5 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-4 text-center shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src="/icons/mark.png"
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="size-9 object-contain opacity-40 grayscale"
+                          draggable={false}
+                          unoptimized
+                        />
+                        <span
+                          className={cn(
+                            gallerySans(),
+                            "text-[11px] tracking-wide text-zinc-500/90"
+                          )}
+                        >
+                          Preview unavailable
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "relative mx-2.5 mt-2.5 overflow-hidden bg-neutral-200/80 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src={thumbUrl}
+                          alt={activeItem?.name ?? image.name}
+                          fill
+                          priority={priorityLcp}
+                          sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 28vw"
+                          className="object-cover"
+                          decoding="async"
+                          onError={() => setThumbFailed(true)}
+                        />
+                        {activeIsVideo ? <PlayBadge /> : null}
+                        {pinnedAt ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
+                            )}
+                          >
+                            <IconPin className="size-3" aria-hidden />
+                            Pinned
+                          </div>
+                        ) : null}
+                        {showSequenceBadge ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                            )}
+                          >
+                            {sequenceGapLabel
+                              ? `Incomplete · ${image.sequence_count}`
+                              : `${image.sequence_count} shots`}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </button>
+                </DialogTrigger>
+              )}
+              {/* Caption sits outside DialogTrigger so owner edit controls are not nested buttons. */}
+              <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
+                <GalleryTitleEditor
+                  imageId={image.id}
+                  name={image.name}
+                  canEdit={isOwner && !selectionMode}
+                  variant="polaroid"
+                  onRenamed={onArtworkRenamed}
+                />
+              </div>
             </div>
             <DialogContent
               showCloseButton={false}
@@ -464,6 +682,12 @@ export function GalleryCard({
               <DialogTitle className="sr-only">
                 {activeItem?.name ?? image.name}
               </DialogTitle>
+              <p className="sr-only" aria-live="polite" aria-atomic="true">
+                {activeItem?.name ?? image.name}
+                {isSequence
+                  ? ` · shot ${activeIndex + 1} of ${sequenceMedia.length}`
+                  : ""}
+              </p>
               <div className="gallery-lightbox-layout">
                 <GalleryLightboxMediaPane
                   gestureProps={gestureProps as Record<string, unknown>}
@@ -493,8 +717,14 @@ export function GalleryCard({
                   isSequence={isSequence}
                   activeIndex={activeIndex}
                   sequenceLength={sequenceMedia.length}
+                  sequenceMedia={sequenceMedia}
                   isSignedIn={isSignedIn}
                   isAdmin={isAdmin}
+                  pinAvailable={pinAvailable}
+                  favoritesAvailable={favoritesAvailable}
+                  albumsAvailable={albumsAvailable}
+                  tagsAvailable={tagsAvailable}
+                  isOwner={isOwner}
                   viewerId={viewerId}
                   viewerName={viewerName}
                   members={members}
@@ -507,9 +737,18 @@ export function GalleryCard({
                   counts={counts}
                   myReaction={myReaction}
                   canReact={canReact}
+                  reactionBusy={reactionBusy}
                   onReact={onReact}
+                  reactionOpenSignal={reactionOpenSignal}
                   comments={comments}
                   setComments={setComments}
+                  onArtworkRenamed={onArtworkRenamed}
+                  favorited={favorited}
+                  onFavoritedChange={setFavorited}
+                  commentPinAvailable={commentPinAvailable}
+                  commentLikesAvailable={commentLikesAvailable}
+                  reactionsAvailable={lightboxReactionsAvailable}
+                  commentsAvailable={commentsAvailable}
                 />
               </div>
             </DialogContent>
@@ -520,33 +759,42 @@ export function GalleryCard({
         <div
           className={cn(
             "flex flex-wrap items-center gap-2",
-            reactionTotal > 0 ? "justify-between" : "justify-end"
+            reactionsAvailable && reactionTotal > 0
+              ? "justify-between"
+              : "justify-end"
           )}
         >
-          <ReactionSummary
-            total={reactionTotal}
-            counts={counts}
-            namesByReaction={namesByReaction}
-          />
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileDetailsOpen(true)
-                setIsDialogOpen(true)
-              }}
-              className={galleryPillClass()}
-            >
-              {wallCommentCount > 0
-                ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
-                : "Comment"}
-            </button>
-            <ReactionBar
+          {reactionsAvailable ? (
+            <ReactionSummary
+              total={reactionTotal}
               counts={counts}
-              myReaction={myReaction}
-              canReact={canReact}
-              onReact={onReact}
+              namesByReaction={namesByReaction}
             />
+          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {commentsAvailable ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDetailsOpen(true)
+                  setIsDialogOpen(true)
+                }}
+                className={galleryPillClass()}
+              >
+                {wallCommentCount > 0
+                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
+                  : "Comment"}
+              </button>
+            ) : null}
+            {reactionsAvailable ? (
+              <ReactionBar
+                counts={counts}
+                myReaction={myReaction}
+                canReact={canReact}
+                busy={reactionBusy}
+                onReact={onReact}
+              />
+            ) : null}
           </div>
         </div>
       </figcaption>

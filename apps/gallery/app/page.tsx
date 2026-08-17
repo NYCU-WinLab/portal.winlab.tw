@@ -6,15 +6,34 @@ import { GalleryInfiniteWall } from "@/app/_components/gallery-infinite-wall"
 import { GalleryHomeFiltersBar } from "@/app/_components/gallery-home-filters"
 import { GalleryHomeHero } from "@/app/_components/gallery-home-hero"
 import { GalleryGrid } from "@/app/_components/gallery-grid"
+import { GalleryMemoriesTeaser } from "@/app/_components/gallery-memories-teaser"
 import { GalleryThemedShell } from "@/components/gallery-shell"
 import { parseGalleryHomeFilters } from "@/lib/gallery/home-filters"
+import { isGalleryAlbumsReady } from "@/lib/gallery/albums"
+import { isGalleryFavoritesReady } from "@/lib/gallery/favorites"
+import { isGalleryCommentsReady } from "@/lib/gallery/comment-edit"
 import { loadGalleryHomePages } from "@/lib/gallery/load-home-page"
+import { loadGalleryMemoriesOnThisDay } from "@/lib/gallery/load-memories"
+import {
+  isGalleryPinReady,
+  isGalleryVideoReady,
+} from "@/lib/gallery/manage-uploads"
+import { isGalleryReactionsReady } from "@/lib/gallery/reactions"
+import {
+  formatMemoriesDayLabel,
+  galleryTaipeiCalendarDay,
+} from "@/lib/gallery/memories"
 import {
   buildGalleryPhotoMetadata,
   DEFAULT_GALLERY_METADATA,
   resolveGallerySiteOrigin,
 } from "@/lib/gallery/og-metadata"
 import { resolveGalleryPhotoDeepLink } from "@/lib/gallery/photo-deep-link"
+import type { GalleryTagSuggestion } from "@/lib/gallery/tags"
+import {
+  isGalleryTagsReady,
+  isGalleryTagsUnavailable,
+} from "@/lib/gallery/tags"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/user"
 
@@ -29,6 +48,9 @@ type GalleryHomePageProps = {
     media?: string
     after?: string
     q?: string
+    tag?: string
+    saved?: string
+    album?: string
   }>
 }
 
@@ -57,8 +79,17 @@ export async function generateMetadata({
 export default async function GalleryHomePage({
   searchParams,
 }: GalleryHomePageProps) {
-  const { page, photo, comment, uploader, media, after, q } = await searchParams
-  const filters = parseGalleryHomeFilters({ uploader, media, after, q })
+  const { page, photo, comment, uploader, media, after, q, tag, saved, album } =
+    await searchParams
+  const filters = parseGalleryHomeFilters({
+    uploader,
+    media,
+    after,
+    q,
+    tag,
+    saved,
+    album,
+  })
   const parsedPage = Number.parseInt(page ?? "1", 10)
   const requestedPage =
     Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -80,23 +111,111 @@ export default async function GalleryHomePage({
     }
   }
 
-  const { images, members, currentPage, hasMore } = await loadGalleryHomePages(
-    supabase,
-    {
+  const today = galleryTaipeiCalendarDay()
+  const [
+    { images, members, currentPage, hasMore },
+    popularTagsResult,
+    memoriesResult,
+    pinAvailable,
+    favoritesAvailable,
+    albumsAvailable,
+    tagsAvailable,
+    reactionsAvailable,
+    commentsAvailable,
+    videoAvailable,
+  ] = await Promise.all([
+    loadGalleryHomePages(supabase, {
       throughPage,
       userId: user?.id ?? null,
       filters,
+    }),
+    supabase.rpc("gallery_list_popular_tags", { p_limit: 40 }),
+    loadGalleryMemoriesOnThisDay(supabase, {
+      month: today.month,
+      day: today.day,
+      limit: 12,
+    }),
+    isGalleryPinReady(supabase),
+    isGalleryFavoritesReady(supabase),
+    isGalleryAlbumsReady(supabase),
+    isGalleryTagsReady(supabase),
+    isGalleryReactionsReady(supabase),
+    isGalleryCommentsReady(supabase),
+    isGalleryVideoReady(supabase),
+  ])
+  const memoryPhotos = memoriesResult.photos
+  const memoriesAvailable = memoriesResult.available
+
+  // Soft-fail when gallery_list_popular_tags is missing (migration not applied).
+  let popularTags: GalleryTagSuggestion[] = []
+  let popularTagsFailed = false
+  if (popularTagsResult.error) {
+    if (!isGalleryTagsUnavailable(popularTagsResult.error)) {
+      console.error("[gallery] popular tags failed", popularTagsResult.error)
+      popularTagsFailed = true
     }
-  )
+  } else {
+    popularTags = (
+      (popularTagsResult.data ?? []) as GalleryTagSuggestion[]
+    ).map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      use_count: Number(row.use_count) || 0,
+    }))
+  }
 
   return (
     <GalleryThemedShell active="home" signedIn={Boolean(user)}>
       <div className="overflow-x-clip">
         <GalleryHomeHero />
+        {memoriesAvailable ? (
+          <GalleryMemoriesTeaser
+            photos={memoryPhotos}
+            dayLabel={formatMemoriesDayLabel(today.month, today.day)}
+          />
+        ) : null}
         {user ? (
           <Suspense fallback={null}>
-            <GalleryHomeFiltersBar filters={filters} members={members} />
+            <GalleryHomeFiltersBar
+              filters={{
+                ...filters,
+                savedOnly: favoritesAvailable ? filters.savedOnly : false,
+                albumSlug: albumsAvailable ? filters.albumSlug : null,
+                tagSlug: tagsAvailable ? filters.tagSlug : null,
+                media:
+                  !videoAvailable && filters.media === "video"
+                    ? "all"
+                    : filters.media,
+              }}
+              members={members}
+              popularTags={tagsAvailable ? popularTags : []}
+              popularTagsFailed={tagsAvailable && popularTagsFailed}
+              favoritesAvailable={favoritesAvailable}
+              tagsAvailable={tagsAvailable}
+              videoAvailable={videoAvailable}
+            />
           </Suspense>
+        ) : filters.tagSlug || filters.albumSlug ? (
+          <p className="mx-auto mb-6 max-w-md px-6 text-center text-xs text-zinc-600">
+            {filters.albumSlug ? (
+              <>
+                Showing album{" "}
+                <span className="font-medium text-foreground">
+                  {filters.albumSlug}
+                </span>
+              </>
+            ) : (
+              <>
+                Showing tag{" "}
+                <span className="font-medium text-foreground">
+                  #
+                  {popularTags.find((item) => item.slug === filters.tagSlug)
+                    ?.slug ?? filters.tagSlug}
+                </span>
+              </>
+            )}
+          </p>
         ) : null}
         <Suspense
           fallback={
@@ -107,6 +226,12 @@ export default async function GalleryHomePage({
               viewerName={user?.name ?? "You"}
               members={members}
               isAdmin={user?.isAdmin ?? false}
+              pinAvailable={pinAvailable}
+              favoritesAvailable={favoritesAvailable}
+              albumsAvailable={albumsAvailable}
+              tagsAvailable={tagsAvailable}
+              reactionsAvailable={reactionsAvailable}
+              commentsAvailable={commentsAvailable}
             />
           }
         >
@@ -116,6 +241,9 @@ export default async function GalleryHomePage({
               filters.media,
               filters.uploadedAfter ?? "",
               filters.query ?? "",
+              filters.tagSlug ?? "",
+              filters.savedOnly ? "1" : "",
+              filters.albumSlug ?? "",
               String(currentPage),
             ].join("|")}
             initialImages={images}
@@ -127,6 +255,12 @@ export default async function GalleryHomePage({
             viewerName={user?.name ?? "You"}
             members={members}
             isAdmin={user?.isAdmin ?? false}
+            pinAvailable={pinAvailable}
+            favoritesAvailable={favoritesAvailable}
+            albumsAvailable={albumsAvailable}
+            tagsAvailable={tagsAvailable}
+            reactionsAvailable={reactionsAvailable}
+            commentsAvailable={commentsAvailable}
             openPhotoId={openPhotoId}
             openCommentId={openCommentId}
           />

@@ -138,21 +138,62 @@ export function slotTier(
   return "none"
 }
 
-// Room-selection priority when suggesting where to book: free tier before
-// paid, and within a tier, prefer by room-number prefix in this order.
-const ROOM_PREFIX_PRIORITY = ["600", "500", "300", "200", "100", "700"]
+// Which floor to prefer when suggesting where to book. Keyed on the floor
+// digit rather than a list of whole room numbers on purpose: the building
+// can't grow storeys, but it can grow seminar rooms, so a hardcoded
+// ["600", "500", …] silently drops every room nobody remembered to add.
+// 7 last is a preference, not arithmetic.
+const FLOOR_PRIORITY = [6, 5, 4, 3, 2, 1, 7]
 
-function roomPriorityRank(roomName: string): number {
-  const rank = ROOM_PREFIX_PRIORITY.findIndex((prefix) =>
-    roomName.startsWith(prefix)
-  )
-  return rank === -1 ? ROOM_PREFIX_PRIORITY.length : rank
+interface RoomKey {
+  floorRank: number
+  /** The room number itself, e.g. 705 for `ES705`. */
+  number: number
+  /** Trailing letters only: `600A` -> `A`, `ES705` -> ``. */
+  suffix: string
+}
+
+// Trailing digits plus any letters after them. Anchored at the end so a
+// leading prefix (`ES705`) is ignored rather than mistaken for a suffix.
+const ROOM_NUMBER = /(\d+)([A-Za-z]*)\s*$/
+
+function roomKey(roomName: string): RoomKey {
+  const match = ROOM_NUMBER.exec(roomName.trim())
+  if (!match?.[1]) {
+    // Nothing numeric to place it by — sorts last rather than anywhere.
+    return { floorRank: FLOOR_PRIORITY.length, number: Infinity, suffix: "" }
+  }
+
+  const digits = match[1]
+  const rank = FLOOR_PRIORITY.indexOf(Number(digits[0]))
+  return {
+    floorRank: rank === -1 ? FLOOR_PRIORITY.length : rank,
+    number: Number(digits),
+    suffix: match[2] ?? "",
+  }
+}
+
+/**
+ * Order rooms best-first: floor, then room number ascending, then the
+ * trailing letter DESCENDING so 600B beats 600A.
+ *
+ * The reversal is N0Ball's call and applies only once two rooms already share
+ * a number, so it can never pull a worse floor ahead — 700B still loses to
+ * 600A.
+ */
+function compareRooms(a: string, b: string): number {
+  const left = roomKey(a)
+  const right = roomKey(b)
+
+  if (left.floorRank !== right.floorRank) {
+    return left.floorRank - right.floorRank
+  }
+  if (left.number !== right.number) return left.number - right.number
+  return right.suffix.localeCompare(left.suffix)
 }
 
 function bestByPriority(roomNames: string[]): string | undefined {
-  return [...roomNames].sort(
-    (a, b) => roomPriorityRank(a) - roomPriorityRank(b)
-  )[0]
+  return [...roomNames].sort(compareRooms)[0]
 }
 
 export interface RoomSuggestion {

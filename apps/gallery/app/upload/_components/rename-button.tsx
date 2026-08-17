@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -14,22 +15,42 @@ import {
 import { Input } from "@workspace/ui/components/input"
 
 import { renameGalleryImage } from "@/app/upload/actions"
+import { ARTWORK_NAME_MAX } from "@/lib/gallery/upload-naming"
+import { describeArtworkNameUpdated } from "@/lib/gallery/manage-toast"
+import { describeSavingLabel } from "@/lib/gallery/busy-labels"
+import { describeSaveLabel } from "@/lib/gallery/dialog-action-labels"
 
-export function RenameButton({ id, name }: { id: string; name: string }) {
+export function RenameButton({
+  id,
+  name,
+  onRenamed,
+}: {
+  id: string
+  name: string
+  onRenamed?: (nextName: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(name)
   const [pending, startTransition] = useTransition()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    if (open) setDraft(name)
-  }, [open, name])
+  function openEditor(nextOpen: boolean) {
+    if (nextOpen) setDraft(name)
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      queueMicrotask(() => triggerRef.current?.focus())
+    }
+  }
 
   function onSave() {
     startTransition(async () => {
       const result = await renameGalleryImage(id, draft)
       if (result.ok) {
-        toast.success("Name updated")
-        setOpen(false)
+        const applied =
+          result.names.find((patch) => patch.id === id)?.name ?? draft
+        onRenamed?.(applied)
+        toast.success(describeArtworkNameUpdated())
+        openEditor(false)
       } else {
         toast.error(result.error)
       }
@@ -37,11 +58,14 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={openEditor}>
       <Button
+        ref={triggerRef}
         type="button"
         variant="ghost"
-        onClick={() => setOpen(true)}
+        onClick={() => openEditor(true)}
+        aria-label={`Rename ${name}`}
+        aria-busy={pending || undefined}
         className="!text-lg text-muted-foreground italic hover:bg-transparent hover:text-foreground"
       >
         Rename
@@ -51,17 +75,21 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
           <DialogTitle className="font-serif text-2xl italic">
             Rename work
           </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Update the title shown on the wall and in Manage.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">
           <label
             className="text-sm text-muted-foreground"
-            htmlFor="rename-name"
+            htmlFor={`rename-name-${id}`}
           >
             Name
           </label>
           <Input
-            id="rename-name"
+            id={`rename-name-${id}`}
             value={draft}
+            maxLength={ARTWORK_NAME_MAX}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -78,13 +106,18 @@ export function RenameButton({ id, name }: { id: string; name: string }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => openEditor(false)}
             disabled={pending}
           >
             Cancel
           </Button>
-          <Button type="button" onClick={onSave} disabled={pending}>
-            Save
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={pending}
+            aria-busy={pending || undefined}
+          >
+            {pending ? describeSavingLabel() : describeSaveLabel()}
           </Button>
         </DialogFooter>
       </DialogContent>
