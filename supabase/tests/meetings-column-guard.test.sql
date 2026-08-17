@@ -12,7 +12,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(20);
+select plan(23);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -199,10 +199,32 @@ select is(
   'an overlong thesis title is capped at 300 characters');
 
 -- ═══ thesis weeks are anchored ══════════════════════════════════════════════
+-- request.jwt.claims is transaction-local: `reset role` drops the ROLE but
+-- leaves the claim, so auth.uid() keeps returning whoever was set last. Every
+-- block below names its own actor rather than inheriting one. (The first draft
+-- didn't, and a check meant to run as superuser quietly ran as the presenter —
+-- it passed the guard's test instead of the CHECK's.)
+
+-- A member never reaches the CHECK at all: the guard refuses the flip first.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-000000000002","role":"authenticated"}', true);
+update public.meetings set is_speaker = true
+where id = '11111111-0000-0000-0000-000000000002';
+reset role;
+
+select is(
+  (select is_speaker from public.meetings where id = '11111111-0000-0000-0000-000000000002'),
+  false,
+  'a presenter cannot flip a thesis week to a speaker week (guard, before any CHECK)');
+
+-- With an admin the guard steps aside, and the CHECK is what refuses it.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-000000000001","role":"authenticated"}', true);
 select throws_ok(
   $$ update public.meetings set is_speaker = true
      where id = '11111111-0000-0000-0000-000000000002' $$,
-  '23514', NULL, 'a thesis week cannot also be a speaker week (CHECK)');
+  '23514', NULL, 'not even an admin can make a week both thesis and speaker (CHECK)');
+reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-000000000003","role":"authenticated"}', true);
