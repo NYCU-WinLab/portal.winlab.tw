@@ -10,6 +10,7 @@ function meeting(partial: Partial<Meeting> & { id: string }): Meeting {
     scheduledDate: "2026-01-01",
     isHoliday: false,
     isSpeaker: false,
+    isThesis: false,
     presenter: null,
     presenterUserId: null,
     pptUploaded: false,

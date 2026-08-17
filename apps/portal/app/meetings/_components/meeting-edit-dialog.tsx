@@ -31,6 +31,7 @@ import {
   usePaperAssignments,
 } from "@/hooks/meetings/use-teacher-papers"
 import {
+  hasFreeFormTitle,
   meetingType,
   typeFlags,
   type MeetingType,
@@ -147,8 +148,10 @@ export function MeetingEditDialog({
   const [speakerName, setSpeakerName] = useState(
     meeting.isSpeaker ? (meeting.presenter ?? "") : ""
   )
-  const [talkTitle, setTalkTitle] = useState(
-    meeting.isSpeaker ? (meeting.paperTitle ?? "") : ""
+  // One field for both kinds that carry a typed title: a speaker's talk and a
+  // student's own thesis. Both land in paper_title.
+  const [freeTitle, setFreeTitle] = useState(
+    hasFreeFormTitle(meetingType(meeting)) ? (meeting.paperTitle ?? "") : ""
   )
   const [teacherPaperId, setTeacherPaperId] = useState(
     meeting.teacherPaperId ?? "__none__"
@@ -159,16 +162,18 @@ export function MeetingEditDialog({
   const [pptUploading, setPptUploading] = useState(false)
   const [videoChecking, setVideoChecking] = useState(false)
 
-  // In the read-only view students only reach the edit button for their own
-  // presentation week, so the 3-way type selector is admin-only; a non-admin
-  // always edits a plain presentation.
-  const effectiveType: MeetingType = isAdmin ? type : "presentation"
+  // The type selector is admin-only. A non-admin can't change the kind of week,
+  // but they can be editing a thesis week an admin flagged for them — so read
+  // the kind off the row rather than assuming a plain presentation.
+  const effectiveType: MeetingType = isAdmin ? type : meetingType(meeting)
   const isPresentation = effectiveType === "presentation"
   const isSpeaker = effectiveType === "speaker"
+  const isThesis = effectiveType === "thesis"
+  const isFreeTitle = hasFreeFormTitle(effectiveType)
 
   const selectedPaper = papers.find((p) => p.id === teacherPaperId) ?? null
   const paperTitle = selectedPaper?.paperName ?? ""
-  const uploadTitle = isSpeaker ? talkTitle : paperTitle
+  const uploadTitle = isFreeTitle ? freeTitle : paperTitle
 
   // Which reading-list papers this meeting can pick, given its date + presenter:
   // 365-day cooldown against every other meeting holding the paper, plus the
@@ -212,7 +217,9 @@ export function MeetingEditDialog({
     setStartTime(meeting.startTime)
     setPresenterUserId(meeting.presenterUserId ?? "__none__")
     setSpeakerName(meeting.isSpeaker ? (meeting.presenter ?? "") : "")
-    setTalkTitle(meeting.isSpeaker ? (meeting.paperTitle ?? "") : "")
+    setFreeTitle(
+      hasFreeFormTitle(meetingType(meeting)) ? (meeting.paperTitle ?? "") : ""
+    )
     setTeacherPaperId(meeting.teacherPaperId ?? "__none__")
     setPptLink(meeting.pptLink)
     setVideoLink(meeting.videoLink)
@@ -259,9 +266,13 @@ export function MeetingEditDialog({
 
     if (isAdmin) {
       const flags = typeFlags(effectiveType)
+      // A thesis week still has a lab member presenting, so it carries a
+      // presenter exactly like a plain presentation; only the title's source
+      // differs.
+      const hasPresenterUser = isPresentation || isThesis
       const resolvedPresenter = isSpeaker
         ? speakerName.trim() || null
-        : isPresentation
+        : hasPresenterUser
           ? (selectedUser?.name ?? null)
           : null
 
@@ -272,22 +283,23 @@ export function MeetingEditDialog({
           scheduledDate: date,
           isHoliday: flags.isHoliday,
           isSpeaker: flags.isSpeaker,
+          isThesis: flags.isThesis,
           presenter: resolvedPresenter,
           presenterUserId:
-            isPresentation && presenterUserId !== "__none__"
+            hasPresenterUser && presenterUserId !== "__none__"
               ? presenterUserId
               : null,
           teacherPaperId:
             isPresentation && teacherPaperId !== "__none__"
               ? teacherPaperId
               : null,
-          // Speaker → store the talk title. Leaving speaker mode → clear the
-          // stale talk title (else it lingers in the Paper column). Otherwise
-          // omit, so a normal week's paper_title stays trigger-derived from
-          // teacher_paper_id (and legacy free-text titles are untouched).
-          paperTitle: isSpeaker
-            ? talkTitle.trim() || null
-            : meeting.isSpeaker
+          // Speaker / thesis → store the typed title. Leaving either mode →
+          // clear the stale title (else it lingers in the Paper column).
+          // Otherwise omit, so a normal week's paper_title stays trigger-derived
+          // from teacher_paper_id (and legacy free-text titles are untouched).
+          paperTitle: isFreeTitle
+            ? freeTitle.trim() || null
+            : hasFreeFormTitle(meetingType(meeting))
               ? null
               : undefined,
           pptUploaded: !!pptLink,
@@ -304,10 +316,11 @@ export function MeetingEditDialog({
       updateOwn.mutate(
         {
           id: meeting.id,
-          presenter: selectedUser?.name ?? null,
-          presenterUserId:
-            presenterUserId === "__none__" ? null : presenterUserId,
-          teacherPaperId: teacherPaperId === "__none__" ? null : teacherPaperId,
+          teacherPaperId:
+            isThesis || teacherPaperId === "__none__" ? null : teacherPaperId,
+          // The thesis week is the one place a presenter may type a title; the
+          // guard trigger drops it on any other kind, so don't even send it.
+          paperTitle: isThesis ? freeTitle.trim() || null : undefined,
           pptUploaded: !!pptLink,
           pptLink,
           videoUploaded: !!videoLink,
@@ -370,13 +383,16 @@ export function MeetingEditDialog({
                   />
                 </div>
               </div>
-              {isPresentation && (
+              {(isPresentation || isThesis) && (
                 <QuestionersField meetingId={meeting.id} year={meeting.year} />
               )}
             </>
           )}
 
-          {isPresentation && (
+          {/* Admin-only: meetings_guard_columns pins presenter for everyone
+              else, so showing this to a member would be a control that silently
+              does nothing. */}
+          {isAdmin && (isPresentation || isThesis) && (
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
               <PresenterSelect
@@ -388,24 +404,31 @@ export function MeetingEditDialog({
           )}
 
           {isSpeaker && (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label>講者姓名</Label>
-                <Input
-                  value={speakerName}
-                  onChange={(e) => setSpeakerName(e.target.value)}
-                  placeholder="吳凱強老師"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>講題（選填）</Label>
-                <Input
-                  value={talkTitle}
-                  onChange={(e) => setTalkTitle(e.target.value)}
-                  placeholder="演講主題"
-                />
-              </div>
-            </>
+            <div className="flex flex-col gap-1.5">
+              <Label>講者姓名</Label>
+              <Input
+                value={speakerName}
+                onChange={(e) => setSpeakerName(e.target.value)}
+                placeholder="吳凱強老師"
+              />
+            </div>
+          )}
+
+          {isFreeTitle && (
+            <div className="flex flex-col gap-1.5">
+              <Label>{isThesis ? "論文題目（選填）" : "講題（選填）"}</Label>
+              <Input
+                value={freeTitle}
+                onChange={(e) => setFreeTitle(e.target.value)}
+                maxLength={300}
+                placeholder={isThesis ? "你的碩士論文題目" : "演講主題"}
+              />
+              {isThesis && (
+                <p className="text-xs text-muted-foreground">
+                  碩論不在老師 Papers 清單裡，題目由報告人自己填。
+                </p>
+              )}
+            </div>
           )}
 
           {isPresentation && (
