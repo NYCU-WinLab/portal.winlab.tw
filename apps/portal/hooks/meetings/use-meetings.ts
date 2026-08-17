@@ -52,9 +52,8 @@ export function useUpdateOwnMeeting() {
   return useMutation({
     mutationFn: async ({
       id,
-      presenter,
-      presenterUserId,
       teacherPaperId,
+      paperTitle,
       pptUploaded,
       pptLink,
       videoUploaded,
@@ -62,26 +61,29 @@ export function useUpdateOwnMeeting() {
       notes,
     }: {
       id: string
-      presenter: string | null
-      presenterUserId: string | null
       teacherPaperId: string | null
+      /** Thesis weeks only — the presenter types their own title. */
+      paperTitle?: string | null
       pptUploaded: boolean
       pptLink: string | null
       videoUploaded: boolean
       videoLink: string | null
       notes: string | null
     }) => {
+      // Deliberately narrow: meetings_guard_columns silently restores OLD for
+      // every column an admin owns (presenter, dates, week kind, paper_link), so
+      // sending them here would look like it worked and change nothing.
       const { error } = await supabase
         .from(TABLE)
         .update({
-          presenter,
-          presenter_user_id: presenterUserId,
           teacher_paper_id: teacherPaperId,
           ppt_uploaded: pptUploaded,
           ppt_link: pptLink,
           video_uploaded: videoUploaded,
           video_link: videoLink,
           notes,
+          // Only accepted on a week an admin already flagged is_thesis.
+          ...(paperTitle !== undefined ? { paper_title: paperTitle } : {}),
         })
         .eq("id", id)
       if (error) throw new Error(paperErrorMessage(error))
@@ -134,6 +136,7 @@ export function useAdminUpdateMeeting() {
       scheduledDate,
       isHoliday,
       isSpeaker,
+      isThesis,
       presenter,
       presenterUserId,
       teacherPaperId,
@@ -151,6 +154,7 @@ export function useAdminUpdateMeeting() {
       scheduledDate: string
       isHoliday: boolean
       isSpeaker: boolean
+      isThesis: boolean
       presenter: string | null
       presenterUserId: string | null
       teacherPaperId: string | null
@@ -170,6 +174,7 @@ export function useAdminUpdateMeeting() {
           scheduled_date: scheduledDate,
           is_holiday: isHoliday,
           is_speaker: isSpeaker,
+          is_thesis: isThesis,
           presenter,
           presenter_user_id: presenterUserId,
           teacher_paper_id: teacherPaperId,
@@ -180,9 +185,10 @@ export function useAdminUpdateMeeting() {
           notes,
           location,
           start_time: startTime,
-          // Speaker weeks keep their talk title in paper_title (teacher_paper_id
-          // null → sync trigger leaves it). Only sent when provided so a normal
-          // week's paper_title stays trigger-derived from teacher_paper_id.
+          // Speaker and thesis weeks keep their typed title in paper_title
+          // (teacher_paper_id null → sync trigger normalizes and keeps it). Only
+          // sent when provided so a normal week's paper_title stays
+          // trigger-derived from teacher_paper_id.
           ...(paperTitle !== undefined ? { paper_title: paperTitle } : {}),
         })
         .eq("id", id)
@@ -215,6 +221,7 @@ export function useAddMeeting() {
       scheduledDate: string
       isHoliday: boolean
       isSpeaker?: boolean
+      isThesis?: boolean
       presenter: string | null
       presenterUserId: string | null
       paperTitle?: string | null
@@ -227,11 +234,13 @@ export function useAddMeeting() {
           scheduled_date: row.scheduledDate,
           is_holiday: row.isHoliday,
           is_speaker: row.isSpeaker ?? false,
+          is_thesis: row.isThesis ?? false,
           presenter: row.presenter,
           presenter_user_id: row.presenterUserId,
-          // Talk title lives in paper_title for a speaker week (teacher_paper_id
-          // stays null, so the sync trigger leaves this value alone). Only sent
-          // when provided so a normal week's paper_title is trigger-governed.
+          // The typed title lives in paper_title for a speaker or thesis week
+          // (teacher_paper_id stays null, so the sync trigger normalizes and
+          // keeps this value). Only sent when provided so a normal week's
+          // paper_title is trigger-governed.
           ...(row.paperTitle !== undefined
             ? { paper_title: row.paperTitle }
             : {}),

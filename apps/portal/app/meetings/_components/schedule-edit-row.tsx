@@ -124,6 +124,7 @@ export function ScheduleEditRow({
         scheduledDate: next.scheduledDate,
         isHoliday: next.isHoliday,
         isSpeaker: next.isSpeaker,
+        isThesis: next.isThesis,
         presenter: next.presenter,
         presenterUserId: next.presenterUserId,
         teacherPaperId: next.teacherPaperId,

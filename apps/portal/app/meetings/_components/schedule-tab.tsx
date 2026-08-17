@@ -80,10 +80,11 @@ export function ScheduleTab({ year }: { year: number }) {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
   const showEditMode = isAdmin && editMode
-  // Swap candidates: only real student-presentation weeks — holidays and
-  // speaker weeks are anchored and can't be swapped.
+  // Swap candidates: only real student-presentation weeks — holidays, speaker
+  // weeks and thesis weeks are anchored and can't be swapped (meetings_swap
+  // refuses all three; a thesis title belongs to the person who wrote it).
   const presentationMeetings = meetings.filter(
-    (m) => !m.isHoliday && !m.isSpeaker
+    (m) => !m.isHoliday && !m.isSpeaker && !m.isThesis
   )
 
   // Mirrors meetings_fill_presenters' own filter so the button's count is what
@@ -351,6 +352,11 @@ export function ScheduleTab({ year }: { year: number }) {
                           演講
                         </Badge>
                       )}
+                      {m.isThesis && (
+                        <Badge variant="secondary" className="font-normal">
+                          碩論
+                        </Badge>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className="text-center">
@@ -402,6 +408,7 @@ export function ScheduleTab({ year }: { year: number }) {
                       {user &&
                         !m.isHoliday &&
                         !m.isSpeaker &&
+                        !m.isThesis &&
                         !m.presenterUserId && (
                           <Button
                             size="sm"

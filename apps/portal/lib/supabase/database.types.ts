@@ -1201,6 +1201,7 @@ export type Database = {
           id: string
           is_holiday: boolean
           is_speaker: boolean
+          is_thesis: boolean
           location: string
           notes: string | null
           paper_link: string | null
@@ -1223,6 +1224,7 @@ export type Database = {
           id?: string
           is_holiday?: boolean
           is_speaker?: boolean
+          is_thesis?: boolean
           location?: string
           notes?: string | null
           paper_link?: string | null
@@ -1245,6 +1247,7 @@ export type Database = {
           id?: string
           is_holiday?: boolean
           is_speaker?: boolean
+          is_thesis?: boolean
           location?: string
           notes?: string | null
           paper_link?: string | null
