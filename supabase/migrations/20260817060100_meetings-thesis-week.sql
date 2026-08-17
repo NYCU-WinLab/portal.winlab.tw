@@ -90,7 +90,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  if current_setting('role', true) = 'service_role' then
+  if current_setting('role', true) = 'service_role' or auth.uid() is null then
     return new;
   end if;
 

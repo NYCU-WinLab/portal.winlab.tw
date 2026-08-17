@@ -38,7 +38,15 @@ begin
   -- service_role is server-side code holding the secret key (the cron routes and
   -- api/meetings/sync-files, which back-fills ppt_link / video_link), never a
   -- member's browser.
-  if current_setting('role', true) = 'service_role' then
+  --
+  -- The auth.uid() clause is a second way of asking the same question, because
+  -- getting this wrong fails silently: sync-files would keep reporting success
+  -- while its ppt_link / video_link writes were quietly reverted. Nothing is
+  -- given away by it — with no uid, neither meetings_update_admin nor
+  -- meetings_update_own grants the row (presenter_user_id = null is NULL, not
+  -- true), so RLS has already refused the write before this trigger runs. Only a
+  -- caller that bypasses RLS, i.e. service_role, can reach it.
+  if current_setting('role', true) = 'service_role' or auth.uid() is null then
     return new;
   end if;
 
