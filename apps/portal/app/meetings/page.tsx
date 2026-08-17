@@ -14,6 +14,11 @@ import {
 
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useSyncMeetingFiles } from "@/hooks/meetings/use-meetings"
+import { useScheduleYears } from "@/hooks/meetings/use-schedule-years"
+import {
+  defaultScheduleYear,
+  maxNavigableYear,
+} from "@/lib/meetings/schedule-year"
 
 import { AddMeetingDialog } from "./_components/add-meeting-dialog"
 import { AddPaperDialog } from "./_components/add-paper-dialog"
@@ -22,13 +27,22 @@ import { ManageTagsDialog } from "./_components/manage-tags-dialog"
 import { PapersTab } from "./_components/papers-tab"
 import { ScheduleTab } from "./_components/schedule-tab"
 
-const CURRENT_YEAR = new Date().getFullYear()
+const CALENDAR_YEAR = new Date().getFullYear()
 
 export default function MeetingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const year = Number(searchParams.get("year")) || CURRENT_YEAR
   const { isAdmin } = useMeetingsAdmin()
+
+  // meetings.year is a schedule bucket, not the calendar year of the dates in
+  // it, so both the default and the forward limit come from the data. While the
+  // bounds load, the empty-table fallbacks stand in and resolve to the calendar
+  // year — the same answer as before, on every day but new year's.
+  const { data: bounds = { upcoming: null, latest: null } } = useScheduleYears()
+  const year =
+    Number(searchParams.get("year")) ||
+    defaultScheduleYear(bounds, CALENDAR_YEAR)
+  const maxYear = maxNavigableYear(bounds, CALENDAR_YEAR)
 
   const syncFiles = useSyncMeetingFiles()
 
@@ -105,7 +119,7 @@ export default function MeetingsPage() {
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7"
-                disabled={year >= CURRENT_YEAR}
+                disabled={year >= maxYear}
                 onClick={() => setYear(year + 1)}
               >
                 <IconChevronRight className="h-4 w-4" />
