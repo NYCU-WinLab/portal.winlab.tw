@@ -5,7 +5,10 @@
 // requires a credential that can already create clients. Supply a Keycloak
 // admin login once via KEYCLOAK_BOOTSTRAP_USERNAME / _PASSWORD (password
 // grant through the built-in `admin-cli` client), let this run, then delete
-// those two lines. Everything afterwards runs on the service accounts.
+// those two lines — which this command does for you. Everything the *portal*
+// needs afterwards runs on the service accounts; `--attr` writes to the realm's
+// user profile, which needs `manage-realm`, so that work needs the admin login
+// restored for the run.
 //
 // Creating clients in a shared realm is outward-facing and not trivially
 // reversible, so the default is a dry run. `--apply` is the deliberate step.
@@ -38,8 +41,13 @@ type ClientSpec = {
 }
 
 // Split by blast radius, per the research record §6. The cli credential is
-// read-only by construction: a leaked laptop secret cannot mutate the realm,
-// and revoking it cannot take the deployed portal down.
+// read-only by construction: a leaked laptop secret cannot mutate the realm.
+// It is also what the deployed portal authenticates as: the same secret,
+// deployed under KEYCLOAK_READ_CLIENT_* rather than the KEYCLOAK_CLI_CLIENT_*
+// name this tool writes locally. So revoking it does take the portal's Keycloak
+// reads down with it — §6.1 of the research record says otherwise and is wrong
+// on that point. Giving prod its own view-users client would separate the two;
+// that is a deliberate deferral, not an oversight.
 const CLIENTS: ClientSpec[] = [
   {
     clientId: "winlab-portal-admin",
