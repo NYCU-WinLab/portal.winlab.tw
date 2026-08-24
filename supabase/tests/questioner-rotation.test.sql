@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(35);
+select plan(37);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -571,6 +571,53 @@ delete from public.meeting_presenter_pool where user_id in (
   '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000011',
   '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000013'
 );
+
+-- ═══ Scenario 11: manual replacement accepts presenter-pool members too ════
+-- Union consistency: meetings_replace_questioner has its own base-table
+-- eligibility check on the manual-replacement path, separate from the view
+-- the auto-pick branch reads. It must accept the same union the rotation
+-- view now draws from — a presenter-pool-only member is a valid manual
+-- replacement, and a member in NEITHER pool is still rejected.
+-- Reuses freed user_profiles rows 021/022/023 (freed by Scenario 2's
+-- cleanup) — none are in any pool when this scenario starts. Meeting m11 on
+-- a distinct date; presenter reuses S2 Presenter (003, not in any pool now).
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000011', 2026, '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000021', 113, 1, '2020-11-01 00:00:00+00'); -- presenter-pool-ONLY member (021 is NOT in meeting_question_pool)
+
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000022', 'auto'); -- pre-assigned, about to be manually removed
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$ select public.meetings_replace_questioner(
+       '10000000-0000-0000-0000-000000000011',
+       '00000000-0000-0000-0000-000000000022',
+       '00000000-0000-0000-0000-000000000021'
+     ) $$,
+  'an admin can manually replace a questioner with a presenter-pool-only member'
+);
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       '10000000-0000-0000-0000-000000000011',
+       '00000000-0000-0000-0000-000000000021',
+       '00000000-0000-0000-0000-000000000023'
+     ) $$,
+  'P0001',
+  '替補人選不在提問成員池中',
+  'a replacement in neither pool is still rejected'
+);
+reset role;
+
+delete from public.meeting_questioners where meeting_id = '10000000-0000-0000-0000-000000000011';
+delete from public.meeting_presenter_pool where user_id = '00000000-0000-0000-0000-000000000021';
 
 select * from finish();
 rollback;
