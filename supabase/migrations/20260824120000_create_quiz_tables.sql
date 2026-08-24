@@ -331,7 +331,10 @@ $function$;
 create or replace function public.get_current_question(p_session_id uuid)
 returns table (
   question_id uuid,
-  position smallint,
+  -- "position" (unlike a plain CREATE TABLE column) needs quoting here --
+  -- it's grammatically reserved inside a RETURNS TABLE column list because
+  -- of the POSITION(x IN y) function syntax.
+  "position" smallint,
   question_count integer,
   question_text text,
   choices text[],
