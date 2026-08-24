@@ -8,7 +8,7 @@ import { Button } from "@workspace/ui/components/button"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import {
   useAddPoolMember,
-  useQuestionPool,
+  useQuestionPoolMembers,
   useRemovePoolMember,
 } from "@/hooks/meetings/use-question-pool"
 
@@ -24,7 +24,7 @@ function lastAskedLabel(lastAskedDate: string | null) {
 }
 
 export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
-  const { data: pool = [], isLoading } = useQuestionPool()
+  const { data: pool = [], isLoading } = useQuestionPoolMembers()
   const { data: labUsers = [] } = useLabUsers()
   const addMember = useAddPoolMember()
   const removeMember = useRemovePoolMember()
