@@ -1485,6 +1485,221 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_answers: {
+        Row: {
+          answered_at: string
+          choice_index: number
+          id: string
+          is_correct: boolean
+          player_id: string
+          points_awarded: number
+          question_id: string
+          session_id: string
+        }
+        Insert: {
+          answered_at?: string
+          choice_index: number
+          id?: string
+          is_correct: boolean
+          player_id: string
+          points_awarded?: number
+          question_id: string
+          session_id: string
+        }
+        Update: {
+          answered_at?: string
+          choice_index?: number
+          id?: string
+          is_correct?: boolean
+          player_id?: string
+          points_awarded?: number
+          question_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_answers_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_players: {
+        Row: {
+          id: string
+          joined_at: string
+          nickname: string
+          score: number
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          nickname: string
+          score?: number
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          nickname?: string
+          score?: number
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_players_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_players_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_questions: {
+        Row: {
+          choices: string[]
+          correct_index: number
+          id: string
+          position: number
+          question_text: string
+          quiz_set_id: string
+          time_limit_seconds: number
+        }
+        Insert: {
+          choices: string[]
+          correct_index: number
+          id?: string
+          position: number
+          question_text: string
+          quiz_set_id: string
+          time_limit_seconds?: number
+        }
+        Update: {
+          choices?: string[]
+          correct_index?: number
+          id?: string
+          position?: number
+          question_text?: string
+          quiz_set_id?: string
+          time_limit_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_set_id_fkey"
+            columns: ["quiz_set_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sessions: {
+        Row: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          quiz_set_id: string
+          question_started_at: string | null
+          room_code: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          current_question_position?: number
+          ended_at?: string | null
+          host_id: string
+          id?: string
+          quiz_set_id: string
+          question_started_at?: string | null
+          room_code: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          current_question_position?: number
+          ended_at?: string | null
+          host_id?: string
+          id?: string
+          quiz_set_id?: string
+          question_started_at?: string | null
+          room_code?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sessions_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_sessions_quiz_set_id_fkey"
+            columns: ["quiz_set_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sets: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receipt_tag_assignments: {
         Row: {
           created_at: string
@@ -2520,12 +2735,113 @@ export type Database = {
         Args: { p_is_admin: boolean; p_roles: Json; p_target_id: string }
         Returns: undefined
       }
+      advance_quiz_session: {
+        Args: { p_session_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_quiz_session: {
+        Args: { p_quiz_set_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_current_question: {
+        Args: { p_session_id: string }
+        Returns: {
+          choices: string[]
+          correct_index: number | null
+          my_choice_index: number | null
+          my_is_correct: boolean | null
+          my_points_awarded: number | null
+          position: number
+          question_count: number
+          question_id: string
+          question_started_at: string
+          question_text: string
+          time_limit_seconds: number
+        }[]
+      }
+      join_quiz_session: {
+        Args: { p_room_code: string }
+        Returns: {
+          id: string
+          joined_at: string
+          nickname: string
+          score: number
+          session_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_players"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reveal_quiz_answer: {
+        Args: { p_session_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_game_score: {
         Args: {
           p_finish_ms: number
           p_game_type: Database["public"]["Enums"]["game_type"]
           p_level?: number
           p_score: number
+        }
+        Returns: undefined
+      }
+      submit_quiz_answer: {
+        Args: {
+          p_choice_index: number
+          p_question_id: string
+          p_session_id: string
         }
         Returns: undefined
       }
