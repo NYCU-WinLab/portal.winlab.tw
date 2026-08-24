@@ -750,8 +750,137 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_activity_notifications_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_activity_notifications_recipient_user_id_fkey"
             columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_album_images: {
+        Row: {
+          added_at: string
+          added_by: string
+          album_id: string
+          image_id: string
+          position: number
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          album_id: string
+          image_id: string
+          position?: number
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          album_id?: string
+          image_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_album_images_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_album_images_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_album_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_album_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_album_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_albums: {
+        Row: {
+          cover_image_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_albums_cover_image_id_fkey"
+            columns: ["cover_image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_cover_image_id_fkey"
+            columns: ["cover_image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_cover_image_id_fkey"
+            columns: ["cover_image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
@@ -881,6 +1010,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_comments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_comments_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -889,42 +1025,46 @@ export type Database = {
           },
         ]
       }
-      gallery_image_votes: {
+      gallery_favorites: {
         Row: {
           created_at: string
           image_id: string
-          reaction: string
           user_id: string
         }
         Insert: {
           created_at?: string
           image_id: string
-          reaction?: string
           user_id: string
         }
         Update: {
           created_at?: string
           image_id?: string
-          reaction?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            foreignKeyName: "gallery_favorites_image_id_fkey"
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "gallery_images"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            foreignKeyName: "gallery_favorites_image_id_fkey"
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "gallery_wall_covers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "gallery_image_votes_user_id_fkey"
+            foreignKeyName: "gallery_favorites_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_favorites_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
@@ -974,10 +1114,67 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gallery_image_tags_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gallery_image_tags_tag_id_fkey"
             columns: ["tag_id"]
             isOneToOne: false
             referencedRelation: "gallery_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_image_votes: {
+        Row: {
+          created_at: string
+          image_id: string
+          reaction: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          image_id: string
+          reaction?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          image_id?: string
+          reaction?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_covers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_wall_page"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_image_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1090,39 +1287,6 @@ export type Database = {
           {
             foreignKeyName: "gallery_tags_created_by_fkey"
             columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      gallery_favorites: {
-        Row: {
-          created_at: string
-          image_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          image_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          image_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gallery_favorites_image_id_fkey"
-            columns: ["image_id"]
-            isOneToOne: false
-            referencedRelation: "gallery_images"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gallery_favorites_user_id_fkey"
-            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
@@ -1484,6 +1648,221 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      quiz_answers: {
+        Row: {
+          answered_at: string
+          choice_index: number
+          id: string
+          is_correct: boolean
+          player_id: string
+          points_awarded: number
+          question_id: string
+          session_id: string
+        }
+        Insert: {
+          answered_at?: string
+          choice_index: number
+          id?: string
+          is_correct: boolean
+          player_id: string
+          points_awarded?: number
+          question_id: string
+          session_id: string
+        }
+        Update: {
+          answered_at?: string
+          choice_index?: number
+          id?: string
+          is_correct?: boolean
+          player_id?: string
+          points_awarded?: number
+          question_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_answers_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_players: {
+        Row: {
+          id: string
+          joined_at: string
+          nickname: string
+          score: number
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          nickname: string
+          score?: number
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          nickname?: string
+          score?: number
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_players_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_players_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_questions: {
+        Row: {
+          choices: string[]
+          correct_index: number
+          id: string
+          position: number
+          question_text: string
+          quiz_set_id: string
+          time_limit_seconds: number
+        }
+        Insert: {
+          choices: string[]
+          correct_index: number
+          id?: string
+          position: number
+          question_text: string
+          quiz_set_id: string
+          time_limit_seconds?: number
+        }
+        Update: {
+          choices?: string[]
+          correct_index?: number
+          id?: string
+          position?: number
+          question_text?: string
+          quiz_set_id?: string
+          time_limit_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_set_id_fkey"
+            columns: ["quiz_set_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sessions: {
+        Row: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          current_question_position?: number
+          ended_at?: string | null
+          host_id: string
+          id?: string
+          question_started_at?: string | null
+          quiz_set_id: string
+          room_code: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          current_question_position?: number
+          ended_at?: string | null
+          host_id?: string
+          id?: string
+          question_started_at?: string | null
+          quiz_set_id?: string
+          room_code?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sessions_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_sessions_quiz_set_id_fkey"
+            columns: ["quiz_set_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sets: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       receipt_tag_assignments: {
         Row: {
@@ -2224,6 +2603,35 @@ export type Database = {
           },
         ]
       }
+      gallery_wall_page: {
+        Row: {
+          comment_count: number | null
+          created_at: string | null
+          created_by: string | null
+          duration_seconds: number | null
+          id: string | null
+          image_path: string | null
+          media_type: string | null
+          my_reaction: string | null
+          name: string | null
+          pinned_at: string | null
+          poster_path: string | null
+          reaction_counts: Json | null
+          reaction_names: Json | null
+          sequence_id: string | null
+          sequence_index: number | null
+          uploader_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_presenter_roster: {
         Row: {
           admission_year: number | null
@@ -2294,6 +2702,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      advance_quiz_session: {
+        Args: { p_session_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_doc_status: { Args: { doc_id: string }; Returns: string }
       approve_is_creator: {
         Args: { doc_id: string; uid: string }
@@ -2332,6 +2760,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_quiz_session: {
+        Args: { p_quiz_set_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      gallery_admin_delete_unused_tag: {
+        Args: { p_tag_id: string }
+        Returns: undefined
+      }
+      gallery_admin_merge_tags: {
+        Args: { p_source_id: string; p_target_id: string }
+        Returns: {
+          id: string
+          moved_count: number
+          name: string
+          slug: string
+        }[]
+      }
+      gallery_admin_rename_tag: {
+        Args: { p_new_name: string; p_tag_id: string }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
       gallery_admin_set_comment_pin: {
         Args: { p_comment_id: string; p_pinned: boolean }
         Returns: undefined
@@ -2339,6 +2808,50 @@ export type Database = {
       gallery_admin_set_image_pin: {
         Args: { p_image_id: string; p_pinned: boolean }
         Returns: undefined
+      }
+      gallery_album_add_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
+      gallery_album_photos: {
+        Args: { p_slug: string }
+        Returns: {
+          added_at: string
+          created_at: string
+          created_by: string
+          image_id: string
+          image_path: string
+          media_type: string
+          name: string
+          poster_path: string
+          sort_position: number
+          uploader_name: string
+        }[]
+      }
+      gallery_album_remove_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
+      gallery_album_reorder_images: {
+        Args: { p_album_id: string; p_image_ids: string[] }
+        Returns: number
+      }
+      gallery_list_albums: {
+        Args: { p_limit?: number }
+        Returns: {
+          cover_image_path: string
+          cover_media_type: string
+          cover_poster_path: string
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          owner_name: string
+          photo_count: number
+          slug: string
+          title: string
+          updated_at: string
+        }[]
       }
       gallery_list_popular_tags: {
         Args: { p_limit?: number }
@@ -2349,85 +2862,50 @@ export type Database = {
           use_count: number
         }[]
       }
-      gallery_wall_cover_ids_for_tag: {
-        Args: { p_tag_slug: string }
-        Returns: string[]
-      }
-      gallery_wall_cover_ids_for_query: {
-        Args: { p_query: string }
-        Returns: string[]
-      }
-      gallery_wall_cover_ids_for_favorites: {
-        Args: Record<string, never>
-        Returns: string[]
+      gallery_memories_on_this_day: {
+        Args: { p_day: number; p_limit?: number; p_month: number }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          image_path: string
+          media_type: string
+          memory_year: number
+          name: string
+          poster_path: string
+          sequence_id: string
+          sequence_index: number
+          taken_at: string
+        }[]
       }
       gallery_wall_cover_ids_for_album: {
         Args: { p_slug: string }
         Returns: string[]
       }
-      gallery_album_add_images: {
-        Args: { p_album_id: string; p_image_ids: string[] }
-        Returns: number
+      gallery_wall_cover_ids_for_favorites: { Args: never; Returns: string[] }
+      gallery_wall_cover_ids_for_query: {
+        Args: { p_query: string }
+        Returns: string[]
       }
-      gallery_album_remove_images: {
-        Args: { p_album_id: string; p_image_ids: string[] }
-        Returns: number
-      }
-      gallery_album_reorder_images: {
-        Args: { p_album_id: string; p_image_ids: string[] }
-        Returns: number
-      }
-      gallery_album_photos: {
-        Args: { p_slug: string }
-        Returns: {
-          image_id: string
-          name: string
-          image_path: string
-          media_type: string
-          poster_path: string | null
-          uploader_name: string
-          created_by: string | null
-          created_at: string
-          sort_position: number
-          added_at: string
-        }[]
-      }
-      gallery_admin_rename_tag: {
-        Args: { p_tag_id: string; p_new_name: string }
-        Returns: {
-          id: string
-          name: string
-          slug: string
-        }[]
-      }
-      gallery_admin_merge_tags: {
-        Args: { p_source_id: string; p_target_id: string }
-        Returns: {
-          id: string
-          name: string
-          slug: string
-          moved_count: number
-        }[]
+      gallery_wall_cover_ids_for_tag: {
+        Args: { p_tag_slug: string }
+        Returns: string[]
       }
       gallery_wall_cover_rank: { Args: { p_image_id: string }; Returns: number }
-      gallery_memories_on_this_day: {
-        Args: {
-          p_month: number
-          p_day: number
-          p_limit?: number
-        }
+      get_current_question: {
+        Args: { p_session_id: string }
         Returns: {
-          id: string
-          name: string
-          image_path: string
-          media_type: string
-          poster_path: string | null
-          created_by: string
-          created_at: string
-          taken_at: string
-          sequence_id: string | null
-          sequence_index: number | null
-          memory_year: number
+          choices: string[]
+          correct_index: number
+          my_choice_index: number
+          my_is_correct: boolean
+          my_points_awarded: number
+          position: number
+          question_count: number
+          question_id: string
+          question_started_at: string
+          question_text: string
+          time_limit_seconds: number
         }[]
       }
       get_game_leaderboard: {
@@ -2451,11 +2929,31 @@ export type Database = {
       }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }
+      is_quiz_host: { Args: { p_session_id: string }; Returns: boolean }
+      is_quiz_participant: { Args: { p_session_id: string }; Returns: boolean }
       is_receipts_admin: { Args: never; Returns: boolean }
       is_reimburse_admin: { Args: never; Returns: boolean }
       is_trip_admin: { Args: never; Returns: boolean }
+      join_quiz_session: {
+        Args: { p_room_code: string }
+        Returns: {
+          id: string
+          joined_at: string
+          nickname: string
+          score: number
+          session_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_players"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
+      meetings_fill_presenters: { Args: { p_year: number }; Returns: Json }
       meetings_generate_semester: {
         Args: {
           p_holidays?: Json
@@ -2465,22 +2963,19 @@ export type Database = {
         }
         Returns: Json
       }
-      meetings_fill_presenters: {
-        Args: { p_year: number }
-        Returns: Json
-      }
       meetings_insert_week: {
         Args: { p_at_meeting_id: string }
         Returns: string
+      }
+      meetings_pool_compact: {
+        Args: { p_admission_year: number }
+        Returns: undefined
       }
       meetings_pool_move: {
         Args: { p_delta: number; p_user: string }
         Returns: undefined
       }
-      meetings_pool_remove: {
-        Args: { p_user: string }
-        Returns: undefined
-      }
+      meetings_pool_remove: { Args: { p_user: string }; Returns: undefined }
       meetings_pool_upsert: {
         Args: { p_admission_year: number; p_user: string }
         Returns: undefined
@@ -2520,12 +3015,40 @@ export type Database = {
         Args: { p_is_admin: boolean; p_roles: Json; p_target_id: string }
         Returns: undefined
       }
+      reveal_quiz_answer: {
+        Args: { p_session_id: string }
+        Returns: {
+          created_at: string
+          current_question_position: number
+          ended_at: string | null
+          host_id: string
+          id: string
+          question_started_at: string | null
+          quiz_set_id: string
+          room_code: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_game_score: {
         Args: {
           p_finish_ms: number
           p_game_type: Database["public"]["Enums"]["game_type"]
           p_level?: number
           p_score: number
+        }
+        Returns: undefined
+      }
+      submit_quiz_answer: {
+        Args: {
+          p_choice_index: number
+          p_question_id: string
+          p_session_id: string
         }
         Returns: undefined
       }
