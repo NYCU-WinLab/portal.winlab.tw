@@ -239,6 +239,32 @@ using (
   )
 );
 
+-- 3.5 Table privileges ---------------------------------------------------
+--
+-- RLS policies alone aren't enough: a database built from migrations alone
+-- (like CI's pgTAP run) has none of the default privileges a Supabase
+-- project normally provisions, so every grant has to be explicit here or
+-- every query gets "permission denied for table" before RLS even runs. See
+-- rooms_bookings_explicit_grants.sql for the same fix on an earlier table.
+--
+-- quiz_sessions/quiz_players/quiz_answers only ever get SELECT -- their
+-- writes are RPC-only (SECURITY DEFINER bypasses table grants), so there's
+-- nothing to grant beyond read access.
+revoke all on public.quiz_sets from anon;
+grant select, insert, update, delete on public.quiz_sets to authenticated;
+
+revoke all on public.quiz_questions from anon;
+grant select, insert, update, delete on public.quiz_questions to authenticated;
+
+revoke all on public.quiz_sessions from anon;
+grant select on public.quiz_sessions to authenticated;
+
+revoke all on public.quiz_players from anon;
+grant select on public.quiz_players to authenticated;
+
+revoke all on public.quiz_answers from anon;
+grant select on public.quiz_answers to authenticated;
+
 -- 4. RPCs --------------------------------------------------------------
 
 create or replace function public.create_quiz_session(p_quiz_set_id uuid)
