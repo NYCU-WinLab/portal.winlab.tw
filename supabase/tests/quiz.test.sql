@@ -45,9 +45,6 @@ values
   ('88888888-8888-8888-8888-888888888888', '66666666-6666-6666-6666-666666666666', 2,
    '1+1=?', array['1', '2', '3', '4'], 1, 20);
 
-create temp table quiz_test_question (q1_id uuid, q2_id uuid);
-insert into quiz_test_question default values;
-
 -- ── impersonate host: create the session (snapshots both questions) ────────
 set local role authenticated;
 select set_config(
@@ -55,6 +52,13 @@ select set_config(
   '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}',
   true
 );
+
+-- Created here (as authenticated), not up in the superuser-owned seed
+-- block, so the player impersonation below is actually allowed to UPDATE
+-- it later -- a temp table's owner is whoever ran CREATE, and cross-role
+-- writes need a real grant just like any other table.
+create temp table quiz_test_question (q1_id uuid, q2_id uuid);
+insert into quiz_test_question default values;
 
 select public.create_quiz_session('66666666-6666-6666-6666-666666666666');
 
