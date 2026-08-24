@@ -106,7 +106,7 @@ export function QuizHistoryDetail({ sessionId }: { sessionId: string }) {
                   </div>
                 ))}
               </div>
-              {questionAnswers.length > 0 && (
+              {questionAnswers.length > 0 ? (
                 <div className="space-y-1">
                   {questionAnswers.map((a) => {
                     const player = playerById.get(a.player_id)
@@ -135,6 +135,14 @@ export function QuizHistoryDetail({ sessionId }: { sessionId: string }) {
                     )
                   })}
                 </div>
+              ) : (
+                // The correct choice above is highlighted regardless of
+                // whether anyone answered -- without this, an unanswered
+                // question reads as "someone got it right but scored
+                // nothing", when really nobody answered at all.
+                <p className="text-sm text-muted-foreground">
+                  沒有人作答這一題。
+                </p>
               )}
             </div>
           )
