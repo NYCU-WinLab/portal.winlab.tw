@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(31);
+select plan(35);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -510,6 +510,66 @@ select ok(
 delete from public.meeting_question_pool where user_id in (
   '00000000-0000-0000-0000-000000000092', '00000000-0000-0000-0000-000000000093',
   '00000000-0000-0000-0000-000000000094'
+);
+
+-- ═══ Scenario 10: presenter-pool members are auto-eligible questioners ══════
+-- The question pool is empty here (every prior scenario cleaned up). Members
+-- exist ONLY in the presenter pool, yet must be pickable as questioners, and a
+-- member in BOTH pools must appear once. The current-week presenter, though in
+-- the presenter pool, is still excluded from their own week.
+-- Reuses user_profiles rows 011/012/013 (freed by Scenario 1's cleanup) and
+-- presenter 002; meeting m10 on a distinct date.
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000010', 2026, '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000002', 113, 1, '2020-10-01 00:00:00+00'), -- the presenter, also in the roster
+  ('00000000-0000-0000-0000-000000000011', 113, 2, '2020-10-01 00:00:01+00'),
+  ('00000000-0000-0000-0000-000000000012', 113, 3, '2020-10-01 00:00:02+00'),
+  ('00000000-0000-0000-0000-000000000013', 113, 4, '2020-10-01 00:00:03+00');
+
+-- 013 is ALSO an "extra" in the question pool — must not double-count.
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('00000000-0000-0000-0000-000000000013', '2020-10-02 00:00:00+00');
+
+select ok(
+  exists (
+    select 1 from public.meeting_question_rotation
+    where user_id = '00000000-0000-0000-0000-000000000011'
+  ),
+  'a presenter-pool-only member appears in the questioner rotation'
+);
+select is(
+  (select count(*)::int from public.meeting_question_rotation
+   where user_id = '00000000-0000-0000-0000-000000000013'),
+  1,
+  'a member in BOTH pools appears exactly once in the rotation (union dedup)'
+);
+
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000010');
+
+select is(
+  (select array_agg(user_id order by user_id) from public.meeting_questioners
+   where meeting_id = '10000000-0000-0000-0000-000000000010'),
+  array[
+    '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000012',
+    '00000000-0000-0000-0000-000000000013'
+  ]::uuid[],
+  'sync fills questioners from the presenter pool when the question pool has no others'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = '10000000-0000-0000-0000-000000000010'
+      and user_id = '00000000-0000-0000-0000-000000000002'
+  ),
+  'the current-week presenter is excluded from their own week even though they are in the presenter pool'
+);
+
+delete from public.meeting_question_pool where user_id = '00000000-0000-0000-0000-000000000013';
+delete from public.meeting_presenter_pool where user_id in (
+  '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000011',
+  '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000013'
 );
 
 select * from finish();
