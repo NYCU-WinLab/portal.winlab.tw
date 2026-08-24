@@ -5,6 +5,15 @@
 -- nothing, and quiz_answers/quiz_players.score stay hidden/unchanged until
 -- reveal), or forge a score by calling the mutation RPCs out of turn / as
 -- someone else.
+--
+-- quiz_test_session is a plain (non-RLS) temp table snapshotting the
+-- session id/room code right after the host creates it. It exists because
+-- quiz_sessions_select itself is RLS-gated to the host or an already-joined
+-- participant -- a non-participant player genuinely cannot query
+-- quiz_sessions to discover the room code (that's the point: in the real
+-- app they learn it out-of-band, from the host's screen), so the test
+-- can't re-derive these values by querying quiz_sessions once it starts
+-- impersonating the player.
 
 begin;
 create extension if not exists pgtap with schema public;
@@ -29,10 +38,6 @@ values
   ('77777777-7777-7777-7777-777777777777', '66666666-6666-6666-6666-666666666666', 1,
    'Capital of Taiwan?', array['Taipei', 'Tainan', 'Taichung', 'Kaohsiung'], 0, 20);
 
--- session id, referenced throughout via this subquery (one session for the
--- whole test transaction, so it's always exactly this row).
--- (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
-
 -- ── impersonate host: create + start the session ────────────────────────────
 set local role authenticated;
 select set_config(
@@ -42,6 +47,11 @@ select set_config(
 );
 
 select public.create_quiz_session('66666666-6666-6666-6666-666666666666');
+
+create temp table quiz_test_session as
+select id as session_id, room_code
+from public.quiz_sessions
+where quiz_set_id = '66666666-6666-6666-6666-666666666666';
 
 -- 1. a freshly created session starts in lobby
 select is(
@@ -61,7 +71,7 @@ select set_config(
 -- 2. a non-participant cannot read the current question
 select throws_ok(
   $$ select * from public.get_current_question(
-       (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+       (select session_id from quiz_test_session)
      ) $$,
   '42501',
   NULL,
@@ -69,23 +79,19 @@ select throws_ok(
 );
 
 -- 3. player joins with the room code and gets a quiz_players row
-select public.join_quiz_session(
-  (select room_code from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
-);
+select public.join_quiz_session((select room_code from quiz_test_session));
 select is(
   (select user_id from public.quiz_players
-     where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')),
+     where session_id = (select session_id from quiz_test_session)),
   '55555555-5555-5555-5555-555555555555'::uuid,
   'joining with the room code creates a quiz_players row for the caller'
 );
 
 -- 4. joining again is idempotent (no duplicate row)
-select public.join_quiz_session(
-  (select room_code from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
-);
+select public.join_quiz_session((select room_code from quiz_test_session));
 select is(
   (select count(*) from public.quiz_players
-     where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')),
+     where session_id = (select session_id from quiz_test_session)),
   1::bigint,
   'rejoining the same session does not create a second player row'
 );
@@ -102,7 +108,7 @@ select is(
 -- 6. a non-host cannot advance the session
 select throws_ok(
   $$ select public.advance_quiz_session(
-       (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+       (select session_id from quiz_test_session)
      ) $$,
   '42501',
   NULL,
@@ -116,9 +122,7 @@ select set_config(
   '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}',
   true
 );
-select public.advance_quiz_session(
-  (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
-);
+select public.advance_quiz_session((select session_id from quiz_test_session));
 
 -- 7. the session is now on question 1
 select is(
@@ -138,7 +142,7 @@ select set_config(
 -- 8. correct_index is hidden while the question is live
 select is(
   (select correct_index from public.get_current_question(
-     (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     (select session_id from quiz_test_session)
    )),
   NULL,
   'get_current_question hides correct_index while status = question'
@@ -147,7 +151,7 @@ select is(
 -- 9. the caller's own result is hidden too, before they've even answered
 select is(
   (select my_is_correct from public.get_current_question(
-     (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     (select session_id from quiz_test_session)
    )),
   NULL,
   'get_current_question hides my_is_correct while status = question'
@@ -158,7 +162,7 @@ select is(
 --     place, which the next few assertions build on.
 select lives_ok(
   $$ select public.submit_quiz_answer(
-       (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666'),
+       (select session_id from quiz_test_session),
        '77777777-7777-7777-7777-777777777777',
        0
      ) $$,
@@ -178,7 +182,7 @@ select is(
 --     live-leaderboard window that would tip off a correct answer
 select is(
   (select score from public.quiz_players
-     where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     where session_id = (select session_id from quiz_test_session)
        and user_id = '55555555-5555-5555-5555-555555555555'),
   0,
   'quiz_players.score is unchanged immediately after answering (pre-reveal)'
@@ -187,7 +191,7 @@ select is(
 -- 13. answering the same question twice (still pre-reveal) is rejected
 select throws_ok(
   $$ select public.submit_quiz_answer(
-       (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666'),
+       (select session_id from quiz_test_session),
        '77777777-7777-7777-7777-777777777777',
        0
      ) $$,
@@ -199,7 +203,7 @@ select throws_ok(
 -- 14. a non-host cannot reveal the answer
 select throws_ok(
   $$ select public.reveal_quiz_answer(
-       (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+       (select session_id from quiz_test_session)
      ) $$,
   '42501',
   NULL,
@@ -213,9 +217,7 @@ select set_config(
   '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}',
   true
 );
-select public.reveal_quiz_answer(
-  (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
-);
+select public.reveal_quiz_answer((select session_id from quiz_test_session));
 
 -- 15. the session is now revealing the answer
 select is(
@@ -227,7 +229,7 @@ select is(
 -- 16. reveal applied points earned this round to the player's score
 select cmp_ok(
   (select score from public.quiz_players
-     where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     where session_id = (select session_id from quiz_test_session)
        and user_id = '55555555-5555-5555-5555-555555555555'),
   '>', 0,
   'the player''s score increased once the host revealed the answer'
@@ -244,7 +246,7 @@ select set_config(
 -- 17. correct_index is now visible
 select is(
   (select correct_index from public.get_current_question(
-     (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     (select session_id from quiz_test_session)
    )),
   0::smallint,
   'get_current_question reveals correct_index once status = reveal'
@@ -253,7 +255,7 @@ select is(
 -- 18. and so is the caller's own result
 select is(
   (select my_is_correct from public.get_current_question(
-     (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     (select session_id from quiz_test_session)
    )),
   true,
   'get_current_question reveals my_is_correct once status = reveal'
@@ -267,7 +269,7 @@ select is(
   (select points_awarded from public.quiz_answers
      where question_id = '77777777-7777-7777-7777-777777777777'
        and player_id = (select id from public.quiz_players
-                           where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+                           where session_id = (select session_id from quiz_test_session)
                              and user_id = '55555555-5555-5555-5555-555555555555')),
   1000,
   'quiz_answers is readable post-reveal and carries the server-computed points'
@@ -285,11 +287,11 @@ select throws_ok(
 -- 21. quiz_players has no UPDATE policy — a direct score rewrite is a silent
 --     no-op (RLS matches 0 rows), the same append-only shape as game_scores.
 update public.quiz_players set score = 999999
-  where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+  where session_id = (select session_id from quiz_test_session)
     and user_id = '55555555-5555-5555-5555-555555555555';
 select cmp_ok(
   (select score from public.quiz_players
-     where session_id = (select id from public.quiz_sessions where quiz_set_id = '66666666-6666-6666-6666-666666666666')
+     where session_id = (select session_id from quiz_test_session)
        and user_id = '55555555-5555-5555-5555-555555555555'),
   '<>', 999999,
   'a direct UPDATE of quiz_players.score is a no-op (no update policy)'
