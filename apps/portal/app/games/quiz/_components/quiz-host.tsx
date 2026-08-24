@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -33,6 +33,23 @@ export function QuizHost({ sessionId }: { sessionId: string }) {
     const interval = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(interval)
   }, [session?.status])
+
+  // Reveal automatically once the clock runs out, instead of leaving the
+  // host to notice and click it manually. Guarded by question_id so the
+  // once-a-second tick above doesn't fire this more than once per question.
+  const autoRevealedQuestionId = useRef<string | null>(null)
+  useEffect(() => {
+    if (session?.status !== "question" || !question) return
+    if (autoRevealedQuestionId.current === question.question_id) return
+    const remaining = remainingSeconds(
+      question.question_started_at,
+      question.time_limit_seconds,
+      now
+    )
+    if (remaining > 0) return
+    autoRevealedQuestionId.current = question.question_id
+    reveal.mutate(undefined, { onError: (err) => toast.error(err.message) })
+  }, [now, session?.status, question, reveal])
 
   if (sessionLoading || !session) {
     return (
