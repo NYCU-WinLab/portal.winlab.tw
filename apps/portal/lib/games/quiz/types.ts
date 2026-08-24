@@ -53,3 +53,34 @@ export interface CurrentQuestion {
   my_is_correct: boolean | null
   my_points_awarded: number | null
 }
+
+// The frozen copy of a session's questions, snapshotted at
+// create_quiz_session time. Only readable once the session has ended (see
+// quiz_session_questions_select in the history migration) -- unlike
+// CurrentQuestion, correct_index here is never hidden, since by the time a
+// session is 'ended' every question has already gone through its own
+// per-question reveal live.
+export interface QuizSessionQuestion {
+  id: string
+  session_id: string
+  position: number
+  question_text: string
+  choices: string[]
+  correct_index: number
+  time_limit_seconds: number
+}
+
+export interface QuizAnswerRecord {
+  id: string
+  session_id: string
+  question_id: string
+  player_id: string
+  choice_index: number
+  is_correct: boolean
+  points_awarded: number
+  answered_at: string
+}
+
+export interface QuizSessionSummary extends QuizSession {
+  quiz_title: string
+}

@@ -1692,7 +1692,7 @@ export type Database = {
             foreignKeyName: "quiz_answers_question_id_fkey"
             columns: ["question_id"]
             isOneToOne: false
-            referencedRelation: "quiz_questions"
+            referencedRelation: "quiz_session_questions"
             referencedColumns: ["id"]
           },
           {
@@ -1780,6 +1780,44 @@ export type Database = {
             columns: ["quiz_set_id"]
             isOneToOne: false
             referencedRelation: "quiz_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_session_questions: {
+        Row: {
+          choices: string[]
+          correct_index: number
+          id: string
+          position: number
+          question_text: string
+          session_id: string
+          time_limit_seconds: number
+        }
+        Insert: {
+          choices: string[]
+          correct_index: number
+          id?: string
+          position: number
+          question_text: string
+          session_id: string
+          time_limit_seconds: number
+        }
+        Update: {
+          choices?: string[]
+          correct_index?: number
+          id?: string
+          position?: number
+          question_text?: string
+          session_id?: string
+          time_limit_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_session_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
             referencedColumns: ["id"]
           },
         ]

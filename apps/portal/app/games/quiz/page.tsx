@@ -49,11 +49,19 @@ export default function QuizLobbyPage() {
         <span className="text-sm font-medium">🧠 即時問答</span>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold">即時問答</h1>
-        <p className="text-sm text-muted-foreground">
-          自建版 Kahoot — 建立題庫、開房間主持，或輸入房間碼加入遊戲。
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold">即時問答</h1>
+          <p className="text-sm text-muted-foreground">
+            自建版 Kahoot — 建立題庫、開房間主持，或輸入房間碼加入遊戲。
+          </p>
+        </div>
+        <Link
+          href="/games/quiz/history"
+          className="shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          歷史紀錄 →
+        </Link>
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-6 sm:flex-row sm:items-end sm:gap-4">

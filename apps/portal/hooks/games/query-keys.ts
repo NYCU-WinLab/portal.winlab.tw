@@ -20,5 +20,12 @@ export const queryKeys = {
       ["games", "quiz", "session", sessionId, "players"] as const,
     currentQuestion: (sessionId: string) =>
       ["games", "quiz", "session", sessionId, "current-question"] as const,
+    history: {
+      all: ["games", "quiz", "history"] as const,
+      questions: (sessionId: string) =>
+        ["games", "quiz", "history", sessionId, "questions"] as const,
+      answers: (sessionId: string) =>
+        ["games", "quiz", "history", sessionId, "answers"] as const,
+    },
   },
 }
