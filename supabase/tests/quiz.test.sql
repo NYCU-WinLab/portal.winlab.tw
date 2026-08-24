@@ -163,8 +163,8 @@ select is(
 select lives_ok(
   $$ select public.submit_quiz_answer(
        (select session_id from quiz_test_session),
-       '77777777-7777-7777-7777-777777777777',
-       0
+       '77777777-7777-7777-7777-777777777777'::uuid,
+       0::smallint
      ) $$,
   'submit_quiz_answer succeeds for a valid, first-time answer'
 );
@@ -192,8 +192,8 @@ select is(
 select throws_ok(
   $$ select public.submit_quiz_answer(
        (select session_id from quiz_test_session),
-       '77777777-7777-7777-7777-777777777777',
-       0
+       '77777777-7777-7777-7777-777777777777'::uuid,
+       0::smallint
      ) $$,
   'P0001',
   NULL,
@@ -275,26 +275,27 @@ select is(
   'quiz_answers is readable post-reveal and carries the server-computed points'
 );
 
--- 20. quiz_sessions has no INSERT policy — direct writes are denied
+-- 20. quiz_sessions was only granted SELECT and has no INSERT policy either
+--     -- direct writes are denied before RLS even gets a say.
 select throws_ok(
   $$ insert into public.quiz_sessions (quiz_set_id, host_id, room_code)
      values ('66666666-6666-6666-6666-666666666666', '55555555-5555-5555-5555-555555555555', 'ZZZZZZ') $$,
   '42501',
   NULL,
-  'direct INSERT into quiz_sessions is denied by RLS (no insert policy)'
+  'direct INSERT into quiz_sessions is denied (no insert grant/policy)'
 );
 
--- 21. quiz_players has no UPDATE policy — a direct score rewrite is a silent
---     no-op (RLS matches 0 rows), the same append-only shape as game_scores.
-update public.quiz_players set score = 999999
-  where session_id = (select session_id from quiz_test_session)
-    and user_id = '55555555-5555-5555-5555-555555555555';
-select cmp_ok(
-  (select score from public.quiz_players
+-- 21. quiz_players was only granted SELECT (see "Table privileges" in the
+--     migration) -- score only ever moves inside reveal_quiz_answer, so a
+--     direct UPDATE is denied outright at the privilege level, not just
+--     filtered to 0 rows by RLS.
+select throws_ok(
+  $$ update public.quiz_players set score = 999999
      where session_id = (select session_id from quiz_test_session)
-       and user_id = '55555555-5555-5555-5555-555555555555'),
-  '<>', 999999,
-  'a direct UPDATE of quiz_players.score is a no-op (no update policy)'
+       and user_id = '55555555-5555-5555-5555-555555555555' $$,
+  '42501',
+  NULL,
+  'direct UPDATE of quiz_players.score is denied (no update grant)'
 );
 
 select * from finish();
