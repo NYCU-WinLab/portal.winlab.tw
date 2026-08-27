@@ -2691,6 +2691,25 @@ export type Database = {
           },
         ]
       }
+      meeting_question_pool_members: {
+        Row: {
+          email: string | null
+          last_asked_date: string | null
+          name: string | null
+          pool_added_at: string | null
+          times_asked: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_question_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_question_rotation: {
         Row: {
           email: string | null

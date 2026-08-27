@@ -8,7 +8,7 @@ import { Button } from "@workspace/ui/components/button"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import {
   useAddPoolMember,
-  useQuestionPool,
+  useQuestionPoolMembers,
   useRemovePoolMember,
 } from "@/hooks/meetings/use-question-pool"
 
@@ -24,7 +24,7 @@ function lastAskedLabel(lastAskedDate: string | null) {
 }
 
 export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
-  const { data: pool = [], isLoading } = useQuestionPool()
+  const { data: pool = [], isLoading } = useQuestionPoolMembers()
   const { data: labUsers = [] } = useLabUsers()
   const addMember = useAddPoolMember()
   const removeMember = useRemovePoolMember()
@@ -40,7 +40,9 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">提問小組成員池</p>
+        <p className="text-xs text-muted-foreground">
+          額外提問成員（報告人以外）
+        </p>
         {isAdmin && (
           <Button
             variant="ghost"
@@ -125,7 +127,8 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <p className="text-xs text-muted-foreground">
-          ＊每週由系統自動從成員池依公平輪替排定 3 位提問人，報告人不會被排入
+          ＊每週自動依公平輪替排定 3
+          位提問人；候選人＝報告順位名單＋此處額外成員，當週報告人不會被排入自己那週
         </p>
       )}
     </div>

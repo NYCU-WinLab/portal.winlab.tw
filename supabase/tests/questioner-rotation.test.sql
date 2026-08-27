@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(31);
+select plan(43);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -511,6 +511,234 @@ delete from public.meeting_question_pool where user_id in (
   '00000000-0000-0000-0000-000000000092', '00000000-0000-0000-0000-000000000093',
   '00000000-0000-0000-0000-000000000094'
 );
+
+-- ═══ Scenario 10: presenter-pool members are auto-eligible questioners ══════
+-- The question pool is empty here (every prior scenario cleaned up). Members
+-- exist ONLY in the presenter pool, yet must be pickable as questioners, and a
+-- member in BOTH pools must appear once. The current-week presenter, though in
+-- the presenter pool, is still excluded from their own week.
+-- Reuses user_profiles rows 011/012/013 (freed by Scenario 1's cleanup) and
+-- presenter 002; meeting m10 on a distinct date.
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000010', 2026, '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000002', 113, 1, '2020-10-01 00:00:00+00'), -- the presenter, also in the roster
+  ('00000000-0000-0000-0000-000000000011', 113, 2, '2020-10-01 00:00:01+00'),
+  ('00000000-0000-0000-0000-000000000012', 113, 3, '2020-10-01 00:00:02+00'),
+  ('00000000-0000-0000-0000-000000000013', 113, 4, '2020-10-01 00:00:03+00');
+
+-- 013 is ALSO an "extra" in the question pool — must not double-count.
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('00000000-0000-0000-0000-000000000013', '2020-10-02 00:00:00+00');
+
+select ok(
+  exists (
+    select 1 from public.meeting_question_rotation
+    where user_id = '00000000-0000-0000-0000-000000000011'
+  ),
+  'a presenter-pool-only member appears in the questioner rotation'
+);
+select is(
+  (select count(*)::int from public.meeting_question_rotation
+   where user_id = '00000000-0000-0000-0000-000000000013'),
+  1,
+  'a member in BOTH pools appears exactly once in the rotation (union dedup)'
+);
+
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000010');
+
+select is(
+  (select array_agg(user_id order by user_id) from public.meeting_questioners
+   where meeting_id = '10000000-0000-0000-0000-000000000010'),
+  array[
+    '00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000012',
+    '00000000-0000-0000-0000-000000000013'
+  ]::uuid[],
+  'sync fills questioners from the presenter pool when the question pool has no others'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = '10000000-0000-0000-0000-000000000010'
+      and user_id = '00000000-0000-0000-0000-000000000002'
+  ),
+  'the current-week presenter is excluded from their own week even though they are in the presenter pool'
+);
+
+delete from public.meeting_question_pool where user_id = '00000000-0000-0000-0000-000000000013';
+delete from public.meeting_presenter_pool where user_id in (
+  '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000011',
+  '00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000013'
+);
+
+-- ═══ Scenario 11: manual replacement accepts presenter-pool members too ════
+-- Union consistency: meetings_replace_questioner has its own base-table
+-- eligibility check on the manual-replacement path, separate from the view
+-- the auto-pick branch reads. It must accept the same union the rotation
+-- view now draws from — a presenter-pool-only member is a valid manual
+-- replacement, and a member in NEITHER pool is still rejected.
+-- Reuses freed user_profiles rows 021/022/023 (freed by Scenario 2's
+-- cleanup) — none are in any pool when this scenario starts. Meeting m11 on
+-- a distinct date; presenter reuses S2 Presenter (003, not in any pool now).
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000011', 2026, '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000021', 113, 1, '2020-11-01 00:00:00+00'); -- presenter-pool-ONLY member (021 is NOT in meeting_question_pool)
+
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('10000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000022', 'auto'); -- pre-assigned, about to be manually removed
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$ select public.meetings_replace_questioner(
+       '10000000-0000-0000-0000-000000000011',
+       '00000000-0000-0000-0000-000000000022',
+       '00000000-0000-0000-0000-000000000021'
+     ) $$,
+  'an admin can manually replace a questioner with a presenter-pool-only member'
+);
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       '10000000-0000-0000-0000-000000000011',
+       '00000000-0000-0000-0000-000000000021',
+       '00000000-0000-0000-0000-000000000023'
+     ) $$,
+  'P0001',
+  '替補人選不在提問成員池中',
+  'a replacement in neither pool is still rejected'
+);
+reset role;
+
+delete from public.meeting_questioners where meeting_id = '10000000-0000-0000-0000-000000000011';
+delete from public.meeting_presenter_pool where user_id = '00000000-0000-0000-0000-000000000021';
+
+-- ═══ Scenario 12: future-eviction must use the UNION, not the narrow pool ══
+-- Fresh actors (101-105): every previously-freed id from Scenarios 1-11 has
+-- since picked up real questioner history (a non-null last_asked_date),
+-- which would win the "nulls first" ranking tie-break and make the auto-pick
+-- order depend on which meetings ran first instead of on this scenario's own
+-- setup. Fresh, never-asked actors keep the ranking fully deterministic.
+-- Meeting m12 is future-dated (like Scenario 9) since the eviction branch
+-- only runs for future meetings.
+insert into auth.users (id) values
+  ('00000000-0000-0000-0000-000000000101'),
+  ('00000000-0000-0000-0000-000000000102'),
+  ('00000000-0000-0000-0000-000000000103'),
+  ('00000000-0000-0000-0000-000000000104'),
+  ('00000000-0000-0000-0000-000000000105');
+
+insert into public.user_profiles (id, email, name, roles) values
+  ('00000000-0000-0000-0000-000000000101', 's12p1@test.local', 'S12 Pool 1', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000102', 's12p2@test.local', 'S12 Pool 2', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000103', 's12p3@test.local', 'S12 Pool 3', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000104', 's12x@test.local', 'S12 Presenter-Pool-Only', '{}'::jsonb),
+  ('00000000-0000-0000-0000-000000000105', 's12y@test.local', 'S12 Stray', '{}'::jsonb);
+--
+-- The question pool has exactly 3 members, so the first sync fills all 3
+-- slots from it (v_missing drops to 0 afterwards). X is then added as a
+-- MANUAL 4th assignment — a manual override the way an admin would create
+-- one. Because the slots are already full, a SECOND sync's eviction is the
+-- only thing that can remove X: if it evicts him (the pre-union bug), there
+-- is no missing slot left to trigger a backfill that would silently restore
+-- him, so the loss is real and observable — not masked by the same-call
+-- backfill the way a naive test would be.
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000012', 2026, current_date + 30, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('00000000-0000-0000-0000-000000000101', '2020-12-01 00:00:01+00'),
+  ('00000000-0000-0000-0000-000000000102', '2020-12-01 00:00:02+00'),
+  ('00000000-0000-0000-0000-000000000103', '2020-12-01 00:00:03+00');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000104', 113, 1, '2020-12-01 00:00:04+00'); -- X: presenter-pool-ONLY, not in meeting_question_pool, ranks last so the first sync doesn't auto-pick him
+
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000012');
+
+select is(
+  (select count(*)::int from public.meeting_questioners where meeting_id = '10000000-0000-0000-0000-000000000012'),
+  3,
+  'the first sync fills all 3 slots from the question pool alone, leaving no missing slot'
+);
+
+-- Manually assign X as a 4th questioner — a manual override.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000104', 'manual');
+
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000012');
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = '10000000-0000-0000-0000-000000000012'
+      and user_id = '00000000-0000-0000-0000-000000000104'
+  ),
+  'a manually-assigned presenter-pool-only questioner survives a resync of a FULL future meeting (must use the union, not the narrow pool — with no missing slot to mask the loss via backfill)'
+);
+
+-- A stray questioner in NEITHER pool must still be evicted.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000105', 'manual'); -- Y: in neither pool
+
+select public.meetings_sync_questioners('10000000-0000-0000-0000-000000000012');
+
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = '10000000-0000-0000-0000-000000000012'
+      and user_id = '00000000-0000-0000-0000-000000000105'
+  ),
+  'a questioner who has left BOTH pools is still evicted by the future-meeting eviction'
+);
+
+delete from public.meeting_questioners where meeting_id = '10000000-0000-0000-0000-000000000012';
+delete from public.meeting_question_pool where user_id in (
+  '00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000102',
+  '00000000-0000-0000-0000-000000000103'
+);
+delete from public.meeting_presenter_pool where user_id = '00000000-0000-0000-0000-000000000104';
+
+-- ═══ Scenario 13: narrow "extras" panel view excludes presenter-pool-only ═══
+-- Reuses freed user_profiles rows 022 (question pool, A) and 012
+-- (presenter-pool-only, B; freed by Scenario 10's cleanup). No meeting
+-- needed — this scenario only checks view membership.
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('00000000-0000-0000-0000-000000000022', '2020-12-02 00:00:01+00'); -- A
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
+  ('00000000-0000-0000-0000-000000000012', 113, 1, '2020-12-02 00:00:02+00'); -- B, presenter-pool-ONLY
+
+select ok(
+  exists (
+    select 1 from public.meeting_question_pool_members
+    where user_id = '00000000-0000-0000-0000-000000000022'
+  ),
+  'the narrow panel view includes a meeting_question_pool member'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_question_pool_members
+    where user_id = '00000000-0000-0000-0000-000000000012'
+  ),
+  'the narrow panel view excludes a presenter-pool-only member'
+);
+select ok(
+  exists (
+    select 1 from public.meeting_question_rotation
+    where user_id = '00000000-0000-0000-0000-000000000012'
+  ),
+  'the widened rotation view DOES include the presenter-pool-only member, proving the two views differ as intended'
+);
+
+delete from public.meeting_question_pool where user_id = '00000000-0000-0000-0000-000000000022';
+delete from public.meeting_presenter_pool where user_id = '00000000-0000-0000-0000-000000000012';
 
 select * from finish();
 rollback;
