@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -1456,6 +1476,33 @@ export type Database = {
           },
         ]
       }
+      meeting_semesters: {
+        Row: {
+          academic_year: number
+          created_at: string
+          id: string
+          planned_weeks: number | null
+          start_date: string
+          term: number
+        }
+        Insert: {
+          academic_year: number
+          created_at?: string
+          id?: string
+          planned_weeks?: number | null
+          start_date: string
+          term: number
+        }
+        Update: {
+          academic_year?: number
+          created_at?: string
+          id?: string
+          planned_weeks?: number | null
+          start_date?: string
+          term?: number
+        }
+        Relationships: []
+      }
       meeting_tags: {
         Row: {
           color: string | null
@@ -1494,6 +1541,7 @@ export type Database = {
           presenter_user_id: string | null
           question_group_number: number | null
           scheduled_date: string
+          semester_id: string
           start_time: string
           teacher_paper_id: string | null
           video_link: string | null
@@ -1517,6 +1565,7 @@ export type Database = {
           presenter_user_id?: string | null
           question_group_number?: number | null
           scheduled_date: string
+          semester_id: string
           start_time?: string
           teacher_paper_id?: string | null
           video_link?: string | null
@@ -1540,6 +1589,7 @@ export type Database = {
           presenter_user_id?: string | null
           question_group_number?: number | null
           scheduled_date?: string
+          semester_id?: string
           start_time?: string
           teacher_paper_id?: string | null
           video_link?: string | null
@@ -1560,6 +1610,13 @@ export type Database = {
             columns: ["presenter_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_semester_id_fkey"
+            columns: ["semester_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_semesters"
             referencedColumns: ["id"]
           },
           {
@@ -2719,15 +2776,7 @@ export type Database = {
           times_asked: number | null
           user_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "meeting_question_pool_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {
@@ -2935,6 +2984,10 @@ export type Database = {
           taken_at: string
         }[]
       }
+      gallery_sync_comment_mentions: {
+        Args: { p_author_id: string; p_body: string; p_comment_id: string }
+        Returns: undefined
+      }
       gallery_wall_cover_ids_for_album: {
         Args: { p_slug: string }
         Returns: string[]
@@ -3009,6 +3062,9 @@ export type Database = {
         }
       }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
+      meeting_academic_year: { Args: { p_date: string }; Returns: number }
+      meeting_semester_for_date: { Args: { p_date: string }; Returns: string }
+      meeting_term: { Args: { p_date: string }; Returns: number }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
       meetings_fill_presenters: { Args: { p_year: number }; Returns: Json }
       meetings_generate_semester: {
@@ -3259,6 +3315,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       egress_status: ["pending", "approved", "rejected", "transferred"],

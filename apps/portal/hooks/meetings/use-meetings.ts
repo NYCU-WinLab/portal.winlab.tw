@@ -217,6 +217,7 @@ export function useAddMeeting() {
   return useMutation({
     mutationFn: async (row: {
       year: number
+      semesterId: string
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
@@ -230,6 +231,7 @@ export function useAddMeeting() {
         .from(TABLE)
         .insert({
           year: row.year,
+          semester_id: row.semesterId,
           week_label: row.weekLabel,
           scheduled_date: row.scheduledDate,
           is_holiday: row.isHoliday,

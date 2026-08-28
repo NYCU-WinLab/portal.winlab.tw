@@ -1,6 +1,7 @@
 export interface Meeting {
   id: string
   year: number
+  semesterId: string
   weekLabel: string | null
   scheduledDate: string
   isHoliday: boolean
@@ -65,9 +66,18 @@ export interface MeetingQuestioner {
   source: "auto" | "manual"
 }
 
+export interface Semester {
+  id: string
+  academicYear: number
+  term: 1 | 2
+  startDate: string
+  plannedWeeks: number | null
+}
+
 export interface DbMeeting {
   id: string
   year: number
+  semester_id: string
   week_label: string | null
   scheduled_date: string
   is_holiday: boolean
@@ -86,6 +96,14 @@ export interface DbMeeting {
   location: string
   start_time: string
   created_at: string
+}
+
+export interface DbSemester {
+  id: string
+  academic_year: number
+  term: number
+  start_date: string
+  planned_weeks: number | null
 }
 
 export interface DbTeacherPaper {
@@ -143,6 +161,7 @@ export function toMeeting(row: DbMeeting): Meeting {
   return {
     id: row.id,
     year: row.year,
+    semesterId: row.semester_id,
     weekLabel: row.week_label,
     scheduledDate: row.scheduled_date,
     isHoliday: row.is_holiday,
@@ -162,6 +181,25 @@ export function toMeeting(row: DbMeeting): Meeting {
     startTime: row.start_time,
     createdAt: row.created_at,
   }
+}
+
+export function toSemester(row: DbSemester): Semester {
+  return {
+    id: row.id,
+    academicYear: row.academic_year,
+    term: row.term === 1 ? 1 : 2,
+    startDate: row.start_date,
+    plannedWeeks: row.planned_weeks,
+  }
+}
+
+/**
+ * Derived from academicYear/term only — start_date and planned_weeks are
+ * informational metadata and must never drive display text (a
+ * trigger-created semester's start_date is incidental, not authoritative).
+ */
+export function semesterLabel(s: Semester): string {
+  return `${s.academicYear} ${s.term === 1 ? "上" : "下"}學期`
 }
 
 export function toTag(row: DbTag): Tag {
