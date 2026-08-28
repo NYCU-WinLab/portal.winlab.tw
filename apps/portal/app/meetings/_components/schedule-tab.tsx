@@ -110,7 +110,10 @@ function groupBySemester(
 }
 
 function spanDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("zh-TW", {
+  // `T00:00:00` for the same reason addOneWeek does it: a bare YYYY-MM-DD is
+  // parsed as UTC midnight, which renders as the previous day anywhere west of
+  // UTC. Harmless in Asia/Taipei, wrong everywhere else.
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("zh-TW", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -387,12 +390,14 @@ export function ScheduleTab({ year }: { year: number }) {
               <Fragment key={group.semesterId}>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   {/* A heading for the rows below it, so it is a th with
-                      scope="colgroup". `h-auto p-3` and the muted colour undo
-                      TableHead's own h-12/px-3/text-foreground via cn's
-                      tailwind-merge, keeping the band identical to the
-                      TableCell it replaces. */}
+                      scope="rowgroup" — the value that means "applies to the
+                      remaining cells of this row group". `colgroup` would be
+                      inert here: there are no <colgroup>s to scope to.
+                      `h-auto p-3` and the muted colour undo TableHead's own
+                      h-12/px-3/text-foreground via cn's tailwind-merge, keeping
+                      the band identical to the TableCell it replaces. */}
                   <TableHead
-                    scope="colgroup"
+                    scope="rowgroup"
                     colSpan={colCount}
                     className="h-auto p-3 text-xs font-medium text-muted-foreground"
                   >
