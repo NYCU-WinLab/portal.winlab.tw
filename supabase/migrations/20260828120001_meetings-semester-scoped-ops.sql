@@ -7,18 +7,84 @@
 -- `meetings.year` itself keeps its current meaning and is still written exactly as
 -- before; it simply stops being the unit that numbering and shuffling restart on.
 --
--- Each function below is a `create or replace` of the newest definition, copied
--- whole and changed only where noted — that is how this repo versions a function
--- or trigger (see 20260817060100:84-85). The named sources are:
+-- Each pre-existing function below is a `create or replace` of the newest
+-- definition, copied whole and changed only where noted — that is how this repo
+-- versions a function or trigger (see 20260817060100:84-85). The named sources
+-- are:
 --   meetings_generate_semester → 20260722000000:25
 --   meetings_insert_week       → 20260722160354:222
 --   meetings_remove_week       → 20260722160354:316
 --   meetings_swap              → 20260817060100:144
 --   meetings_guard_columns     → 20260817060100:86
 --
--- All four RPCs are SECURITY DEFINER, which is what lets them call
+-- Two functions are NEW here and have no earlier source:
+--   meetings_next_free_date — the bounded free-date walk, shared by insert_week
+--     and append_week so the two cannot drift apart;
+--   meetings_append_week    — appends one week to the END of a named semester,
+--     computing both the label and the date server-side. It exists because the
+--     UI used to do that arithmetic itself from a YEAR-filtered row set, which a
+--     backfilled semester can outgrow (issues #1102, #1103).
+--
+-- All the RPCs are SECURITY DEFINER, which is what lets them call
 -- public.meeting_semester_for_date — EXECUTE on it is revoked from public, anon
 -- AND authenticated, so it is reachable only from an owner-privileged context.
+
+-- ── the bounded free-date walk ───────────────────────────────────────────────
+-- Both places that mint a trailing slot (insert_week's shuffle, append_week)
+-- want the same thing: p_from if it is free, else the next same-weekday date
+-- that is. The walk has to be DATE-GLOBAL — one meeting per calendar date is a
+-- lab-wide invariant with no unique index behind it, and a doubled date makes
+-- the Nextcloud recording match ambiguous (apps/portal/lib/meetings/
+-- recording-match.ts keys on the date in a filename).
+--
+-- IT ALSO HAS TO BE BOUNDED. An appended 上學期 week walks straight into 下學期's
+-- calendar months; if 下學期 is already generated on the same weekday, an
+-- unbounded walk steps over ALL of its dates and mints a slot months later,
+-- still stamped with 上學期's semester_id, and the admin is told it worked. The
+-- ceiling is 8 candidates — the caller's date plus 7 more, so just under two
+-- months. That is comfortably more than any run of make-up weeks or holidays a
+-- schedule actually collides with, and far short of a whole term: if eight
+-- consecutive same-weekday slots are taken, the calendar ahead belongs to
+-- another semester and the right answer is to say so, not to keep walking.
+--
+-- SECURITY DEFINER so the invariant is checked against EVERY meeting, not just
+-- the ones the caller's RLS lets it see; not API surface, so EXECUTE is revoked
+-- from public, anon AND authenticated (Postgres hands anon/authenticated EXECUTE
+-- directly by default, so revoking from public alone would leave both able to
+-- call it).
+create or replace function public.meetings_next_free_date(p_from date)
+returns date
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_date    date := p_from;
+  v_blocked date[] := '{}';
+  i int;
+begin
+  if p_from is null then
+    raise exception '缺少起始日期' using errcode = 'P0001';
+  end if;
+
+  for i in 1 .. 8 loop
+    if not exists (select 1 from public.meetings where scheduled_date = v_date) then
+      return v_date;
+    end if;
+    v_blocked := v_blocked || v_date;
+    v_date := v_date + 7;
+  end loop;
+
+  -- Name the dates. The admin's next move is to look at them — they are almost
+  -- always the other term's generated schedule — and the message is the only
+  -- place that information exists.
+  raise exception '找不到可用的日期：% 起連續 8 個同一星期幾的日期都已排定（%），請確認是否已與另一學期的排班重疊',
+    p_from, array_to_string(v_blocked, '、')
+    using errcode = 'P0001';
+end;
+$function$;
+
+revoke all on function public.meetings_next_free_date(date) from public, anon, authenticated;
 
 -- ── generate: one semester per call, and the numbers belong to it ────────────
 -- Changes from 20260722000000:
@@ -39,6 +105,13 @@
 --     semester that already holds a week keeps working (the existing
 --     skip-then-idempotent-re-run assertions depend on it), and it sits AFTER the
 --     date check so a same-date re-run is still reported the way it always was;
+--   * the two skips are COUNTED SEPARATELY and returned as skipped_date /
+--     skipped_label. They mean opposite things to the admin — "those dates are
+--     already scheduled, nothing to do" versus "your start date is off, this
+--     semester's numbers are already used" — and reporting one total made the
+--     second read as the first, sending an admin away from a schedule that was
+--     never created. `skipped` stays in the payload as their sum so nothing
+--     reading the old shape breaks;
 --   * both INSERTs stamp semester_id explicitly. Generate accepts up to 60 weeks,
 --     so ONE generated semester can itself straddle January→February; leaving the
 --     BEFORE INSERT safety net to guess would split that single semester in two.
@@ -55,7 +128,8 @@ set search_path to 'public'
 as $function$
 declare
   v_inserted int := 0;
-  v_skipped  int := 0;
+  v_skipped_date  int := 0;
+  v_skipped_label int := 0;
   v_date     date;
   v_reason   text;
   v_semester_id uuid;
@@ -112,7 +186,7 @@ begin
       select 1 from public.meetings
       where scheduled_date = v_date
     ) then
-      v_skipped := v_skipped + 1;
+      v_skipped_date := v_skipped_date + 1;
       continue;
     end if;
 
@@ -124,7 +198,7 @@ begin
       select 1 from public.meetings
       where semester_id = v_semester_id and week_label ~ ('^第' || i || '週')
     ) then
-      v_skipped := v_skipped + 1;
+      v_skipped_label := v_skipped_label + 1;
       continue;
     end if;
 
@@ -151,7 +225,15 @@ begin
     v_inserted := v_inserted + 1;
   end loop;
 
-  return jsonb_build_object('inserted', v_inserted, 'skipped', v_skipped);
+  -- `skipped` is the sum, kept so any older reader of this payload still sees
+  -- the number it expects; the two components are what the UI words its toast
+  -- from.
+  return jsonb_build_object(
+    'inserted', v_inserted,
+    'skipped', v_skipped_date + v_skipped_label,
+    'skipped_date', v_skipped_date,
+    'skipped_label', v_skipped_label
+  );
 end;
 $function$;
 
@@ -165,10 +247,11 @@ grant execute on function public.meetings_generate_semester(int, date, int, json
 -- the next number comes from THIS semester's numbers, so 上學期's 第16週 is followed
 -- by 下學期's 第1週, not 第17週.
 --
--- The fifth, the free-date scan, becomes DATE-GLOBAL instead. See the comment at
--- the scan itself: a year bucket held both terms, so dropping to the semester
--- would have been a narrowing, and one meeting per calendar date is a lab-wide
--- invariant with no constraint behind it.
+-- The fifth, the free-date scan, becomes DATE-GLOBAL instead and moves out into
+-- public.meetings_next_free_date, which append_week shares: a year bucket held
+-- both terms, so dropping to the semester would have been a narrowing, and one
+-- meeting per calendar date is a lab-wide invariant with no constraint behind
+-- it. The walk is bounded there and raises when it runs out of room.
 --
 -- v_year survives because the trailing INSERT still writes the `year` column with
 -- exactly the value it always did.
@@ -233,18 +316,12 @@ begin
   select max(scheduled_date) into v_max_date
   from public.meetings where semester_id = v_semester_id and not is_holiday and not is_speaker;
   -- The max above is semester-scoped (the cadence to continue is THIS semester's),
-  -- but the free-date scan below is DATE-GLOBAL, and the difference is deliberate.
-  -- One meeting per calendar date is a lab-wide invariant with nothing in the
-  -- schema behind it (no unique index on scheduled_date), and an appended 上學期
-  -- week walks straight into 下學期's calendar months — semester-scoping this scan
-  -- would let it land on a date another semester already holds, which gives the
-  -- schedule two "this week"s and makes the Nextcloud recording match ambiguous
-  -- (apps/portal/lib/meetings/recording-match.ts keys on the date in a filename).
-  -- Numbering and ordering belong to the semester; the calendar does not.
-  v_new_date := v_max_date + 7;
-  while exists (select 1 from public.meetings where scheduled_date = v_new_date) loop
-    v_new_date := v_new_date + 7;
-  end loop;
+  -- but the free-date scan is DATE-GLOBAL, and the difference is deliberate — see
+  -- meetings_next_free_date, which owns that scan and its 8-candidate ceiling.
+  -- It RAISES rather than wandering when the slots ahead all belong to another
+  -- semester, so this shuffle aborts instead of dropping the trailing week four
+  -- months out under this semester's id.
+  v_new_date := public.meetings_next_free_date(v_max_date + 7);
 
   select coalesce(max(substring(week_label from '第(\d+)週')::int), 0) + 1
     into v_next_no
@@ -278,6 +355,102 @@ $function$;
 
 revoke all on function public.meetings_insert_week(uuid) from public, anon;
 grant execute on function public.meetings_insert_week(uuid) to authenticated, service_role;
+
+-- ── append one week to the END of a semester ─────────────────────────────────
+-- NEW. The schedule tab's per-group "＋ 新增一週" used to be a plain PostgREST
+-- INSERT with both values computed in the browser, and both computations were
+-- wrong in the same way: they were derived from useMeetings(year), which is
+-- filtered to ONE meetings.year bucket. A backfilled historical semester can
+-- span two buckets (see 20260828120000's backfill report, which shouts about
+-- exactly that), so the client saw a truncated slice of the semester, minted a
+-- 第N週 the semester already used, and reported success — the duplicate-number
+-- symptom this whole feature set exists to remove. The plain INSERT also skipped
+-- the date-global occupancy invariant every RPC here enforces (issue #1103;
+-- there is still no unique index on scheduled_date).
+--
+-- So the server computes both. It sees the whole semester by construction —
+-- semester_id is the parameter, no year bucket is involved — and it is the same
+-- code path, label mint included, that insert_week uses.
+--
+-- Not to be confused with meetings_insert_week: that one INSERTS A GAP at a
+-- given week and pushes everything after it back by one slot. This one only
+-- appends, touches no existing row, and is keyed on the semester rather than on
+-- a meeting.
+create or replace function public.meetings_append_week(p_semester_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_year      int;
+  v_max_date  date;
+  v_new_date  date;
+  v_next_no   int;
+  v_new_id    uuid;
+begin
+  if not public.is_meetings_admin() then
+    raise exception 'Forbidden: 僅管理員可調整排班' using errcode = '42501';
+  end if;
+  if p_semester_id is null then
+    raise exception '缺少學期' using errcode = 'P0001';
+  end if;
+
+  -- Serialize appends to one semester: two admins clicking at once would both
+  -- read the same max date and the same max week number, and both would insert.
+  -- Transaction-scoped, keyed on the semester, so different semesters never wait
+  -- on each other.
+  perform pg_advisory_xact_lock(hashtext('meetings_append_week:' || p_semester_id::text));
+
+  -- Same row lock the other schedule-editing RPCs take, so an append cannot
+  -- interleave with an insert_week / remove_week shuffle of the same semester.
+  perform 1 from public.meetings where semester_id = p_semester_id for update;
+
+  -- The row to continue from: this semester's LAST one, by date. Its `year` is
+  -- what the appended week inherits — the same rule meetings_insert_week uses
+  -- (it carries the target row's year onto the row it creates), so `year` keeps
+  -- meaning exactly what it always did and the new week lands in the same year
+  -- tab as the tail it extends. Holidays and speaker weeks count here: this is
+  -- the end of the schedule, not a cadence reconstruction, and the free-date
+  -- walk below would step over them anyway.
+  select year, scheduled_date into v_year, v_max_date
+  from public.meetings
+  where semester_id = p_semester_id
+  order by scheduled_date desc, id desc
+  limit 1;
+  if not found then
+    raise exception '此學期還沒有任何週次，無法接續新增' using errcode = 'P0001';
+  end if;
+
+  -- +7 preserves whatever weekday this semester actually runs on (no hard-coded
+  -- Monday, no assumed 16 weeks), then step over any date another semester
+  -- already holds — bounded, so a fully-generated 下學期 ahead is an error and
+  -- not a slot four months out.
+  v_new_date := public.meetings_next_free_date(v_max_date + 7);
+
+  -- The label is THIS semester's max + 1, taken from the whole semester rather
+  -- than from whatever subset a client happens to be showing.
+  select coalesce(max(substring(week_label from '第(\d+)週')::int), 0) + 1
+    into v_next_no
+  from public.meetings
+  where semester_id = p_semester_id and week_label ~ '第\d+週';
+
+  -- semester_id is stamped EXPLICITLY. The appended week can fall outside its
+  -- semester's calendar months (a 上學期 tail reaching into February), and the
+  -- BEFORE INSERT safety net's date-derived guess would move it into 下學期 and
+  -- restart its numbering.
+  insert into public.meetings
+    (year, semester_id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id)
+  values
+    (v_year, p_semester_id, '第' || v_next_no || '週', v_new_date, false, null, null)
+  returning id into v_new_id;
+
+  return v_new_id;
+end;
+$function$;
+
+revoke all on function public.meetings_append_week(uuid) from public, anon;
+grant execute on function public.meetings_append_week(uuid) to authenticated, service_role;
 
 -- ── date-mover: remove a week, within one semester ───────────────────────────
 -- Redeclared whole from 20260722160354:316; every `year = v_year` becomes

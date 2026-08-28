@@ -1628,6 +1628,24 @@ export type Database = {
           },
         ]
       }
+      meetings_week_label_backup_20260828: {
+        Row: {
+          id: string | null
+          scheduled_date: string | null
+          week_label: string | null
+        }
+        Insert: {
+          id?: string | null
+          scheduled_date?: string | null
+          week_label?: string | null
+        }
+        Update: {
+          id?: string | null
+          scheduled_date?: string | null
+          week_label?: string | null
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           avatar_url: string | null
@@ -3065,6 +3083,7 @@ export type Database = {
       meeting_academic_year: { Args: { p_date: string }; Returns: number }
       meeting_semester_for_date: { Args: { p_date: string }; Returns: string }
       meeting_term: { Args: { p_date: string }; Returns: number }
+      meetings_append_week: { Args: { p_semester_id: string }; Returns: string }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
       meetings_fill_presenters: { Args: { p_year: number }; Returns: Json }
       meetings_generate_semester: {
@@ -3080,6 +3099,7 @@ export type Database = {
         Args: { p_at_meeting_id: string }
         Returns: string
       }
+      meetings_next_free_date: { Args: { p_from: string }; Returns: string }
       meetings_pool_compact: {
         Args: { p_admission_year: number }
         Returns: undefined

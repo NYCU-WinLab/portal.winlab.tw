@@ -10,7 +10,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(37);
+select plan(41);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -120,6 +120,12 @@ reset role;
 
 select is((select (ret->>'inserted')::int from gen_skip), 2, 'skips the one existing date, inserts the other 2');
 select is((select (ret->>'skipped')::int from gen_skip), 1, 'reports 1 skipped');
+-- The two skip reasons are reported separately: this one is a taken DATE, and
+-- the UI must not tell the admin their week numbers were already used.
+select is((select (ret->>'skipped_date')::int from gen_skip), 1,
+  'the skip is attributed to the taken date (skipped_date = 1)');
+select is((select (ret->>'skipped_label')::int from gen_skip), 0,
+  'no week number was in the way (skipped_label = 0)');
 select is(
   (select presenter from public.meetings where year = 2042 and scheduled_date = '2042-09-04'),
   '既有報告人', 'the pre-existing presenter is never overwritten');
@@ -187,6 +193,14 @@ select is((select (ret->>'inserted')::int from gen_shifted), 0,
   'a shifted-start regenerate of the same semester inserts nothing');
 select is((select (ret->>'skipped')::int from gen_shifted), 3,
   'all 3 shifted rows are reported as skipped');
+-- The reason MATTERS here, and it is the opposite of the gen_skip case above:
+-- not one date collided, every week NUMBER did. Reported as a date collision it
+-- reads as "already scheduled, nothing to do", and the admin walks away from a
+-- schedule that was never created.
+select is((select (ret->>'skipped_date')::int from gen_shifted), 0,
+  'a shifted-start regenerate collides with no DATE (skipped_date = 0)');
+select is((select (ret->>'skipped_label')::int from gen_shifted), 3,
+  'all 3 skips are week-number collisions inside the semester (skipped_label = 3)');
 select is(
   (select count(*)::int from public.meetings
    where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 1)),
