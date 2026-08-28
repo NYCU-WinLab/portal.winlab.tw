@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
+import type { TablesInsert } from "@/lib/supabase/database.types"
 import { toMeeting, type DbMeeting, type Meeting } from "@/lib/meetings/types"
 
 import { queryKeys } from "./query-keys"
@@ -217,7 +218,13 @@ export function useAddMeeting() {
   return useMutation({
     mutationFn: async (row: {
       year: number
-      semesterId: string
+      // Optional: pass it when appending inside a known semester group, so
+      // the row can't drift to another semester (e.g. a date near a
+      // month/semester boundary). Omit it when adding a meeting at an
+      // arbitrary date with no group context — the meetings_set_semester
+      // BEFORE INSERT trigger derives the right semester from
+      // scheduled_date.
+      semesterId?: string
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
@@ -227,26 +234,40 @@ export function useAddMeeting() {
       presenterUserId: string | null
       paperTitle?: string | null
     }) => {
+      // semester_id is NOT NULL with no column default (only
+      // meetings_set_semester's BEFORE INSERT trigger fills it), so the
+      // generated Insert type marks it required. Build the payload against a
+      // locally-widened type so the key can be genuinely absent, then cast
+      // back for `.insert()` — the trigger covers the omitted case.
+      const payload: Omit<TablesInsert<"meetings">, "semester_id"> & {
+        semester_id?: string
+      } = {
+        year: row.year,
+        // Only sent when provided so the column is absent and the trigger
+        // derives it — passing `undefined`/`null` explicitly would still
+        // include the key and override the trigger's default.
+        ...(row.semesterId !== undefined
+          ? { semester_id: row.semesterId }
+          : {}),
+        week_label: row.weekLabel,
+        scheduled_date: row.scheduledDate,
+        is_holiday: row.isHoliday,
+        is_speaker: row.isSpeaker ?? false,
+        is_thesis: row.isThesis ?? false,
+        presenter: row.presenter,
+        presenter_user_id: row.presenterUserId,
+        // The typed title lives in paper_title for a speaker or thesis week
+        // (teacher_paper_id stays null, so the sync trigger normalizes and
+        // keeps this value). Only sent when provided so a normal week's
+        // paper_title is trigger-governed.
+        ...(row.paperTitle !== undefined
+          ? { paper_title: row.paperTitle }
+          : {}),
+      }
+
       const { data, error } = await supabase
         .from(TABLE)
-        .insert({
-          year: row.year,
-          semester_id: row.semesterId,
-          week_label: row.weekLabel,
-          scheduled_date: row.scheduledDate,
-          is_holiday: row.isHoliday,
-          is_speaker: row.isSpeaker ?? false,
-          is_thesis: row.isThesis ?? false,
-          presenter: row.presenter,
-          presenter_user_id: row.presenterUserId,
-          // The typed title lives in paper_title for a speaker or thesis week
-          // (teacher_paper_id stays null, so the sync trigger normalizes and
-          // keeps this value). Only sent when provided so a normal week's
-          // paper_title is trigger-governed.
-          ...(row.paperTitle !== undefined
-            ? { paper_title: row.paperTitle }
-            : {}),
-        })
+        .insert(payload as TablesInsert<"meetings">)
         .select("id")
         .single()
       if (error) throw new Error(error.message || "新增失敗")
