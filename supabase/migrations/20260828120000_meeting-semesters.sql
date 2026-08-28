@@ -87,6 +87,17 @@ comment on column public.meetings.semester_id is
 -- Race-safe by construction: two concurrent inserts for the same semester both
 -- reach the INSERT, one wins, the loser's `on conflict do nothing` returns no
 -- row, and the re-select picks up the winner's id.
+--
+-- ...ALMOST by construction. `on conflict do nothing` is allowed to neither
+-- insert nor expose the conflicting row to this transaction's snapshot (the
+-- winner may still be uncommitted under REPEATABLE READ, and DO NOTHING does not
+-- wait for it the way DO UPDATE does), so the re-select can come up empty too.
+-- That is rare, but a NULL return is far worse than a retry: it collapses
+-- generate's advisory-lock key to a constant, and it makes every
+-- `insert … semester_id = null` fall through to the BEFORE INSERT safety net,
+-- which re-derives per row and splits one generated semester at the January
+-- boundary — the exact failure explicit stamping exists to prevent. So the
+-- final guard below turns that into a loud, retryable error instead.
 create or replace function public.meeting_semester_for_date(p_date date)
 returns uuid
 language plpgsql
@@ -111,6 +122,16 @@ begin
     select id into v_id from public.meeting_semesters
     where academic_year = v_ay and term = v_term;
   end if;
+
+  -- Never hand a NULL back. Callers stamp this value straight into
+  -- meetings.semester_id and key advisory locks on it; a silent NULL would be
+  -- read as "derive it yourself", which is the wrong answer for every caller
+  -- that bothered to ask. Retrying the statement resolves it.
+  if v_id is null then
+    raise exception '無法建立或取得學期（% 學年度第 % 學期），請重試', v_ay, v_term
+      using errcode = 'P0001';
+  end if;
+
   return v_id;
 end;
 $function$;
@@ -261,10 +282,11 @@ create table if not exists public.meetings_week_label_backup_20260828 as
 comment on table public.meetings_week_label_backup_20260828 is
   'Pre-renumber snapshot of meetings.week_label taken by 20260828120000. Restore with `update public.meetings m set week_label = b.week_label from public.meetings_week_label_backup_20260828 b where b.id = m.id`. Drop once the renumber is verified on production.';
 
--- RLS, not GRANTs, because GRANTs restrict nothing here. This project's
--- `alter default privileges` hands anon, authenticated and service_role ALL
--- privileges on every new table in `public`, so this table is born readable by
--- anon. RLS with no policy at all is the right control: nothing in the app ever
+-- RLS, not GRANTs, because GRANTs restrict nothing here. Supabase's platform
+-- provisioning — not any DDL in this repo; `grep -rn "alter default privileges"
+-- supabase/` finds none — leaves `alter default privileges` in `public` handing
+-- anon, authenticated and service_role ALL privileges on every new table, so
+-- this table is born readable by anon. RLS with no policy at all is the right control: nothing in the app ever
 -- reads this table — restores are run by an operator as postgres/service_role,
 -- both of which hold BYPASSRLS — so there is no policy to write, and an
 -- admin-only one would falsely suggest the portal queries it. The explicit
@@ -357,8 +379,9 @@ create policy meeting_semesters_delete on public.meeting_semesters
 
 -- These mirror what `public.meetings` itself holds. `anon` stays in the select
 -- grant because `meetings` grants select to `anon` too — checked, not assumed:
--- this project's `alter default privileges` hands every new public table all
--- privileges to anon / authenticated / service_role, so `meetings.relacl` reads
+-- Supabase's platform provisioning leaves `alter default privileges` in `public`
+-- handing every new table all privileges to anon / authenticated / service_role
+-- (no such DDL exists in this repo), so `meetings.relacl` reads
 -- `anon=arwdDxtm/postgres`. Anon's inability to read `meetings` comes entirely
 -- from `meetings_select`'s `auth.uid() is not null`, never from the grant — which
 -- is exactly why the policy above had to be the thing that got fixed.
