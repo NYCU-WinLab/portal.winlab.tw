@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(27);
+select plan(28);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -136,7 +136,21 @@ select is(
   'eeeeeeee-0000-0000-0000-0000000000f1'::uuid,
   'the safety net never overwrites a supplied semester_id, even when the date says otherwise');
 
--- ═══ 7. RLS: everyone reads, only a meetings admin writes ══════════════════
+-- ═══ 7. RLS: every signed-in reader reads, only a meetings admin writes ════
+-- anon is not a reader. meeting_semesters_select is a mirror of meetings_select
+-- (`to public using (auth.uid() is not null)`), so a signed-out caller sees no
+-- semesters — the grouping rows must never be more public than the meetings they
+-- group. Table-level SELECT *is* granted to anon (Supabase default privileges
+-- hand it out on every public table, `meetings` included), so RLS is the only
+-- thing standing here and it is worth an assertion of its own.
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+select is(
+  (select count(*)::int from public.meeting_semesters),
+  0,
+  'anon reads no semesters — the select policy mirrors meetings_select''s auth.uid() gate');
+reset role;
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-000000000009","role":"authenticated"}', true);
 

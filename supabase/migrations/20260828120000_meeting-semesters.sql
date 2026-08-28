@@ -207,32 +207,74 @@ end $$;
 -- does not consume a number — a holiday week is not week 4. And any trailing
 -- text after `第N週` (a `(原因)` note an admin typed) is carried across, because
 -- it is the admin's words, not generated.
-with numbered as (
-  select id,
-         row_number() over (partition by semester_id order by scheduled_date, id) as n,
-         coalesce(substring(week_label from '^第\d+週(.*)$'), '') as suffix
-  from public.meetings
-  where week_label ~ '^第\d+週'
-)
-update public.meetings m
-set week_label = '第' || n.n || '週' || n.suffix
-from numbered n
-where n.id = m.id
-  and m.week_label <> '第' || n.n || '週' || n.suffix;
+--
+-- THE APPLY LOG IS THE UNDO RECORD. This is the only statement in the migration
+-- that overwrites existing history, and the old labels exist nowhere else — no
+-- audit table, and the >30-week notice above only reports a suspicion, it does
+-- not preserve anything. So every row this touches gets a NOTICE carrying its
+-- id, its date, both labels, and a ready-to-paste UPDATE that puts the old label
+-- back. Whoever applies this to production must capture the apply output; the
+-- transcript is the rollback plan.
+--
+-- Wrapping the statement in a do-block changes nothing about which rows are
+-- renumbered or how the numbers are computed: it is still the same single
+-- set-based UPDATE, now as a data-modifying CTE whose RETURNING feeds the loop
+-- that emits the notices. `n.old_label` is read from the FROM-list relation
+-- because RETURNING cannot see the pre-update value of a column it just wrote
+-- (`returning old.*` is Postgres 18+, and this has to run on 15/17).
+do $$
+declare r record;
+begin
+  for r in
+    with numbered as (
+      select id,
+             week_label as old_label,
+             row_number() over (partition by semester_id order by scheduled_date, id) as n,
+             coalesce(substring(week_label from '^第\d+週(.*)$'), '') as suffix
+      from public.meetings
+      where week_label ~ '^第\d+週'
+    ),
+    renumbered as (
+      update public.meetings m
+      set week_label = '第' || n.n || '週' || n.suffix
+      from numbered n
+      where n.id = m.id
+        and m.week_label <> '第' || n.n || '週' || n.suffix
+      returning m.id, m.scheduled_date, n.old_label, m.week_label as new_label
+    )
+    select * from renumbered order by scheduled_date, id
+  loop
+    -- The undo statement is built with format(), not written inline: RAISE only
+    -- understands bare `%`, so a `%L` in its format string would be emitted as a
+    -- literal L and the "ready to paste" statement would be unquoted garbage.
+    raise notice 'meeting_semesters renumber: % on %: % -> %  |  undo: %',
+      r.id, r.scheduled_date, r.old_label, r.new_label,
+      format('update public.meetings set week_label = %L where id = %L;', r.old_label, r.id);
+  end loop;
+end $$;
 
 -- ── 9. RLS ──────────────────────────────────────────────────────────────────
--- The SELECT audience mirrors `meetings_select` (baseline:2657), which is also
--- `to public`. A semester row carries no PII — a ROC year, a term, a start date
--- and a week count — and it exists to group meeting rows. Making it stricter
--- than the meetings it groups would just break the join for readers who can
--- already read the meetings.
+-- SELECT is a byte-for-byte mirror of `meetings_select` (baseline:2657) —
+-- `for select to public using ((auth.uid() is not null))`. Both halves matter.
+--
+-- `to public` rather than `to authenticated`, because that is the audience the
+-- meetings it groups use, and the `auth.uid() is not null` predicate is what
+-- actually does the gating: any reader who can see a meeting can see the
+-- semester it belongs to, so a `第N週` label never renders against a row the
+-- reader cannot join to.
+--
+-- `using (true)` would have been the wrong call even though a semester row is
+-- just a ROC year, a term, a date and a week count. It leaks less than the
+-- meetings do, but it leaks it to a strictly wider audience — anon could read
+-- the lab's whole semester calendar while being unable to read a single meeting.
+-- Grouping rows must not be more public than the rows they group.
 --
 -- Writes are the admin's: the semester is the schedule's frame, and a member
 -- editing it would renumber everybody's weeks.
 alter table public.meeting_semesters enable row level security;
 
 create policy meeting_semesters_select on public.meeting_semesters
-  for select to public using (true);
+  for select to public using ((auth.uid() is not null));
 create policy meeting_semesters_insert on public.meeting_semesters
   for insert to authenticated with check (public.is_meetings_admin());
 create policy meeting_semesters_update on public.meeting_semesters
@@ -240,5 +282,12 @@ create policy meeting_semesters_update on public.meeting_semesters
 create policy meeting_semesters_delete on public.meeting_semesters
   for delete to authenticated using (public.is_meetings_admin());
 
+-- These mirror what `public.meetings` itself holds. `anon` stays in the select
+-- grant because `meetings` grants select to `anon` too — checked, not assumed:
+-- this project's `alter default privileges` hands every new public table all
+-- privileges to anon / authenticated / service_role, so `meetings.relacl` reads
+-- `anon=arwdDxtm/postgres`. Anon's inability to read `meetings` comes entirely
+-- from `meetings_select`'s `auth.uid() is not null`, never from the grant — which
+-- is exactly why the policy above had to be the thing that got fixed.
 grant select on public.meeting_semesters to anon, authenticated, service_role;
 grant insert, update, delete on public.meeting_semesters to authenticated, service_role;
