@@ -11,7 +11,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(53);
+select plan(62);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -101,7 +101,7 @@ select throws_ok(
   'P0001', '不能與自己互換', 'cannot swap a meeting with itself');
 select throws_ok(
   $$ select public.meetings_swap('cccccccc-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000004') $$,
-  'P0001', '只能在同一年度內互換', 'cannot swap across years');
+  'P0001', '只能在同一學期內互換', 'cannot swap across semesters');
 select throws_ok(
   $$ select public.meetings_swap('cccccccc-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000003') $$,
   'P0001', '假期週不可互換', 'cannot swap a holiday week');
@@ -470,6 +470,97 @@ select is(
   (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000003'),
   '講題Y',
   'editing a speaker week talk title persists (trigger leaves it, teacher_paper_id null)');
+
+-- ═══ tail regression: an appended week stays in ITS OWN semester ════════════
+-- The whole reason meeting_semesters exists. 上學期 of academic year 132 ends in
+-- January; five admin insert-weeks push the trailing slot across the
+-- January→February line, where re-deriving the semester from the date would say
+-- 下學期. The stored semester_id has to win: the tail keeps counting inside the
+-- semester it was appended to, and no second semester may be minted for the
+-- February/March dates.
+--
+-- Wednesday cadence (2044-01-13 …) on purpose, and 2044 is a leap year, so the
+-- arithmetic below is 02-24 + 7 = 03-02.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('66666666-0000-0000-0000-000000000001', 2044, '第1週', '2044-01-13', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('66666666-0000-0000-0000-000000000002', 2044, '第2週', '2044-01-20', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('66666666-0000-0000-0000-000000000003', 2044, '第3週', '2044-01-27', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023');
+
+-- Always insert at the same row: it is postponed one slot per call and never
+-- becomes the trailing week, so five calls append five weeks.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+reset role;
+
+select is(
+  (select count(*)::int from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)),
+  8,
+  'every week of the extended 上學期 — February and March tail included — stays in the original semester');
+select is(
+  (select count(*)::int from public.meeting_semesters where academic_year = 132),
+  1,
+  'pushing the tail past February mints no second semester for the February/March dates');
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)),
+  '第1週,第2週,第3週,第4週,第5週,第6週,第7週,第8週',
+  'the trailing labels keep counting inside the semester (第1..第8週, no restart, no second sequence)');
+select is(
+  (select scheduled_date from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)
+     and week_label = '第8週'),
+  '2044-03-02'::date,
+  '第8週 lands on 2044-03-02 — past the end of February, still 上學期 132');
+
+-- ═══ two semesters in ONE `year` bucket are numbered independently ══════════
+-- Semester A: 4 Wednesdays from 2046-09-05 (上學期 135). Semester B: 3 Fridays
+-- from 2047-02-22 (下學期 135). Different weekday, different length, and both
+-- carry year = 2046 — exactly the bucket the old year-scoped logic shared, where
+-- an insert in A shifted B's rows and minted its label from B's numbers too.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('55555555-0000-0000-0000-00000000000a', 2046, '第1週', '2046-09-05', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('55555555-0000-0000-0000-00000000000b', 2046, '第2週', '2046-09-12', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('55555555-0000-0000-0000-00000000000c', 2046, '第3週', '2046-09-19', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'),
+  ('55555555-0000-0000-0000-00000000000d', 2046, '第4週', '2046-09-26', false, null, null),
+  ('55555555-0000-0000-0000-00000000001a', 2046, '第1週', '2047-02-22', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('55555555-0000-0000-0000-00000000001b', 2046, '第2週', '2047-03-01', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('55555555-0000-0000-0000-00000000001c', 2046, '第3週', '2047-03-08', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('55555555-0000-0000-0000-00000000000a');
+reset role;
+
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 1)),
+  '第1週,第2週,第3週,第4週,第5週',
+  'semester A is numbered 第1..第5週 from its own weeks after the insert');
+select is(
+  (select to_char(max(scheduled_date), 'YYYY-MM-DD Dy') from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 1)),
+  '2046-10-03 Wed',
+  'A''s appended week keeps A''s own Wednesday cadence (2046-09-26 + 7)');
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 2)),
+  '第1週,第2週,第3週',
+  'semester B still numbers 第1..第3週 — an insert in A never renumbers B');
+select is(
+  (select string_agg(to_char(scheduled_date, 'YYYY-MM-DD'), ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 2)),
+  '2047-02-22,2047-03-01,2047-03-08',
+  'B''s Friday dates are untouched by the insert in A (no cross-semester shift)');
+select isnt(
+  (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000001a'),
+  (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000000b'),
+  'the two semesters sharing the year 2046 bucket are distinct entities');
 
 select * from finish();
 rollback;
