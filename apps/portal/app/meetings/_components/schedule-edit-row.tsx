@@ -29,7 +29,11 @@ import { FileCell } from "./file-cell"
 import { PresenterSelect } from "./presenter-select"
 
 function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("zh-TW", {
+  // `T00:00:00` parses as LOCAL midnight. A bare YYYY-MM-DD is parsed as UTC
+  // midnight and renders as the previous day west of UTC — the same trap
+  // schedule-tab's addOneWeek documents.
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("zh-TW", {
+    year: "numeric",
     month: "numeric",
     day: "numeric",
   })

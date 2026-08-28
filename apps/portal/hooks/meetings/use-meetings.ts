@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
+import type { TablesInsert } from "@/lib/supabase/database.types"
 import { toMeeting, type DbMeeting, type Meeting } from "@/lib/meetings/types"
 
 import { queryKeys } from "./query-keys"
@@ -210,6 +211,23 @@ export function useAdminUpdateMeeting() {
   })
 }
 
+/**
+ * Adds a meeting at an ARBITRARY date — the page-level add-meeting dialog, and
+ * the first week of an empty year bucket.
+ *
+ * This hook never sets `semester_id`, and takes no option to. The database
+ * derives it from `scheduled_date` (`meetings_set_semester`, a BEFORE INSERT
+ * trigger that fills the column only when it is NULL), which is the right
+ * answer here: when a date is picked out of thin air, the semester it falls in
+ * IS the semester it belongs to.
+ *
+ * Appending inside a KNOWN semester is a different question with a different
+ * answer, and it does not belong here — a week appended to the end of 上學期 can
+ * legitimately fall in February, where the date-derived guess would move it into
+ * 下學期 and restart its numbering. Use `useAppendMeetingWeek` for that: it lets
+ * the server compute the label and the date from the whole semester and stamps
+ * `semester_id` explicitly.
+ */
 export function useAddMeeting() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -226,25 +244,38 @@ export function useAddMeeting() {
       presenterUserId: string | null
       paperTitle?: string | null
     }) => {
+      // `semester_id` is NOT NULL with no column DEFAULT — only the
+      // meetings_set_semester trigger fills it — and codegen can't see
+      // triggers, so the generated Insert type marks it required. Typing the
+      // payload as `Omit<…, "semester_id">` is what keeps every OTHER column
+      // fully checked, including any column a future migration makes required:
+      // the object literal still has to satisfy the generated shape, so such a
+      // change surfaces here as an error rather than being swallowed.
+      //
+      // The cast at `.insert()` is the narrowest one that compiles: it asserts
+      // exactly the one thing TypeScript cannot know — that the trigger
+      // supplies the missing column — and nothing else.
+      const payload: Omit<TablesInsert<"meetings">, "semester_id"> = {
+        year: row.year,
+        week_label: row.weekLabel,
+        scheduled_date: row.scheduledDate,
+        is_holiday: row.isHoliday,
+        is_speaker: row.isSpeaker ?? false,
+        is_thesis: row.isThesis ?? false,
+        presenter: row.presenter,
+        presenter_user_id: row.presenterUserId,
+        // The typed title lives in paper_title for a speaker or thesis week
+        // (teacher_paper_id stays null, so the sync trigger normalizes and
+        // keeps this value). Only sent when provided so a normal week's
+        // paper_title is trigger-governed.
+        ...(row.paperTitle !== undefined
+          ? { paper_title: row.paperTitle }
+          : {}),
+      }
+
       const { data, error } = await supabase
         .from(TABLE)
-        .insert({
-          year: row.year,
-          week_label: row.weekLabel,
-          scheduled_date: row.scheduledDate,
-          is_holiday: row.isHoliday,
-          is_speaker: row.isSpeaker ?? false,
-          is_thesis: row.isThesis ?? false,
-          presenter: row.presenter,
-          presenter_user_id: row.presenterUserId,
-          // The typed title lives in paper_title for a speaker or thesis week
-          // (teacher_paper_id stays null, so the sync trigger normalizes and
-          // keeps this value). Only sent when provided so a normal week's
-          // paper_title is trigger-governed.
-          ...(row.paperTitle !== undefined
-            ? { paper_title: row.paperTitle }
-            : {}),
-        })
+        .insert(payload as TablesInsert<"meetings">)
         .select("id")
         .single()
       if (error) throw new Error(error.message || "新增失敗")
@@ -325,6 +356,39 @@ export function useInsertMeetingWeek() {
   })
 }
 
+/**
+ * Appends one week to the END of a semester. Both values are computed by the
+ * server: this hook deliberately sends nothing but the semester id.
+ *
+ * The client used to compute them, from `useMeetings(year)` — a YEAR-filtered
+ * row set. A semester can span two `meetings.year` buckets (a 上學期 running
+ * September→January does), so the browser saw a truncated slice of it, minted a
+ * `第N週` the semester already used, and reported success. The RPC also enforces
+ * the date-global "one meeting per calendar date" invariant that a plain
+ * `.insert()` walked straight past (#1103).
+ */
+export function useAppendMeetingWeek() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (semesterId: string): Promise<string> => {
+      const { data, error } = await supabase.rpc("meetings_append_week", {
+        p_semester_id: semesterId,
+      })
+      if (error) throw new Error(error.message || "新增週次失敗")
+      return data as string
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+      toast.success("週次已新增")
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export function useRemoveMeetingWeek() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -352,6 +416,20 @@ export type SemesterHoliday = {
   label: string
 }
 
+/**
+ * What `meetings_generate_semester` reports. The RPC skips a week for two
+ * unrelated reasons and counts them separately; `skipped` (their sum) is still
+ * in the jsonb payload for older readers, and is deliberately not surfaced here
+ * — a caller that only sees the total cannot word the message correctly.
+ */
+export interface GenerateSemesterResult {
+  inserted: number
+  /** The date is already scheduled (the check is date-global, not per-semester). */
+  skippedDate: number
+  /** This semester already holds a 第N週 with that number. */
+  skippedLabel: number
+}
+
 export function useGenerateSemester() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -362,7 +440,7 @@ export function useGenerateSemester() {
       startDate: string
       weeks: number
       holidays: SemesterHoliday[]
-    }): Promise<{ inserted: number; skipped: number }> => {
+    }): Promise<GenerateSemesterResult> => {
       const { data, error } = await supabase.rpc("meetings_generate_semester", {
         p_year: input.year,
         p_start_date: input.startDate,
@@ -370,15 +448,33 @@ export function useGenerateSemester() {
         p_holidays: input.holidays,
       })
       if (error) throw new Error(error.message || "產生排班失敗")
-      return data as { inserted: number; skipped: number }
+      const raw = data as {
+        inserted: number
+        skipped_date: number
+        skipped_label: number
+      }
+      return {
+        inserted: raw.inserted,
+        skippedDate: raw.skipped_date,
+        skippedLabel: raw.skipped_label,
+      }
     },
-    onSuccess: ({ inserted, skipped }) => {
+    onSuccess: ({ inserted, skippedDate, skippedLabel }) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+      // The two skip reasons mean opposite things and used to share one
+      // sentence. "略過 16 週已存在" on a semester whose NUMBERS were taken (not
+      // its dates) reads as "already scheduled, nothing to do" — and the admin
+      // walks away from a schedule that was never created, which is the whole
+      // point of the shifted-start-date case.
+      const reasons: string[] = []
+      if (skippedDate > 0) reasons.push(`${skippedDate} 週日期已排定`)
+      if (skippedLabel > 0)
+        reasons.push(`${skippedLabel} 週的週次編號已被此學期使用`)
       toast.success(
-        skipped > 0
-          ? `已產生 ${inserted} 週（略過 ${skipped} 週已存在）`
+        reasons.length > 0
+          ? `已產生 ${inserted} 週（略過：${reasons.join("、")}）`
           : `已產生 ${inserted} 週`
       )
     },
