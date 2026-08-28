@@ -456,7 +456,11 @@ export function ScheduleTab({ year }: { year: number }) {
                         {m.weekLabel ?? "—"}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {new Date(m.scheduledDate).toLocaleDateString("zh-TW", {
+                        {/* `T00:00:00` parses as local midnight — see spanDate
+                            and addOneWeek above. */}
+                        {new Date(
+                          `${m.scheduledDate}T00:00:00`
+                        ).toLocaleDateString("zh-TW", {
                           year: "numeric",
                           month: "numeric",
                           day: "numeric",

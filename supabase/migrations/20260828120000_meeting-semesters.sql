@@ -269,8 +269,10 @@ comment on table public.meetings_week_label_backup_20260828 is
 -- both of which hold BYPASSRLS — so there is no policy to write, and an
 -- admin-only one would falsely suggest the portal queries it. The explicit
 -- revoke is belt-and-braces: it takes the privileges away now, and RLS keeps
--- the table shut even if a later migration re-grants them with one of this
--- repo's blanket `grant … on all tables in schema public` lines.
+-- the table shut regardless of what the grants say later.
+--
+-- (RLS with no policy trips Supabase's rls_enabled_no_policy advisor at INFO.
+-- That is the intended shape here, not an oversight.)
 alter table public.meetings_week_label_backup_20260828 enable row level security;
 revoke all on public.meetings_week_label_backup_20260828 from anon, authenticated;
 
