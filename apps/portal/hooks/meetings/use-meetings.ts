@@ -29,6 +29,23 @@ function paperErrorMessage(error: { code?: string; message?: string }): string {
   return msg || "更新失敗"
 }
 
+// meetings_scheduled_date_uniq (see 20260828160000_meetings-one-per-date.sql)
+// is what the RPCs' own occupied-date check never covered: a direct INSERT
+// that skips every RPC (add-meeting dialog, empty-year "first week" button).
+// A raw "duplicate key value violates unique constraint …" toast isn't
+// something an admin can act on, so translate that one violation like
+// paperErrorMessage does for the paper rules above.
+function addMeetingErrorMessage(error: {
+  code?: string
+  message?: string
+}): string {
+  const msg = error.message ?? ""
+  if (error.code === "23505" && msg.includes("meetings_scheduled_date_uniq")) {
+    return "該日期已有會議"
+  }
+  return msg || "新增失敗"
+}
+
 export function useMeetings(year: number) {
   const supabase = createClient()
 
@@ -278,7 +295,7 @@ export function useAddMeeting() {
         .insert(payload as TablesInsert<"meetings">)
         .select("id")
         .single()
-      if (error) throw new Error(error.message || "新增失敗")
+      if (error) throw new Error(addMeetingErrorMessage(error))
 
       const { error: syncError } = await supabase.rpc(
         "meetings_sync_questioners",

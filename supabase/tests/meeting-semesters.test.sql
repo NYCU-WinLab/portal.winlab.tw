@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(28);
+select plan(30);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -202,6 +202,27 @@ select is(
   0,
   'a meetings admin''s DELETE on a semester actually lands');
 reset role;
+
+-- ═══ 8. one meeting per calendar date is a hard DB constraint (#1103) ═══════
+-- meetings_scheduled_date_uniq closes the gap the RPCs' own occupied-date
+-- check never covered: a plain INSERT that skips every RPC (the add-meeting
+-- dialog, the empty-year-bucket "first week" button) used to be able to
+-- double-book a date the RPCs would have refused. See
+-- 20260828160000_meetings-one-per-date.sql's comment for why this is a
+-- POLICY choice, not a physical law, and how to relax it later.
+insert into public.meetings (year, week_label, scheduled_date, is_holiday)
+values (2043, '第1週', '2043-05-01', false);
+
+select throws_ok(
+  $$ insert into public.meetings (year, week_label, scheduled_date, is_holiday)
+     values (2043, '第2週', '2043-05-01', false) $$,
+  '23505', null,
+  'a second meeting on an already-occupied scheduled_date is rejected (meetings_scheduled_date_uniq)');
+
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2043-05-01'),
+  1,
+  'the rejected duplicate-date insert did not silently create a second row');
 
 select * from finish();
 rollback;
