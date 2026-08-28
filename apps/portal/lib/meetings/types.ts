@@ -66,6 +66,18 @@ export interface MeetingQuestioner {
   source: "auto" | "manual"
 }
 
+/**
+ * The unit `第N週` numbering restarts on.
+ *
+ * N is the Nth **calendar** week of the semester, not the Nth week the lab
+ * actually met: a holiday week occupies its number (the generate RPC writes
+ * `第N週(原因)`), and it keeps that number even if an admin later rewrites the
+ * label by hand (`大掃除`). Numbers are therefore only ever minted forward, as
+ * `max(第N) + 1` over the whole semester — nothing renumbers a semester
+ * automatically, on the client or in a migration. A positional re-derivation
+ * from "the weeks that look like `第N週`" would pull every week after a
+ * hand-relabelled holiday down by one.
+ */
 export interface Semester {
   id: string
   academicYear: number

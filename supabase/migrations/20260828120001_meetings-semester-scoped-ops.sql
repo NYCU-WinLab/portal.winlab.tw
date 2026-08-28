@@ -28,6 +28,23 @@
 -- All the RPCs are SECURITY DEFINER, which is what lets them call
 -- public.meeting_semester_for_date — EXECUTE on it is revoked from public, anon
 -- AND authenticated, so it is reachable only from an owner-privileged context.
+--
+-- ── WHAT `第N週` MEANS (the rule every mint below obeys) ─────────────────────
+-- N is the Nth CALENDAR week of the semester, not the Nth week anyone actually
+-- met. A holiday week OCCUPIES its number — generate writes `第N週(原因)` for
+-- one, and the number is still consumed if an admin later rewrites that label by
+-- hand (`大掃除`, `期末考週`), because the week happened on the calendar either
+-- way.
+--
+-- Two consequences, and both are why this file only ever mints FORWARD:
+--   * a semester's numbers are never re-derived from "the teaching weeks" —
+--     a `max(第N)+1` mint over the semester is correct precisely because every
+--     week, met or not, took a number on the way past;
+--   * NOTHING renumbers a semester automatically. 20260828120000 is purely
+--     additive for exactly this reason (see its header): a positional renumber
+--     that only counts `^第\d+週` rows would silently pull every week after a
+--     hand-relabelled holiday down by one. If you are ever tempted to add one,
+--     that is the bug you are about to ship.
 
 -- ── the bounded free-date walk ───────────────────────────────────────────────
 -- Both places that mint a trailing slot (insert_week's shuffle, append_week)
@@ -429,7 +446,9 @@ begin
   v_new_date := public.meetings_next_free_date(v_max_date + 7);
 
   -- The label is THIS semester's max + 1, taken from the whole semester rather
-  -- than from whatever subset a client happens to be showing.
+  -- than from whatever subset a client happens to be showing. max+1 (not
+  -- count+1) because `第N週` is the Nth CALENDAR week of the semester and a
+  -- holiday keeps its number — see "WHAT 第N週 MEANS" at the top of this file.
   select coalesce(max(substring(week_label from '第(\d+)週')::int), 0) + 1
     into v_next_no
   from public.meetings
