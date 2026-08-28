@@ -403,8 +403,11 @@ export function ScheduleTab({ year }: { year: number }) {
                         isCurrent={isCurrent}
                         isOwn={isOwn}
                         questioners={questioners?.get(m.id) ?? []}
+                        // Same semester only: meetings_swap refuses a
+                        // cross-semester swap ("只能在同一學期內互換"), so
+                        // offering one would only ever advertise a failure.
                         otherWeeks={presentationMeetings.filter(
-                          (o) => o.id !== m.id
+                          (o) => o.id !== m.id && o.semesterId === m.semesterId
                         )}
                         users={users}
                         isDragging={dragId === m.id}

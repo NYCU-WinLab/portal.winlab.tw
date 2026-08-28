@@ -30,6 +30,7 @@ import { PresenterSelect } from "./presenter-select"
 
 function formatShortDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("zh-TW", {
+    year: "numeric",
     month: "numeric",
     day: "numeric",
   })
