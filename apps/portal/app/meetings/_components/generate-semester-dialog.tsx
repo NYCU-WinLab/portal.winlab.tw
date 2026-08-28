@@ -55,7 +55,12 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   // week, where no date collides but every number is taken — shows as sixteen
   // insertable weeks and then inserts none.
   const { data: existing = [] } = useMeetings(year)
-  const { data: semesters = [] } = useSemesters()
+  // Same trap schedule-tab fell into: without the semester list the week-number
+  // rule below silently switches itself off and the preview quietly reverts to
+  // the date-only rule it had before — looking exactly like a start date that
+  // collides with nothing. The banner further down is what stops a viewer
+  // believing an incomplete preview.
+  const { data: semesters = [], isError: semestersFailed } = useSemesters()
 
   const [startDate, setStartDate] = useState("")
   const [weeks, setWeeks] = useState(16)
@@ -244,6 +249,12 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
               </div>
             )}
           </div>
+
+          {semestersFailed && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              讀取學期失敗，下方預覽只會標出「日期已存在」的週次，無法標出「週次編號已被此學期使用」的週次——仍可產生，伺服器一樣會略過重複的週次，但預覽此刻並不完整。
+            </p>
+          )}
 
           {misaligned && (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
