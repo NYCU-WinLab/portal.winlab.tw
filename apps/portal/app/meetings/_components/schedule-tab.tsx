@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type DragEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type DragEvent } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
@@ -29,8 +29,13 @@ import { useFillPresenters } from "@/hooks/meetings/use-presenter-pool"
 import { useQuestionersByYear } from "@/hooks/meetings/use-questioners"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
+import { useSemesters } from "@/hooks/meetings/use-semesters"
 import { getCurrentMeetingId } from "@/lib/meetings/schedule"
-import type { Meeting } from "@/lib/meetings/types"
+import {
+  semesterLabel,
+  type Meeting,
+  type Semester,
+} from "@/lib/meetings/types"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { FileCell } from "./file-cell"
@@ -50,6 +55,8 @@ function addOneWeek(dateStr: string): string {
   return `${y}-${m}-${day}`
 }
 
+// Numbering restarts every semester, so this must only ever see one
+// semester's rows — the DB does the same when it renumbers.
 function nextWeekLabel(meetings: Meeting[]): string {
   let max = 0
   for (const m of meetings) {
@@ -59,10 +66,71 @@ function nextWeekLabel(meetings: Meeting[]): string {
   return `第${max + 1}週`
 }
 
+interface SemesterGroup {
+  semesterId: string
+  /** Absent when the row's semester isn't in `useSemesters()`' result. */
+  semester: Semester | undefined
+  rows: Meeting[]
+  firstDate: string
+  lastDate: string
+}
+
+/**
+ * Groups the year bucket's rows by semester, ordered by each group's earliest
+ * real `scheduledDate` — never by the semester's own `startDate`, which is
+ * incidental metadata when a semester was minted by the safety-net trigger.
+ * The dates are the authority: inside one year bucket the 下學期 genuinely
+ * precedes the 上學期, and the two belong to different academic years.
+ */
+function groupBySemester(
+  meetings: Meeting[],
+  semesters: Semester[]
+): SemesterGroup[] {
+  const byId = new Map(semesters.map((s) => [s.id, s]))
+  const rowsBySemester = new Map<string, Meeting[]>()
+  for (const m of meetings) {
+    const rows = rowsBySemester.get(m.semesterId)
+    if (rows) rows.push(m)
+    else rowsBySemester.set(m.semesterId, [m])
+  }
+  // ISO dates sort lexicographically, so string compare is chronological.
+  return Array.from(rowsBySemester, ([semesterId, rows]) => ({
+    semesterId,
+    semester: byId.get(semesterId),
+    rows,
+    firstDate: rows.reduce(
+      (min, r) => (r.scheduledDate < min ? r.scheduledDate : min),
+      rows[0]!.scheduledDate
+    ),
+    lastDate: rows.reduce(
+      (max, r) => (r.scheduledDate > max ? r.scheduledDate : max),
+      rows[0]!.scheduledDate
+    ),
+  })).sort((a, b) => a.firstDate.localeCompare(b.firstDate))
+}
+
+function spanDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
+
+function groupHeading(group: SemesterGroup): string {
+  const span = `${spanDate(group.firstDate)} – ${spanDate(group.lastDate)}`
+  return group.semester
+    ? `${semesterLabel(group.semester)}（${span}）`
+    : // An unknown semester still gets its rows shown, headed by the span
+      // alone — dropping them would hide real meetings.
+      span
+}
+
 export function ScheduleTab({ year }: { year: number }) {
   const { user } = useAuth()
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
+  const { data: semesters = [] } = useSemesters()
   const { data: questioners } = useQuestionersByYear(year)
   const { data: users = [] } = useLabUsers()
   const deleteMeeting = useDeleteMeeting()
@@ -80,6 +148,8 @@ export function ScheduleTab({ year }: { year: number }) {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
   const showEditMode = isAdmin && editMode
+  const groups = groupBySemester(meetings, semesters)
+  const colCount = showEditMode ? 11 : 9
   // Swap candidates: only real student-presentation weeks — holidays, speaker
   // weeks and thesis weeks are anchored and can't be swapped (meetings_swap
   // refuses all three; a thesis title belongs to the person who wrote it).
@@ -156,12 +226,32 @@ export function ScheduleTab({ year }: { year: number }) {
     })
   }
 
-  function handleAddWeek() {
-    const last = meetings[meetings.length - 1]
+  // Per group: the appended week has to stay in *this* semester even when its
+  // date crosses a month boundary, so semesterId is passed explicitly instead
+  // of letting the trigger re-derive it from the date.
+  function handleAddWeek(group: SemesterGroup) {
+    const last = group.rows[group.rows.length - 1]
     addMeeting.mutate({
       year,
-      weekLabel: nextWeekLabel(meetings),
-      scheduledDate: last ? addOneWeek(last.scheduledDate) : `${year}-01-01`,
+      semesterId: group.semesterId,
+      weekLabel: nextWeekLabel(group.rows),
+      scheduledDate: last
+        ? addOneWeek(last.scheduledDate)
+        : (group.semester?.startDate ?? `${year}-01-01`),
+      isHoliday: false,
+      presenter: null,
+      presenterUserId: null,
+    })
+  }
+
+  // The year bucket is empty, so there is no group to extend and no semester
+  // to name: omit semesterId and let meetings_set_semester derive it from the
+  // date, exactly as the page-level add-meeting dialog does.
+  function handleAddFirstWeek() {
+    addMeeting.mutate({
+      year,
+      weekLabel: nextWeekLabel([]),
+      scheduledDate: `${year}-01-01`,
       isHoliday: false,
       presenter: null,
       presenterUserId: null,
@@ -290,170 +380,200 @@ export function ScheduleTab({ year }: { year: number }) {
             )}
           </TableHeader>
           <TableBody>
-            {meetings.map((m) => {
-              const isOwn = user?.id === m.presenterUserId
-              const isCurrent = m.id === currentWeekId
-
-              if (showEditMode) {
-                return (
-                  <ScheduleEditRow
-                    key={m.id}
-                    meeting={m}
-                    year={year}
-                    isCurrent={isCurrent}
-                    isOwn={isOwn}
-                    questioners={questioners?.get(m.id) ?? []}
-                    otherWeeks={presentationMeetings.filter(
-                      (o) => o.id !== m.id
-                    )}
-                    users={users}
-                    isDragging={dragId === m.id}
-                    isDropTarget={dropTargetId === m.id}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onRowDragOver={handleRowDragOver}
-                    onRowDragLeave={handleRowDragLeave}
-                    onRowDrop={handleRowDrop}
-                    onSwap={handleSwap}
-                    onInsert={handleInsert}
-                    onRemove={handleRemove}
-                  />
-                )
-              }
-
-              return (
-                <TableRow
-                  key={m.id}
-                  ref={isCurrent ? currentRowRef : undefined}
-                  className={
-                    m.isHoliday
-                      ? "opacity-40"
-                      : isCurrent
-                        ? "bg-muted/60"
-                        : isOwn
-                          ? "bg-primary/5"
-                          : undefined
-                  }
-                >
-                  <TableCell className="text-xs text-muted-foreground">
-                    {m.weekLabel ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {new Date(m.scheduledDate).toLocaleDateString("zh-TW", {
-                      month: "numeric",
-                      day: "numeric",
-                    })}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <span className="flex items-center gap-1.5">
-                      {m.presenter ?? "—"}
-                      {m.isSpeaker && (
-                        <Badge variant="secondary" className="font-normal">
-                          演講
-                        </Badge>
-                      )}
-                      {m.isThesis && (
-                        <Badge variant="secondary" className="font-normal">
-                          碩論
-                        </Badge>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <FileCell link={m.pptLink} />
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <FileCell link={m.videoLink} />
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    {m.paperLink ? (
-                      <a
-                        href={m.paperLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={m.paperTitle ?? m.paperLink}
-                        className="block truncate text-xs hover:underline"
-                      >
-                        {m.paperTitle ?? m.paperLink}
-                      </a>
-                    ) : (
-                      <span
-                        title={m.paperTitle ?? undefined}
-                        className="block truncate text-xs text-muted-foreground"
-                      >
-                        {m.paperTitle ?? "—"}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {m.isHoliday || !m.presenterUserId ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (questioners?.get(m.id) ?? []).length === 0 ? (
-                      <span className="text-xs text-muted-foreground">
-                        尚無提問小組成員
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {(questioners?.get(m.id) ?? [])
-                          .map((q) => q.name ?? "")
-                          .join("　")}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {m.notes ?? ""}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {user &&
-                        !m.isHoliday &&
-                        !m.isSpeaker &&
-                        !m.isThesis &&
-                        !m.presenterUserId && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs"
-                            disabled={claimMeeting.isPending}
-                            onClick={() => claimMeeting.mutate(m.id)}
-                          >
-                            認領
-                          </Button>
-                        )}
-                      {(isAdmin || isOwn) && !m.isHoliday && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => setEditTarget(m)}
-                        >
-                          編輯
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                          onClick={() => deleteMeeting.mutate(m.id)}
-                        >
-                          刪除
-                        </Button>
-                      )}
-                    </div>
+            {groups.map((group) => (
+              <Fragment key={group.semesterId}>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableCell
+                    colSpan={colCount}
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    {groupHeading(group)}
                   </TableCell>
                 </TableRow>
-              )
-            })}
-            {showEditMode && (
+                {group.rows.map((m) => {
+                  const isOwn = user?.id === m.presenterUserId
+                  const isCurrent = m.id === currentWeekId
+
+                  if (showEditMode) {
+                    return (
+                      <ScheduleEditRow
+                        key={m.id}
+                        meeting={m}
+                        year={year}
+                        isCurrent={isCurrent}
+                        isOwn={isOwn}
+                        questioners={questioners?.get(m.id) ?? []}
+                        otherWeeks={presentationMeetings.filter(
+                          (o) => o.id !== m.id
+                        )}
+                        users={users}
+                        isDragging={dragId === m.id}
+                        isDropTarget={dropTargetId === m.id}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onRowDragOver={handleRowDragOver}
+                        onRowDragLeave={handleRowDragLeave}
+                        onRowDrop={handleRowDrop}
+                        onSwap={handleSwap}
+                        onInsert={handleInsert}
+                        onRemove={handleRemove}
+                      />
+                    )
+                  }
+
+                  return (
+                    <TableRow
+                      key={m.id}
+                      ref={isCurrent ? currentRowRef : undefined}
+                      className={
+                        m.isHoliday
+                          ? "opacity-40"
+                          : isCurrent
+                            ? "bg-muted/60"
+                            : isOwn
+                              ? "bg-primary/5"
+                              : undefined
+                      }
+                    >
+                      <TableCell className="text-xs text-muted-foreground">
+                        {m.weekLabel ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {new Date(m.scheduledDate).toLocaleDateString("zh-TW", {
+                          year: "numeric",
+                          month: "numeric",
+                          day: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <span className="flex items-center gap-1.5">
+                          {m.presenter ?? "—"}
+                          {m.isSpeaker && (
+                            <Badge variant="secondary" className="font-normal">
+                              演講
+                            </Badge>
+                          )}
+                          {m.isThesis && (
+                            <Badge variant="secondary" className="font-normal">
+                              碩論
+                            </Badge>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <FileCell link={m.pptLink} />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <FileCell link={m.videoLink} />
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        {m.paperLink ? (
+                          <a
+                            href={m.paperLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={m.paperTitle ?? m.paperLink}
+                            className="block truncate text-xs hover:underline"
+                          >
+                            {m.paperTitle ?? m.paperLink}
+                          </a>
+                        ) : (
+                          <span
+                            title={m.paperTitle ?? undefined}
+                            className="block truncate text-xs text-muted-foreground"
+                          >
+                            {m.paperTitle ?? "—"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {m.isHoliday || !m.presenterUserId ? (
+                          <span className="text-xs text-muted-foreground">
+                            —
+                          </span>
+                        ) : (questioners?.get(m.id) ?? []).length === 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            尚無提問小組成員
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {(questioners?.get(m.id) ?? [])
+                              .map((q) => q.name ?? "")
+                              .join("　")}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {m.notes ?? ""}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {user &&
+                            !m.isHoliday &&
+                            !m.isSpeaker &&
+                            !m.isThesis &&
+                            !m.presenterUserId && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                disabled={claimMeeting.isPending}
+                                onClick={() => claimMeeting.mutate(m.id)}
+                              >
+                                認領
+                              </Button>
+                            )}
+                          {(isAdmin || isOwn) && !m.isHoliday && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setEditTarget(m)}
+                            >
+                              編輯
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={() => deleteMeeting.mutate(m.id)}
+                            >
+                              刪除
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+                {showEditMode && (
+                  <TableRow>
+                    <TableCell colSpan={colCount} className="text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs"
+                        disabled={addMeeting.isPending}
+                        onClick={() => handleAddWeek(group)}
+                      >
+                        ＋ 新增一週
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            ))}
+            {showEditMode && groups.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center">
+                <TableCell colSpan={colCount} className="text-center">
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-xs"
                     disabled={addMeeting.isPending}
-                    onClick={handleAddWeek}
+                    onClick={handleAddFirstWeek}
                   >
                     ＋ 新增一週
                   </Button>
