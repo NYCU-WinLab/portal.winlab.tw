@@ -211,6 +211,23 @@ export function useAdminUpdateMeeting() {
   })
 }
 
+/**
+ * Adds a meeting at an ARBITRARY date — the page-level add-meeting dialog, and
+ * the first week of an empty year bucket.
+ *
+ * This hook never sets `semester_id`, and takes no option to. The database
+ * derives it from `scheduled_date` (`meetings_set_semester`, a BEFORE INSERT
+ * trigger that fills the column only when it is NULL), which is the right
+ * answer here: when a date is picked out of thin air, the semester it falls in
+ * IS the semester it belongs to.
+ *
+ * Appending inside a KNOWN semester is a different question with a different
+ * answer, and it does not belong here — a week appended to the end of 上學期 can
+ * legitimately fall in February, where the date-derived guess would move it into
+ * 下學期 and restart its numbering. Use `useAppendMeetingWeek` for that: it lets
+ * the server compute the label and the date from the whole semester and stamps
+ * `semester_id` explicitly.
+ */
 export function useAddMeeting() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -218,13 +235,6 @@ export function useAddMeeting() {
   return useMutation({
     mutationFn: async (row: {
       year: number
-      // Optional: pass it when appending inside a known semester group, so
-      // the row can't drift to another semester (e.g. a date near a
-      // month/semester boundary). Omit it when adding a meeting at an
-      // arbitrary date with no group context — the meetings_set_semester
-      // BEFORE INSERT trigger derives the right semester from
-      // scheduled_date.
-      semesterId?: string
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
@@ -234,21 +244,19 @@ export function useAddMeeting() {
       presenterUserId: string | null
       paperTitle?: string | null
     }) => {
-      // semester_id is NOT NULL with no column default (only
-      // meetings_set_semester's BEFORE INSERT trigger fills it), so the
-      // generated Insert type marks it required. Build the payload against a
-      // locally-widened type so the key can be genuinely absent, then cast
-      // back for `.insert()` — the trigger covers the omitted case.
-      const payload: Omit<TablesInsert<"meetings">, "semester_id"> & {
-        semester_id?: string
-      } = {
+      // `semester_id` is NOT NULL with no column DEFAULT — only the
+      // meetings_set_semester trigger fills it — and codegen can't see
+      // triggers, so the generated Insert type marks it required. Typing the
+      // payload as `Omit<…, "semester_id">` is what keeps every OTHER column
+      // fully checked, including any column a future migration makes required:
+      // the object literal still has to satisfy the generated shape, so such a
+      // change surfaces here as an error rather than being swallowed.
+      //
+      // The cast at `.insert()` is the narrowest one that compiles: it asserts
+      // exactly the one thing TypeScript cannot know — that the trigger
+      // supplies the missing column — and nothing else.
+      const payload: Omit<TablesInsert<"meetings">, "semester_id"> = {
         year: row.year,
-        // Only sent when provided so the column is absent and the trigger
-        // derives it — passing `undefined`/`null` explicitly would still
-        // include the key and override the trigger's default.
-        ...(row.semesterId !== undefined
-          ? { semester_id: row.semesterId }
-          : {}),
         week_label: row.weekLabel,
         scheduled_date: row.scheduledDate,
         is_holiday: row.isHoliday,

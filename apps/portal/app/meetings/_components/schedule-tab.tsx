@@ -228,10 +228,11 @@ export function ScheduleTab({ year }: { year: number }) {
     appendWeek.mutate(group.semesterId)
   }
 
-  // The year bucket is empty, so there is no group to extend and no semester
-  // to name: omit semesterId and let meetings_set_semester derive it from the
-  // date, exactly as the page-level add-meeting dialog does. append_week has
-  // nothing to append to here, which is why this one path stays on the insert.
+  // The year bucket is empty, so there is no group to extend and no semester to
+  // name. append_week has nothing to append to here, which is why this one path
+  // stays on useAddMeeting — and useAddMeeting is exactly right for it: the
+  // meetings_set_semester trigger derives the semester from the chosen date,
+  // the same way the page-level add-meeting dialog relies on it.
   function handleAddFirstWeek() {
     addMeeting.mutate({
       year,
