@@ -10,7 +10,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(34);
+select plan(37);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -198,6 +198,35 @@ select is(
    where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 1)),
   '2050-09-01=第1週,2050-09-08=第2週,2050-09-15=第3週',
   'the pre-existing dates and labels are left exactly as they were');
+
+-- ═══ generate never lands on a date ANOTHER semester holds ══════════════════
+-- The date skip is date-global, not semester-scoped. 上學期 145 was extended into
+-- February (2057-02-07 / 02-14 carry an EXPLICIT 上學期 semester_id, which is what
+-- keeps an appended week in its own semester even though its date derives to
+-- 下學期). Generating 下學期 145 from 2057-02-14 therefore starts on a date that is
+-- already taken: it must be reported as `skipped`, not inserted on top. One
+-- meeting per calendar date is a lab-wide invariant that no constraint enforces.
+insert into public.meeting_semesters (id, academic_year, term, start_date, planned_weeks)
+values ('dddddddd-0000-0000-0000-0000000000a1', 145, 1, '2056-09-06', 16);
+
+insert into public.meetings (year, semester_id, week_label, scheduled_date, is_holiday) values
+  (2056, 'dddddddd-0000-0000-0000-0000000000a1', '第15週', '2057-02-07', false),
+  (2056, 'dddddddd-0000-0000-0000-0000000000a1', '第16週', '2057-02-14', false);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table gen_over_tail as
+  select public.meetings_generate_semester(2057, '2057-02-14', 3, '[]'::jsonb) as ret;
+reset role;
+
+select is((select (ret->>'skipped')::int from gen_over_tail), 1,
+  '2057-02-14 is reported as skipped — 上學期''s appended tail already holds that date');
+select is((select (ret->>'inserted')::int from gen_over_tail), 2,
+  'the other two dates are free and inserted');
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2057-02-14'),
+  1,
+  '2057-02-14 still holds exactly one meeting (no two rows share a calendar date)');
 
 select * from finish();
 rollback;

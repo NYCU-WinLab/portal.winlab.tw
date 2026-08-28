@@ -28,7 +28,10 @@
 --   * re-stamps the semester's own start_date / planned_weeks, but only while the
 --     semester still holds no weeks, so a generate never rewrites the frame of a
 --     semester that is already running;
---   * the per-date skip is scoped to the semester rather than the year bucket;
+--   * the per-date skip becomes DATE-GLOBAL. It used to read `year = p_year`, and a
+--     year bucket contains BOTH terms, so it did catch a collision with the other
+--     term. Narrowing it to the semester would have been a regression: one meeting
+--     per calendar date is a lab-wide invariant that no constraint enforces;
 --   * a per-row LABEL-collision skip: a semester that already holds 第i週 does not
 --     get a second one. This is what makes a re-run from a SHIFTED start date
 --     harmless — no date collides, but every number is taken. It is deliberately a
@@ -95,9 +98,19 @@ begin
     -- +7 per step preserves the start date's own weekday (no hard-coded Monday).
     v_date := p_start_date + (i - 1) * 7;
 
+    -- DATE-GLOBAL on purpose, and the one predicate in this function that is not
+    -- semester-scoped. One meeting per calendar date is a lab-wide invariant, not
+    -- a per-semester one: two rows on one date give the schedule two "this week"s
+    -- and make the Nextcloud recording match ambiguous (see
+    -- apps/portal/lib/meetings/recording-match.ts, which keys on the date in a
+    -- filename). Nothing enforces it in the schema — there is no unique index on
+    -- scheduled_date — so this check is it. Scoping it to the semester would let a
+    -- 下學期 generate silently land on top of a 上學期 tail week that was appended
+    -- into February. Numbering and ordering belong to the semester; the calendar
+    -- does not.
     if exists (
       select 1 from public.meetings
-      where semester_id = v_semester_id and scheduled_date = v_date
+      where scheduled_date = v_date
     ) then
       v_skipped := v_skipped + 1;
       continue;
@@ -146,11 +159,16 @@ revoke all on function public.meetings_generate_semester(int, date, int, jsonb) 
 grant execute on function public.meetings_generate_semester(int, date, int, jsonb) to authenticated, service_role;
 
 -- ── date-mover: insert a blank week, within one semester ─────────────────────
--- Redeclared whole from 20260722160354:222. Every `year = v_year` predicate is now
--- `semester_id = v_semester_id`: the row lock, the slot array, the max-date lookup,
--- the free-date scan, and the label mint. The label mint is the overflow fix — the
--- next number comes from THIS semester's numbers, so 上學期's 第16週 is followed by
--- 下學期's 第1週, not 第17週.
+-- Redeclared whole from 20260722160354:222. Four of the five `year = v_year`
+-- predicates become `semester_id = v_semester_id`: the row lock, the slot array,
+-- the max-date lookup, and the label mint. The label mint is the overflow fix —
+-- the next number comes from THIS semester's numbers, so 上學期's 第16週 is followed
+-- by 下學期's 第1週, not 第17週.
+--
+-- The fifth, the free-date scan, becomes DATE-GLOBAL instead. See the comment at
+-- the scan itself: a year bucket held both terms, so dropping to the semester
+-- would have been a narrowing, and one meeting per calendar date is a lab-wide
+-- invariant with no constraint behind it.
 --
 -- v_year survives because the trailing INSERT still writes the `year` column with
 -- exactly the value it always did.
@@ -214,8 +232,17 @@ begin
   -- schedule's cadence.
   select max(scheduled_date) into v_max_date
   from public.meetings where semester_id = v_semester_id and not is_holiday and not is_speaker;
+  -- The max above is semester-scoped (the cadence to continue is THIS semester's),
+  -- but the free-date scan below is DATE-GLOBAL, and the difference is deliberate.
+  -- One meeting per calendar date is a lab-wide invariant with nothing in the
+  -- schema behind it (no unique index on scheduled_date), and an appended 上學期
+  -- week walks straight into 下學期's calendar months — semester-scoping this scan
+  -- would let it land on a date another semester already holds, which gives the
+  -- schedule two "this week"s and makes the Nextcloud recording match ambiguous
+  -- (apps/portal/lib/meetings/recording-match.ts keys on the date in a filename).
+  -- Numbering and ordering belong to the semester; the calendar does not.
   v_new_date := v_max_date + 7;
-  while exists (select 1 from public.meetings where semester_id = v_semester_id and scheduled_date = v_new_date) loop
+  while exists (select 1 from public.meetings where scheduled_date = v_new_date) loop
     v_new_date := v_new_date + 7;
   end loop;
 

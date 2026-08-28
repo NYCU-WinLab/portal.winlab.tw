@@ -11,7 +11,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(62);
+select plan(65);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -517,6 +517,12 @@ select is(
      and week_label = '第8週'),
   '2044-03-02'::date,
   '第8週 lands on 2044-03-02 — past the end of February, still 上學期 132');
+select is(
+  (select count(*)::int from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)
+     and year = 2044),
+  8,
+  'every appended week inherits the target row''s year (2044) — meetings.year keeps its meaning');
 
 -- ═══ two semesters in ONE `year` bucket are numbered independently ══════════
 -- Semester A: 4 Wednesdays from 2046-09-05 (上學期 135). Semester B: 3 Fridays
@@ -561,6 +567,33 @@ select isnt(
   (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000001a'),
   (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000000b'),
   'the two semesters sharing the year 2046 bucket are distinct entities');
+
+-- ═══ an appended week never lands on a date ANOTHER semester holds ══════════
+-- The one predicate in meetings_insert_week that is date-global rather than
+-- semester-scoped, and why: 上學期 137 ends on 2049-01-27, so its next slot would
+-- be 2049-02-03 — which 下學期 137 already occupies, because an appended 上學期
+-- week walks straight into 下學期's calendar months. One meeting per calendar date
+-- is a lab-wide invariant with no unique index behind it (and a doubled date makes
+-- the Nextcloud recording match ambiguous), so the free-date scan has to see rows
+-- outside its own semester and step past them to 2049-02-10.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('44444444-0000-0000-0000-000000000001', 2049, '第1週', '2049-01-20', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'), -- 上學期 137
+  ('44444444-0000-0000-0000-000000000002', 2049, '第2週', '2049-01-27', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'), -- 上學期 137
+  ('44444444-0000-0000-0000-000000000009', 2049, '第1週', '2049-02-03', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'); -- 下學期 137
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('44444444-0000-0000-0000-000000000001');
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '44444444-0000-0000-0000-000000000002'),
+  '2049-02-10'::date,
+  'the appended slot steps past 2049-02-03 — a date another semester already holds');
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2049-02-03'),
+  1,
+  '2049-02-03 still holds exactly one meeting (no two rows share a calendar date)');
 
 select * from finish();
 rollback;
