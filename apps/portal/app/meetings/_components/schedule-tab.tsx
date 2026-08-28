@@ -230,14 +230,17 @@ export function ScheduleTab({ year }: { year: number }) {
   // date crosses a month boundary, so semesterId is passed explicitly instead
   // of letting the trigger re-derive it from the date.
   function handleAddWeek(group: SemesterGroup) {
-    const last = group.rows[group.rows.length - 1]
     addMeeting.mutate({
       year,
       semesterId: group.semesterId,
       weekLabel: nextWeekLabel(group.rows),
-      scheduledDate: last
-        ? addOneWeek(last.scheduledDate)
-        : (group.semester?.startDate ?? `${year}-01-01`),
+      // Anchored on the group's latest *date*, not its last positional row:
+      // an optimistic update keeps a row in place after its date is edited
+      // inline, so the positionally-last row can no longer be the
+      // chronologically-last one — and +7 days from it would land the new
+      // week before an existing one. A group always has ≥1 row (it is built
+      // from them), so lastDate is always real.
+      scheduledDate: addOneWeek(group.lastDate),
       isHoliday: false,
       presenter: null,
       presenterUserId: null,
@@ -383,12 +386,18 @@ export function ScheduleTab({ year }: { year: number }) {
             {groups.map((group) => (
               <Fragment key={group.semesterId}>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableCell
+                  {/* A heading for the rows below it, so it is a th with
+                      scope="colgroup". `h-auto p-3` and the muted colour undo
+                      TableHead's own h-12/px-3/text-foreground via cn's
+                      tailwind-merge, keeping the band identical to the
+                      TableCell it replaces. */}
+                  <TableHead
+                    scope="colgroup"
                     colSpan={colCount}
-                    className="text-xs font-medium text-muted-foreground"
+                    className="h-auto p-3 text-xs font-medium text-muted-foreground"
                   >
                     {groupHeading(group)}
-                  </TableCell>
+                  </TableHead>
                 </TableRow>
                 {group.rows.map((m) => {
                   const isOwn = user?.id === m.presenterUserId
