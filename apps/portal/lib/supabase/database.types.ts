@@ -1628,24 +1628,6 @@ export type Database = {
           },
         ]
       }
-      meetings_week_label_backup_20260828: {
-        Row: {
-          id: string | null
-          scheduled_date: string | null
-          week_label: string | null
-        }
-        Insert: {
-          id?: string | null
-          scheduled_date?: string | null
-          week_label?: string | null
-        }
-        Update: {
-          id?: string | null
-          scheduled_date?: string | null
-          week_label?: string | null
-        }
-        Relationships: []
-      }
       members: {
         Row: {
           avatar_url: string | null

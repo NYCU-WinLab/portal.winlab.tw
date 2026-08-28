@@ -6,14 +6,37 @@
 --
 -- This migration introduces public.meeting_semesters as that entity, hangs every
 -- meeting off it via a mandatory meetings.semester_id, backfills the existing
--- rows, renumbers their labels per semester, and leaves a safety net so no
--- insert path can produce a semester-less meeting.
+-- rows, and leaves a safety net so no insert path can produce a semester-less
+-- meeting.
+--
+-- PURELY ADDITIVE. It adds metadata and NEVER rewrites an existing week_label.
+-- An earlier version of this file also renumbered history per semester; that is
+-- gone, for two reasons.
+--
+-- First, production's numbering is already per-semester-correct, so the premise
+-- was false: a dry run against prod changed exactly one row
+-- (114/2, 2026-06-01, 第15週 → 第14週) and that change was WRONG.
+--
+-- Second — and this is the rule everything else here follows — `第N週` counts
+-- SEMESTER CALENDAR WEEKS, not teaching weeks. A holiday week occupies its
+-- number (meetings_generate_semester writes `第N週(原因)` for one), and a week
+-- whose label an admin later rewrote by hand (`大掃除`) is still the Nth week of
+-- the semester even though the text no longer says so. The removed renumber
+-- assumed the opposite — only `^第\d+週` rows took part in row_number(), so a
+-- hand-relabelled holiday consumed no number and every later week shifted down
+-- by one. Nor is it fixable with a better rule: correct positional renumbering
+-- would need each semester's week-1 start date and would have to exclude the
+-- 寒假/暑假 padding rows bracketing the teaching span, and in the data a padding
+-- row is indistinguishable from an in-span holiday — both are free-form labels
+-- with no number.
+--
+-- So history is left exactly as the lab wrote it. Numbering is only ever minted
+-- forward, by the RPCs in 20260828120001.
 --
 -- ORDER IS LOAD-BEARING, top to bottom: the helpers must exist before the
 -- find-or-create that calls them; the column must exist before the trigger that
--- fills it; the backfill must have run before the backfill report and the
--- renumber, both of which read semester_id; and the week_label snapshot must be
--- taken before the renumber that overwrites what it snapshots.
+-- fills it; and the backfill must have run before the `set not null` that
+-- requires it.
 
 -- ── 1. derivation helpers ───────────────────────────────────────────────────
 -- ROC academic year with an AUGUST boundary: September is when teaching starts,
@@ -173,10 +196,12 @@ create trigger meetings_set_semester
   execute function public.meetings_set_semester();
 
 -- ── 6. backfill, then make the column mandatory ─────────────────────────────
--- The only place the date-derived guess is applied to history. Existing rows
--- were numbered per calendar year, so grouping them by (derived year, derived
--- term) is the best reconstruction available — step 7 reports every group it
--- produced and shouts about the ones that look merged.
+-- The only place the date-derived guess is applied to history, and it only ever
+-- WRITES semester_id — no existing column is rewritten. Existing rows were
+-- numbered per calendar year, so grouping them by (derived year, derived term)
+-- is the best reconstruction available; the human's pre-flight SELECT against
+-- production (in the PR body) is where the grouping gets eyeballed before this
+-- is applied.
 insert into public.meeting_semesters (academic_year, term, start_date, planned_weeks)
 select public.meeting_academic_year(scheduled_date),
        public.meeting_term(scheduled_date),
@@ -197,158 +222,7 @@ where s.academic_year = public.meeting_academic_year(m.scheduled_date)
 -- no week number, and the trigger above guarantees one can't be created.
 alter table public.meetings alter column semester_id set not null;
 
--- ── 7. backfill report ──────────────────────────────────────────────────────
--- What this replaced, and why: the first version of this block only spoke up
--- when a group's date span exceeded 30 * 7 = 210 days. That check could never
--- fire. The derivation splits at August and February, so a CORRECTLY derived
--- group spans at most ~150 days (Aug→Jan, or Feb→Jul) — the threshold sat above
--- the maximum a well-formed group can reach. Nor could it fire on the realistic
--- malformed case: rows of a 上學期 that overran into February derive to
--- term = 2 and JOIN the existing 下學期 group, which then holds 20+ rows while
--- still spanning the same ~150 days. The span carries no signal in either
--- direction.
---
--- The two signals that CAN fire are the row count and the number of
--- `meetings.year` buckets a group draws from. So this reports every derived
--- semester unconditionally, and additionally shouts on either of:
---   * more than 24 rows — a semester holding far more weeks than 16 plus
---     make-ups and holidays means the grouping merged two real semesters;
---   * more than one distinct `meetings.year` — expected for historical data (a
---     year bucket runs Jan→Jan, so a reconstructed 上學期 necessarily reaches
---     back into the previous bucket) and worth SEEING, because such a group
---     renders split across two year tabs in /meetings with its numbering
---     continuing across the tab boundary.
---
--- THIS REPORT IS NOT A CONTROL. Nothing here can refuse a deploy, and applied
--- via Supabase MCP `apply_migration` or the dashboard SQL editor these lines
--- are never returned to the caller at all. The durable controls are step 8's
--- backup table and a human running the pre-flight SELECT against production
--- BEFORE applying this file, reading the row counts and year-bucket counts off
--- it. This block is the same information for whoever applies via `psql`.
-do $$
-declare r record;
-begin
-  for r in
-    select s.academic_year, s.term, count(*) as weeks,
-           min(m.scheduled_date) as first_date,
-           max(m.scheduled_date) as last_date,
-           count(distinct m.year) as year_buckets
-    from public.meeting_semesters s
-    join public.meetings m on m.semester_id = s.id
-    group by s.academic_year, s.term
-    order by s.academic_year, s.term
-  loop
-    raise notice 'meeting_semesters backfill: %-% — % rows, % .. %, % year bucket(s)',
-      r.academic_year, r.term, r.weeks, r.first_date, r.last_date, r.year_buckets;
-    if r.weeks > 24 then
-      raise warning 'ANOMALY: semester %-% holds % rows — far more than 16 weeks plus make-ups and holidays. The date-derived grouping has probably merged two real semesters; check this one by hand before trusting its renumbered labels.',
-        r.academic_year, r.term, r.weeks;
-    end if;
-    if r.year_buckets > 1 then
-      raise warning 'ANOMALY: semester %-% draws rows from % different meetings.year buckets (% .. %) — /meetings filters by year, so this group will render split across % year tabs and its 第N週 numbering will not start at 1 in every tab.',
-        r.academic_year, r.term, r.year_buckets, r.first_date, r.last_date, r.year_buckets;
-    end if;
-  end loop;
-end $$;
-
--- ── 8. snapshot the old labels, then renumber per semester ──────────────────
--- THE UNDO RECORD IS A TABLE, NOT THE APPLY LOG. The renumber below is the only
--- statement in this migration that overwrites existing history, and it rewrites
--- essentially every `week_label` the lab has ever had. An earlier version of
--- this file declared its per-row RAISE NOTICEs to be the rollback plan; that
--- was wrong, because this project's sanctioned deploy path is Supabase MCP
--- `apply_migration` or the dashboard SQL editor, and NEITHER returns server
--- NOTICE output to the caller. Applied that way, the undo record would be
--- generated and thrown away in the same breath, leaving no copy of the old
--- labels anywhere.
---
--- So take the snapshot first, in the same transaction, before a single label
--- changes. It holds (id, scheduled_date, week_label) as they were the instant
--- before the renumber. No PII: three columns of schedule metadata.
---
--- TO RESTORE (all rows, or add `and b.id = '…'` for one):
---   update public.meetings m
---   set week_label = b.week_label
---   from public.meetings_week_label_backup_20260828 b
---   where b.id = m.id;
---
--- SAFE TO DROP once the renumber has been verified on production — spot-check a
--- historical semester that straddles a January, the case the reconstruction is
--- least sure about, then:
---   drop table public.meetings_week_label_backup_20260828;
-create table if not exists public.meetings_week_label_backup_20260828 as
-  select id, scheduled_date, week_label from public.meetings;
-
-comment on table public.meetings_week_label_backup_20260828 is
-  'Pre-renumber snapshot of meetings.week_label taken by 20260828120000. Restore with `update public.meetings m set week_label = b.week_label from public.meetings_week_label_backup_20260828 b where b.id = m.id`. Drop once the renumber is verified on production.';
-
--- RLS, not GRANTs, because GRANTs restrict nothing here. Supabase's platform
--- provisioning — not any DDL in this repo; `grep -rn "alter default privileges"
--- supabase/` finds none — leaves `alter default privileges` in `public` handing
--- anon, authenticated and service_role ALL privileges on every new table, so
--- this table is born readable by anon. RLS with no policy at all is the right control: nothing in the app ever
--- reads this table — restores are run by an operator as postgres/service_role,
--- both of which hold BYPASSRLS — so there is no policy to write, and an
--- admin-only one would falsely suggest the portal queries it. The explicit
--- revoke is belt-and-braces: it takes the privileges away now, and RLS keeps
--- the table shut regardless of what the grants say later.
---
--- (RLS with no policy trips Supabase's rls_enabled_no_policy advisor at INFO.
--- That is the intended shape here, not an oversight.)
-alter table public.meetings_week_label_backup_20260828 enable row level security;
-revoke all on public.meetings_week_label_backup_20260828 from anon, authenticated;
-
--- The renumber itself. The whole visible symptom: numbering restarts inside
--- each semester, in date order.
---
--- Two deliberate exclusions. Only rows that already carry a `第N週` label take
--- part, so a hand-written label (`春假`, `演講`) is left exactly as written AND
--- does not consume a number — a holiday week is not week 4. And any trailing
--- text after `第N週` (a `(原因)` note an admin typed) is carried across, because
--- it is the admin's words, not generated.
---
--- The per-row NOTICEs are kept on top of the backup table. They are still the
--- fastest way to read what happened when this is applied through `psql`, and
--- each one carries a ready-to-paste single-row UPDATE.
---
--- Wrapping the statement in a do-block changes nothing about which rows are
--- renumbered or how the numbers are computed: it is still the same single
--- set-based UPDATE, now as a data-modifying CTE whose RETURNING feeds the loop
--- that emits the notices. `n.old_label` is read from the FROM-list relation
--- because RETURNING cannot see the pre-update value of a column it just wrote
--- (`returning old.*` is Postgres 18+, and this has to run on 15/17).
-do $$
-declare r record;
-begin
-  for r in
-    with numbered as (
-      select id,
-             week_label as old_label,
-             row_number() over (partition by semester_id order by scheduled_date, id) as n,
-             coalesce(substring(week_label from '^第\d+週(.*)$'), '') as suffix
-      from public.meetings
-      where week_label ~ '^第\d+週'
-    ),
-    renumbered as (
-      update public.meetings m
-      set week_label = '第' || n.n || '週' || n.suffix
-      from numbered n
-      where n.id = m.id
-        and m.week_label <> '第' || n.n || '週' || n.suffix
-      returning m.id, m.scheduled_date, n.old_label, m.week_label as new_label
-    )
-    select * from renumbered order by scheduled_date, id
-  loop
-    -- The undo statement is built with format(), not written inline: RAISE only
-    -- understands bare `%`, so a `%L` in its format string would be emitted as a
-    -- literal L and the "ready to paste" statement would be unquoted garbage.
-    raise notice 'meeting_semesters renumber: % on %: % -> %  |  undo: %',
-      r.id, r.scheduled_date, r.old_label, r.new_label,
-      format('update public.meetings set week_label = %L where id = %L;', r.old_label, r.id);
-  end loop;
-end $$;
-
--- ── 9. RLS ──────────────────────────────────────────────────────────────────
+-- ── 7. RLS ──────────────────────────────────────────────────────────────────
 -- SELECT is a byte-for-byte mirror of `meetings_select` (baseline:2657) —
 -- `for select to public using ((auth.uid() is not null))`. Both halves matter.
 --
