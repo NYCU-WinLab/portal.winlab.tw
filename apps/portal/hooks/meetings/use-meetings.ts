@@ -348,6 +348,39 @@ export function useInsertMeetingWeek() {
   })
 }
 
+/**
+ * Appends one week to the END of a semester. Both values are computed by the
+ * server: this hook deliberately sends nothing but the semester id.
+ *
+ * The client used to compute them, from `useMeetings(year)` — a YEAR-filtered
+ * row set. A semester can span two `meetings.year` buckets (a 上學期 running
+ * September→January does), so the browser saw a truncated slice of it, minted a
+ * `第N週` the semester already used, and reported success. The RPC also enforces
+ * the date-global "one meeting per calendar date" invariant that a plain
+ * `.insert()` walked straight past (#1103).
+ */
+export function useAppendMeetingWeek() {
+  const supabase = createClient()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (semesterId: string): Promise<string> => {
+      const { data, error } = await supabase.rpc("meetings_append_week", {
+        p_semester_id: semesterId,
+      })
+      if (error) throw new Error(error.message || "新增週次失敗")
+      return data as string
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+      toast.success("週次已新增")
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
 export function useRemoveMeetingWeek() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -375,6 +408,20 @@ export type SemesterHoliday = {
   label: string
 }
 
+/**
+ * What `meetings_generate_semester` reports. The RPC skips a week for two
+ * unrelated reasons and counts them separately; `skipped` (their sum) is still
+ * in the jsonb payload for older readers, and is deliberately not surfaced here
+ * — a caller that only sees the total cannot word the message correctly.
+ */
+export interface GenerateSemesterResult {
+  inserted: number
+  /** The date is already scheduled (the check is date-global, not per-semester). */
+  skippedDate: number
+  /** This semester already holds a 第N週 with that number. */
+  skippedLabel: number
+}
+
 export function useGenerateSemester() {
   const supabase = createClient()
   const qc = useQueryClient()
@@ -385,7 +432,7 @@ export function useGenerateSemester() {
       startDate: string
       weeks: number
       holidays: SemesterHoliday[]
-    }): Promise<{ inserted: number; skipped: number }> => {
+    }): Promise<GenerateSemesterResult> => {
       const { data, error } = await supabase.rpc("meetings_generate_semester", {
         p_year: input.year,
         p_start_date: input.startDate,
@@ -393,15 +440,33 @@ export function useGenerateSemester() {
         p_holidays: input.holidays,
       })
       if (error) throw new Error(error.message || "產生排班失敗")
-      return data as { inserted: number; skipped: number }
+      const raw = data as {
+        inserted: number
+        skipped_date: number
+        skipped_label: number
+      }
+      return {
+        inserted: raw.inserted,
+        skippedDate: raw.skipped_date,
+        skippedLabel: raw.skipped_label,
+      }
     },
-    onSuccess: ({ inserted, skipped }) => {
+    onSuccess: ({ inserted, skippedDate, skippedLabel }) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
+      // The two skip reasons mean opposite things and used to share one
+      // sentence. "略過 16 週已存在" on a semester whose NUMBERS were taken (not
+      // its dates) reads as "already scheduled, nothing to do" — and the admin
+      // walks away from a schedule that was never created, which is the whole
+      // point of the shifted-start-date case.
+      const reasons: string[] = []
+      if (skippedDate > 0) reasons.push(`${skippedDate} 週日期已排定`)
+      if (skippedLabel > 0)
+        reasons.push(`${skippedLabel} 週的週次編號已被此學期使用`)
       toast.success(
-        skipped > 0
-          ? `已產生 ${inserted} 週（略過 ${skipped} 週已存在）`
+        reasons.length > 0
+          ? `已產生 ${inserted} 週（略過：${reasons.join("、")}）`
           : `已產生 ${inserted} 週`
       )
     },

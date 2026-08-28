@@ -21,6 +21,7 @@ import {
   useDeleteMeeting,
   useClaimMeeting,
   useAddMeeting,
+  useAppendMeetingWeek,
   useSwapMeetings,
   useInsertMeetingWeek,
   useRemoveMeetingWeek,
@@ -42,29 +43,6 @@ import { FileCell } from "./file-cell"
 import { GenerateSemesterDialog } from "./generate-semester-dialog"
 import { MeetingEditDialog } from "./meeting-edit-dialog"
 import { ScheduleEditRow } from "./schedule-edit-row"
-
-function addOneWeek(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`)
-  d.setDate(d.getDate() + 7)
-  // Format in LOCAL time: toISOString() converts to UTC, which rolls the date
-  // back a day in UTC+ timezones (e.g. Asia/Taipei), so "+7 days" from a Friday
-  // would land on the Thursday and break the weekly cadence.
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
-}
-
-// Numbering restarts every semester, so this must only ever see one
-// semester's rows — the DB does the same when it renumbers.
-function nextWeekLabel(meetings: Meeting[]): string {
-  let max = 0
-  for (const m of meetings) {
-    const match = /第(\d+)週/.exec(m.weekLabel ?? "")
-    if (match) max = Math.max(max, Number(match[1]))
-  }
-  return `第${max + 1}週`
-}
 
 interface SemesterGroup {
   semesterId: string
@@ -110,9 +88,9 @@ function groupBySemester(
 }
 
 function spanDate(dateStr: string): string {
-  // `T00:00:00` for the same reason addOneWeek does it: a bare YYYY-MM-DD is
-  // parsed as UTC midnight, which renders as the previous day anywhere west of
-  // UTC. Harmless in Asia/Taipei, wrong everywhere else.
+  // `T00:00:00` makes this parse as LOCAL midnight. A bare YYYY-MM-DD is parsed
+  // as UTC midnight, which renders as the previous day anywhere west of UTC —
+  // harmless in Asia/Taipei, wrong everywhere else.
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString("zh-TW", {
     year: "numeric",
     month: "2-digit",
@@ -133,12 +111,22 @@ export function ScheduleTab({ year }: { year: number }) {
   const { user } = useAuth()
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
-  const { data: semesters = [] } = useSemesters()
+  // The error matters as much as the data. groupHeading falls back to a bare
+  // date span when a row's semester is missing from this list — a deliberate
+  // fallback for the rare unknown semester — so a query that failed OUTRIGHT
+  // renders exactly like a successful one, with every header silently
+  // degraded. The banner below is what tells the two apart.
+  const {
+    data: semesters = [],
+    isError: semestersFailed,
+    error: semestersError,
+  } = useSemesters()
   const { data: questioners } = useQuestionersByYear(year)
   const { data: users = [] } = useLabUsers()
   const deleteMeeting = useDeleteMeeting()
   const claimMeeting = useClaimMeeting()
   const addMeeting = useAddMeeting()
+  const appendWeek = useAppendMeetingWeek()
   const swapMeetings = useSwapMeetings()
   const insertWeek = useInsertMeetingWeek()
   const removeWeek = useRemoveMeetingWeek()
@@ -229,34 +217,25 @@ export function ScheduleTab({ year }: { year: number }) {
     })
   }
 
-  // Per group: the appended week has to stay in *this* semester even when its
-  // date crosses a month boundary, so semesterId is passed explicitly instead
-  // of letting the trigger re-derive it from the date.
+  // Per group: the semester id is the ONLY thing sent. The label and the date
+  // are computed by meetings_append_week, because this component cannot compute
+  // either one correctly — `group.rows` comes from useMeetings(year) and a
+  // semester can span two year buckets, so a 上學期 running September→January is
+  // half-visible here and the client's max(第N)+1 would re-mint a number the
+  // semester already uses. The RPC also enforces the date-global occupancy
+  // invariant a plain insert bypassed (#1103).
   function handleAddWeek(group: SemesterGroup) {
-    addMeeting.mutate({
-      year,
-      semesterId: group.semesterId,
-      weekLabel: nextWeekLabel(group.rows),
-      // Anchored on the group's latest *date*, not its last positional row:
-      // an optimistic update keeps a row in place after its date is edited
-      // inline, so the positionally-last row can no longer be the
-      // chronologically-last one — and +7 days from it would land the new
-      // week before an existing one. A group always has ≥1 row (it is built
-      // from them), so lastDate is always real.
-      scheduledDate: addOneWeek(group.lastDate),
-      isHoliday: false,
-      presenter: null,
-      presenterUserId: null,
-    })
+    appendWeek.mutate(group.semesterId)
   }
 
   // The year bucket is empty, so there is no group to extend and no semester
   // to name: omit semesterId and let meetings_set_semester derive it from the
-  // date, exactly as the page-level add-meeting dialog does.
+  // date, exactly as the page-level add-meeting dialog does. append_week has
+  // nothing to append to here, which is why this one path stays on the insert.
   function handleAddFirstWeek() {
     addMeeting.mutate({
       year,
-      weekLabel: nextWeekLabel([]),
+      weekLabel: "第1週",
       scheduledDate: `${year}-01-01`,
       isHoliday: false,
       presenter: null,
@@ -352,6 +331,13 @@ export function ScheduleTab({ year }: { year: number }) {
             </span>
           )}
         </div>
+      )}
+
+      {semestersFailed && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          讀取學期失敗，下方分組只會顯示日期範圍，看不到學年度與上／下學期：
+          {semestersError instanceof Error ? semestersError.message : "unknown"}
+        </p>
       )}
 
       <div className="overflow-x-auto rounded-md border">
@@ -457,7 +443,7 @@ export function ScheduleTab({ year }: { year: number }) {
                       </TableCell>
                       <TableCell className="text-xs">
                         {/* `T00:00:00` parses as local midnight — see spanDate
-                            and addOneWeek above. */}
+                            above. */}
                         {new Date(
                           `${m.scheduledDate}T00:00:00`
                         ).toLocaleDateString("zh-TW", {
@@ -576,7 +562,7 @@ export function ScheduleTab({ year }: { year: number }) {
                         size="sm"
                         variant="ghost"
                         className="text-xs"
-                        disabled={addMeeting.isPending}
+                        disabled={appendWeek.isPending}
                         onClick={() => handleAddWeek(group)}
                       >
                         ＋ 新增一週
