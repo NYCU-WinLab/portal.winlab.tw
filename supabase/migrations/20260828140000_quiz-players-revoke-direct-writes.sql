@@ -1,0 +1,42 @@
+-- quiz_players: make "no direct writes" a privilege, not just a missing policy.
+--
+-- 20260824083402_create_quiz_tables.sql:208 states the intent plainly — "No
+-- insert/update policy: joining happens only via join_quiz_session" — and it
+-- backs that up with RLS: the table has exactly one policy, quiz_players_select,
+-- for SELECT. Every write therefore matches no policy and silently affects zero
+-- rows.
+--
+-- Silently is the problem. That file's grants are
+--
+--   revoke all on public.quiz_players from anon;
+--   grant select on public.quiz_players to authenticated;
+--
+-- which reads as "authenticated may only select", but does not do that.
+-- Supabase's platform-level default privileges have already granted
+-- authenticated every privilege on the table directly, so `grant select` adds
+-- nothing and nothing takes the rest away. Confirmed on a freshly reset local
+-- database: quiz_players' relacl is
+-- {postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}.
+-- The `revoke ... from anon` above worked precisely because it was explicit;
+-- authenticated never got the same treatment.
+--
+-- That is why supabase/tests/quiz.test.sql's assertion 33 — "direct UPDATE of
+-- quiz_players.score is denied (no update grant)" — expects SQLSTATE 42501 and
+-- gets no exception at all: 42501 is raised when the ROLE lacks the privilege,
+-- while an RLS policy that matches no rows just updates nothing. The test
+-- describes the security posture the schema intended; the grants never
+-- implemented it.
+--
+-- Safe to revoke: nothing writes this table as `authenticated`. The portal only
+-- ever reads it (apps/portal/hooks/games/use-quiz-players.ts does `.select("*")`,
+-- and use-quiz-realtime.ts subscribes), and the sole writer is
+-- public.join_quiz_session(text) — SECURITY DEFINER, so it runs as the owner and
+-- is unaffected by a grant on the invoking role. service_role keeps everything.
+--
+-- TRUNCATE is revoked alongside the three the test names, and it is the one that
+-- most needed it: RLS does not apply to TRUNCATE at all, so a missing policy
+-- never blocked it the way it silently blocked UPDATE. It is not reachable
+-- through PostgREST, which only issues select/insert/update/delete and RPC
+-- calls — but "authenticated may only select" should be true of the privilege,
+-- not merely true of the paths that happen to be exposed today.
+revoke insert, update, delete, truncate on public.quiz_players from authenticated;
