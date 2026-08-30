@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(51);
+select plan(52);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -407,6 +407,16 @@ select is(
    where id = 'd0000000-0000-0000-0000-0000000000a1'),
   'Fill Doc',
   'fill_presenters walks the roster in tier order: the later-admitted doctoral student takes the first week'
+);
+
+-- Without this, an implementation that assigned the doctoral student to
+-- EVERY week (rather than cycling to the next roster member) would still
+-- pass the assertion above.
+select is(
+  (select presenter from public.meetings
+   where id = 'd0000000-0000-0000-0000-0000000000a2'),
+  'Fill Master',
+  'fill_presenters moves on to the next roster member for the second week'
 );
 
 delete from public.meetings where year = 2099;
