@@ -54,8 +54,20 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   const { data: pool = [], isLoading } = usePresenterPool()
   const { data: labUsers = [] } = useLabUsers()
   const { data: semesters = [] } = useSemesters()
-  // 最新一個學期的學年度就是「現在」。semesters 依 start_date 升冪，取最後一筆。
-  const academicYear = semesters.at(-1)?.academicYear ?? null
+  // "Current" means the latest semester that has already started, not the
+  // latest semester by start_date — those diverge the moment next year's
+  // semester row exists (an admin routinely creates it months ahead), and
+  // `.at(-1)` would then report next year's academicYear while the lab is
+  // still living in the current one. Compare against today in Asia/Taipei,
+  // same as use-schedule-years.ts, since the DB session runs in UTC. Fall
+  // back to the newest semester only when none has started yet, so a
+  // database seeded with future-only semesters still labels something.
+  const today = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Taipei",
+  }).format(new Date())
+  const started = semesters.filter((s) => s.startDate <= today)
+  const academicYear =
+    (started.at(-1) ?? semesters.at(-1))?.academicYear ?? null
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()
@@ -228,13 +240,11 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
               {cohorts.map(([cohort, members]) => (
                 <div key={cohort} className="flex flex-col gap-1">
                   <p className="text-xs text-muted-foreground">
-                    {(academicYear !== null &&
-                      tierGradeLabel(
-                        members[0]?.labStatus ?? null,
-                        academicYear,
-                        cohort
-                      )) ??
-                      admissionYearLabel(cohort)}
+                    {tierGradeLabel(
+                      members[0]?.labStatus ?? null,
+                      academicYear,
+                      cohort
+                    ) ?? admissionYearLabel(cohort)}
                   </p>
                   {members.map((m, i) => (
                     <div

@@ -113,4 +113,11 @@ describe("tierGradeLabel", () => {
     expect(tierGradeLabel("master", 115, 116)).toBeNull()
     expect(tierGradeLabel("master", 115, 100)).toBeNull()
   })
+
+  // The caller (semesters still loading, or none exist yet) may not have an
+  // academic year yet. This must be a plain null, not something a `??` at
+  // the call site has to reconstruct — `false ?? fallback` is still `false`.
+  test("returns null when the academic year itself is unknown", () => {
+    expect(tierGradeLabel("master", null, 114)).toBeNull()
+  })
 })
