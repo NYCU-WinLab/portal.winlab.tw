@@ -59,9 +59,15 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && adding && (
         <div className="flex flex-wrap gap-1.5 rounded-lg border p-2">
           {candidates.length === 0 ? (
-            <span className="text-xs text-muted-foreground">
-              所有成員皆已加入
-            </span>
+            pool.length > 0 && labUsers.length === 0 ? (
+              <span className="text-xs text-muted-foreground">
+                候選名單目前是空的，/api/cron/kc-lab-status 可能尚未成功同步過
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                所有成員皆已加入
+              </span>
+            )
           ) : (
             candidates.map((u) => (
               <button
