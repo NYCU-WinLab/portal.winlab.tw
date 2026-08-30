@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  checkLabStatusUpdatePlan,
   EXCLUDED_USERNAMES,
+  findUnrecognisedGroupPaths,
   isSelectableMember,
   labStatusFromGroupPath,
+  parseLabStatus,
   planLabStatusUpdates,
+  type LabStatusRow,
+  type LabStatusUpdate,
 } from "./lab-status"
 
 describe("labStatusFromGroupPath", () => {
@@ -56,6 +61,51 @@ describe("isSelectableMember", () => {
       expect(isSelectableMember({ username, labStatus: "master" })).toBe(false)
     }
   })
+
+  // Isolates the username guard from the labStatus guard: the only other
+  // null-username case in this file also has a null labStatus, so a
+  // regression dropping just the `if (!u.username) return false` line would
+  // still pass every other test here.
+  test("rejects a real status with no username", () => {
+    expect(isSelectableMember({ username: null, labStatus: "master" })).toBe(
+      false
+    )
+  })
+})
+
+describe("parseLabStatus", () => {
+  test("accepts a known status", () => {
+    expect(parseLabStatus("doctoral")).toBe("doctoral")
+    expect(parseLabStatus("alumni")).toBe("alumni")
+  })
+
+  test("rejects anything else, including null", () => {
+    expect(parseLabStatus("visiting")).toBeNull()
+    expect(parseLabStatus("")).toBeNull()
+    expect(parseLabStatus(null)).toBeNull()
+  })
+})
+
+describe("findUnrecognisedGroupPaths", () => {
+  test("returns nothing when every child maps to a known status", () => {
+    expect(
+      findUnrecognisedGroupPaths([
+        "/lab-member/doctoral",
+        "/lab-member/master",
+        "/lab-member/undergrad",
+      ])
+    ).toEqual([])
+  })
+
+  test("names a renamed or newly added group", () => {
+    expect(
+      findUnrecognisedGroupPaths(["/lab-member/master", "/lab-member/masters"])
+    ).toEqual(["/lab-member/masters"])
+  })
+
+  test("an empty child list is not itself unrecognised", () => {
+    expect(findUnrecognisedGroupPaths([])).toEqual([])
+  })
 })
 
 describe("planLabStatusUpdates", () => {
@@ -94,5 +144,88 @@ describe("planLabStatusUpdates", () => {
       new Map()
     )
     expect(updates).toEqual([])
+  })
+})
+
+describe("checkLabStatusUpdatePlan", () => {
+  // Fixtures are scaled to a real measurement of the lab's current
+  // Keycloak-mapped projection: 44 profiles carry a non-null lab_status
+  // today (master 32, doctoral 4, assistant 3, undergrad 2, alumni 2,
+  // teacher 1). `nonNullProfiles` stands in for "44 rows currently have a
+  // status"; `clearUpdates` stands in for "N of them would go to null".
+  function nonNullProfiles(n: number): LabStatusRow[] {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `p${i}`,
+      username: `u${i}`,
+      labStatus: "master",
+    }))
+  }
+  function clearUpdates(n: number): LabStatusUpdate[] {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `p${i}`,
+      labStatus: null,
+    }))
+  }
+
+  test("refuses a sweep the size of a failed /lab-member/master read", () => {
+    // 32 of 44 = 73%, well past both floors.
+    const result = checkLabStatusUpdatePlan(
+      nonNullProfiles(44),
+      clearUpdates(32)
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.detail).toContain("32")
+      expect(result.detail).toContain("44")
+    }
+  })
+
+  // The case that proves BOTH conditions are required, not just one: 4 of 44
+  // is over the 3-row floor but under the 20% ratio floor (9%). A
+  // row-count-only guard would refuse this and halt the entire sync over
+  // four people (the size of /lab-member/doctoral); a ratio-only guard would
+  // let through a mass-clear in a small dataset. Don't "simplify" this to
+  // one condition.
+  test("allows a sweep the size of /lab-member/doctoral (4 of 44, under the ratio floor)", () => {
+    const result = checkLabStatusUpdatePlan(
+      nonNullProfiles(44),
+      clearUpdates(4)
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  test("allows a sweep at exactly the row floor (3 of 44)", () => {
+    const result = checkLabStatusUpdatePlan(
+      nonNullProfiles(44),
+      clearUpdates(3)
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  test("allows a small, plausible sweep (2 of 44)", () => {
+    const result = checkLabStatusUpdatePlan(
+      nonNullProfiles(44),
+      clearUpdates(2)
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  test("allows a plan that clears nobody", () => {
+    const result = checkLabStatusUpdatePlan(nonNullProfiles(44), [])
+    expect(result.ok).toBe(true)
+  })
+
+  test("allows a plan that only assigns statuses, never clears one", () => {
+    const profiles: LabStatusRow[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `q${i}`,
+      username: `u${i}`,
+      labStatus: null,
+    }))
+    const updates: LabStatusUpdate[] = profiles.map((p) => ({
+      id: p.id,
+      labStatus: "master",
+    }))
+    const result = checkLabStatusUpdatePlan(profiles, updates)
+    expect(result.ok).toBe(true)
   })
 })

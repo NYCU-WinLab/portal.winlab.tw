@@ -17,12 +17,20 @@ import {
   KeycloakAdminError,
 } from "@/lib/keycloak/admin"
 import {
+  findUnrecognisedGroupPaths,
   labStatusFromGroupPath,
   type LabStatus,
 } from "@/lib/meetings/lab-status"
 
 export type LabStatusFetchResult =
-  | { status: "ok"; byUsername: Map<string, LabStatus> }
+  | {
+      status: "ok"
+      byUsername: Map<string, LabStatus>
+      // Members returned by a group's members endpoint with no `username`.
+      // Indistinguishable, downstream, from a departure — surfaced so a
+      // non-zero rate is visible in the cron's response rather than silent.
+      skippedNoUsername: number
+    }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
   | { status: "error"; detail: string }
@@ -66,9 +74,26 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
       token
     )
 
+    // An unrecognised child is not something to skip past: the realm was
+    // already restructured once (a subgroup rename, 2026-08-11), and mapping
+    // one to null here would silently drop everyone in it from the sync —
+    // indistinguishable, downstream, from those people leaving. Refuse the
+    // whole read and name the offender rather than write a partial map.
+    const unrecognised = findUnrecognisedGroupPaths(children.map((c) => c.path))
+    if (unrecognised.length > 0) {
+      return {
+        status: "error",
+        detail: `unrecognised /lab-member child group(s): ${unrecognised.join(", ")}`,
+      }
+    }
+
     const byUsername = new Map<string, LabStatus>()
+    let skippedNoUsername = 0
     for (const child of children) {
       const status = labStatusFromGroupPath(child.path)
+      // Unreachable after the check above — every child path here is a known
+      // LabStatus — but the type is still `LabStatus | null`, so keep the
+      // guard rather than assert past it.
       if (!status) continue
       for (let first = 0; ; first += PAGE) {
         const page = await getJson<RawMember[]>(
@@ -77,27 +102,21 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
         )
         for (const member of page) {
           if (member.username) byUsername.set(member.username, status)
+          else skippedNoUsername++
         }
         if (page.length < PAGE) break
       }
     }
 
-    // Zero statuses is indistinguishable, downstream, from a silent
-    // catastrophe: an empty `/lab-member` children list, or every child
-    // mapping to something other than a known LabStatus, both produce the
-    // same empty map as a transport failure would — and planLabStatusUpdates
-    // reads an empty map as "Keycloak knows nobody", nulling out lab_status
-    // for every profile with a username in one sweep. Refuse it here rather
-    // than let the route's ok-branch apply it.
-    if (byUsername.size === 0) {
-      return {
-        status: "error",
-        detail:
-          "no lab-member statuses found across any /lab-member child group",
-      }
-    }
-
-    return { status: "ok", byUsername }
+    // A single group's members endpoint returning empty (or every group
+    // being empty) is no longer refused here: a legitimately small group can
+    // hit zero, and refusing the whole sync on that would stop lab_status
+    // updating for everyone indefinitely. The blast-radius guard on the
+    // resulting update PLAN (checkLabStatusUpdatePlan, called from the cron
+    // route) catches the harmful case — a sweep that would mass-null
+    // lab_status — without needing to guess which underlying cause produced
+    // it.
+    return { status: "ok", byUsername, skippedNoUsername }
   } catch (err) {
     if (err instanceof KeycloakAdminError) {
       if (err.status === 403) {

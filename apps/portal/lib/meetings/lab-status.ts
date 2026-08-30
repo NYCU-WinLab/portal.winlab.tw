@@ -32,6 +32,30 @@ export function labStatusFromGroupPath(path: string): LabStatus | null {
 }
 
 /**
+ * Parse a raw, unvalidated `lab_status` DB value (or a Keycloak leaf) into a
+ * known status. The boundary every caller that hands a string into
+ * `isSelectableMember` must pass through first, rather than trusting the
+ * column's text.
+ */
+export function parseLabStatus(v: string | null): LabStatus | null {
+  return v !== null && (LAB_STATUSES as readonly string[]).includes(v)
+    ? (v as LabStatus)
+    : null
+}
+
+/**
+ * Which children of `/lab-member` this code does not know how to file under a
+ * `LabStatus`. Never skip one silently: the realm has already been
+ * restructured once (a subgroup rename), and a renamed or newly added group
+ * mapping to null would quietly drop everyone in it from the sync — which
+ * looks, downstream, exactly like those people leaving. That is a decision
+ * for a human, not something to `continue` past.
+ */
+export function findUnrecognisedGroupPaths(childPaths: string[]): string[] {
+  return childPaths.filter((path) => labStatusFromGroupPath(path) === null)
+}
+
+/**
  * Accounts that hold a real lab-member group but are not people. They sit
  * inside /lab-member/master, so the group rule alone cannot exclude them.
  */
@@ -44,11 +68,11 @@ export const EXCLUDED_USERNAMES: ReadonlySet<string> = new Set([
  * Whether someone may be offered as a presenter-roster or question-pool
  * candidate. A whitelist, and it fails closed: an account Keycloak has nothing
  * to say about is not selectable, because "unclassified" is exactly the shape
- * of the eight pre-Keycloak shell accounts that were cluttering the picker.
+ * of the pre-Keycloak shell accounts that were cluttering the picker.
  */
 export function isSelectableMember(u: {
   username: string | null
-  labStatus: string | null
+  labStatus: LabStatus | null
 }): boolean {
   if (!u.username || EXCLUDED_USERNAMES.has(u.username)) return false
   return u.labStatus !== null && u.labStatus !== "alumni"
@@ -87,4 +111,51 @@ export function planLabStatusUpdates(
       updates.push({ id: profile.id, labStatus: next })
   }
   return updates
+}
+
+/** Both floors in {@link checkLabStatusUpdatePlan} must trip before refusing. */
+const MASS_NULL_ROW_FLOOR = 3
+const MASS_NULL_RATIO_FLOOR = 0.2
+
+/**
+ * Refuses a sweep that would clear `lab_status` for an implausible number of
+ * profiles in one pass.
+ *
+ * Graduating moves someone to `"alumni"` — it never nulls them. A profile
+ * going from some status to null means Keycloak has nothing to say about that
+ * username any more, which is legitimate one or two people at a time (deleted
+ * from the realm) but is exactly the symptom of a broken read otherwise: a
+ * `/lab-member` child group renamed, a page that came back transiently empty,
+ * a credential that lost a scope. None of those are distinguishable from each
+ * other here, so the guard doesn't try — it only asks "how many people is
+ * this sweep about to erase", and refuses to write anything when the answer
+ * is large relative to how many currently have a status at all.
+ *
+ * Both floors must trip, so a small lab or a handful of genuine departures is
+ * never blocked: more than {@link MASS_NULL_ROW_FLOOR} rows, AND more than
+ * {@link MASS_NULL_RATIO_FLOOR} of the rows that currently carry a status.
+ */
+export function checkLabStatusUpdatePlan(
+  profiles: LabStatusRow[],
+  updates: LabStatusUpdate[]
+): { ok: true } | { ok: false; detail: string } {
+  const currentNonNull = profiles.filter((p) => p.labStatus !== null).length
+  // planLabStatusUpdates only emits a row when the value actually changed, so
+  // every update landing on null here previously held a real status.
+  const clearedCount = updates.filter((u) => u.labStatus === null).length
+
+  const ratio = currentNonNull === 0 ? 0 : clearedCount / currentNonNull
+  if (clearedCount > MASS_NULL_ROW_FLOOR && ratio > MASS_NULL_RATIO_FLOOR) {
+    const pct = Math.round(ratio * 100)
+    return {
+      ok: false,
+      detail:
+        `refusing to clear lab_status for ${clearedCount} of ` +
+        `${currentNonNull} profiles that currently carry one (${pct}%) in ` +
+        "one sweep — check whether a /lab-member child group was renamed " +
+        "or came back empty before applying this by hand",
+    }
+  }
+
+  return { ok: true }
 }

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 
 import { fetchLabStatuses } from "@/lib/keycloak/lab-status"
-import { planLabStatusUpdates } from "@/lib/meetings/lab-status"
+import {
+  checkLabStatusUpdatePlan,
+  planLabStatusUpdates,
+} from "@/lib/meetings/lab-status"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Mirrors Keycloak's /lab-member/* membership into user_profiles.lab_status
@@ -46,6 +49,17 @@ export async function GET(request: Request) {
   }))
   const updates = planLabStatusUpdates(rows, fetched.byUsername)
 
+  // Refuse to write a sweep that would mass-null lab_status — see
+  // checkLabStatusUpdatePlan's doc comment for why that shape is almost
+  // always a broken read rather than a real membership event.
+  const guard = checkLabStatusUpdatePlan(rows, updates)
+  if (!guard.ok) {
+    return NextResponse.json(
+      { status: "error", detail: guard.detail },
+      { status: 502 }
+    )
+  }
+
   for (const [index, update] of updates.entries()) {
     const { error: writeError } = await supabase
       .from("user_profiles")
@@ -63,5 +77,6 @@ export async function GET(request: Request) {
     scanned: rows.length,
     changed: updates.length,
     updates,
+    skippedNoUsername: fetched.skippedNoUsername,
   })
 }
