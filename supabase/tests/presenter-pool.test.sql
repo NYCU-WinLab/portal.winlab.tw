@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(46);
+select plan(48);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -413,6 +413,60 @@ delete from public.meetings where year = 2099;
 delete from public.meeting_presenter_pool
   where user_id in ('d0000000-0000-0000-0000-000000000012',
                     'd0000000-0000-0000-0000-000000000013');
+
+-- ── move 只在同一層內找鄰居 ─────────────────────────────────────────────────
+-- 同一個入學年裡放一位博士與兩位碩士。博士是他那一層的唯一成員，所以往上移
+-- 應該是 no-op；碩士的順序不能被他動到。
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000021'),  -- 管理員
+  ('d0000000-0000-0000-0000-000000000022'),  -- 博士，民國 116
+  ('d0000000-0000-0000-0000-000000000023'),  -- 碩士，民國 116
+  ('d0000000-0000-0000-0000-000000000024');  -- 碩士，民國 116
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('d0000000-0000-0000-0000-000000000021', 'madmin@test.local', 'M Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000022', 'm22@test.local', 'Mixed Doc', '{}'::jsonb, 'doctoral'),
+  ('d0000000-0000-0000-0000-000000000023', 'm23@test.local', 'Mixed M1',  '{}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000024', 'm24@test.local', 'Mixed M2',  '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000023', 116, 1),
+  ('d0000000-0000-0000-0000-000000000024', 116, 2),
+  ('d0000000-0000-0000-0000-000000000022', 116, 3);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000021","role":"authenticated"}', true);
+
+-- 博士生往上移：他那一層只有他，應該什麼都不做。
+select public.meetings_pool_move('d0000000-0000-0000-0000-000000000022', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'd0000000-0000-0000-0000-000000000024'),
+  2,
+  'moving the only member of a tier does not shuffle a member of another tier'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000021","role":"authenticated"}', true);
+
+-- 碩士之間的搬移照舊有效。
+select public.meetings_pool_move('d0000000-0000-0000-0000-000000000024', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'd0000000-0000-0000-0000-000000000024'),
+  1,
+  'moving within a tier still swaps with the adjacent same-tier member'
+);
+
+delete from public.meeting_presenter_pool where admission_year = 116;
 
 select * from finish();
 rollback;
