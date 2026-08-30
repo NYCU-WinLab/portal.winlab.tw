@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(48);
+select plan(51);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -467,6 +467,70 @@ select is(
 );
 
 delete from public.meeting_presenter_pool where admission_year = 116;
+
+-- ── move skips past an intervening different-tier member to the NEAREST
+--    same-tier neighbour, not merely one that happens to sit at ± 1 ────────
+-- Tiers interleaved by sort_order within one intake year: doctoral@1,
+-- master@2, doctoral@3, master@4. Moving doctoral@3 up must land it at
+-- position 1 (trading with doctoral@1), skipping straight over master@2 —
+-- not a no-op, and not a swap with master@2. An implementation that simply
+-- ANDs a tier check onto the OLD `sort_order = current + p_delta` predicate
+-- would look for a same-tier row at sort_order = 2, find none (it's a
+-- master), and wrongly no-op: mover stays at 3, target stays at 1, and the
+-- intervening master's position would be the only thing "consistent" with
+-- both a correct and a naive implementation — which is why it is asserted
+-- unchanged rather than used to distinguish them.
+insert into auth.users (id) values
+  ('f0000000-0000-0000-0000-000000000001'),  -- 管理員
+  ('f0000000-0000-0000-0000-000000000002'),  -- 博士，民國 118 (target)
+  ('f0000000-0000-0000-0000-000000000003'),  -- 碩士，民國 118 (intervening)
+  ('f0000000-0000-0000-0000-000000000004'),  -- 博士，民國 118 (mover)
+  ('f0000000-0000-0000-0000-000000000005');  -- 碩士，民國 118
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('f0000000-0000-0000-0000-000000000001', 'fadmin@test.local', 'F Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('f0000000-0000-0000-0000-000000000002', 'f2@test.local', 'Interleave Doc A', '{}'::jsonb, 'doctoral'),
+  ('f0000000-0000-0000-0000-000000000003', 'f3@test.local', 'Interleave M1',    '{}'::jsonb, 'master'),
+  ('f0000000-0000-0000-0000-000000000004', 'f4@test.local', 'Interleave Doc B', '{}'::jsonb, 'doctoral'),
+  ('f0000000-0000-0000-0000-000000000005', 'f5@test.local', 'Interleave M2',    '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('f0000000-0000-0000-0000-000000000002', 118, 1),
+  ('f0000000-0000-0000-0000-000000000003', 118, 2),
+  ('f0000000-0000-0000-0000-000000000004', 118, 3),
+  ('f0000000-0000-0000-0000-000000000005', 118, 4);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"f0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+-- doctoral@3 往上移：他那一層在該方向唯一的候選是 doctoral@1，中間隔著一位碩士。
+select public.meetings_pool_move('f0000000-0000-0000-0000-000000000004', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000004'),
+  1,
+  'the mover reaches the nearest same-tier neighbour, skipping the intervening tier'
+);
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000002'),
+  3,
+  'the same-tier target takes the mover''s old position, not merely vacates its own'
+);
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000003'),
+  2,
+  'the intervening different-tier member sitting between them is left untouched'
+);
+
+delete from public.meeting_presenter_pool where admission_year = 118;
 
 select * from finish();
 rollback;
