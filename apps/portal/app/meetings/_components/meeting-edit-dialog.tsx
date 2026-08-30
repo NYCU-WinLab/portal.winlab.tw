@@ -273,7 +273,15 @@ export function MeetingEditDialog({
       const resolvedPresenter = isSpeaker
         ? speakerName.trim() || null
         : hasPresenterUser
-          ? (selectedUser?.name ?? null)
+          ? (selectedUser?.name ??
+            // When the id being saved is the one the meeting already carries
+            // and the lookup misses (filtered out), keep the meeting's stored
+            // presenter name instead of nulling it. An admin who deliberately
+            // changes the presenter still gets the new value; an admin who
+            // touches nothing keeps what was there.
+            (presenterUserId === meeting.presenterUserId
+              ? meeting.presenter
+              : null))
           : null
 
       updateAdmin.mutate(
