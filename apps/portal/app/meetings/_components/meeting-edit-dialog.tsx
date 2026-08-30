@@ -40,6 +40,7 @@ import {
   paperAvailabilityForMeeting,
   type PaperAvailability,
 } from "@/lib/meetings/papers"
+import { resolvePresenterNameOnSave } from "@/lib/meetings/presenter-save"
 import type { Meeting } from "@/lib/meetings/types"
 
 import { MeetingTypeSelect } from "./meeting-type-select"
@@ -289,15 +290,12 @@ export function MeetingEditDialog({
       const resolvedPresenter = isSpeaker
         ? speakerName.trim() || null
         : hasPresenterUser
-          ? (selectedUser?.name ??
-            // When the id being saved is the one the meeting already carries
-            // and the lookup misses (filtered out), keep the meeting's stored
-            // presenter name instead of nulling it. An admin who deliberately
-            // changes the presenter still gets the new value; an admin who
-            // touches nothing keeps what was there.
-            (presenterUserId === meeting.presenterUserId
-              ? meeting.presenter
-              : null))
+          ? resolvePresenterNameOnSave({
+              presenterUserId,
+              selectedName: selectedUser?.name,
+              meetingPresenterUserId: meeting.presenterUserId,
+              meetingPresenter: meeting.presenter,
+            })
           : null
 
       updateAdmin.mutate(
