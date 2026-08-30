@@ -51,3 +51,33 @@ export function admissionYearFromStudentId(
   const year = head < 20 ? head + 100 : head
   return year >= MIN_YEAR && year <= MAX_YEAR ? year : null
 }
+
+// 學制的中文字首。teacher / assistant / alumni 刻意不在表內：他們沒有年級。
+const TIER_PREFIX: Record<string, string> = {
+  doctoral: "博",
+  master: "碩",
+  undergrad: "大",
+}
+
+const GRADE_NUMERAL = ["一", "二", "三", "四", "五", "六", "七", "八"]
+
+/**
+ * `碩二` — 學制加上「入學後第幾年」。純顯示用。
+ *
+ * 排序不需要這個：報告順位的層內順序是 admission_year 升冪，那本身就是年級由高
+ * 到低，博士班也一樣。這裡只是把兩個數字翻成人看得懂的標籤。
+ *
+ * academicYear 與 admissionYear 都是民國年。超出 1..8 一律回 null —— 入學年比
+ * 學年度還晚代表資料有問題，編一個名字出來只會掩蓋它。
+ */
+export function tierGradeLabel(
+  labStatus: string | null,
+  academicYear: number,
+  admissionYear: number
+): string | null {
+  const prefix = labStatus ? TIER_PREFIX[labStatus] : undefined
+  if (!prefix) return null
+  const grade = academicYear - admissionYear + 1
+  if (grade < 1 || grade > GRADE_NUMERAL.length) return null
+  return `${prefix}${GRADE_NUMERAL[grade - 1]}`
+}

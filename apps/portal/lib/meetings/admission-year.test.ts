@@ -5,6 +5,7 @@ import {
   admissionYearLabel,
   formatAdmissionYear,
   parseAdmissionYear,
+  tierGradeLabel,
 } from "./admission-year"
 
 describe("parseAdmissionYear", () => {
@@ -82,5 +83,34 @@ describe("admissionYearFromStudentId", () => {
 describe("admissionYearLabel", () => {
   test("labels a cohort the way the lab says it", () => {
     expect(admissionYearLabel(113)).toBe("113 級")
+  })
+})
+
+describe("tierGradeLabel", () => {
+  // 學年度 115、民國 114 入學 → 第二年 → 碩二
+  test("combines tier and year-in-programme", () => {
+    expect(tierGradeLabel("master", 115, 114)).toBe("碩二")
+    expect(tierGradeLabel("master", 115, 115)).toBe("碩一")
+    expect(tierGradeLabel("doctoral", 115, 113)).toBe("博三")
+    expect(tierGradeLabel("undergrad", 115, 112)).toBe("大四")
+  })
+
+  // 教職、助理、校友沒有年級可言 —— 標一個假的比不標更糟。
+  test("has no label for tiers without a year-in-programme", () => {
+    expect(tierGradeLabel("teacher", 115, 100)).toBeNull()
+    expect(tierGradeLabel("assistant", 115, 100)).toBeNull()
+    expect(tierGradeLabel("alumni", 115, 110)).toBeNull()
+    expect(tierGradeLabel(null, 115, 114)).toBeNull()
+  })
+
+  // 延畢是真的：碩五、碩六照樣標出來，不要靜靜地變成 null。
+  test("keeps labelling beyond the nominal length", () => {
+    expect(tierGradeLabel("master", 115, 111)).toBe("碩五")
+  })
+
+  // 入學年比學年度還晚，或早得離譜 —— 資料有問題，不要編一個名字出來。
+  test("returns null for an out-of-range year", () => {
+    expect(tierGradeLabel("master", 115, 116)).toBeNull()
+    expect(tierGradeLabel("master", 115, 100)).toBeNull()
   })
 })

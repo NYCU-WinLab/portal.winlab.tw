@@ -18,30 +18,44 @@ import {
   useRemovePresenter,
   useUpsertPresenter,
 } from "@/hooks/meetings/use-presenter-pool"
+import { useSemesters } from "@/hooks/meetings/use-semesters"
 import {
   admissionYearLabel,
   parseAdmissionYear,
+  tierGradeLabel,
 } from "@/lib/meetings/admission-year"
 import type { PresenterPoolMember } from "@/lib/meetings/types"
 
 import { suggestAdmissionYear } from "../actions"
 import { ConfirmDialog } from "./confirm-dialog"
 
-function groupByCohort(pool: PresenterPoolMember[]) {
-  const cohorts = new Map<number, PresenterPoolMember[]>()
+/**
+ * 先依學制分層，層內再依入學年分組。兩層都用 tier_rank / admission_year 升冪，
+ * 與 meetings_fill_presenters 走訪順位名單的順序一致。
+ */
+function groupByTierAndCohort(pool: PresenterPoolMember[]) {
+  const tiers = new Map<number, Map<number, PresenterPoolMember[]>>()
   for (const member of pool) {
+    const cohorts = tiers.get(member.tierRank) ?? new Map()
     const list = cohorts.get(member.admissionYear) ?? []
     list.push(member)
     cohorts.set(member.admissionYear, list)
+    tiers.set(member.tierRank, cohorts)
   }
-  // Seniors first: the lab's convention is that the earlier intake presents
-  // first, and meetings_fill_presenters walks the roster in this same order.
-  return [...cohorts.entries()].sort((a, b) => a[0] - b[0])
+  return [...tiers.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(
+      ([tierRank, cohorts]) =>
+        [tierRank, [...cohorts.entries()].sort((a, b) => a[0] - b[0])] as const
+    )
 }
 
 export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   const { data: pool = [], isLoading } = usePresenterPool()
   const { data: labUsers = [] } = useLabUsers()
+  const { data: semesters = [] } = useSemesters()
+  // 最新一個學期的學年度就是「現在」。semesters 依 start_date 升冪，取最後一筆。
+  const academicYear = semesters.at(-1)?.academicYear ?? null
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()
@@ -62,7 +76,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
   const pooled = new Set(pool.map((m) => m.userId))
   const candidates = labUsers.filter((u) => !pooled.has(u.id))
-  const cohorts = groupByCohort(pool)
+  const tiers = groupByTierAndCohort(pool)
   const parsedYear = parseAdmissionYear(year)
 
   async function pick(user: { id: string; name: string | null }) {
@@ -209,68 +223,82 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
         <p className="text-xs text-muted-foreground">尚未排定任何報告順位</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {cohorts.map(([cohort, members]) => (
-            <div key={cohort} className="flex flex-col gap-1">
-              <p className="text-xs text-muted-foreground">
-                {admissionYearLabel(cohort)}
-              </p>
-              {members.map((m, i) => (
-                <div
-                  key={m.userId}
-                  className="flex items-center justify-between gap-2 rounded-lg border p-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 text-xs text-muted-foreground">
-                      {m.sortOrder}
-                    </span>
-                    <span className="text-sm font-medium">{m.name ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="mr-2 text-xs text-muted-foreground">
-                      已報告 {m.timesPresented} 次
-                    </span>
-                    {isAdmin && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === 0 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: -1 })
-                          }
-                        >
-                          <IconChevronUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === members.length - 1 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: 1 })
-                          }
-                        >
-                          <IconChevronDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
+          {tiers.map(([tierRank, cohorts]) => (
+            <div key={tierRank} className="flex flex-col gap-1">
+              {cohorts.map(([cohort, members]) => (
+                <div key={cohort} className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground">
+                    {(academicYear !== null &&
+                      tierGradeLabel(
+                        members[0]?.labStatus ?? null,
+                        academicYear,
+                        cohort
+                      )) ??
+                      admissionYearLabel(cohort)}
+                  </p>
+                  {members.map((m, i) => (
+                    <div
+                      key={m.userId}
+                      className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-xs text-muted-foreground">
+                          {m.sortOrder}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {m.name ?? "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="mr-2 text-xs text-muted-foreground">
+                          已報告 {m.timesPresented} 次
+                        </span>
+                        {isAdmin && (
+                          <>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={i === 0 || move.isPending}
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: -1 })
+                              }
                             >
-                              <IconTrash className="h-3.5 w-3.5" />
+                              <IconChevronUp className="h-3.5 w-3.5" />
                             </Button>
-                          }
-                          title="移出報告順位？"
-                          description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
-                          variant="destructive"
-                          onConfirm={() => remove.mutate(m.userId)}
-                        />
-                      </>
-                    )}
-                  </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={
+                                i === members.length - 1 || move.isPending
+                              }
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: 1 })
+                              }
+                            >
+                              <IconChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <ConfirmDialog
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                >
+                                  <IconTrash className="h-3.5 w-3.5" />
+                                </Button>
+                              }
+                              title="移出報告順位？"
+                              description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
+                              variant="destructive"
+                              onConfirm={() => remove.mutate(m.userId)}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
