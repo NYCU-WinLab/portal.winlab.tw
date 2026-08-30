@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(41);
+select plan(45);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -313,6 +313,57 @@ select is(
 select is(
   (select presenter from public.meetings where scheduled_date = '2035-01-01'),
   'A', 'the earlier presentation of that paper is untouched');
+
+-- ── tier ordering: 學制優先於入學年 ──────────────────────────────────────────
+-- 一位入學年「較晚」的博士生，必須排在所有碩士之前。這正是舊排序
+-- (admission_year, sort_order) 排不出來的情況 —— 現行資料排對純屬巧合，
+-- 因為唯一的博士生剛好入學年最早。
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000001'),  -- 博士，民國 115（較晚）
+  ('d0000000-0000-0000-0000-000000000002'),  -- 碩士，民國 113（較早）
+  ('d0000000-0000-0000-0000-000000000003');  -- 大學部，民國 114
+
+insert into public.user_profiles (id, email, name, lab_status) values
+  ('d0000000-0000-0000-0000-000000000001', 'd1@test.local', 'Doc Late',   'doctoral'),
+  ('d0000000-0000-0000-0000-000000000002', 'd2@test.local', 'Master Early','master'),
+  ('d0000000-0000-0000-0000-000000000003', 'd3@test.local', 'Undergrad',  'undergrad');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000001', 115, 1),
+  ('d0000000-0000-0000-0000-000000000002', 113, 2),
+  ('d0000000-0000-0000-0000-000000000003', 114, 2);
+
+select is(
+  public.meetings_tier_rank('doctoral'), 0,
+  'meetings_tier_rank: doctoral is 0'
+);
+
+select is(
+  public.meetings_tier_rank(null), 3,
+  'meetings_tier_rank: NULL falls to the trailing bucket'
+);
+
+select is(
+  (select array_agg(name order by tier_rank asc, admission_year asc, sort_order asc, user_id asc)
+   from public.meeting_presenter_roster
+   where user_id in ('d0000000-0000-0000-0000-000000000001',
+                     'd0000000-0000-0000-0000-000000000002',
+                     'd0000000-0000-0000-0000-000000000003')),
+  array['Doc Late', 'Master Early', 'Undergrad'],
+  'roster tier order puts a LATER-admitted doctoral student ahead of an EARLIER-admitted master'
+);
+
+select is(
+  (select lab_status from public.meeting_presenter_roster
+   where user_id = 'd0000000-0000-0000-0000-000000000001'),
+  'doctoral',
+  'roster exposes lab_status'
+);
+
+delete from public.meeting_presenter_pool
+  where user_id in ('d0000000-0000-0000-0000-000000000001',
+                    'd0000000-0000-0000-0000-000000000002',
+                    'd0000000-0000-0000-0000-000000000003');
 
 select * from finish();
 rollback;
