@@ -1,5 +1,8 @@
--- Redeclared whole from 20260807000000:236. The ONLY change is the neighbour
--- lookup, which now requires the same tier as well as the same intake year.
+-- Redeclared whole from 20260807000000:229. Beyond the neighbour lookup
+-- (which now requires the same tier as well as the same intake year), this
+-- adds a `v_tier integer` declaration, a `select
+-- public.meetings_tier_rank(...) into v_tier` to populate it, and reworded
+-- the edge-of-tier comment.
 --
 -- Until the roster gained a tier dimension, "same admission_year" and "same
 -- displayed group" were the same thing — every intake year held exactly one
