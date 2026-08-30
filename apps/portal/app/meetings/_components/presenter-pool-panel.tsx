@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   IconChevronDown,
@@ -24,6 +24,7 @@ import {
   parseAdmissionYear,
   tierGradeLabel,
 } from "@/lib/meetings/admission-year"
+import { currentAcademicYear } from "@/lib/meetings/semester"
 import type { PresenterPoolMember } from "@/lib/meetings/types"
 
 import { suggestAdmissionYear } from "../actions"
@@ -51,23 +52,28 @@ function groupByTierAndCohort(pool: PresenterPoolMember[]) {
 }
 
 export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
-  const { data: pool = [], isLoading } = usePresenterPool()
-  const { data: labUsers = [] } = useLabUsers()
+  const {
+    data: pool = [],
+    isLoading,
+    isError: poolIsError,
+  } = usePresenterPool()
+  const {
+    data: labUsers = [],
+    isSuccess: labUsersLoaded,
+    isError: labUsersIsError,
+  } = useLabUsers()
   const { data: semesters = [] } = useSemesters()
-  // "Current" means the latest semester that has already started, not the
-  // latest semester by start_date — those diverge the moment next year's
-  // semester row exists (an admin routinely creates it months ahead), and
-  // `.at(-1)` would then report next year's academicYear while the lab is
-  // still living in the current one. Compare against today in Asia/Taipei,
-  // same as use-schedule-years.ts, since the DB session runs in UTC. Fall
-  // back to the newest semester only when none has started yet, so a
-  // database seeded with future-only semesters still labels something.
-  const today = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Taipei",
-  }).format(new Date())
-  const started = semesters.filter((s) => s.startDate <= today)
-  const academicYear =
-    (started.at(-1) ?? semesters.at(-1))?.academicYear ?? null
+  // See lib/meetings/semester.ts's currentAcademicYear doc comment for why
+  // "current" means the latest semester that has already started, not the
+  // latest by start_date. Compared against today in Asia/Taipei, same as
+  // use-schedule-years.ts, since the DB session runs in UTC. Memoized so the
+  // date is read once per render pass rather than inside the JSX expression.
+  const academicYear = useMemo(() => {
+    const today = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Taipei",
+    }).format(new Date())
+    return currentAcademicYear(semesters, today)
+  }, [semesters])
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()
@@ -84,6 +90,19 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
+  }
+
+  // Checked before any empty-state logic: on a query error `isLoading` is
+  // false and `data` defaults to `[]`, so without this the panel would fall
+  // through to the empty-state branch below — including the sync-problem
+  // hint, which would then confidently misdiagnose a Supabase outage as a
+  // cron failure.
+  if (poolIsError || labUsersIsError) {
+    return (
+      <p className="text-sm text-destructive">
+        讀取報告順位名單失敗，請重新整理頁面再試一次
+      </p>
+    )
   }
 
   const pooled = new Set(pool.map((m) => m.userId))
@@ -172,7 +191,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
           {!picked ? (
             <div className="flex flex-wrap gap-1.5">
               {candidates.length === 0 ? (
-                pool.length > 0 && labUsers.length === 0 ? (
+                labUsersLoaded && labUsers.length === 0 ? (
                   <span className="text-xs text-muted-foreground">
                     候選名單目前是空的，/api/cron/kc-lab-status
                     可能尚未成功同步過

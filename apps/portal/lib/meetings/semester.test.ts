@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { semesterKeyForDate } from "./semester"
+import { currentAcademicYear, semesterKeyForDate } from "./semester"
 
 // Every case here is checked against the SQL these functions mirror
 // (public.meeting_academic_year / public.meeting_term). The boundaries are the
@@ -48,5 +48,25 @@ describe("semesterKeyForDate", () => {
       academicYear: 115,
       term: 2,
     })
+  })
+})
+
+describe("currentAcademicYear", () => {
+  const semesters = [
+    { academicYear: 113, startDate: "2024-09-01" },
+    { academicYear: 114, startDate: "2025-09-01" },
+    { academicYear: 115, startDate: "2026-09-01" },
+  ]
+
+  it("picks the latest semester that has already started", () => {
+    expect(currentAcademicYear(semesters, "2026-01-15")).toBe(114)
+  })
+
+  it("falls back to the newest semester when none has started yet", () => {
+    expect(currentAcademicYear(semesters, "2020-01-01")).toBe(115)
+  })
+
+  it("returns null for an empty semester list", () => {
+    expect(currentAcademicYear([], "2026-01-15")).toBeNull()
   })
 })
