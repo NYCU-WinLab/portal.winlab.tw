@@ -82,6 +82,21 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
       }
     }
 
+    // Zero statuses is indistinguishable, downstream, from a silent
+    // catastrophe: an empty `/lab-member` children list, or every child
+    // mapping to something other than a known LabStatus, both produce the
+    // same empty map as a transport failure would — and planLabStatusUpdates
+    // reads an empty map as "Keycloak knows nobody", nulling out lab_status
+    // for every profile with a username in one sweep. Refuse it here rather
+    // than let the route's ok-branch apply it.
+    if (byUsername.size === 0) {
+      return {
+        status: "error",
+        detail:
+          "no lab-member statuses found across any /lab-member child group",
+      }
+    }
+
     return { status: "ok", byUsername }
   } catch (err) {
     if (err instanceof KeycloakAdminError) {
