@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
-import { isSelectableMember } from "@/lib/meetings/lab-status"
+import { isSelectableMember, parseLabStatus } from "@/lib/meetings/lab-status"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -11,11 +11,11 @@ import { queryKeys } from "./query-keys"
  * Who may be added to the presenter roster or the question pool.
  *
  * A whitelist, not the whole table. This used to be `select id, name from
- * user_profiles` with no filter, so every row showed up as a candidate — two
- * graduates, two profiles for people who have left the realm, eight
- * pre-Keycloak shell accounts that were never signed into, the faculty and
- * admin staff, and the test account. Filtering here rather than in the panels
- * keeps both pickers honest from one place.
+ * user_profiles` with no filter, so every row showed up as a candidate —
+ * graduates, profiles for people who have left the realm, pre-Keycloak shell
+ * accounts that were never signed into, faculty and admin staff, and test
+ * accounts. Filtering here rather than in the panels keeps both pickers
+ * honest from one place.
  *
  * `lab_status` is mirrored from Keycloak nightly by /api/cron/kc-lab-status.
  */
@@ -42,7 +42,7 @@ export function useLabUsers() {
         .filter((row) =>
           isSelectableMember({
             username: row.username,
-            labStatus: row.lab_status,
+            labStatus: parseLabStatus(row.lab_status),
           })
         )
         .map((row) => ({ id: row.id, name: row.name }))
