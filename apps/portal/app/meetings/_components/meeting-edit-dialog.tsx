@@ -171,6 +171,22 @@ export function MeetingEditDialog({
   const isThesis = effectiveType === "thesis"
   const isFreeTitle = hasFreeFormTitle(effectiveType)
 
+  // `users` is useLabUsers()'s now-filtered roster: it can omit the meeting's
+  // stored presenter entirely (graduated, unmapped in Keycloak, etc). Falling
+  // back OUT of the list would misreport a real presenter as unassigned
+  // (「（未指定）」), so fall back INTO it instead by appending a synthetic
+  // option carrying the meeting's own stored name. Display only — handleSave
+  // below keeps its own `??` fallback to meeting.presenter as defence in
+  // depth.
+  const presenterOptions = useMemo(
+    () =>
+      meeting.presenterUserId &&
+      !users.some((u) => u.id === meeting.presenterUserId)
+        ? [...users, { id: meeting.presenterUserId, name: meeting.presenter }]
+        : users,
+    [users, meeting.presenterUserId, meeting.presenter]
+  )
+
   const selectedPaper = papers.find((p) => p.id === teacherPaperId) ?? null
   const paperTitle = selectedPaper?.paperName ?? ""
   const uploadTitle = isFreeTitle ? freeTitle : paperTitle
@@ -404,7 +420,7 @@ export function MeetingEditDialog({
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
               <PresenterSelect
-                users={users}
+                users={presenterOptions}
                 value={presenterUserId}
                 onSelect={setPresenterUserId}
               />
