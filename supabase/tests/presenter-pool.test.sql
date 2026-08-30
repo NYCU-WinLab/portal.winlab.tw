@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(45);
+select plan(46);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -364,6 +364,55 @@ delete from public.meeting_presenter_pool
   where user_id in ('d0000000-0000-0000-0000-000000000001',
                     'd0000000-0000-0000-0000-000000000002',
                     'd0000000-0000-0000-0000-000000000003');
+
+-- ── fill_presenters 也要吃 tier 順序 ────────────────────────────────────────
+-- 兩個空白週 + 兩位候選人：博士(民國115，入學較晚) 與 碩士(民國113，入學較早)。
+-- 舊排序會讓碩士先拿到第一週；新排序必須讓博士先拿到。
+-- Note: (113, 1) is already taken at this point by bbbbbbbb-...-011 (see the
+-- `meetings_pool_upsert` restore two blocks up, after the pool was emptied at
+-- line 276) — the master candidate here uses (113, 2) instead. The brief's
+-- literal sort_order for the master collides with that leftover row; the
+-- admission years (115 later, 113 earlier) are what the assertion needs and
+-- are kept exactly as specified.
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000011'),  -- 管理員
+  ('d0000000-0000-0000-0000-000000000012'),  -- 博士，民國 115
+  ('d0000000-0000-0000-0000-000000000013');  -- 碩士，民國 113
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('d0000000-0000-0000-0000-000000000011', 'dadmin@test.local', 'D Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000012', 'd12@test.local', 'Fill Doc',    '{}'::jsonb, 'doctoral'),
+  ('d0000000-0000-0000-0000-000000000013', 'd13@test.local', 'Fill Master', '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000012', 115, 1),
+  ('d0000000-0000-0000-0000-000000000013', 113, 2);
+
+-- 未來日期寫死，避免測試隨時鐘飄移。fill 只碰 scheduled_date >= 今天(台北)。
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values
+  ('d0000000-0000-0000-0000-0000000000a1', 2099, 'T2 第1週', '2099-03-02', false, false),
+  ('d0000000-0000-0000-0000-0000000000a2', 2099, 'T2 第2週', '2099-03-09', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000011"}', true);
+
+select public.meetings_fill_presenters(2099);
+
+reset role;
+
+select is(
+  (select presenter from public.meetings
+   where id = 'd0000000-0000-0000-0000-0000000000a1'),
+  'Fill Doc',
+  'fill_presenters walks the roster in tier order: the later-admitted doctoral student takes the first week'
+);
+
+delete from public.meetings where year = 2099;
+delete from public.meeting_presenter_pool
+  where user_id in ('d0000000-0000-0000-0000-000000000012',
+                    'd0000000-0000-0000-0000-000000000013');
 
 select * from finish();
 rollback;
