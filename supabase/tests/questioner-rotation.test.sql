@@ -650,7 +650,7 @@ insert into public.user_profiles (id, email, name, roles) values
 -- him, so the loss is real and observable — not masked by the same-call
 -- backfill the way a naive test would be.
 insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000012', 2026, current_date + 30, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter
+  ('10000000-0000-0000-0000-000000000012', 2026, current_date + 31, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter (current_date + 30 is scenario 9's mFuture, above)
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('00000000-0000-0000-0000-000000000101', '2020-12-01 00:00:01+00'),
