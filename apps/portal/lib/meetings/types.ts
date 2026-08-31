@@ -1,3 +1,5 @@
+import { parseLabStatus, type LabStatus } from "@/lib/meetings/lab-status"
+
 export interface Meeting {
   id: string
   year: number
@@ -57,6 +59,8 @@ export interface PresenterPoolMember {
   poolAddedAt: string
   lastPresentedDate: string | null
   timesPresented: number
+  labStatus: LabStatus | null
+  tierRank: number
 }
 
 export interface MeetingQuestioner {
@@ -152,6 +156,8 @@ export interface DbPresenterPoolMember {
   pool_added_at: string
   last_presented_date: string | null
   times_presented: number
+  lab_status: string | null
+  tier_rank: number
 }
 
 export function toPresenterPoolMember(
@@ -166,6 +172,8 @@ export function toPresenterPoolMember(
     poolAddedAt: row.pool_added_at,
     lastPresentedDate: row.last_presented_date,
     timesPresented: row.times_presented,
+    labStatus: parseLabStatus(row.lab_status),
+    tierRank: row.tier_rank,
   }
 }
 

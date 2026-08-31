@@ -22,10 +22,13 @@ export function usePresenterPool() {
     queryFn: async (): Promise<PresenterPoolMember[]> => {
       // Explicit ordering rather than the view's: a view's internal ORDER BY
       // is not guaranteed to survive PostgREST's own query planning, and the
-      // running order is the whole point of this table.
+      // running order is the whole point of this table. tier_rank leads —
+      // 博士班 → 碩士 → 大學部 — because intake year alone puts a
+      // later-admitted doctoral student in the middle of the master cohort.
       const { data, error } = await supabase
         .from(VIEW)
         .select("*")
+        .order("tier_rank", { ascending: true })
         .order("admission_year", { ascending: true })
         .order("sort_order", { ascending: true })
       if (error) throw new Error(error.message || "讀取報告順位失敗")

@@ -34,3 +34,28 @@ export function semesterKeyForDate(dateStr: string): SemesterKey {
   const term = month >= 8 || month === 1 ? 1 : 2
   return { academicYear, term }
 }
+
+/**
+ * Which academic year the presenter roster's tier grade labels (`碩二`, …)
+ * should be computed against — "current" meaning the latest semester that
+ * has already started, not the latest by start_date. Those diverge the
+ * moment next year's semester row exists (an admin routinely creates it
+ * months ahead): `semesters.at(-1)` would then report next year's
+ * academicYear while the lab is still living in the current one.
+ *
+ * `today` must be a `YYYY-MM-DD` string already resolved to the lab's
+ * timezone (Asia/Taipei) — this function does no clock reads of its own, so
+ * it stays pure and the caller controls when "now" is sampled.
+ *
+ * Falls back to the newest semester when none has started yet, so a
+ * database seeded with future-only semesters still labels something.
+ * `semesters` is assumed sorted ascending by startDate, same as
+ * useSemesters()'s query order.
+ */
+export function currentAcademicYear(
+  semesters: { academicYear: number; startDate: string }[],
+  today: string
+): number | null {
+  const started = semesters.filter((s) => s.startDate <= today)
+  return (started.at(-1) ?? semesters.at(-1))?.academicYear ?? null
+}

@@ -2603,6 +2603,7 @@ export type Database = {
           email: string | null
           id: string
           is_admin: boolean | null
+          lab_status: string | null
           last_active_platform: string | null
           line_user_id: string | null
           name: string | null
@@ -2618,6 +2619,7 @@ export type Database = {
           email?: string | null
           id: string
           is_admin?: boolean | null
+          lab_status?: string | null
           last_active_platform?: string | null
           line_user_id?: string | null
           name?: string | null
@@ -2633,6 +2635,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean | null
+          lab_status?: string | null
           last_active_platform?: string | null
           line_user_id?: string | null
           name?: string | null
@@ -2731,10 +2734,12 @@ export type Database = {
         Row: {
           admission_year: number | null
           email: string | null
+          lab_status: string | null
           last_presented_date: string | null
           name: string | null
           pool_added_at: string | null
           sort_order: number | null
+          tier_rank: number | null
           times_presented: number | null
           user_id: string | null
         }
@@ -3116,6 +3121,7 @@ export type Database = {
         Args: { p_meeting_id: string }
         Returns: undefined
       }
+      meetings_tier_rank: { Args: { p_status: string }; Returns: number }
       portal_admin_get_users: {
         Args: never
         Returns: {

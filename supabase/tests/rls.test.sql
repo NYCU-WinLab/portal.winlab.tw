@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(19);
+select plan(21);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -48,7 +48,43 @@ select lives_ok(
   'a user can still update non-privileged columns on their own profile'
 );
 
--- 4. game_scores has no INSERT policy → direct writes are denied (must go
+-- 4-5. lab_status write guard (20260830100500): it's the first ordering key
+--    of the presenter roster, so a member forging their own lab_status could
+--    jump the queue for meetings_fill_presenters. prevent_role_escalation
+--    must pin it the same way it already pins roles/is_admin — but the write
+--    itself must not error (it's a legitimate column on an otherwise-normal
+--    profile save), so the assertion is on the STORED value, not on throws_ok.
+update public.user_profiles set lab_status = 'doctoral'
+  where id = '11111111-1111-1111-1111-111111111111';
+select is(
+  (select lab_status from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
+  NULL,
+  'a member cannot self-promote lab_status — the write "succeeds" but the stored value is unchanged'
+);
+
+-- service_role is the deliberate carve-out: the nightly Keycloak sync
+-- (api/cron/kc-lab-status) authenticates as service_role and must still be
+-- able to write this column.
+reset role;
+set local role service_role;
+update public.user_profiles set lab_status = 'doctoral'
+  where id = '11111111-1111-1111-1111-111111111111';
+reset role;
+select is(
+  (select lab_status from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
+  'doctoral',
+  'service_role (the nightly Keycloak sync) can still write lab_status'
+);
+
+-- back to impersonating user A for the rest of the ordinary-user assertions.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+
+-- 6. game_scores has no INSERT policy → direct writes are denied (must go
 --    through the submit_game_score RPC gate)
 select throws_ok(
   $$ insert into public.game_scores (user_id, game_type, score, finish_time_ms)

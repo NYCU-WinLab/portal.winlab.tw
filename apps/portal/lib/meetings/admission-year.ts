@@ -51,3 +51,38 @@ export function admissionYearFromStudentId(
   const year = head < 20 ? head + 100 : head
   return year >= MIN_YEAR && year <= MAX_YEAR ? year : null
 }
+
+// 學制的中文字首。teacher / assistant / alumni 刻意不在表內：他們沒有年級。
+const TIER_PREFIX: Record<string, string> = {
+  doctoral: "博",
+  master: "碩",
+  undergrad: "大",
+}
+
+const GRADE_NUMERAL = ["一", "二", "三", "四", "五", "六", "七", "八"]
+
+/**
+ * `碩二` — 學制加上「入學後第幾年」。純顯示用。
+ *
+ * 排序不需要這個：報告順位的層內順序是 admission_year 升冪，那本身就是年級由高
+ * 到低，博士班也一樣。這裡只是把兩個數字翻成人看得懂的標籤。
+ *
+ * academicYear 與 admissionYear 都是民國年。超出 1..8 一律回 null —— 入學年比
+ * 學年度還晚代表資料有問題，編一個名字出來只會掩蓋它。academicYear 允許 null
+ * ——呼叫端（目前學期尚未載入完成，或資料庫還沒有任何學期列）可能還沒有答案，
+ * 讓這個函式自己吞掉 null 而不是要求呼叫端用 `&&`/`??` 兜，那種寫法在
+ * academicYear 是 null 時會短路成 `false`，而 `false ?? fallback` 仍是
+ * `false`——react 把它渲染成空白，讓後備標籤永遠跑不到。
+ */
+export function tierGradeLabel(
+  labStatus: string | null,
+  academicYear: number | null,
+  admissionYear: number
+): string | null {
+  if (academicYear === null) return null
+  const prefix = labStatus ? TIER_PREFIX[labStatus] : undefined
+  if (!prefix) return null
+  const grade = academicYear - admissionYear + 1
+  if (grade < 1 || grade > GRADE_NUMERAL.length) return null
+  return `${prefix}${GRADE_NUMERAL[grade - 1]}`
+}

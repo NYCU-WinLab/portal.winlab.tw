@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(41);
+select plan(52);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -313,6 +313,234 @@ select is(
 select is(
   (select presenter from public.meetings where scheduled_date = '2035-01-01'),
   'A', 'the earlier presentation of that paper is untouched');
+
+-- ── tier ordering: 學制優先於入學年 ──────────────────────────────────────────
+-- 一位入學年「較晚」的博士生，必須排在所有碩士之前。這正是舊排序
+-- (admission_year, sort_order) 排不出來的情況 —— 現行資料排對純屬巧合，
+-- 因為唯一的博士生剛好入學年最早。
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000001'),  -- 博士，民國 115（較晚）
+  ('d0000000-0000-0000-0000-000000000002'),  -- 碩士，民國 113（較早）
+  ('d0000000-0000-0000-0000-000000000003');  -- 大學部，民國 114
+
+insert into public.user_profiles (id, email, name, lab_status) values
+  ('d0000000-0000-0000-0000-000000000001', 'd1@test.local', 'Doc Late',   'doctoral'),
+  ('d0000000-0000-0000-0000-000000000002', 'd2@test.local', 'Master Early','master'),
+  ('d0000000-0000-0000-0000-000000000003', 'd3@test.local', 'Undergrad',  'undergrad');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000001', 115, 1),
+  ('d0000000-0000-0000-0000-000000000002', 113, 2),
+  ('d0000000-0000-0000-0000-000000000003', 114, 2);
+
+select is(
+  public.meetings_tier_rank('doctoral'), 0,
+  'meetings_tier_rank: doctoral is 0'
+);
+
+select is(
+  public.meetings_tier_rank(null), 3,
+  'meetings_tier_rank: NULL falls to the trailing bucket'
+);
+
+select is(
+  (select array_agg(name order by tier_rank asc, admission_year asc, sort_order asc, user_id asc)
+   from public.meeting_presenter_roster
+   where user_id in ('d0000000-0000-0000-0000-000000000001',
+                     'd0000000-0000-0000-0000-000000000002',
+                     'd0000000-0000-0000-0000-000000000003')),
+  array['Doc Late', 'Master Early', 'Undergrad'],
+  'roster tier order puts a LATER-admitted doctoral student ahead of an EARLIER-admitted master'
+);
+
+select is(
+  (select lab_status from public.meeting_presenter_roster
+   where user_id = 'd0000000-0000-0000-0000-000000000001'),
+  'doctoral',
+  'roster exposes lab_status'
+);
+
+delete from public.meeting_presenter_pool
+  where user_id in ('d0000000-0000-0000-0000-000000000001',
+                    'd0000000-0000-0000-0000-000000000002',
+                    'd0000000-0000-0000-0000-000000000003');
+
+-- ── fill_presenters 也要吃 tier 順序 ────────────────────────────────────────
+-- 兩個空白週 + 兩位候選人：博士(民國115，入學較晚) 與 碩士(民國113，入學較早)。
+-- 舊排序會讓碩士先拿到第一週；新排序必須讓博士先拿到。
+-- Note: (113, 1) is already taken at this point by bbbbbbbb-...-011 (see the
+-- `meetings_pool_upsert` restore two blocks up, after the pool was emptied at
+-- line 276) — the master candidate here uses (113, 2) instead. The brief's
+-- literal sort_order for the master collides with that leftover row; the
+-- admission years (115 later, 113 earlier) are what the assertion needs and
+-- are kept exactly as specified.
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000011'),  -- 管理員
+  ('d0000000-0000-0000-0000-000000000012'),  -- 博士，民國 115
+  ('d0000000-0000-0000-0000-000000000013');  -- 碩士，民國 113
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('d0000000-0000-0000-0000-000000000011', 'dadmin@test.local', 'D Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000012', 'd12@test.local', 'Fill Doc',    '{}'::jsonb, 'doctoral'),
+  ('d0000000-0000-0000-0000-000000000013', 'd13@test.local', 'Fill Master', '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000012', 115, 1),
+  ('d0000000-0000-0000-0000-000000000013', 113, 2);
+
+-- 未來日期寫死，避免測試隨時鐘飄移。fill 只碰 scheduled_date >= 今天(台北)。
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values
+  ('d0000000-0000-0000-0000-0000000000a1', 2099, 'T2 第1週', '2099-03-02', false, false),
+  ('d0000000-0000-0000-0000-0000000000a2', 2099, 'T2 第2週', '2099-03-09', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000011"}', true);
+
+select public.meetings_fill_presenters(2099);
+
+reset role;
+
+select is(
+  (select presenter from public.meetings
+   where id = 'd0000000-0000-0000-0000-0000000000a1'),
+  'Fill Doc',
+  'fill_presenters walks the roster in tier order: the later-admitted doctoral student takes the first week'
+);
+
+-- Without this, an implementation that assigned the doctoral student to
+-- EVERY week (rather than cycling to the next roster member) would still
+-- pass the assertion above.
+select is(
+  (select presenter from public.meetings
+   where id = 'd0000000-0000-0000-0000-0000000000a2'),
+  'Fill Master',
+  'fill_presenters moves on to the next roster member for the second week'
+);
+
+delete from public.meetings where year = 2099;
+delete from public.meeting_presenter_pool
+  where user_id in ('d0000000-0000-0000-0000-000000000012',
+                    'd0000000-0000-0000-0000-000000000013');
+
+-- ── move 只在同一層內找鄰居 ─────────────────────────────────────────────────
+-- 同一個入學年裡放一位博士與兩位碩士。博士是他那一層的唯一成員，所以往上移
+-- 應該是 no-op；碩士的順序不能被他動到。
+insert into auth.users (id) values
+  ('d0000000-0000-0000-0000-000000000021'),  -- 管理員
+  ('d0000000-0000-0000-0000-000000000022'),  -- 博士，民國 116
+  ('d0000000-0000-0000-0000-000000000023'),  -- 碩士，民國 116
+  ('d0000000-0000-0000-0000-000000000024');  -- 碩士，民國 116
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('d0000000-0000-0000-0000-000000000021', 'madmin@test.local', 'M Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000022', 'm22@test.local', 'Mixed Doc', '{}'::jsonb, 'doctoral'),
+  ('d0000000-0000-0000-0000-000000000023', 'm23@test.local', 'Mixed M1',  '{}'::jsonb, 'master'),
+  ('d0000000-0000-0000-0000-000000000024', 'm24@test.local', 'Mixed M2',  '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('d0000000-0000-0000-0000-000000000023', 116, 1),
+  ('d0000000-0000-0000-0000-000000000024', 116, 2),
+  ('d0000000-0000-0000-0000-000000000022', 116, 3);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000021","role":"authenticated"}', true);
+
+-- 博士生往上移：他那一層只有他，應該什麼都不做。
+select public.meetings_pool_move('d0000000-0000-0000-0000-000000000022', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'd0000000-0000-0000-0000-000000000024'),
+  2,
+  'moving the only member of a tier does not shuffle a member of another tier'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"d0000000-0000-0000-0000-000000000021","role":"authenticated"}', true);
+
+-- 碩士之間的搬移照舊有效。
+select public.meetings_pool_move('d0000000-0000-0000-0000-000000000024', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'd0000000-0000-0000-0000-000000000024'),
+  1,
+  'moving within a tier still swaps with the adjacent same-tier member'
+);
+
+delete from public.meeting_presenter_pool where admission_year = 116;
+
+-- ── move skips past an intervening different-tier member to the NEAREST
+--    same-tier neighbour, not merely one that happens to sit at ± 1 ────────
+-- Tiers interleaved by sort_order within one intake year: doctoral@1,
+-- master@2, doctoral@3, master@4. Moving doctoral@3 up must land it at
+-- position 1 (trading with doctoral@1), skipping straight over master@2 —
+-- not a no-op, and not a swap with master@2. An implementation that simply
+-- ANDs a tier check onto the OLD `sort_order = current + p_delta` predicate
+-- would look for a same-tier row at sort_order = 2, find none (it's a
+-- master), and wrongly no-op: mover stays at 3, target stays at 1, and the
+-- intervening master's position would be the only thing "consistent" with
+-- both a correct and a naive implementation — which is why it is asserted
+-- unchanged rather than used to distinguish them.
+insert into auth.users (id) values
+  ('f0000000-0000-0000-0000-000000000001'),  -- 管理員
+  ('f0000000-0000-0000-0000-000000000002'),  -- 博士，民國 118 (target)
+  ('f0000000-0000-0000-0000-000000000003'),  -- 碩士，民國 118 (intervening)
+  ('f0000000-0000-0000-0000-000000000004'),  -- 博士，民國 118 (mover)
+  ('f0000000-0000-0000-0000-000000000005');  -- 碩士，民國 118
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('f0000000-0000-0000-0000-000000000001', 'fadmin@test.local', 'F Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('f0000000-0000-0000-0000-000000000002', 'f2@test.local', 'Interleave Doc A', '{}'::jsonb, 'doctoral'),
+  ('f0000000-0000-0000-0000-000000000003', 'f3@test.local', 'Interleave M1',    '{}'::jsonb, 'master'),
+  ('f0000000-0000-0000-0000-000000000004', 'f4@test.local', 'Interleave Doc B', '{}'::jsonb, 'doctoral'),
+  ('f0000000-0000-0000-0000-000000000005', 'f5@test.local', 'Interleave M2',    '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('f0000000-0000-0000-0000-000000000002', 118, 1),
+  ('f0000000-0000-0000-0000-000000000003', 118, 2),
+  ('f0000000-0000-0000-0000-000000000004', 118, 3),
+  ('f0000000-0000-0000-0000-000000000005', 118, 4);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"f0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+-- doctoral@3 往上移：他那一層在該方向唯一的候選是 doctoral@1，中間隔著一位碩士。
+select public.meetings_pool_move('f0000000-0000-0000-0000-000000000004', -1);
+
+reset role;
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000004'),
+  1,
+  'the mover reaches the nearest same-tier neighbour, skipping the intervening tier'
+);
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000002'),
+  3,
+  'the same-tier target takes the mover''s old position, not merely vacates its own'
+);
+
+select is(
+  (select sort_order from public.meeting_presenter_pool
+   where user_id = 'f0000000-0000-0000-0000-000000000003'),
+  2,
+  'the intervening different-tier member sitting between them is left untouched'
+);
+
+delete from public.meeting_presenter_pool where admission_year = 118;
 
 select * from finish();
 rollback;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   IconChevronDown,
@@ -18,30 +18,62 @@ import {
   useRemovePresenter,
   useUpsertPresenter,
 } from "@/hooks/meetings/use-presenter-pool"
+import { useSemesters } from "@/hooks/meetings/use-semesters"
 import {
   admissionYearLabel,
   parseAdmissionYear,
+  tierGradeLabel,
 } from "@/lib/meetings/admission-year"
+import { currentAcademicYear } from "@/lib/meetings/semester"
 import type { PresenterPoolMember } from "@/lib/meetings/types"
 
 import { suggestAdmissionYear } from "../actions"
 import { ConfirmDialog } from "./confirm-dialog"
 
-function groupByCohort(pool: PresenterPoolMember[]) {
-  const cohorts = new Map<number, PresenterPoolMember[]>()
+/**
+ * 先依學制分層，層內再依入學年分組。兩層都用 tier_rank / admission_year 升冪，
+ * 與 meetings_fill_presenters 走訪順位名單的順序一致。
+ */
+function groupByTierAndCohort(pool: PresenterPoolMember[]) {
+  const tiers = new Map<number, Map<number, PresenterPoolMember[]>>()
   for (const member of pool) {
+    const cohorts = tiers.get(member.tierRank) ?? new Map()
     const list = cohorts.get(member.admissionYear) ?? []
     list.push(member)
     cohorts.set(member.admissionYear, list)
+    tiers.set(member.tierRank, cohorts)
   }
-  // Seniors first: the lab's convention is that the earlier intake presents
-  // first, and meetings_fill_presenters walks the roster in this same order.
-  return [...cohorts.entries()].sort((a, b) => a[0] - b[0])
+  return [...tiers.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(
+      ([tierRank, cohorts]) =>
+        [tierRank, [...cohorts.entries()].sort((a, b) => a[0] - b[0])] as const
+    )
 }
 
 export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
-  const { data: pool = [], isLoading } = usePresenterPool()
-  const { data: labUsers = [] } = useLabUsers()
+  const {
+    data: pool = [],
+    isLoading,
+    isError: poolIsError,
+  } = usePresenterPool()
+  const {
+    data: labUsers = [],
+    isSuccess: labUsersLoaded,
+    isError: labUsersIsError,
+  } = useLabUsers()
+  const { data: semesters = [] } = useSemesters()
+  // See lib/meetings/semester.ts's currentAcademicYear doc comment for why
+  // "current" means the latest semester that has already started, not the
+  // latest by start_date. Compared against today in Asia/Taipei, same as
+  // use-schedule-years.ts, since the DB session runs in UTC. Memoized so the
+  // date is read once per render pass rather than inside the JSX expression.
+  const academicYear = useMemo(() => {
+    const today = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Taipei",
+    }).format(new Date())
+    return currentAcademicYear(semesters, today)
+  }, [semesters])
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()
@@ -60,9 +92,22 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
   }
 
+  // Checked before any empty-state logic: on a query error `isLoading` is
+  // false and `data` defaults to `[]`, so without this the panel would fall
+  // through to the empty-state branch below — including the sync-problem
+  // hint, which would then confidently misdiagnose a Supabase outage as a
+  // cron failure.
+  if (poolIsError || labUsersIsError) {
+    return (
+      <p className="text-sm text-destructive">
+        讀取報告順位名單失敗，請重新整理頁面再試一次
+      </p>
+    )
+  }
+
   const pooled = new Set(pool.map((m) => m.userId))
   const candidates = labUsers.filter((u) => !pooled.has(u.id))
-  const cohorts = groupByCohort(pool)
+  const tiers = groupByTierAndCohort(pool)
   const parsedYear = parseAdmissionYear(year)
 
   async function pick(user: { id: string; name: string | null }) {
@@ -146,9 +191,16 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
           {!picked ? (
             <div className="flex flex-wrap gap-1.5">
               {candidates.length === 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  所有成員皆已加入
-                </span>
+                labUsersLoaded && labUsers.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    候選名單目前是空的，/api/cron/kc-lab-status
+                    可能尚未成功同步過
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    所有成員皆已加入
+                  </span>
+                )
               ) : (
                 candidates.map((u) => (
                   <button
@@ -209,68 +261,80 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
         <p className="text-xs text-muted-foreground">尚未排定任何報告順位</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {cohorts.map(([cohort, members]) => (
-            <div key={cohort} className="flex flex-col gap-1">
-              <p className="text-xs text-muted-foreground">
-                {admissionYearLabel(cohort)}
-              </p>
-              {members.map((m, i) => (
-                <div
-                  key={m.userId}
-                  className="flex items-center justify-between gap-2 rounded-lg border p-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 text-xs text-muted-foreground">
-                      {m.sortOrder}
-                    </span>
-                    <span className="text-sm font-medium">{m.name ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="mr-2 text-xs text-muted-foreground">
-                      已報告 {m.timesPresented} 次
-                    </span>
-                    {isAdmin && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === 0 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: -1 })
-                          }
-                        >
-                          <IconChevronUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === members.length - 1 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: 1 })
-                          }
-                        >
-                          <IconChevronDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
+          {tiers.map(([tierRank, cohorts]) => (
+            <div key={tierRank} className="flex flex-col gap-1">
+              {cohorts.map(([cohort, members]) => (
+                <div key={cohort} className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground">
+                    {tierGradeLabel(
+                      members[0]?.labStatus ?? null,
+                      academicYear,
+                      cohort
+                    ) ?? admissionYearLabel(cohort)}
+                  </p>
+                  {members.map((m, i) => (
+                    <div
+                      key={m.userId}
+                      className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-xs text-muted-foreground">
+                          {m.sortOrder}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {m.name ?? "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="mr-2 text-xs text-muted-foreground">
+                          已報告 {m.timesPresented} 次
+                        </span>
+                        {isAdmin && (
+                          <>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={i === 0 || move.isPending}
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: -1 })
+                              }
                             >
-                              <IconTrash className="h-3.5 w-3.5" />
+                              <IconChevronUp className="h-3.5 w-3.5" />
                             </Button>
-                          }
-                          title="移出報告順位？"
-                          description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
-                          variant="destructive"
-                          onConfirm={() => remove.mutate(m.userId)}
-                        />
-                      </>
-                    )}
-                  </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={
+                                i === members.length - 1 || move.isPending
+                              }
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: 1 })
+                              }
+                            >
+                              <IconChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <ConfirmDialog
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                >
+                                  <IconTrash className="h-3.5 w-3.5" />
+                                </Button>
+                              }
+                              title="移出報告順位？"
+                              description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
+                              variant="destructive"
+                              onConfirm={() => remove.mutate(m.userId)}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
