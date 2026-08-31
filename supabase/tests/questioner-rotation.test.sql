@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(43);
+select plan(48);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -758,6 +758,104 @@ select ok(
 
 delete from public.meeting_question_pool where user_id = '00000000-0000-0000-0000-000000000022';
 delete from public.meeting_presenter_pool where user_id = '00000000-0000-0000-0000-000000000012';
+
+-- ═══ 在籍成員才會被排提問 ════════════════════════════════════════════════════
+--
+-- The views deliberately keep every row and merely report is_active, so the
+-- "額外提問成員" panel can still list — and let an admin remove — someone the
+-- automation now skips. Filtering the view instead would move the silent
+-- disappearance rather than fix it. The three places that CHOOSE someone
+-- (sync's backfill, sync's future eviction, replace's auto-pick and manual
+-- check) are what filter.
+insert into auth.users (id) values
+  ('a0000000-0000-0000-0000-000000000001'),  -- admin
+  ('a0000000-0000-0000-0000-000000000002'),  -- presenter
+  ('a0000000-0000-0000-0000-000000000003'),  -- active candidate
+  ('a0000000-0000-0000-0000-000000000004'),  -- graduated candidate
+  ('a0000000-0000-0000-0000-000000000005');  -- never synced from Keycloak
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('a0000000-0000-0000-0000-000000000001', 'aadmin@test.local', 'A Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('a0000000-0000-0000-0000-000000000002', 'a2@test.local', 'A Presenter', '{}'::jsonb, 'master'),
+  ('a0000000-0000-0000-0000-000000000003', 'a3@test.local', 'A Active',    '{}'::jsonb, 'master'),
+  ('a0000000-0000-0000-0000-000000000004', 'a4@test.local', 'A Alumni',    '{}'::jsonb, 'alumni'),
+  ('a0000000-0000-0000-0000-000000000005', 'a5@test.local', 'A Unsynced',  '{}'::jsonb, null);
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('a0000000-0000-0000-0000-000000000003', '2021-01-01 00:00:01+00'),
+  ('a0000000-0000-0000-0000-000000000004', '2021-01-01 00:00:02+00'),
+  ('a0000000-0000-0000-0000-000000000005', '2021-01-01 00:00:03+00');
+
+select is(
+  (select is_active from public.meeting_question_rotation
+   where user_id = 'a0000000-0000-0000-0000-000000000004'),
+  false,
+  'the rotation view still lists a graduated member, flagged inactive rather than hidden'
+);
+
+select is(
+  (select is_active from public.meeting_question_pool_members
+   where user_id = 'a0000000-0000-0000-0000-000000000005'),
+  false,
+  'a member with no lab_status is reported inactive by the narrow panel view too'
+);
+
+-- Only one candidate is active, so the backfill can fill exactly one of the
+-- three slots. Before 20260831140200 it would have filled all three.
+insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
+  ('a0000000-0000-0000-0000-0000000000c1', 2094, '2094-03-03', false, 'a0000000-0000-0000-0000-000000000002');
+
+select public.meetings_sync_questioners('a0000000-0000-0000-0000-0000000000c1');
+
+select is(
+  (select array_agg(user_id) from public.meeting_questioners
+   where meeting_id = 'a0000000-0000-0000-0000-0000000000c1'),
+  array['a0000000-0000-0000-0000-000000000003']::uuid[],
+  'the backfill takes only the active candidate and leaves the rest of the slots open'
+);
+
+-- A roster written before someone graduated is not revisited on its own. The
+-- next resync of a FUTURE meeting is where it gets corrected — which also means
+-- a week's roster can change without anyone touching that week.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('a0000000-0000-0000-0000-0000000000c1', 'a0000000-0000-0000-0000-000000000004', 'manual');
+
+select public.meetings_sync_questioners('a0000000-0000-0000-0000-0000000000c1');
+
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'a0000000-0000-0000-0000-0000000000c1'
+      and user_id = 'a0000000-0000-0000-0000-000000000004'
+  ),
+  'a questioner still in the pool but no longer in the lab is evicted from a future meeting'
+);
+
+-- The manual path gets its own message. An admin looking at a name they can
+-- still see in the panel deserves to be told which of the two reasons applies.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001"}', true);
+
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       'a0000000-0000-0000-0000-0000000000c1',
+       'a0000000-0000-0000-0000-000000000003',
+       'a0000000-0000-0000-0000-000000000004') $$,
+  'P0001',
+  '替補人選已非在籍成員(已畢業,或尚未從 Keycloak 同步到身分)',
+  'a manual replacement who has left the lab is rejected, and told apart from one who was never in the pool'
+);
+
+reset role;
+
+delete from public.meeting_questioners
+  where meeting_id = 'a0000000-0000-0000-0000-0000000000c1';
+delete from public.meetings where id = 'a0000000-0000-0000-0000-0000000000c1';
+delete from public.meeting_question_pool
+  where user_id in ('a0000000-0000-0000-0000-000000000003',
+                    'a0000000-0000-0000-0000-000000000004',
+                    'a0000000-0000-0000-0000-000000000005');
 
 select * from finish();
 rollback;

@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(52);
+select plan(58);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -556,6 +556,164 @@ select is(
 );
 
 delete from public.meeting_presenter_pool where admission_year = 118;
+
+-- ═══ 在籍成員才會被排報告 ════════════════════════════════════════════════════
+--
+-- Until 20260831140000 nothing in SQL knew what 'alumni' meant. A graduated
+-- member stayed a candidate and merely sorted last, so once the active members
+-- had each taken a week the roster wrapped around and started handing weeks to
+-- people who had left. NULL is excluded on the same footing — see that
+-- migration's header for why that is a deliberate and slightly dangerous call.
+insert into auth.users (id) values
+  ('e0000000-0000-0000-0000-000000000001'),  -- admin
+  ('e0000000-0000-0000-0000-000000000002'),  -- the only active candidate
+  ('e0000000-0000-0000-0000-000000000003'),  -- graduated
+  ('e0000000-0000-0000-0000-000000000004');  -- never synced from Keycloak
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('e0000000-0000-0000-0000-000000000001', 'eadmin@test.local', 'E Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('e0000000-0000-0000-0000-000000000002', 'e2@test.local', 'E Active', '{}'::jsonb, 'doctoral'),
+  ('e0000000-0000-0000-0000-000000000003', 'e3@test.local', 'E Alumni', '{}'::jsonb, 'alumni'),
+  ('e0000000-0000-0000-0000-000000000004', 'e4@test.local', 'E Unsynced', '{}'::jsonb, null);
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('e0000000-0000-0000-0000-000000000002', 120, 1),
+  ('e0000000-0000-0000-0000-000000000003', 120, 2),
+  ('e0000000-0000-0000-0000-000000000004', 120, 3);
+
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values
+  ('e0000000-0000-0000-0000-0000000000a1', 2091, 'E 第1週', '2091-03-05', false, false),
+  ('e0000000-0000-0000-0000-0000000000a2', 2091, 'E 第2週', '2091-03-12', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"e0000000-0000-0000-0000-000000000001"}', true);
+
+select public.meetings_fill_presenters(2091) as e_result \gset
+
+reset role;
+
+select is(
+  (select presenter from public.meetings
+   where id = 'e0000000-0000-0000-0000-0000000000a1'),
+  'E Active',
+  'fill_presenters schedules the active member'
+);
+
+-- The pool holds three people and only one is active, so the roster wraps
+-- after one week. If alumni were merely sorted last rather than excluded, this
+-- is the week they would get.
+select is(
+  (select presenter from public.meetings
+   where id = 'e0000000-0000-0000-0000-0000000000a2'),
+  'E Active',
+  'the roster wraps back to the active member rather than reaching a graduated one'
+);
+
+select is(
+  ((:'e_result')::jsonb ->> 'excluded')::int,
+  2,
+  'fill_presenters reports how many pool members it skipped'
+);
+
+-- An empty pool and a pool of nothing but graduates both used to answer
+-- {"filled": 0, "poolSize": 0}. The admin pressing the button needs to be able
+-- to tell "nobody is in the pool" from "everyone in it has left or has not
+-- synced yet", because the fix is completely different.
+delete from public.meeting_presenter_pool
+  where user_id = 'e0000000-0000-0000-0000-000000000002';
+
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values ('e0000000-0000-0000-0000-0000000000a3', 2092, 'E 第3週', '2092-03-04', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"e0000000-0000-0000-0000-000000000001"}', true);
+
+select public.meetings_fill_presenters(2092) as e_empty \gset
+
+reset role;
+
+select is(
+  (:'e_empty')::jsonb,
+  '{"filled": 0, "poolSize": 0, "excluded": 2}'::jsonb,
+  'a pool with no active members is reported as such, not as an empty pool'
+);
+
+delete from public.meetings where id::text like 'e0000000-0000-0000-0000-0000000000a%';
+delete from public.meeting_presenter_pool where admission_year = 120;
+
+-- ═══ 分批排定要接續，不是每次從頭 ═══════════════════════════════════════════
+--
+-- v_index used to start at 0 on every call while the loop only visits weeks
+-- with no presenter, so filling a term in two goes replayed the top of the
+-- roster each time. Since 20260830100100 the top of the roster is always the
+-- doctoral tier, so the same people collected the extra talks — and because the
+-- questioner rate's denominator subtracts weeks you present, extra talks turn
+-- into LESS questioning duty. A presentation-order preference was leaking into
+-- questioning load.
+insert into auth.users (id) values
+  ('e1000000-0000-0000-0000-000000000001'),
+  ('e1000000-0000-0000-0000-000000000002'),
+  ('e1000000-0000-0000-0000-000000000003'),
+  ('e1000000-0000-0000-0000-000000000004');
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('e1000000-0000-0000-0000-000000000001', 'radm@test.local', 'R Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
+  ('e1000000-0000-0000-0000-000000000002', 'r1@test.local', 'R One',   '{}'::jsonb, 'master'),
+  ('e1000000-0000-0000-0000-000000000003', 'r2@test.local', 'R Two',   '{}'::jsonb, 'master'),
+  ('e1000000-0000-0000-0000-000000000004', 'r3@test.local', 'R Three', '{}'::jsonb, 'master');
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
+  ('e1000000-0000-0000-0000-000000000002', 121, 1),
+  ('e1000000-0000-0000-0000-000000000003', 121, 2),
+  ('e1000000-0000-0000-0000-000000000004', 121, 3);
+
+-- First batch: two weeks exist, so R One and R Two take them.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values
+  ('e1000000-0000-0000-0000-0000000000b1', 2093, 'R 第1週', '2093-03-02', false, false),
+  ('e1000000-0000-0000-0000-0000000000b2', 2093, 'R 第2週', '2093-03-09', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"e1000000-0000-0000-0000-000000000001"}', true);
+
+select public.meetings_fill_presenters(2093);
+
+reset role;
+
+-- Second batch: the rest of the term is generated later and filled again.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+values
+  ('e1000000-0000-0000-0000-0000000000b3', 2093, 'R 第3週', '2093-03-16', false, false),
+  ('e1000000-0000-0000-0000-0000000000b4', 2093, 'R 第4週', '2093-03-23', false, false);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"e1000000-0000-0000-0000-000000000001"}', true);
+
+select public.meetings_fill_presenters(2093);
+
+reset role;
+
+select is(
+  (select presenter from public.meetings
+   where id = 'e1000000-0000-0000-0000-0000000000b3'),
+  'R Three',
+  'a second fill continues after the last assigned week instead of restarting the roster'
+);
+
+select is(
+  (select presenter from public.meetings
+   where id = 'e1000000-0000-0000-0000-0000000000b4'),
+  'R One',
+  'and then wraps, so two batches produce the same sequence as one'
+);
+
+delete from public.meetings where id::text like 'e1000000-0000-0000-0000-0000000000b%';
+delete from public.meeting_presenter_pool where admission_year = 121;
 
 select * from finish();
 rollback;
