@@ -559,27 +559,33 @@ delete from public.meeting_presenter_pool where admission_year = 118;
 
 -- ═══ 在籍成員才會被排報告 ════════════════════════════════════════════════════
 --
--- Until 20260831140000 nothing in SQL knew what 'alumni' meant. A graduated
--- member stayed a candidate and merely sorted last, so once the active members
+-- The rotation is 碩士生 and 博士生 only (the lab's rule, 2026-08-31). Until
+-- 20260831140000 no SQL knew any of that: every pool row was a candidate, and a
+-- graduated or non-grad member merely sorted last — so once the grad students
 -- had each taken a week the roster wrapped around and started handing weeks to
--- people who had left. NULL is excluded on the same footing — see that
--- migration's header for why that is a deliberate and slightly dangerous call.
+-- people who should never have been in it.
 insert into auth.users (id) values
   ('e0000000-0000-0000-0000-000000000001'),  -- admin
-  ('e0000000-0000-0000-0000-000000000002'),  -- the only active candidate
+  ('e0000000-0000-0000-0000-000000000002'),  -- the only eligible candidate
   ('e0000000-0000-0000-0000-000000000003'),  -- graduated
-  ('e0000000-0000-0000-0000-000000000004');  -- never synced from Keycloak
+  ('e0000000-0000-0000-0000-000000000004'),  -- never synced from Keycloak
+  ('e0000000-0000-0000-0000-000000000005'),  -- 助理
+  ('e0000000-0000-0000-0000-000000000006');  -- 大學部
 
 insert into public.user_profiles (id, email, name, roles, lab_status) values
   ('e0000000-0000-0000-0000-000000000001', 'eadmin@test.local', 'E Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
   ('e0000000-0000-0000-0000-000000000002', 'e2@test.local', 'E Active', '{}'::jsonb, 'doctoral'),
   ('e0000000-0000-0000-0000-000000000003', 'e3@test.local', 'E Alumni', '{}'::jsonb, 'alumni'),
-  ('e0000000-0000-0000-0000-000000000004', 'e4@test.local', 'E Unsynced', '{}'::jsonb, null);
+  ('e0000000-0000-0000-0000-000000000004', 'e4@test.local', 'E Unsynced', '{}'::jsonb, null),
+  ('e0000000-0000-0000-0000-000000000005', 'e5@test.local', 'E Assistant', '{}'::jsonb, 'assistant'),
+  ('e0000000-0000-0000-0000-000000000006', 'e6@test.local', 'E Undergrad', '{}'::jsonb, 'undergrad');
 
 insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) values
   ('e0000000-0000-0000-0000-000000000002', 120, 1),
   ('e0000000-0000-0000-0000-000000000003', 120, 2),
-  ('e0000000-0000-0000-0000-000000000004', 120, 3);
+  ('e0000000-0000-0000-0000-000000000004', 120, 3),
+  ('e0000000-0000-0000-0000-000000000005', 120, 4),
+  ('e0000000-0000-0000-0000-000000000006', 120, 5);
 
 insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
 values
@@ -601,19 +607,19 @@ select is(
   'fill_presenters schedules the active member'
 );
 
--- The pool holds three people and only one is active, so the roster wraps
--- after one week. If alumni were merely sorted last rather than excluded, this
--- is the week they would get.
+-- The pool holds five people and only one is eligible, so the roster wraps
+-- after one week. If the others were merely sorted last rather than excluded,
+-- this is the week one of them would get.
 select is(
   (select presenter from public.meetings
    where id = 'e0000000-0000-0000-0000-0000000000a2'),
   'E Active',
-  'the roster wraps back to the active member rather than reaching a graduated one'
+  'the roster wraps back to the grad student rather than reaching a graduate, an assistant or an undergrad'
 );
 
 select is(
   ((:'e_result')::jsonb ->> 'excluded')::int,
-  2,
+  4,
   'fill_presenters reports how many pool members it skipped'
 );
 
@@ -637,8 +643,8 @@ reset role;
 
 select is(
   (:'e_empty')::jsonb,
-  '{"filled": 0, "poolSize": 0, "excluded": 2}'::jsonb,
-  'a pool with no active members is reported as such, not as an empty pool'
+  '{"filled": 0, "poolSize": 0, "excluded": 4}'::jsonb,
+  'a pool with nobody eligible is reported as such, not as an empty pool'
 );
 
 delete from public.meetings where id::text like 'e0000000-0000-0000-0000-0000000000a%';

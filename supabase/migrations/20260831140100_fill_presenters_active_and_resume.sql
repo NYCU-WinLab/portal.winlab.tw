@@ -1,15 +1,15 @@
 -- Redeclared whole from 20260830100100_meetings_fill_presenters_tier.sql:7.
 -- Three changes, everything else byte-for-byte:
 --
---   1. The roster is now built from ACTIVE members only. Before this, a
---      graduated member stayed a candidate and simply sorted last, so a pool
---      whose tail is alumni still handed them weeks once the active members
---      had each taken one.
+--   1. The roster is now built from rotation members only — 碩士生 and 博士生,
+--      per the lab's rule. Before this there was no filter at all: a graduated
+--      member stayed a candidate and simply sorted last, so a pool whose tail
+--      is alumni still handed them weeks once everyone else had taken one.
 --
 --   2. The return carries `excluded`. A pool of twelve alumni and an empty pool
 --      both used to answer {"filled": 0, "poolSize": 0}; the admin pressing the
---      button needs to be able to tell "nobody is in the pool" from "everyone
---      in the pool has graduated or has not synced from Keycloak yet".
+--      button needs to be able to tell "nobody is in the pool" from "nobody in
+--      the pool is a grad student, or their status has not synced yet".
 --      It is returned always, not only when poolSize is 0 — a partial exclusion
 --      is exactly as invisible.
 --
@@ -56,12 +56,12 @@ begin
   into v_roster, v_names
   from public.meeting_presenter_pool p
   join public.user_profiles up on up.id = p.user_id
-  where public.meetings_is_active_member(up.lab_status);
+  where public.meetings_is_rotation_member(up.lab_status);
 
   select count(*)::int into v_excluded
   from public.meeting_presenter_pool p
   join public.user_profiles up on up.id = p.user_id
-  where not public.meetings_is_active_member(up.lab_status);
+  where not public.meetings_is_rotation_member(up.lab_status);
 
   v_size := coalesce(array_length(v_roster, 1), 0);
   if v_size = 0 then

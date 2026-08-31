@@ -3121,7 +3121,7 @@ export type Database = {
         Args: { p_at_meeting_id: string }
         Returns: string
       }
-      meetings_is_active_member: {
+      meetings_is_rotation_member: {
         Args: { p_status: string }
         Returns: boolean
       }

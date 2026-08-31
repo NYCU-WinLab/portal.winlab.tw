@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(50);
+select plan(52);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -772,19 +772,22 @@ insert into auth.users (id) values
   ('a0000000-0000-0000-0000-000000000002'),  -- presenter
   ('a0000000-0000-0000-0000-000000000003'),  -- active candidate
   ('a0000000-0000-0000-0000-000000000004'),  -- graduated candidate
-  ('a0000000-0000-0000-0000-000000000005');  -- never synced from Keycloak
+  ('a0000000-0000-0000-0000-000000000005'),  -- never synced from Keycloak
+  ('a0000000-0000-0000-0000-000000000006');  -- 助理: in the lab, not in the rotation
 
 insert into public.user_profiles (id, email, name, roles, lab_status) values
   ('a0000000-0000-0000-0000-000000000001', 'aadmin@test.local', 'A Admin', '{"meetings":["admin"]}'::jsonb, 'master'),
   ('a0000000-0000-0000-0000-000000000002', 'a2@test.local', 'A Presenter', '{}'::jsonb, 'master'),
   ('a0000000-0000-0000-0000-000000000003', 'a3@test.local', 'A Active',    '{}'::jsonb, 'master'),
   ('a0000000-0000-0000-0000-000000000004', 'a4@test.local', 'A Alumni',    '{}'::jsonb, 'alumni'),
-  ('a0000000-0000-0000-0000-000000000005', 'a5@test.local', 'A Unsynced',  '{}'::jsonb, null);
+  ('a0000000-0000-0000-0000-000000000005', 'a5@test.local', 'A Unsynced',  '{}'::jsonb, null),
+  ('a0000000-0000-0000-0000-000000000006', 'a6@test.local', 'A Assistant', '{}'::jsonb, 'assistant');
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('a0000000-0000-0000-0000-000000000003', '2021-01-01 00:00:01+00'),
   ('a0000000-0000-0000-0000-000000000004', '2021-01-01 00:00:02+00'),
-  ('a0000000-0000-0000-0000-000000000005', '2021-01-01 00:00:03+00');
+  ('a0000000-0000-0000-0000-000000000005', '2021-01-01 00:00:03+00'),
+  ('a0000000-0000-0000-0000-000000000006', '2021-01-01 00:00:04+00');
 
 select is(
   (select is_active from public.meeting_question_rotation
@@ -798,6 +801,15 @@ select is(
    where user_id = 'a0000000-0000-0000-0000-000000000005'),
   false,
   'a member with no lab_status is reported inactive by the narrow panel view too'
+);
+
+-- The rotation is 碩士生 and 博士生 only. An assistant is very much in the lab
+-- and is not alumni, so nothing before 20260831140000 would have skipped them.
+select is(
+  (select is_active from public.meeting_question_rotation
+   where user_id = 'a0000000-0000-0000-0000-000000000006'),
+  false,
+  'a lab member who is not a grad student is outside the rotation'
 );
 
 -- Only one candidate is active, so the backfill can fill exactly one of the
@@ -859,8 +871,20 @@ select throws_ok(
        'a0000000-0000-0000-0000-000000000003',
        'a0000000-0000-0000-0000-000000000004') $$,
   'P0001',
-  '替補人選已畢業,不能排入提問小組',
+  '替補人選不在提問輪替範圍(僅限碩士生與博士生)',
   'a manual replacement who has graduated is rejected with a message that says why'
+);
+
+-- Same treatment, same message: Keycloak has positively placed them outside the
+-- rotation, which is a different thing from having said nothing.
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       'a0000000-0000-0000-0000-0000000000c1',
+       'a0000000-0000-0000-0000-000000000003',
+       'a0000000-0000-0000-0000-000000000006') $$,
+  'P0001',
+  '替補人選不在提問輪替範圍(僅限碩士生與博士生)',
+  'a manual replacement who is in the lab but not a grad student is rejected too'
 );
 
 -- Clear the manual row added above so the replacement below is a fresh
@@ -892,7 +916,8 @@ delete from public.meetings where id = 'a0000000-0000-0000-0000-0000000000c1';
 delete from public.meeting_question_pool
   where user_id in ('a0000000-0000-0000-0000-000000000003',
                     'a0000000-0000-0000-0000-000000000004',
-                    'a0000000-0000-0000-0000-000000000005');
+                    'a0000000-0000-0000-0000-000000000005',
+                    'a0000000-0000-0000-0000-000000000006');
 
 select * from finish();
 rollback;

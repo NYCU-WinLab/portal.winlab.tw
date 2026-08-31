@@ -36,7 +36,7 @@ select
   pool.pool_added_at,
   stats.last_asked_date,
   coalesce(stats.times_asked, 0) as times_asked,
-  public.meetings_is_active_member(up.lab_status) as is_active
+  public.meetings_is_rotation_member(up.lab_status) as is_active
 from pool
 join public.user_profiles up on up.id = pool.user_id
 left join (
@@ -63,7 +63,7 @@ select
   p.created_at as pool_added_at,
   stats.last_asked_date,
   coalesce(stats.times_asked, 0) as times_asked,
-  public.meetings_is_active_member(up.lab_status) as is_active
+  public.meetings_is_rotation_member(up.lab_status) as is_active
 from public.meeting_question_pool p
 join public.user_profiles up on up.id = p.user_id
 left join (
@@ -90,26 +90,28 @@ grant select on public.meeting_question_pool_members to anon, authenticated, ser
 --
 -- EVICTION IS NARROWER THAN THE BACKFILL, ON PURPOSE.
 --
--- The backfill will not PICK anyone who is not an active member, alumni and
--- NULL alike. Eviction only removes 'alumni'. The asymmetry is about what each
--- value actually claims: 'alumni' is a positive statement that this person has
--- left, while NULL means Keycloak had nothing to say — which is also what a
--- member gets the morning after renaming themselves in Keycloak, since the sync
--- matches on a username the portal only refreshes at login.
+-- The backfill picks only rotation members (碩士生/博士生). Eviction removes
+-- only those Keycloak has POSITIVELY placed somewhere else — 老師, 助理,
+-- 大學部, 校友. NULL is left alone.
+--
+-- The asymmetry is about what each value claims. A known non-grad status is a
+-- statement about a person. NULL means Keycloak had nothing to say — which is
+-- also what a member gets the morning after renaming themselves in Keycloak,
+-- since the sync matches on a username the portal only refreshes at login.
 --
 -- Evicting on NULL would make that rename destructive and irreversible: the
 -- member is torn out of every future week, and when their status comes back at
 -- their next login nothing puts the weeks back. Declining to pick them for NEW
 -- slots costs nothing and reverses itself. So a NULL member keeps what they
--- already hold and simply stops accruing more, which is the mildest reading of
+-- already hold and simply stops accruing more — the mildest reading of
 -- "excluded" that still does the job.
 --
 -- NOTE THIS IS A BEHAVIOUR CHANGE TO ALREADY-SCHEDULED WEEKS. The next thing
 -- that resyncs a future meeting — changing its presenter, most commonly — will
--- now evict graduated questioners from it and pull in replacements. That is the
--- intent (it is half of "a schedule written before someone graduated never gets
--- revisited"), but it means a week's roster can change without anyone touching
--- that week.
+-- now evict non-rotation questioners from it and pull in replacements. That is
+-- the intent (it is half of "a schedule written before someone graduated never
+-- gets revisited"), but it means a week's roster can change without anyone
+-- touching that week.
 --
 -- Past meetings stay untouched, as before: their roster is history, not a plan.
 create or replace function public.meetings_sync_questioners(p_meeting_id uuid)
@@ -136,10 +138,10 @@ begin
   delete from public.meeting_questioners
   where meeting_id = p_meeting_id and user_id = v_meeting.presenter_user_id;
 
-  -- Future meetings only: a questioner who has since left BOTH pools, or who
-  -- has graduated, is no longer a valid pick — evict them so the backfill
-  -- refills from the current union. NULL lab_status is deliberately NOT an
-  -- eviction reason; see the header.
+  -- Future meetings only: a questioner who has since left BOTH pools, or whom
+  -- Keycloak now places outside the rotation, is no longer a valid pick — evict
+  -- them so the backfill refills from the current union. NULL lab_status is
+  -- deliberately NOT an eviction reason; see the header.
   -- Past meetings are left untouched (their roster is history).
   if v_meeting.scheduled_date > current_date then
     delete from public.meeting_questioners mq
@@ -152,7 +154,9 @@ begin
         )
         or exists (
           select 1 from public.user_profiles up
-          where up.id = mq.user_id and up.lab_status = 'alumni'
+          where up.id = mq.user_id
+            and up.lab_status is not null
+            and not public.meetings_is_rotation_member(up.lab_status)
         )
       );
   end if;
@@ -183,9 +187,9 @@ revoke all on function public.meetings_sync_questioners(uuid) from public, anon;
 grant execute on function public.meetings_sync_questioners(uuid) to authenticated, service_role;
 
 -- Redeclared whole from 20260825120000:48. Two changes, both about eligibility:
--- the auto-pick skips inactive candidates so removing someone by hand can never
--- pull a graduate back in, and a MANUAL replacement is rejected for a graduate
--- with a message that says so.
+-- the auto-pick skips non-rotation candidates so removing someone by hand can
+-- never pull a graduate back in, and a MANUAL replacement is rejected for
+-- anyone Keycloak places outside the rotation, with a message that says why.
 --
 -- Manual assignment still accepts a member whose lab_status is NULL. The
 -- automation will not choose them, but an admin looking at the panel — where
@@ -240,9 +244,12 @@ begin
     end if;
     if exists (
       select 1 from public.user_profiles up
-      where up.id = p_replacement and up.lab_status = 'alumni'
+      where up.id = p_replacement
+        and up.lab_status is not null
+        and not public.meetings_is_rotation_member(up.lab_status)
     ) then
-      raise exception '替補人選已畢業,不能排入提問小組' using errcode = 'P0001';
+      raise exception '替補人選不在提問輪替範圍(僅限碩士生與博士生)'
+        using errcode = 'P0001';
     end if;
     if exists (
       select 1 from public.meeting_questioners
