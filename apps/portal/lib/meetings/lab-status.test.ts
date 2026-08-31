@@ -4,7 +4,9 @@ import {
   checkLabStatusUpdatePlan,
   EXCLUDED_USERNAMES,
   findUnrecognisedGroupPaths,
+  isRotationMember,
   isSelectableMember,
+  rotationExclusionReason,
   labStatusFromGroupPath,
   parseLabStatus,
   planLabStatusUpdates,
@@ -42,6 +44,21 @@ describe("isSelectableMember", () => {
   test("rejects alumni", () => {
     expect(
       isSelectableMember({ username: "hibbert", labStatus: "alumni" })
+    ).toBe(false)
+  })
+
+  // The lab's rule (2026-08-31): the rotation is 碩士生 and 博士生 only.
+  // Teachers, assistants and undergrads attend but are never scheduled, so
+  // offering them in the picker would just create work an admin has to undo.
+  test("rejects lab members who are not grad students", () => {
+    expect(isSelectableMember({ username: "prof", labStatus: "teacher" })).toBe(
+      false
+    )
+    expect(isSelectableMember({ username: "ra", labStatus: "assistant" })).toBe(
+      false
+    )
+    expect(
+      isSelectableMember({ username: "junior", labStatus: "undergrad" })
     ).toBe(false)
   })
 
@@ -227,5 +244,37 @@ describe("checkLabStatusUpdatePlan", () => {
     }))
     const result = checkLabStatusUpdatePlan(profiles, updates)
     expect(result.ok).toBe(true)
+  })
+})
+
+describe("isRotationMember", () => {
+  test("only 碩士生 and 博士生 are in the rotation", () => {
+    expect(isRotationMember("doctoral")).toBe(true)
+    expect(isRotationMember("master")).toBe(true)
+    for (const other of ["teacher", "assistant", "undergrad", "alumni", null]) {
+      expect(isRotationMember(other)).toBe(false)
+    }
+  })
+
+  // The SQL mirror tests the raw column, so this one does too — a value the
+  // CHECK constraint does not allow today must still not read as eligible.
+  test("an unrecognised status is not in the rotation", () => {
+    expect(isRotationMember("visiting")).toBe(false)
+  })
+})
+
+describe("rotationExclusionReason", () => {
+  test("a rotation member has no reason", () => {
+    expect(rotationExclusionReason("master")).toBeNull()
+  })
+
+  // The three reasons are not cosmetic: unsynced keeps the weeks it already
+  // holds and can still be assigned by hand, the other two are evicted and
+  // refused. See 20260831140200's header.
+  test("distinguishes no-information from a positive placement elsewhere", () => {
+    expect(rotationExclusionReason(null)).toBe("unsynced")
+    expect(rotationExclusionReason("alumni")).toBe("alumni")
+    expect(rotationExclusionReason("teacher")).toBe("not-graduate")
+    expect(rotationExclusionReason("undergrad")).toBe("not-graduate")
   })
 })

@@ -47,6 +47,15 @@ insert into public.user_profiles (id, email, name, roles) values
   ('aaaaaaaa-0000-0000-0000-000000000013', 'q3@test.local', 'Q3', '{}'::jsonb),
   ('aaaaaaaa-0000-0000-0000-000000000014', 'q4@test.local', 'Q4', '{}'::jsonb);
 
+-- Fixture profiles are active lab members unless a scenario below says
+-- otherwise. Since 20260831140000 the scheduling automation only considers
+-- members whose lab_status is set and is not 'alumni', so leaving these NULL
+-- would make every candidate set here empty and every assertion below vacuous.
+-- Written as a follow-up UPDATE rather than a column in each INSERT so the
+-- scenarios that DO care about lab_status (tier ordering, the alumni
+-- exclusions) can set theirs explicitly and stay untouched by this.
+update public.user_profiles set lab_status = 'master' where lab_status is null;
+
 -- ── meetings ─────────────────────────────────────────────────────────────────
 -- Swap year 2030
 insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values

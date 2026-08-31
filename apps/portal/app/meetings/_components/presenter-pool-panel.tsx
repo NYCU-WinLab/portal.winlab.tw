@@ -11,6 +11,8 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 
+import { useLabStatusHealth } from "@/hooks/meetings/use-lab-status-health"
+import type { LabStatusHealth } from "@/hooks/meetings/use-lab-status-health"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import {
   useMovePresenter,
@@ -24,7 +26,9 @@ import {
   parseAdmissionYear,
   tierGradeLabel,
 } from "@/lib/meetings/admission-year"
+import { rotationExclusionReason } from "@/lib/meetings/lab-status"
 import { currentAcademicYear } from "@/lib/meetings/semester"
+import { syncFreshness } from "@/lib/meetings/sync-health"
 import type { PresenterPoolMember } from "@/lib/meetings/types"
 
 import { suggestAdmissionYear } from "../actions"
@@ -49,6 +53,118 @@ function groupByTierAndCohort(pool: PresenterPoolMember[]) {
       ([tierRank, cohorts]) =>
         [tierRank, [...cohorts.entries()].sort((a, b) => a[0] - b[0])] as const
     )
+}
+
+/**
+ * Why a pool member is greyed out. Three reasons, not one, because the
+ * automation treats them differently — see rotationExclusionReason.
+ */
+const EXCLUSION_HINT = {
+  unsynced:
+    "尚未從 Keycloak 同步到身分：不會被排入新的報告或提問，已排定的不受影響，管理員仍可手動指定",
+  alumni: "已畢業：不會被排入新的報告或提問，已排定的提問也會在下次同步時換人",
+  "not-graduate":
+    "提問輪替只包含碩士生與博士生：不會被排入新的報告或提問，已排定的提問也會在下次同步時換人",
+} as const
+
+/** Greys out a pool member the automation will not schedule, and says why. */
+function NotScheduledBadge({ labStatus }: { labStatus: string | null }) {
+  const reason = rotationExclusionReason(labStatus)
+  if (!reason) return null
+  return (
+    <span
+      className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+      title={EXCLUSION_HINT[reason]}
+    >
+      未排程
+    </span>
+  )
+}
+
+const FRESHNESS_TONE = {
+  fresh: "text-muted-foreground",
+  stale: "text-destructive",
+  never: "text-destructive",
+} as const
+
+/**
+ * One line telling an admin whether the Keycloak mirror is still running, and
+ * who has fallen out of it.
+ *
+ * Worth the space because there is no other symptom. lab_status decides who
+ * gets scheduled, and when the sync stops the last good data simply stays put:
+ * no error, no empty screen, the roster looks exactly as it did yesterday. The
+ * only thing that changes is the date.
+ */
+function SyncHealthLine({
+  health,
+  level,
+  days,
+  expanded,
+  onToggle,
+}: {
+  health: LabStatusHealth
+  level: "fresh" | "stale" | "never"
+  days: number | null
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const failing =
+    health.lastRun !== null && health.lastRun.status !== "ok"
+      ? health.lastRun
+      : null
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border p-2">
+      <p className={`text-xs ${FRESHNESS_TONE[level]}`}>
+        {level === "never"
+          ? "Keycloak 身分同步從未成功執行過"
+          : days === 0
+            ? "身分同步：今天"
+            : `身分同步：${days} 天前${level === "stale" ? "（異常）" : ""}`}
+      </p>
+
+      {/* A job that runs and fails every night still has a recent row, so the
+          date alone would read as healthy. This is the other failure mode. */}
+      {failing && (
+        <p className="text-xs text-destructive">
+          最近一次執行失敗（{failing.status}）
+          {failing.detail ? `：${failing.detail}` : ""}
+        </p>
+      )}
+
+      {health.unsynced.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {health.unsynced.length} 位成員沒有身分資料，不會被排入報告或提問
+          </button>
+          {expanded && (
+            <div className="flex flex-col gap-1 pl-1">
+              <div className="flex flex-wrap gap-1.5">
+                {health.unsynced.map((u) => (
+                  <span
+                    key={u.id}
+                    className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {u.name ?? u.username}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                若他們仍在實驗室，請確認 Keycloak 的 /lab-member/*
+                子群裡有這個人，且 portal 這邊的帳號名稱是最新的（改過 Keycloak
+                username 的人要重新登入一次才會對得上）。
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
@@ -78,7 +194,14 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   const remove = useRemovePresenter()
   const move = useMovePresenter()
 
+  const { data: health, isError: healthIsError } = useLabStatusHealth()
+  // Deliberately NOT memoized on lastSuccessAt: that value stops changing the
+  // moment the sync dies, which is exactly when the elapsed count has to keep
+  // climbing. Recomputing per render costs one Date and one Intl format.
+  const freshness = syncFreshness(health?.lastSuccessAt ?? null, new Date())
+
   const [adding, setAdding] = useState(false)
+  const [showUnsynced, setShowUnsynced] = useState(false)
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(
     null
   )
@@ -186,6 +309,27 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
+      {/* An error here must not render nothing. This widget is the only thing
+          that says a member has silently dropped out of every roster, and a
+          panel that looks exactly like the healthy one reads as "all clear" —
+          the same reasoning as the pool's isError branch below, applied to the
+          alarm itself. */}
+      {isAdmin && healthIsError && (
+        <p className="rounded-lg border p-2 text-xs text-destructive">
+          讀不到身分同步狀態，無法確認名單是否為最新
+        </p>
+      )}
+
+      {isAdmin && health && (
+        <SyncHealthLine
+          health={health}
+          level={freshness.level}
+          days={freshness.days}
+          expanded={showUnsynced}
+          onToggle={() => setShowUnsynced((v) => !v)}
+        />
+      )}
+
       {isAdmin && adding && (
         <div className="flex flex-col gap-2 rounded-lg border p-2">
           {!picked ? (
@@ -278,12 +422,24 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                       className="flex items-center justify-between gap-2 rounded-lg border p-2"
                     >
                       <div className="flex items-center gap-2">
+                        {/*
+                          The position WITHIN this tier and cohort, not the raw
+                          sort_order. sort_order is numbered per intake year and
+                          knows nothing about 學制, so since 民國 115 became the
+                          first mixed cohort a doctoral student sitting first in
+                          their own tier could read "6". The up/down buttons
+                          already work on the in-group index (and so does
+                          meetings_pool_move, which finds the nearest same-tier
+                          neighbour), so this only aligns the number with what
+                          the buttons and the automation already do.
+                        */}
                         <span className="w-5 text-xs text-muted-foreground">
-                          {m.sortOrder}
+                          {i + 1}
                         </span>
                         <span className="text-sm font-medium">
                           {m.name ?? "—"}
                         </span>
+                        <NotScheduledBadge labStatus={m.labStatus} />
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="mr-2 text-xs text-muted-foreground">
@@ -344,7 +500,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <p className="text-xs text-muted-foreground">
-          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環
+          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環。輪替只包含碩士生與博士生，標示「未排程」者不會被排入新的報告或提問。
         </p>
       )}
     </div>

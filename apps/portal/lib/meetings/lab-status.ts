@@ -75,7 +75,58 @@ export function isSelectableMember(u: {
   labStatus: LabStatus | null
 }): boolean {
   if (!u.username || EXCLUDED_USERNAMES.has(u.username)) return false
-  return u.labStatus !== null && u.labStatus !== "alumni"
+  return isRotationMember(u.labStatus)
+}
+
+/**
+ * Whether someone is in the weekly meeting rotation.
+ *
+ * The lab's rule, stated 2026-08-31: **只保留 master 跟 ph.d**. 老師, 助理,
+ * 大學部 and 校友 attend meetings but are not scheduled to present and are not
+ * drawn for the questioning group.
+ *
+ * The TypeScript mirror of `public.meetings_is_rotation_member` (migration
+ * 20260831140000) — same rule, and the two must not drift, because SQL decides
+ * who gets scheduled while this decides what the panel says about it. A member
+ * the database has quietly dropped from every roster while the UI shows them as
+ * normal is the exact failure this pair exists to prevent.
+ *
+ * Takes raw text rather than a parsed {@link LabStatus} so the two really do
+ * agree: SQL tests the column, and `parseLabStatus` maps anything outside
+ * LAB_STATUSES to null. `user_profiles_lab_status_check` makes a value outside
+ * that set unreachable today — this signature keeps it unreachable if the
+ * constraint is ever widened.
+ *
+ * Note what this does NOT check, unlike {@link isSelectableMember}: username.
+ * That one is choosing who may be ADDED to a pool and fails closed on shell
+ * accounts; this one describes someone already in one, where pool membership is
+ * itself the human judgement. See the migration header — they are deliberately
+ * different and should not be merged.
+ */
+export function isRotationMember(labStatus: string | null): boolean {
+  return labStatus === "doctoral" || labStatus === "master"
+}
+
+/**
+ * Why someone in a pool is not being scheduled, or null when they are.
+ *
+ * Three states, not two, and the difference is what the automation does about
+ * them (see 20260831140200's header):
+ *
+ * - `"unsynced"` — Keycloak had nothing to say. Also what a member gets the
+ *   morning after renaming themselves in Keycloak. Not given new slots, but
+ *   keeps the ones they hold, and an admin may still assign them by hand.
+ * - `"alumni"` / `"not-graduate"` — Keycloak has positively placed them outside
+ *   the rotation. Not given new slots, evicted from future weeks on the next
+ *   resync, and rejected for manual assignment.
+ */
+export function rotationExclusionReason(
+  labStatus: string | null
+): "unsynced" | "alumni" | "not-graduate" | null {
+  if (isRotationMember(labStatus)) return null
+  if (labStatus === null) return "unsynced"
+  if (labStatus === "alumni") return "alumni"
+  return "not-graduate"
 }
 
 export type LabStatusRow = {
