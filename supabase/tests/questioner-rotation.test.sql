@@ -91,6 +91,15 @@ insert into public.user_profiles (id, email, name, roles) values
   ('00000000-0000-0000-0000-000000000093', 's9c@test.local', 'S9 Pool C', '{}'::jsonb),
   ('00000000-0000-0000-0000-000000000094', 's9d@test.local', 'S9 Pool D', '{}'::jsonb);
 
+-- Fixture profiles are active lab members unless a scenario below says
+-- otherwise. Since 20260831140000 the scheduling automation only considers
+-- members whose lab_status is set and is not 'alumni', so leaving these NULL
+-- would make every candidate set here empty and every assertion below vacuous.
+-- Written as a follow-up UPDATE rather than a column in each INSERT so the
+-- scenarios that DO care about lab_status (tier ordering, the alumni
+-- exclusions) can set theirs explicitly and stay untouched by this.
+update public.user_profiles set lab_status = 'master' where lab_status is null;
+
 -- meetings for each scenario, distinct scheduled_date values throughout.
 insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
   ('10000000-0000-0000-0000-000000000003', 2026, '2026-01-06', false, null),                                       -- m2_hist (past)
@@ -634,12 +643,22 @@ insert into auth.users (id) values
   ('00000000-0000-0000-0000-000000000104'),
   ('00000000-0000-0000-0000-000000000105');
 
-insert into public.user_profiles (id, email, name, roles) values
-  ('00000000-0000-0000-0000-000000000101', 's12p1@test.local', 'S12 Pool 1', '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000102', 's12p2@test.local', 'S12 Pool 2', '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000103', 's12p3@test.local', 'S12 Pool 3', '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000104', 's12x@test.local', 'S12 Presenter-Pool-Only', '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000105', 's12y@test.local', 'S12 Stray', '{}'::jsonb);
+-- lab_status is set INLINE here, not by a follow-up UPDATE like the fixture
+-- block at the top of this file. By this point an earlier scenario has called
+-- set_config('request.jwt.claims', …, true), and `is_local = true` means "until
+-- this transaction ends" — pgTAP runs the whole file in one transaction, so
+-- auth.uid() is still non-null down here. prevent_role_escalation pins
+-- lab_status whenever auth.uid() is non-null and the role is not service_role,
+-- and it pins SILENTLY rather than raising, so an UPDATE here would leave every
+-- profile NULL and every candidate set below empty with nothing to show why.
+-- The guard is a BEFORE UPDATE trigger; INSERT is not subject to it.
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('00000000-0000-0000-0000-000000000101', 's12p1@test.local', 'S12 Pool 1', '{}'::jsonb, 'master'),
+  ('00000000-0000-0000-0000-000000000102', 's12p2@test.local', 'S12 Pool 2', '{}'::jsonb, 'master'),
+  ('00000000-0000-0000-0000-000000000103', 's12p3@test.local', 'S12 Pool 3', '{}'::jsonb, 'master'),
+  ('00000000-0000-0000-0000-000000000104', 's12x@test.local', 'S12 Presenter-Pool-Only', '{}'::jsonb, 'master'),
+  ('00000000-0000-0000-0000-000000000105', 's12y@test.local', 'S12 Stray', '{}'::jsonb, 'master');
+
 --
 -- The question pool has exactly 3 members, so the first sync fills all 3
 -- slots from it (v_missing drops to 0 afterwards). X is then added as a

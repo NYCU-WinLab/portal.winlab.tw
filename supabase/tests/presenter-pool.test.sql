@@ -38,6 +38,15 @@ insert into public.user_profiles (id, email, name, roles) values
   ('bbbbbbbb-0000-0000-0000-000000000022', 'd@test.local', 'D', '{}'::jsonb),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'p@test.local', 'P', '{}'::jsonb);
 
+-- Fixture profiles are active lab members unless a scenario below says
+-- otherwise. Since 20260831140000 the scheduling automation only considers
+-- members whose lab_status is set and is not 'alumni', so leaving these NULL
+-- would make every candidate set here empty and every assertion below vacuous.
+-- Written as a follow-up UPDATE rather than a column in each INSERT so the
+-- scenarios that DO care about lab_status (tier ordering, the alumni
+-- exclusions) can set theirs explicitly and stay untouched by this.
+update public.user_profiles set lab_status = 'master' where lab_status is null;
+
 -- ═══ auth guards ════════════════════════════════════════════════════════════
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000009","role":"authenticated"}', true);
@@ -368,12 +377,18 @@ delete from public.meeting_presenter_pool
 -- ── fill_presenters 也要吃 tier 順序 ────────────────────────────────────────
 -- 兩個空白週 + 兩位候選人：博士(民國115，入學較晚) 與 碩士(民國113，入學較早)。
 -- 舊排序會讓碩士先拿到第一週；新排序必須讓博士先拿到。
--- Note: (113, 1) is already taken at this point by bbbbbbbb-...-011 (see the
--- `meetings_pool_upsert` restore two blocks up, after the pool was emptied at
--- line 276) — the master candidate here uses (113, 2) instead. The brief's
--- literal sort_order for the master collides with that leftover row; the
--- admission years (115 later, 113 earlier) are what the assertion needs and
--- are kept exactly as specified.
+-- The pool still holds bbbbbbbb-...-011 ("A", 113/1) from the
+-- `meetings_pool_upsert` restore two blocks up (the pool was emptied at line
+-- 276). Drop it: this scenario asserts on the SECOND week too, so a third
+-- roster member turns "does fill cycle to the next candidate" into "which of
+-- two leftovers came first". Until 20260831140000 the leftover was harmless by
+-- accident — it had no lab_status, so meetings_tier_rank sorted it to the back
+-- behind both candidates. Now that fixture profiles are active members it sorts
+-- into the middle, which is the honest arrangement and the reason to remove it
+-- rather than rely on where it lands.
+delete from public.meeting_presenter_pool
+  where user_id = 'bbbbbbbb-0000-0000-0000-000000000011';
+
 insert into auth.users (id) values
   ('d0000000-0000-0000-0000-000000000011'),  -- 管理員
   ('d0000000-0000-0000-0000-000000000012'),  -- 博士，民國 115
