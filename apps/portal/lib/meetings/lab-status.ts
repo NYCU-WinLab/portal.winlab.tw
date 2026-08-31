@@ -75,7 +75,26 @@ export function isSelectableMember(u: {
   labStatus: LabStatus | null
 }): boolean {
   if (!u.username || EXCLUDED_USERNAMES.has(u.username)) return false
-  return u.labStatus !== null && u.labStatus !== "alumni"
+  return isActiveMember(u.labStatus)
+}
+
+/**
+ * Whether the scheduling automation still counts someone as being in the lab.
+ *
+ * The TypeScript mirror of `public.meetings_is_active_member` (migration
+ * 20260831140000) — same rule, and the two must not drift, because SQL decides
+ * who gets scheduled while this decides what the panel says about it. A member
+ * the database has quietly dropped from every roster while the UI shows them as
+ * normal is the exact failure this pair exists to prevent.
+ *
+ * Note what this does NOT check, unlike {@link isSelectableMember}: username.
+ * That one is choosing who may be ADDED to a pool and fails closed on shell
+ * accounts; this one describes someone already in one, where pool membership is
+ * itself the human judgement. See the migration header — they are deliberately
+ * different and should not be merged.
+ */
+export function isActiveMember(labStatus: LabStatus | null): boolean {
+  return labStatus !== null && labStatus !== "alumni"
 }
 
 export type LabStatusRow = {

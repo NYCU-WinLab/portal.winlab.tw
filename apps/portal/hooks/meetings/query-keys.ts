@@ -31,6 +31,9 @@ export const queryKeys = {
   presenterPool: {
     all: ["meetings", "presenter-pool"] as const,
   },
+  labStatusHealth: {
+    all: ["meetings", "lab-status-health"] as const,
+  },
   questioners: {
     byYear: (year: number) => ["meetings", "questioners", year] as const,
   },

@@ -1,5 +1,5 @@
-import type { LabStatus } from "./lab-status"
-import type { LabStatusRow } from "./lab-status"
+import { EXCLUDED_USERNAMES } from "./lab-status"
+import type { LabStatus, LabStatusRow } from "./lab-status"
 
 /**
  * How a sync run ended. Mirrors `lab_status_sync_runs.status`'s CHECK
@@ -83,4 +83,29 @@ export function matchedProfileIds(
   return profiles
     .filter((p) => p.username !== null && fromKeycloak.has(p.username))
     .map((p) => p.id)
+}
+
+/**
+ * Members who have a portal account and a real username but no `lab_status`.
+ *
+ * This list is not a nicety — it is the compensating control for the decision
+ * to exclude NULL from scheduling. A member who renames themselves in Keycloak
+ * stops matching on `username` (the portal only refreshes that at login), the
+ * next nightly sync writes NULL, and they drop out of the presenter roster and
+ * the questioner rotation with no error anywhere. One rename is one changed
+ * row, far under checkLabStatusUpdatePlan's floors, so the blast-radius guard
+ * will not catch it either. Nothing else in the system says this happened.
+ *
+ * Shell accounts are filtered out (no username, or a known non-human one):
+ * they can never be matched, so listing them buries the one name that means
+ * something under nine that never will.
+ */
+export function unsyncedMembers<T extends LabStatusRow>(profiles: T[]): T[] {
+  return profiles.filter(
+    (p) =>
+      p.labStatus === null &&
+      p.username !== null &&
+      p.username.length > 0 &&
+      !EXCLUDED_USERNAMES.has(p.username)
+  )
 }

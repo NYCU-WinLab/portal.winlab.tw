@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
 import type { LabStatus, LabStatusRow } from "@/lib/meetings/lab-status"
-import { matchedProfileIds, syncFreshness } from "@/lib/meetings/sync-health"
+import {
+  matchedProfileIds,
+  syncFreshness,
+  unsyncedMembers,
+} from "@/lib/meetings/sync-health"
 
 const NOW = new Date("2026-08-31T12:00:00+08:00")
 const daysAgo = (n: number) =>
@@ -56,5 +60,26 @@ describe("matchedProfileIds", () => {
 
   test("a profile with no username cannot be matched", () => {
     expect(matchedProfileIds(profiles, fromKeycloak)).not.toContain("d")
+  })
+})
+
+describe("unsyncedMembers", () => {
+  const rows: LabStatusRow[] = [
+    { id: "ok", username: "alice", labStatus: "master" },
+    // The case this list exists for: a real person who renamed themselves in
+    // Keycloak and has silently dropped out of every roster.
+    { id: "renamed", username: "bob", labStatus: null },
+    { id: "shell", username: null, labStatus: null },
+    { id: "robot", username: "test-master", labStatus: null },
+  ]
+
+  test("lists only real accounts that have no status", () => {
+    expect(unsyncedMembers(rows).map((r) => r.id)).toEqual(["renamed"])
+  })
+
+  test("an empty username is a shell account, not a missing sync", () => {
+    expect(
+      unsyncedMembers([{ id: "x", username: "", labStatus: null }])
+    ).toEqual([])
   })
 })
