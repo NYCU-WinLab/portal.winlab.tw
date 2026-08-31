@@ -22,13 +22,36 @@ describe("syncFreshness", () => {
 
   // One skipped night is normal; the cron is daily, so tolerating exactly two
   // days means a single failure never cries wolf.
-  test("two days is still fresh, three is not", () => {
-    expect(syncFreshness(daysAgo(2), NOW).level).toBe("fresh")
-    expect(syncFreshness(daysAgo(3), NOW)).toEqual({ level: "stale", days: 3 })
+  // Counted in Asia/Taipei calendar days: yesterday is one missed run and is
+  // still fine, the day before that is two and is not.
+  test("yesterday is fresh, the day before is stale", () => {
+    expect(syncFreshness(daysAgo(1), NOW)).toEqual({ level: "fresh", days: 1 })
+    expect(syncFreshness(daysAgo(2), NOW)).toEqual({ level: "stale", days: 2 })
+  })
+
+  // The cron fires at 12:45 Taipei. Seen at 09:00 the next morning that is
+  // under 24 hours ago, but it is not 今天 — and 今天 is what the panel prints
+  // for 0.
+  test("a run from yesterday lunchtime is 1 day, not 0, when read this morning", () => {
+    expect(
+      syncFreshness(
+        "2026-08-30T12:45:00+08:00",
+        new Date("2026-08-31T09:00:00+08:00")
+      )
+    ).toEqual({ level: "fresh", days: 1 })
   })
 
   test("a timestamp in the future reads as zero days, not negative", () => {
     expect(syncFreshness(daysAgo(-5), NOW)).toEqual({ level: "fresh", days: 0 })
+  })
+
+  test("a run later today is still 今天", () => {
+    expect(
+      syncFreshness(
+        "2026-08-31T12:45:00+08:00",
+        new Date("2026-08-31T23:00:00+08:00")
+      )
+    ).toEqual({ level: "fresh", days: 0 })
   })
 
   test("an unparseable timestamp is treated as never, not as fresh", () => {
@@ -64,22 +87,33 @@ describe("matchedProfileIds", () => {
 })
 
 describe("unsyncedMembers", () => {
-  const rows: LabStatusRow[] = [
-    { id: "ok", username: "alice", labStatus: "master" },
-    // The case this list exists for: a real person who renamed themselves in
-    // Keycloak and has silently dropped out of every roster.
-    { id: "renamed", username: "bob", labStatus: null },
-    { id: "shell", username: null, labStatus: null },
-    { id: "robot", username: "test-master", labStatus: null },
+  const SEEN = "2026-08-20T04:45:00Z"
+  const rows: (LabStatusRow & { lastSyncedAt: string | null })[] = [
+    { id: "ok", username: "alice", labStatus: "master", lastSyncedAt: SEEN },
+    // The case this list exists for: a real person the sync matched before and
+    // does not now, who has silently dropped out of every roster.
+    { id: "renamed", username: "bob", labStatus: null, lastSyncedAt: SEEN },
+    // Faculty, admin staff, people who left the realm years ago. Permanently
+    // NULL and never lab members — listing them buries "renamed".
+    { id: "never", username: "carol", labStatus: null, lastSyncedAt: null },
+    { id: "shell", username: null, labStatus: null, lastSyncedAt: null },
+    {
+      id: "robot",
+      username: "test-master",
+      labStatus: null,
+      lastSyncedAt: SEEN,
+    },
   ]
 
-  test("lists only real accounts that have no status", () => {
+  test("lists only accounts the sync used to match and now does not", () => {
     expect(unsyncedMembers(rows).map((r) => r.id)).toEqual(["renamed"])
   })
 
   test("an empty username is a shell account, not a missing sync", () => {
     expect(
-      unsyncedMembers([{ id: "x", username: "", labStatus: null }])
+      unsyncedMembers([
+        { id: "x", username: "", labStatus: null, lastSyncedAt: SEEN },
+      ])
     ).toEqual([])
   })
 })

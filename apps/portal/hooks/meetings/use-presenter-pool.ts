@@ -104,14 +104,25 @@ export function useFillPresenters() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async (year: number): Promise<number> => {
+    mutationFn: async (
+      year: number
+    ): Promise<{ filled: number; poolSize: number; excluded: number }> => {
       const { data, error } = await supabase.rpc("meetings_fill_presenters", {
         p_year: year,
       })
       if (error) throw new Error(error.message || "自動排定報告人失敗")
-      return (data as { filled?: number } | null)?.filled ?? 0
+      const result = data as {
+        filled?: number
+        poolSize?: number
+        excluded?: number
+      } | null
+      return {
+        filled: result?.filled ?? 0,
+        poolSize: result?.poolSize ?? 0,
+        excluded: result?.excluded ?? 0,
+      }
     },
-    onSuccess: (filled) => {
+    onSuccess: ({ filled, poolSize, excluded }) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       // Assigning a presenter re-syncs that week's questioners server-side.
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
@@ -119,9 +130,25 @@ export function useFillPresenters() {
       // so a fill changes it too — without this the admin keeps reading the
       // pre-fill counts they are about to reorder by.
       qc.invalidateQueries({ queryKey: queryKeys.presenterPool.all })
-      toast.success(
-        filled > 0 ? `已排定 ${filled} 週的報告人` : "沒有可排定的空白週"
-      )
+      if (filled > 0) {
+        toast.success(
+          excluded > 0
+            ? `已排定 ${filled} 週的報告人（略過 ${excluded} 位非在籍成員）`
+            : `已排定 ${filled} 週的報告人`
+        )
+      } else if (poolSize === 0 && excluded > 0) {
+        // The reason nothing happened is the opposite of "no blank weeks", and
+        // saying the wrong one sends the admin to the schedule when the problem
+        // is in the roster. This is what the RPC's `excluded` exists for.
+        toast.error(
+          `順位名單裡的 ${excluded} 位成員都沒有在籍身分，沒有人可以排。` +
+            "請看「報告順位名單」上方的身分同步狀態。"
+        )
+      } else if (poolSize === 0) {
+        toast.error("報告順位名單是空的")
+      } else {
+        toast.success("沒有可排定的空白週")
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   })

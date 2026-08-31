@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 import { fetchLabStatuses } from "@/lib/keycloak/lab-status"
@@ -8,7 +9,6 @@ import {
 import { matchedProfileIds } from "@/lib/meetings/sync-health"
 import type { SyncRunStatus } from "@/lib/meetings/sync-health"
 import { createAdminClient } from "@/lib/supabase/admin"
-import type { SupabaseClient } from "@supabase/supabase-js"
 
 // Mirrors Keycloak's /lab-member/* membership into user_profiles.lab_status
 // once a day. The candidate pickers on /meetings read that column, so a member
@@ -39,6 +39,11 @@ type RunRecord = {
  * Failing to write the log must never fail the sync. Observability breaking is
  * annoying; observability breaking the thing it observes is worse, and this
  * route is the only writer of lab_status.
+ *
+ * Note which way that failure points: a log that cannot be written leaves the
+ * panel with no successful run to date and shouting 從未成功執行過 while the
+ * sync is fine. A false alarm, not false calm — the safe direction for a
+ * control whose whole job is to notice silence.
  */
 async function recordRun(
   supabase: SupabaseClient,
@@ -161,10 +166,20 @@ export async function GET(request: Request) {
   let stampedAt: string | null = null
   if (matched.length > 0) {
     stampedAt = new Date().toISOString()
-    const { error: stampError } = await supabase
-      .from("user_profiles")
-      .update({ lab_status_synced_at: stampedAt })
-      .in("id", matched)
+    // Chunked because `.in()` is serialised into the request URI — roughly 39
+    // bytes per UUID — and this list is the whole lab, growing every year. Past
+    // a couple of hundred members the URI outgrows the proxy's header buffer
+    // and the request comes back 414, which would show up as a red run every
+    // night while the sync itself was working perfectly.
+    const CHUNK = 50
+    let stampError: { message: string } | null = null
+    for (let i = 0; i < matched.length && !stampError; i += CHUNK) {
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({ lab_status_synced_at: stampedAt })
+        .in("id", matched.slice(i, i + CHUNK))
+      stampError = error
+    }
     if (stampError) {
       return recordRun(
         supabase,

@@ -87,13 +87,19 @@ export function isSelectableMember(u: {
  * the database has quietly dropped from every roster while the UI shows them as
  * normal is the exact failure this pair exists to prevent.
  *
+ * Takes raw text rather than a parsed {@link LabStatus} so the two really do
+ * agree: SQL tests the column, and `parseLabStatus` maps anything outside
+ * LAB_STATUSES to null, which would read as inactive here while SQL scheduled
+ * the person. `user_profiles_lab_status_check` makes that unreachable today —
+ * this signature keeps it unreachable if the constraint is ever widened.
+ *
  * Note what this does NOT check, unlike {@link isSelectableMember}: username.
  * That one is choosing who may be ADDED to a pool and fails closed on shell
  * accounts; this one describes someone already in one, where pool membership is
  * itself the human judgement. See the migration header — they are deliberately
  * different and should not be merged.
  */
-export function isActiveMember(labStatus: LabStatus | null): boolean {
+export function isActiveMember(labStatus: string | null): boolean {
   return labStatus !== null && labStatus !== "alumni"
 }
 

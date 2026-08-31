@@ -43,20 +43,31 @@ create index if not exists lab_status_sync_runs_ran_at_idx
 
 alter table public.lab_status_sync_runs enable row level security;
 
--- Supabase's default privileges grant anon directly, so RLS alone is not the
--- whole story — revoke the grant as well (same reasoning as
--- 20260828140000_quiz-players-revoke-direct-writes).
-revoke all on public.lab_status_sync_runs from public, anon;
+-- Supabase's default privileges grant anon AND authenticated directly, so RLS
+-- alone is not the whole story — revoke both, then grant back only what is
+-- needed (same reasoning as 20260828140000_quiz-players-revoke-direct-writes).
+--
+-- `authenticated` matters as much as `anon` here. Left with its default
+-- arwdDxtm, the table is write-protected only by the ABSENCE of a write policy
+-- — one `for all using (true)` added later by someone adding a feature, and a
+-- member can forge a successful run. That is the same "silence the alarm rather
+-- than trip it" move the lab_status_synced_at guard below exists to stop, and a
+-- defence that holds only while nobody adds a policy is not one.
+revoke all on public.lab_status_sync_runs from public, anon, authenticated;
 grant select on public.lab_status_sync_runs to authenticated;
 
--- Read-only to every logged-in member; there is deliberately NO insert/update/
+-- Readable by meetings admins only, and there is deliberately NO insert/update/
 -- delete policy, so only service_role (the cron, via createAdminClient) writes.
+--
+-- Admin-only rather than every signed-in member because `detail` carries raw
+-- Postgres and Keycloak error text straight out of the cron. The only reader is
+-- the admin panel, so narrowing it costs nothing.
 drop policy if exists lab_status_sync_runs_select on public.lab_status_sync_runs;
 create policy lab_status_sync_runs_select
   on public.lab_status_sync_runs
   for select
   to authenticated
-  using (true);
+  using (public.is_meetings_admin());
 
 -- Redeclared whole from 20260830100600:19. The only change is that
 -- lab_status_synced_at is pinned exactly like lab_status.

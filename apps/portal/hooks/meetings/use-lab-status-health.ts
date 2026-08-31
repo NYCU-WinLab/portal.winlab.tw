@@ -51,7 +51,9 @@ export function useLabStatusHealth() {
           .eq("status", "ok")
           .order("ran_at", { ascending: false })
           .limit(1),
-        supabase.from("user_profiles").select("id, name, username, lab_status"),
+        supabase
+          .from("user_profiles")
+          .select("id, name, username, lab_status, lab_status_synced_at"),
       ])
 
       if (runs.error) throw runs.error
@@ -64,6 +66,7 @@ export function useLabStatusHealth() {
         name: row.name,
         username: row.username,
         labStatus: parseLabStatus(row.lab_status),
+        lastSyncedAt: row.lab_status_synced_at,
       }))
 
       return {

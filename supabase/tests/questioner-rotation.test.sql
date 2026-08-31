@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(48);
+select plan(50);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -831,8 +831,24 @@ select ok(
   'a questioner still in the pool but no longer in the lab is evicted from a future meeting'
 );
 
--- The manual path gets its own message. An admin looking at a name they can
--- still see in the panel deserves to be told which of the two reasons applies.
+-- NULL lab_status is NOT an eviction reason. It is what a member gets the
+-- morning after renaming themselves in Keycloak, and tearing them out of every
+-- future week would be destructive and irreversible — their status coming back
+-- at the next login does not put the weeks back.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('a0000000-0000-0000-0000-0000000000c1', 'a0000000-0000-0000-0000-000000000005', 'manual');
+
+select public.meetings_sync_questioners('a0000000-0000-0000-0000-0000000000c1');
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'a0000000-0000-0000-0000-0000000000c1'
+      and user_id = 'a0000000-0000-0000-0000-000000000005'
+  ),
+  'a member with no lab_status keeps the weeks they already hold — only alumni are evicted'
+);
+
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"a0000000-0000-0000-0000-000000000001"}', true);
@@ -843,8 +859,29 @@ select throws_ok(
        'a0000000-0000-0000-0000-000000000003',
        'a0000000-0000-0000-0000-000000000004') $$,
   'P0001',
-  '替補人選已非在籍成員(已畢業,或尚未從 Keycloak 同步到身分)',
-  'a manual replacement who has left the lab is rejected, and told apart from one who was never in the pool'
+  '替補人選已畢業,不能排入提問小組',
+  'a manual replacement who has graduated is rejected with a message that says why'
+);
+
+-- Clear the manual row added above so the replacement below is a fresh
+-- assignment rather than a duplicate.
+reset role;
+delete from public.meeting_questioners
+  where meeting_id = 'a0000000-0000-0000-0000-0000000000c1'
+    and user_id = 'a0000000-0000-0000-0000-000000000005';
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001"}', true);
+
+-- A rule that detects a problem has to leave someone able to act on it. The
+-- admin can see this member marked 未排程 in the panel; refusing the manual
+-- assignment as well would mean seeing the problem and being unable to fix it.
+select lives_ok(
+  $$ select public.meetings_replace_questioner(
+       'a0000000-0000-0000-0000-0000000000c1',
+       'a0000000-0000-0000-0000-000000000003',
+       'a0000000-0000-0000-0000-000000000005') $$,
+  'an admin may still MANUALLY assign a member whose lab_status has not synced'
 );
 
 reset role;

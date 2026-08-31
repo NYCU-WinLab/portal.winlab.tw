@@ -168,11 +168,11 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   const remove = useRemovePresenter()
   const move = useMovePresenter()
 
-  const { data: health } = useLabStatusHealth()
-  const freshness = useMemo(
-    () => syncFreshness(health?.lastSuccessAt ?? null, new Date()),
-    [health?.lastSuccessAt]
-  )
+  const { data: health, isError: healthIsError } = useLabStatusHealth()
+  // Deliberately NOT memoized on lastSuccessAt: that value stops changing the
+  // moment the sync dies, which is exactly when the elapsed count has to keep
+  // climbing. Recomputing per render costs one Date and one Intl format.
+  const freshness = syncFreshness(health?.lastSuccessAt ?? null, new Date())
 
   const [adding, setAdding] = useState(false)
   const [showUnsynced, setShowUnsynced] = useState(false)
@@ -282,6 +282,17 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
           </Button>
         )}
       </div>
+
+      {/* An error here must not render nothing. This widget is the only thing
+          that says a member has silently dropped out of every roster, and a
+          panel that looks exactly like the healthy one reads as "all clear" —
+          the same reasoning as the pool's isError branch below, applied to the
+          alarm itself. */}
+      {isAdmin && healthIsError && (
+        <p className="rounded-lg border p-2 text-xs text-destructive">
+          讀不到身分同步狀態，無法確認名單是否為最新
+        </p>
+      )}
 
       {isAdmin && health && (
         <SyncHealthLine
@@ -407,8 +418,8 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                             className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
                             title={
                               m.labStatus === "alumni"
-                                ? "已畢業，不會被排入報告或提問"
-                                : "尚未從 Keycloak 同步到身分，不會被排入報告或提問"
+                                ? "已畢業：不會被排入新的報告或提問，已排定的提問也會在下次同步時換人"
+                                : "尚未從 Keycloak 同步到身分：不會被排入新的報告或提問，已排定的不受影響"
                             }
                           >
                             未排程
@@ -474,7 +485,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <p className="text-xs text-muted-foreground">
-          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環。標示「未排程」者不會被排入報告或提問。
+          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環。標示「未排程」者不會被排入新的報告或提問。
         </p>
       )}
     </div>

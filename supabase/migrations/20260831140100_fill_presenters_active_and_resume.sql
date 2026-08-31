@@ -84,6 +84,18 @@ begin
   --
   -- Resuming after whoever actually holds the latest assigned week makes a
   -- second batch continue the first instead of replaying it.
+  --
+  -- The `array_position(...) is not null` predicate is load-bearing, not
+  -- defensive. Without it this picks the latest assigned week unconditionally
+  -- and then asks where its presenter sits; an OFF-ROSTER holder answers NULL,
+  -- coalesces to 0, and the fill restarts at the head — silently reverting to
+  -- the exact behaviour this block exists to remove, in the case where it
+  -- matters most. Off-roster holders are not exotic: meetings_claim performs no
+  -- pool or membership check at all, so any member can claim the latest open
+  -- week; and this migration's own active-member filter makes a graduated
+  -- member who holds a week off-roster by construction. Skipping past them and
+  -- resuming after the last roster member who actually took a week is what
+  -- "continue the rotation" means.
   select array_position(v_roster, m.presenter_user_id)
   into v_last_pos
   from public.meetings m
@@ -92,6 +104,7 @@ begin
     and not m.is_holiday
     and not m.is_speaker
     and not m.is_thesis
+    and array_position(v_roster, m.presenter_user_id) is not null
   order by m.scheduled_date desc, m.id desc
   limit 1;
 
@@ -100,9 +113,10 @@ begin
   -- k" is exactly v_index := k. No off-by-one adjustment: adding one here would
   -- skip a member every batch.
   --
-  -- NULL when the year has no assigned week yet, or when that presenter is no
-  -- longer an active pool member (array_position found nothing) — both fall
-  -- back to 0, i.e. the previous behaviour.
+  -- NULL only when no week in this year is held by anyone currently on the
+  -- roster — a fresh year, or one filled entirely before the current pool
+  -- existed. Falling back to 0 there is correct: there is no rotation to
+  -- resume.
   --
   -- Scoped to p_year on purpose. Crossing into a new academic year restarts at
   -- the top, because deciding whether last year's tail should displace this

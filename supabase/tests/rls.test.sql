@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(26);
+select plan(27);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -268,16 +268,38 @@ select set_config(
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
   true
 );
+-- Admin-only: `detail` carries raw Postgres and Keycloak error text straight
+-- out of the cron, and the only reader is the meetings admin panel.
 select is(
   (select count(*)::int from public.lab_status_sync_runs),
-  1,
-  'a signed-in member can read the sync run log'
+  0,
+  'an ordinary member cannot read the sync run log'
 );
 select throws_ok(
   $$ insert into public.lab_status_sync_runs (status) values ('ok') $$,
   '42501',
   NULL,
   'a signed-in member cannot forge a sync run — there is no insert policy'
+);
+
+-- `roles` is a hard RAISE for everyone, service_role included; the only way in
+-- is the same bypass GUC the admin RPCs set inside their SECURITY DEFINER
+-- bodies (see prevent_role_escalation's first branch).
+reset role;
+select set_config('my.portal_admin_bypass', 'true', true);
+update public.user_profiles set roles = '{"meetings":["admin"]}'::jsonb
+  where id = '22222222-2222-2222-2222-222222222222';
+select set_config('my.portal_admin_bypass', 'false', true);
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
+  true
+);
+select is(
+  (select count(*)::int from public.lab_status_sync_runs),
+  1,
+  'a meetings admin can read the sync run log'
 );
 
 -- Supabase's default privileges grant anon directly, so enabling RLS is not by
