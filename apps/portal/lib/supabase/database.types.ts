@@ -1343,6 +1343,36 @@ export type Database = {
         }
         Relationships: []
       }
+      lab_status_sync_runs: {
+        Row: {
+          changed: number
+          detail: string | null
+          id: number
+          ran_at: string
+          scanned: number
+          skipped_no_username: number
+          status: string
+        }
+        Insert: {
+          changed?: number
+          detail?: string | null
+          id?: never
+          ran_at?: string
+          scanned?: number
+          skipped_no_username?: number
+          status: string
+        }
+        Update: {
+          changed?: number
+          detail?: string | null
+          id?: never
+          ran_at?: string
+          scanned?: number
+          skipped_no_username?: number
+          status?: string
+        }
+        Relationships: []
+      }
       leaves: {
         Row: {
           created_at: string | null
@@ -2604,6 +2634,7 @@ export type Database = {
           id: string
           is_admin: boolean | null
           lab_status: string | null
+          lab_status_synced_at: string | null
           last_active_platform: string | null
           line_user_id: string | null
           name: string | null
@@ -2620,6 +2651,7 @@ export type Database = {
           id: string
           is_admin?: boolean | null
           lab_status?: string | null
+          lab_status_synced_at?: string | null
           last_active_platform?: string | null
           line_user_id?: string | null
           name?: string | null
@@ -2636,6 +2668,7 @@ export type Database = {
           id?: string
           is_admin?: boolean | null
           lab_status?: string | null
+          lab_status_synced_at?: string | null
           last_active_platform?: string | null
           line_user_id?: string | null
           name?: string | null
@@ -2756,6 +2789,7 @@ export type Database = {
       meeting_question_pool_members: {
         Row: {
           email: string | null
+          is_active: boolean | null
           last_asked_date: string | null
           name: string | null
           pool_added_at: string | null
@@ -2775,6 +2809,7 @@ export type Database = {
       meeting_question_rotation: {
         Row: {
           email: string | null
+          is_active: boolean | null
           last_asked_date: string | null
           name: string | null
           pool_added_at: string | null
@@ -3085,6 +3120,10 @@ export type Database = {
       meetings_insert_week: {
         Args: { p_at_meeting_id: string }
         Returns: string
+      }
+      meetings_is_active_member: {
+        Args: { p_status: string }
+        Returns: boolean
       }
       meetings_next_free_date: { Args: { p_from: string }; Returns: string }
       meetings_pool_compact: {
