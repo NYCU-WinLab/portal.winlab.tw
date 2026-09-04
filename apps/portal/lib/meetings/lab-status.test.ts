@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   checkLabStatusUpdatePlan,
   EXCLUDED_USERNAMES,
+  findCohortOnlyUsernames,
   findUnrecognisedGroupPaths,
   isCohortGroupPath,
   isRotationMember,
@@ -11,6 +12,7 @@ import {
   labStatusFromGroupPath,
   parseLabStatus,
   planLabStatusUpdates,
+  type LabStatus,
   type LabStatusRow,
   type LabStatusUpdate,
 } from "./lab-status"
@@ -129,9 +131,8 @@ describe("findUnrecognisedGroupPaths", () => {
     expect(findUnrecognisedGroupPaths([])).toEqual([])
   })
 
-  // The realm grew four admission-year groups on 2026-09-03 (112–115), each
-  // member of which is also in an identity group. They describe a cohort, not
-  // a status, so they must not stop the sync.
+  // The realm grew four admission-year groups on 2026-09-03 (112–115). They
+  // describe a cohort, not a status, so they must not stop the sync.
   test("lets admission-year cohort groups through", () => {
     expect(
       findUnrecognisedGroupPaths([
@@ -167,11 +168,24 @@ describe("isCohortGroupPath", () => {
     expect(isCohortGroupPath("/lab-member/095")).toBe(true)
   })
 
-  test("rejects anything that is not exactly a three-digit 民國 year", () => {
-    expect(isCohortGroupPath("/lab-member/12")).toBe(false) // two digits
+  test("pins both ends of the realm's admissionYear range", () => {
+    expect(isCohortGroupPath("/lab-member/089")).toBe(false)
+    expect(isCohortGroupPath("/lab-member/090")).toBe(true)
+    expect(isCohortGroupPath("/lab-member/199")).toBe(true)
+    expect(isCohortGroupPath("/lab-member/200")).toBe(false)
+  })
+
+  // parseAdmissionYear alone accepts "95" and trims whitespace; the digit
+  // regex is what makes a group NAME stricter than the attribute. These would
+  // all pass if that regex were dropped.
+  test("requires exactly three digits, no padding shortcuts, no whitespace", () => {
+    expect(isCohortGroupPath("/lab-member/95")).toBe(false) // in range, unpadded
+    expect(isCohortGroupPath("/lab-member/12")).toBe(false) // out of range too
     expect(isCohortGroupPath("/lab-member/2026")).toBe(false) // 西元
-    expect(isCohortGroupPath("/lab-member/089")).toBe(false) // below the realm floor
+    expect(isCohortGroupPath("/lab-member/113 ")).toBe(false)
+    expect(isCohortGroupPath("/lab-member/ 113")).toBe(false)
     expect(isCohortGroupPath("/lab-member/113a")).toBe(false)
+    expect(isCohortGroupPath("/lab-member/113/foo")).toBe(false)
     expect(isCohortGroupPath("/lab-member/master")).toBe(false)
   })
 
@@ -179,6 +193,33 @@ describe("isCohortGroupPath", () => {
     expect(isCohortGroupPath("/winlab-projects/113")).toBe(false)
     expect(isCohortGroupPath("/113")).toBe(false)
     expect(isCohortGroupPath("/lab-member")).toBe(false)
+  })
+})
+
+describe("findCohortOnlyUsernames", () => {
+  const identity = new Map<string, LabStatus>([
+    ["alice", "master"],
+    ["bob", "doctoral"],
+  ])
+
+  test("is empty when every cohort member holds an identity", () => {
+    expect(findCohortOnlyUsernames(["alice", "bob"], identity)).toEqual([])
+  })
+
+  test("names the members no identity group mentioned, sorted", () => {
+    expect(
+      findCohortOnlyUsernames(["zed", "alice", "carol", "bob"], identity)
+    ).toEqual(["carol", "zed"])
+  })
+
+  test("reports a person in two cohorts once", () => {
+    expect(findCohortOnlyUsernames(["carol", "carol"], identity)).toEqual([
+      "carol",
+    ])
+  })
+
+  test("an empty cohort is not a problem", () => {
+    expect(findCohortOnlyUsernames([], identity)).toEqual([])
   })
 })
 

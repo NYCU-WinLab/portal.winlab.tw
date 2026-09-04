@@ -17,7 +17,9 @@ import {
   KeycloakAdminError,
 } from "@/lib/keycloak/admin"
 import {
+  findCohortOnlyUsernames,
   findUnrecognisedGroupPaths,
+  isCohortGroupPath,
   labStatusFromGroupPath,
   type LabStatus,
 } from "@/lib/meetings/lab-status"
@@ -30,6 +32,10 @@ export type LabStatusFetchResult =
       // Indistinguishable, downstream, from a departure — surfaced so a
       // non-zero rate is visible in the cron's response rather than silent.
       skippedNoUsername: number
+      // Members of a cohort group (/lab-member/113 …) who are in no identity
+      // group. Cohorts are skipped, which only loses nobody while this is
+      // empty — so it is reported on every run rather than assumed.
+      cohortOnly: string[]
     }
   | { status: "unconfigured" }
   | { status: "forbidden"; detail: string }
@@ -41,6 +47,21 @@ type RawMember = { username?: string }
 // Keycloak's members endpoint has no cursor and no total header — page on
 // first/max and stop when a page comes back short. Same shape as scripts/kc.
 const PAGE = 100
+
+async function* members(
+  base: string,
+  groupId: string,
+  token: string
+): AsyncGenerator<RawMember> {
+  for (let first = 0; ; first += PAGE) {
+    const page = await getJson<RawMember[]>(
+      `${base}/groups/${groupId}/members?first=${first}&max=${PAGE}`,
+      token
+    )
+    yield* page
+    if (page.length < PAGE) return
+  }
+}
 
 async function getJson<T>(url: string, token: string): Promise<T> {
   const res = await fetch(url, {
@@ -93,21 +114,27 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
       const status = labStatusFromGroupPath(child.path)
       // Reached for cohort groups (/lab-member/112 …): findUnrecognisedGroupPaths
       // lets them through because they say when someone joined, not what they
-      // are. Their members are all in an identity group as well, so skipping
-      // the cohort loses nobody. Anything else unknown was refused above.
+      // are. They are read separately below. Anything else unknown was
+      // refused above.
       if (!status) continue
-      for (let first = 0; ; first += PAGE) {
-        const page = await getJson<RawMember[]>(
-          `${base}/groups/${child.id}/members?first=${first}&max=${PAGE}`,
-          token
-        )
-        for (const member of page) {
-          if (member.username) byUsername.set(member.username, status)
-          else skippedNoUsername++
-        }
-        if (page.length < PAGE) break
+      for await (const member of members(base, child.id, token)) {
+        if (member.username) byUsername.set(member.username, status)
+        else skippedNoUsername++
       }
     }
+
+    // A cohort adds nobody to the map, but skipping it is only harmless while
+    // each of its members also holds an identity group. That was true of all
+    // 29 people on 2026-09-03; it is a fact about the realm, not something
+    // the realm enforces, so check it every run and name the exceptions.
+    const cohortMembers: string[] = []
+    for (const child of children) {
+      if (!isCohortGroupPath(child.path)) continue
+      for await (const member of members(base, child.id, token)) {
+        if (member.username) cohortMembers.push(member.username)
+      }
+    }
+    const cohortOnly = findCohortOnlyUsernames(cohortMembers, byUsername)
 
     // A single group's members endpoint returning empty (or every group
     // being empty) is no longer refused here: a legitimately small group can
@@ -117,7 +144,7 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
     // route) catches the harmful case — a sweep that would mass-null
     // lab_status — without needing to guess which underlying cause produced
     // it.
-    return { status: "ok", byUsername, skippedNoUsername }
+    return { status: "ok", byUsername, skippedNoUsername, cohortOnly }
   } catch (err) {
     if (err instanceof KeycloakAdminError) {
       if (err.status === 403) {
