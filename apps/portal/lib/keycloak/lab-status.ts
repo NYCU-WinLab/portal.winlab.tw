@@ -91,9 +91,10 @@ export async function fetchLabStatuses(): Promise<LabStatusFetchResult> {
     let skippedNoUsername = 0
     for (const child of children) {
       const status = labStatusFromGroupPath(child.path)
-      // Unreachable after the check above — every child path here is a known
-      // LabStatus — but the type is still `LabStatus | null`, so keep the
-      // guard rather than assert past it.
+      // Reached for cohort groups (/lab-member/112 …): findUnrecognisedGroupPaths
+      // lets them through because they say when someone joined, not what they
+      // are. Their members are all in an identity group as well, so skipping
+      // the cohort loses nobody. Anything else unknown was refused above.
       if (!status) continue
       for (let first = 0; ; first += PAGE) {
         const page = await getJson<RawMember[]>(

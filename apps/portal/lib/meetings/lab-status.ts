@@ -4,6 +4,8 @@
 // lives in lib/keycloak/lab-status.ts and the write in the cron route; keeping
 // the rules here is what makes them testable with `bun test`.
 
+import { parseAdmissionYear } from "@/lib/meetings/admission-year"
+
 export const LAB_STATUSES = [
   "teacher",
   "assistant",
@@ -44,15 +46,37 @@ export function parseLabStatus(v: string | null): LabStatus | null {
 }
 
 /**
+ * An admission-year cohort group: `/lab-member/<民國 year>`, three digits,
+ * zero-padded, in the same 90–199 range the realm enforces on `admissionYear`.
+ *
+ * These appeared on 2026-09-03 (112, 113, 114, 115). Every member of one is
+ * also in exactly one identity group, so a cohort says *when* someone joined,
+ * never *what* they are — it is orthogonal to `LabStatus` and the sync ignores
+ * it. Deliberately narrow: `12`, `2026` or `113a` are not cohorts and stay
+ * unrecognised, because a loose match here is how a typo'd identity group
+ * would slip past {@link findUnrecognisedGroupPaths}.
+ */
+export function isCohortGroupPath(path: string): boolean {
+  if (!path.startsWith(LAB_MEMBER_PREFIX)) return false
+  const leaf = path.slice(LAB_MEMBER_PREFIX.length)
+  return /^\d{3}$/.test(leaf) && parseAdmissionYear(leaf) !== null
+}
+
+/**
  * Which children of `/lab-member` this code does not know how to file under a
  * `LabStatus`. Never skip one silently: the realm has already been
  * restructured once (a subgroup rename), and a renamed or newly added group
  * mapping to null would quietly drop everyone in it from the sync — which
  * looks, downstream, exactly like those people leaving. That is a decision
  * for a human, not something to `continue` past.
+ *
+ * The one shape that is recognised without being a status is a cohort group
+ * ({@link isCohortGroupPath}); everything else unknown still stops the sync.
  */
 export function findUnrecognisedGroupPaths(childPaths: string[]): string[] {
-  return childPaths.filter((path) => labStatusFromGroupPath(path) === null)
+  return childPaths.filter(
+    (path) => labStatusFromGroupPath(path) === null && !isCohortGroupPath(path)
+  )
 }
 
 /**

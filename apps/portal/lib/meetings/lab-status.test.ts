@@ -4,6 +4,7 @@ import {
   checkLabStatusUpdatePlan,
   EXCLUDED_USERNAMES,
   findUnrecognisedGroupPaths,
+  isCohortGroupPath,
   isRotationMember,
   isSelectableMember,
   rotationExclusionReason,
@@ -27,6 +28,10 @@ describe("labStatusFromGroupPath", () => {
 
   test("ignores an unknown leaf rather than inventing a status", () => {
     expect(labStatusFromGroupPath("/lab-member/visiting")).toBeNull()
+  })
+
+  test("a cohort group is not an identity", () => {
+    expect(labStatusFromGroupPath("/lab-member/113")).toBeNull()
   })
 
   test("does not match the parent group itself", () => {
@@ -122,6 +127,58 @@ describe("findUnrecognisedGroupPaths", () => {
 
   test("an empty child list is not itself unrecognised", () => {
     expect(findUnrecognisedGroupPaths([])).toEqual([])
+  })
+
+  // The realm grew four admission-year groups on 2026-09-03 (112–115), each
+  // member of which is also in an identity group. They describe a cohort, not
+  // a status, so they must not stop the sync.
+  test("lets admission-year cohort groups through", () => {
+    expect(
+      findUnrecognisedGroupPaths([
+        "/lab-member/112",
+        "/lab-member/113",
+        "/lab-member/114",
+        "/lab-member/115",
+        "/lab-member/teacher",
+        "/lab-member/assistant",
+        "/lab-member/doctoral",
+        "/lab-member/master",
+        "/lab-member/undergrad",
+        "/lab-member/alumni",
+      ])
+    ).toEqual([])
+  })
+
+  test("still names an unknown group sitting next to cohort groups", () => {
+    expect(
+      findUnrecognisedGroupPaths([
+        "/lab-member/113",
+        "/lab-member/master",
+        "/lab-member/visiting",
+      ])
+    ).toEqual(["/lab-member/visiting"])
+  })
+})
+
+describe("isCohortGroupPath", () => {
+  test("accepts a zero-padded 民國 year under /lab-member", () => {
+    expect(isCohortGroupPath("/lab-member/112")).toBe(true)
+    expect(isCohortGroupPath("/lab-member/115")).toBe(true)
+    expect(isCohortGroupPath("/lab-member/095")).toBe(true)
+  })
+
+  test("rejects anything that is not exactly a three-digit 民國 year", () => {
+    expect(isCohortGroupPath("/lab-member/12")).toBe(false) // two digits
+    expect(isCohortGroupPath("/lab-member/2026")).toBe(false) // 西元
+    expect(isCohortGroupPath("/lab-member/089")).toBe(false) // below the realm floor
+    expect(isCohortGroupPath("/lab-member/113a")).toBe(false)
+    expect(isCohortGroupPath("/lab-member/master")).toBe(false)
+  })
+
+  test("only applies under /lab-member", () => {
+    expect(isCohortGroupPath("/winlab-projects/113")).toBe(false)
+    expect(isCohortGroupPath("/113")).toBe(false)
+    expect(isCohortGroupPath("/lab-member")).toBe(false)
   })
 })
 
