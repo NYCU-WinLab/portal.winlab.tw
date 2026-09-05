@@ -9,7 +9,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(19);
+select plan(27);
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
 insert into auth.users (id) values
@@ -48,7 +48,43 @@ select lives_ok(
   'a user can still update non-privileged columns on their own profile'
 );
 
--- 4. game_scores has no INSERT policy → direct writes are denied (must go
+-- 4-5. lab_status write guard (20260830100500): it's the first ordering key
+--    of the presenter roster, so a member forging their own lab_status could
+--    jump the queue for meetings_fill_presenters. prevent_role_escalation
+--    must pin it the same way it already pins roles/is_admin — but the write
+--    itself must not error (it's a legitimate column on an otherwise-normal
+--    profile save), so the assertion is on the STORED value, not on throws_ok.
+update public.user_profiles set lab_status = 'doctoral'
+  where id = '11111111-1111-1111-1111-111111111111';
+select is(
+  (select lab_status from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
+  NULL,
+  'a member cannot self-promote lab_status — the write "succeeds" but the stored value is unchanged'
+);
+
+-- service_role is the deliberate carve-out: the nightly Keycloak sync
+-- (api/cron/kc-lab-status) authenticates as service_role and must still be
+-- able to write this column.
+reset role;
+set local role service_role;
+update public.user_profiles set lab_status = 'doctoral'
+  where id = '11111111-1111-1111-1111-111111111111';
+reset role;
+select is(
+  (select lab_status from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
+  'doctoral',
+  'service_role (the nightly Keycloak sync) can still write lab_status'
+);
+
+-- back to impersonating user A for the rest of the ordinary-user assertions.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+
+-- 6. game_scores has no INSERT policy → direct writes are denied (must go
 --    through the submit_game_score RPC gate)
 select throws_ok(
   $$ insert into public.game_scores (user_id, game_type, score, finish_time_ms)
@@ -189,6 +225,97 @@ select throws_ok(
   NULL,
   'a booking cannot have a room without an external reservation id'
 );
+
+-- ── lab_status_synced_at + lab_status_sync_runs (20260831140300) ────────────
+-- The timestamp feeds the panel's "上次同步:N 天前" warning, so a member who
+-- could write it could silence the alarm rather than trip it — pinned exactly
+-- like lab_status, and for a sharper reason.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+
+update public.user_profiles set lab_status_synced_at = now()
+  where id = '11111111-1111-1111-1111-111111111111';
+select is(
+  (select lab_status_synced_at from public.user_profiles
+   where id = '11111111-1111-1111-1111-111111111111'),
+  NULL,
+  'a member cannot backdate their own lab_status_synced_at to make a dead sync look healthy'
+);
+
+reset role;
+set local role service_role;
+update public.user_profiles set lab_status_synced_at = '2026-08-31 00:00:00+00'
+  where id = '11111111-1111-1111-1111-111111111111';
+reset role;
+select is(
+  (select lab_status_synced_at from public.user_profiles
+   where id = '11111111-1111-1111-1111-111111111111'),
+  '2026-08-31 00:00:00+00'::timestamptz,
+  'the nightly sync (service_role) can still stamp lab_status_synced_at'
+);
+
+insert into public.lab_status_sync_runs (status, scanned, changed) values ('ok', 44, 2);
+
+-- The run log is readable by any signed-in member (the panel shows it) but
+-- writable by nobody except service_role: there is no insert policy at all.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+-- Admin-only: `detail` carries raw Postgres and Keycloak error text straight
+-- out of the cron, and the only reader is the meetings admin panel.
+select is(
+  (select count(*)::int from public.lab_status_sync_runs),
+  0,
+  'an ordinary member cannot read the sync run log'
+);
+select throws_ok(
+  $$ insert into public.lab_status_sync_runs (status) values ('ok') $$,
+  '42501',
+  NULL,
+  'a signed-in member cannot forge a sync run — there is no insert policy'
+);
+
+-- `roles` is a hard RAISE for everyone, service_role included; the only way in
+-- is the same bypass GUC the admin RPCs set inside their SECURITY DEFINER
+-- bodies (see prevent_role_escalation's first branch).
+reset role;
+select set_config('my.portal_admin_bypass', 'true', true);
+update public.user_profiles set roles = '{"meetings":["admin"]}'::jsonb
+  where id = '22222222-2222-2222-2222-222222222222';
+select set_config('my.portal_admin_bypass', 'false', true);
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
+  true
+);
+select is(
+  (select count(*)::int from public.lab_status_sync_runs),
+  1,
+  'a meetings admin can read the sync run log'
+);
+
+-- Supabase's default privileges grant anon directly, so enabling RLS is not by
+-- itself enough to keep a table off the public API — the grant has to be
+-- revoked as well. This repo has been caught by that before (see
+-- 20260828140000_quiz-players-revoke-direct-writes).
+reset role;
+set local role anon;
+select throws_ok(
+  $$ select 1 from public.lab_status_sync_runs $$,
+  '42501',
+  NULL,
+  'anon cannot read the sync run log at all — the grant is revoked, not merely policy-gated'
+);
+
+reset role;
 
 select * from finish();
 rollback;

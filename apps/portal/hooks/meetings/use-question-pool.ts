@@ -13,8 +13,12 @@ import {
 import { queryKeys } from "./query-keys"
 
 const VIEW = "meeting_question_rotation"
+const MEMBERS_VIEW = "meeting_question_pool_members"
 const TABLE = "meeting_question_pool"
 
+// Reads the WIDENED rotation view (question pool ∪ presenter pool). Feeds
+// questioners-field.tsx's manual-swap candidate list, which should see the
+// full union of eligible questioners.
 export function useQuestionPool() {
   const supabase = createClient()
 
@@ -23,6 +27,27 @@ export function useQuestionPool() {
     queryFn: async (): Promise<QuestionPoolMember[]> => {
       const { data, error } = await supabase
         .from(VIEW)
+        .select("*")
+        .order("last_asked_date", { ascending: true, nullsFirst: true })
+        .order("pool_added_at", { ascending: true })
+        .order("user_id", { ascending: true })
+      if (error) throw new Error(error.message || "讀取成員池失敗")
+      return (data as DbQuestionPoolMember[]).map(toQuestionPoolMember)
+    },
+  })
+}
+
+// Reads the NARROW meeting_question_pool_members view (question pool only).
+// Feeds the "額外提問成員" admin panel, which manages only
+// meeting_question_pool and must not list presenter-pool members.
+export function useQuestionPoolMembers() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: queryKeys.questionPool.members,
+    queryFn: async (): Promise<QuestionPoolMember[]> => {
+      const { data, error } = await supabase
+        .from(MEMBERS_VIEW)
         .select("*")
         .order("last_asked_date", { ascending: true, nullsFirst: true })
         .order("pool_added_at", { ascending: true })
@@ -49,6 +74,7 @@ export function useAddPoolMember() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
       toast.success("已加入成員池")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -71,6 +97,7 @@ export function useRemovePoolMember() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
       // Upcoming rosters may have changed — refresh questioners too.
       qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       toast.success("已移出成員池")

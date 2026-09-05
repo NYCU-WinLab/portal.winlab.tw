@@ -29,7 +29,11 @@ import { FileCell } from "./file-cell"
 import { PresenterSelect } from "./presenter-select"
 
 function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("zh-TW", {
+  // `T00:00:00` parses as LOCAL midnight. A bare YYYY-MM-DD is parsed as UTC
+  // midnight and renders as the previous day west of UTC — the same trap
+  // schedule-tab's addOneWeek documents.
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("zh-TW", {
+    year: "numeric",
     month: "numeric",
     day: "numeric",
   })
@@ -82,6 +86,17 @@ export function ScheduleEditRow({
   const qc = useQueryClient()
   const [armed, setArmed] = useState(false)
   const [weekLabel, setWeekLabel] = useState(meeting.weekLabel ?? "")
+
+  // `users` is useLabUsers()'s now-filtered roster: it can omit the meeting's
+  // stored presenter entirely (graduated, unmapped in Keycloak, etc). Falling
+  // back OUT of the list (?? noneLabel) would misreport a real presenter as
+  // unassigned, so fall back INTO it instead by appending a synthetic option
+  // that carries the meeting's own stored name.
+  const presenterOptions =
+    meeting.presenterUserId &&
+    !users.some((u) => u.id === meeting.presenterUserId)
+      ? [...users, { id: meeting.presenterUserId, name: meeting.presenter }]
+      : users
 
   // Resync the local text buffer when the server value changes underneath us
   // (e.g. a swap/insert/remove elsewhere renumbers this row). Adjusting state
@@ -239,10 +254,10 @@ export function ScheduleEditRow({
           <span className="text-xs">{meeting.presenter ?? "—"}</span>
         ) : (
           <PresenterSelect
-            users={users}
+            users={presenterOptions}
             value={meeting.presenterUserId ?? "__none__"}
             onSelect={(userId) => {
-              const selected = users.find((u) => u.id === userId)
+              const selected = presenterOptions.find((u) => u.id === userId)
               commit({
                 presenterUserId: userId === "__none__" ? null : userId,
                 presenter:

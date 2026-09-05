@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   IconChevronDown,
@@ -11,6 +11,8 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 
+import { useLabStatusHealth } from "@/hooks/meetings/use-lab-status-health"
+import type { LabStatusHealth } from "@/hooks/meetings/use-lab-status-health"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
 import {
   useMovePresenter,
@@ -18,35 +20,197 @@ import {
   useRemovePresenter,
   useUpsertPresenter,
 } from "@/hooks/meetings/use-presenter-pool"
+import { useSemesters } from "@/hooks/meetings/use-semesters"
 import {
   admissionYearLabel,
   parseAdmissionYear,
+  tierGradeLabel,
 } from "@/lib/meetings/admission-year"
+import { rotationExclusionReason } from "@/lib/meetings/lab-status"
+import { currentAcademicYear } from "@/lib/meetings/semester"
+import { syncFreshness } from "@/lib/meetings/sync-health"
 import type { PresenterPoolMember } from "@/lib/meetings/types"
 
 import { suggestAdmissionYear } from "../actions"
 import { ConfirmDialog } from "./confirm-dialog"
 
-function groupByCohort(pool: PresenterPoolMember[]) {
-  const cohorts = new Map<number, PresenterPoolMember[]>()
+/**
+ * 先依學制分層，層內再依入學年分組。兩層都用 tier_rank / admission_year 升冪，
+ * 與 meetings_fill_presenters 走訪順位名單的順序一致。
+ */
+function groupByTierAndCohort(pool: PresenterPoolMember[]) {
+  const tiers = new Map<number, Map<number, PresenterPoolMember[]>>()
   for (const member of pool) {
+    const cohorts = tiers.get(member.tierRank) ?? new Map()
     const list = cohorts.get(member.admissionYear) ?? []
     list.push(member)
     cohorts.set(member.admissionYear, list)
+    tiers.set(member.tierRank, cohorts)
   }
-  // Seniors first: the lab's convention is that the earlier intake presents
-  // first, and meetings_fill_presenters walks the roster in this same order.
-  return [...cohorts.entries()].sort((a, b) => a[0] - b[0])
+  return [...tiers.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(
+      ([tierRank, cohorts]) =>
+        [tierRank, [...cohorts.entries()].sort((a, b) => a[0] - b[0])] as const
+    )
+}
+
+/**
+ * Why a pool member is greyed out. Three reasons, not one, because the
+ * automation treats them differently — see rotationExclusionReason.
+ */
+const EXCLUSION_HINT = {
+  unsynced:
+    "尚未從 Keycloak 同步到身分：不會被排入新的報告或提問，已排定的不受影響，管理員仍可手動指定",
+  alumni: "已畢業：不會被排入新的報告或提問，已排定的提問也會在下次同步時換人",
+  "not-graduate":
+    "提問輪替只包含碩士生與博士生：不會被排入新的報告或提問，已排定的提問也會在下次同步時換人",
+} as const
+
+/** Greys out a pool member the automation will not schedule, and says why. */
+function NotScheduledBadge({ labStatus }: { labStatus: string | null }) {
+  const reason = rotationExclusionReason(labStatus)
+  if (!reason) return null
+  return (
+    <span
+      className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+      title={EXCLUSION_HINT[reason]}
+    >
+      未排程
+    </span>
+  )
+}
+
+const FRESHNESS_TONE = {
+  fresh: "text-muted-foreground",
+  stale: "text-destructive",
+  never: "text-destructive",
+} as const
+
+/**
+ * One line telling an admin whether the Keycloak mirror is still running, and
+ * who has fallen out of it.
+ *
+ * Worth the space because there is no other symptom. lab_status decides who
+ * gets scheduled, and when the sync stops the last good data simply stays put:
+ * no error, no empty screen, the roster looks exactly as it did yesterday. The
+ * only thing that changes is the date.
+ */
+function SyncHealthLine({
+  health,
+  level,
+  days,
+  expanded,
+  onToggle,
+}: {
+  health: LabStatusHealth
+  level: "fresh" | "stale" | "never"
+  days: number | null
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const failing =
+    health.lastRun !== null && health.lastRun.status !== "ok"
+      ? health.lastRun
+      : null
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border p-2">
+      <p className={`text-xs ${FRESHNESS_TONE[level]}`}>
+        {level === "never"
+          ? "Keycloak 身分同步從未成功執行過"
+          : days === 0
+            ? "身分同步：今天"
+            : `身分同步：${days} 天前${level === "stale" ? "（異常）" : ""}`}
+      </p>
+
+      {/* A job that runs and fails every night still has a recent row, so the
+          date alone would read as healthy. This is the other failure mode. */}
+      {failing && (
+        <p className="text-xs text-destructive">
+          最近一次執行失敗（{failing.status}）
+          {failing.detail ? `：${failing.detail}` : ""}
+        </p>
+      )}
+
+      {/* A successful run only carries detail when it has something to
+          confess — today, members filed under a cohort group but no identity
+          group, whom the sync could not place and nothing else will list. */}
+      {health.lastRun?.status === "ok" && health.lastRun.detail && (
+        <p className="text-xs text-destructive">
+          同步完成，但有成員無法歸類：{health.lastRun.detail}
+        </p>
+      )}
+
+      {health.unsynced.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {health.unsynced.length} 位成員沒有身分資料，不會被排入報告或提問
+          </button>
+          {expanded && (
+            <div className="flex flex-col gap-1 pl-1">
+              <div className="flex flex-wrap gap-1.5">
+                {health.unsynced.map((u) => (
+                  <span
+                    key={u.id}
+                    className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {u.name ?? u.username}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                若他們仍在實驗室，請確認 Keycloak 的 /lab-member/*
+                子群裡有這個人，且 portal 這邊的帳號名稱是最新的（改過 Keycloak
+                username 的人要重新登入一次才會對得上）。
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
-  const { data: pool = [], isLoading } = usePresenterPool()
-  const { data: labUsers = [] } = useLabUsers()
+  const {
+    data: pool = [],
+    isLoading,
+    isError: poolIsError,
+  } = usePresenterPool()
+  const {
+    data: labUsers = [],
+    isSuccess: labUsersLoaded,
+    isError: labUsersIsError,
+  } = useLabUsers()
+  const { data: semesters = [] } = useSemesters()
+  // See lib/meetings/semester.ts's currentAcademicYear doc comment for why
+  // "current" means the latest semester that has already started, not the
+  // latest by start_date. Compared against today in Asia/Taipei, same as
+  // use-schedule-years.ts, since the DB session runs in UTC. Memoized so the
+  // date is read once per render pass rather than inside the JSX expression.
+  const academicYear = useMemo(() => {
+    const today = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Taipei",
+    }).format(new Date())
+    return currentAcademicYear(semesters, today)
+  }, [semesters])
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()
 
+  const { data: health, isError: healthIsError } = useLabStatusHealth()
+  // Deliberately NOT memoized on lastSuccessAt: that value stops changing the
+  // moment the sync dies, which is exactly when the elapsed count has to keep
+  // climbing. Recomputing per render costs one Date and one Intl format.
+  const freshness = syncFreshness(health?.lastSuccessAt ?? null, new Date())
+
   const [adding, setAdding] = useState(false)
+  const [showUnsynced, setShowUnsynced] = useState(false)
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(
     null
   )
@@ -60,9 +224,22 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
   }
 
+  // Checked before any empty-state logic: on a query error `isLoading` is
+  // false and `data` defaults to `[]`, so without this the panel would fall
+  // through to the empty-state branch below — including the sync-problem
+  // hint, which would then confidently misdiagnose a Supabase outage as a
+  // cron failure.
+  if (poolIsError || labUsersIsError) {
+    return (
+      <p className="text-sm text-destructive">
+        讀取報告順位名單失敗，請重新整理頁面再試一次
+      </p>
+    )
+  }
+
   const pooled = new Set(pool.map((m) => m.userId))
   const candidates = labUsers.filter((u) => !pooled.has(u.id))
-  const cohorts = groupByCohort(pool)
+  const tiers = groupByTierAndCohort(pool)
   const parsedYear = parseAdmissionYear(year)
 
   async function pick(user: { id: string; name: string | null }) {
@@ -141,14 +318,42 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
+      {/* An error here must not render nothing. This widget is the only thing
+          that says a member has silently dropped out of every roster, and a
+          panel that looks exactly like the healthy one reads as "all clear" —
+          the same reasoning as the pool's isError branch below, applied to the
+          alarm itself. */}
+      {isAdmin && healthIsError && (
+        <p className="rounded-lg border p-2 text-xs text-destructive">
+          讀不到身分同步狀態，無法確認名單是否為最新
+        </p>
+      )}
+
+      {isAdmin && health && (
+        <SyncHealthLine
+          health={health}
+          level={freshness.level}
+          days={freshness.days}
+          expanded={showUnsynced}
+          onToggle={() => setShowUnsynced((v) => !v)}
+        />
+      )}
+
       {isAdmin && adding && (
         <div className="flex flex-col gap-2 rounded-lg border p-2">
           {!picked ? (
             <div className="flex flex-wrap gap-1.5">
               {candidates.length === 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  所有成員皆已加入
-                </span>
+                labUsersLoaded && labUsers.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    候選名單目前是空的，/api/cron/kc-lab-status
+                    可能尚未成功同步過
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    所有成員皆已加入
+                  </span>
+                )
               ) : (
                 candidates.map((u) => (
                   <button
@@ -209,68 +414,92 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
         <p className="text-xs text-muted-foreground">尚未排定任何報告順位</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {cohorts.map(([cohort, members]) => (
-            <div key={cohort} className="flex flex-col gap-1">
-              <p className="text-xs text-muted-foreground">
-                {admissionYearLabel(cohort)}
-              </p>
-              {members.map((m, i) => (
-                <div
-                  key={m.userId}
-                  className="flex items-center justify-between gap-2 rounded-lg border p-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 text-xs text-muted-foreground">
-                      {m.sortOrder}
-                    </span>
-                    <span className="text-sm font-medium">{m.name ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="mr-2 text-xs text-muted-foreground">
-                      已報告 {m.timesPresented} 次
-                    </span>
-                    {isAdmin && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === 0 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: -1 })
-                          }
-                        >
-                          <IconChevronUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground"
-                          disabled={i === members.length - 1 || move.isPending}
-                          onClick={() =>
-                            move.mutate({ userId: m.userId, delta: 1 })
-                          }
-                        >
-                          <IconChevronDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
+          {tiers.map(([tierRank, cohorts]) => (
+            <div key={tierRank} className="flex flex-col gap-1">
+              {cohorts.map(([cohort, members]) => (
+                <div key={cohort} className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground">
+                    {tierGradeLabel(
+                      members[0]?.labStatus ?? null,
+                      academicYear,
+                      cohort
+                    ) ?? admissionYearLabel(cohort)}
+                  </p>
+                  {members.map((m, i) => (
+                    <div
+                      key={m.userId}
+                      className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        {/*
+                          The position WITHIN this tier and cohort, not the raw
+                          sort_order. sort_order is numbered per intake year and
+                          knows nothing about 學制, so since 民國 115 became the
+                          first mixed cohort a doctoral student sitting first in
+                          their own tier could read "6". The up/down buttons
+                          already work on the in-group index (and so does
+                          meetings_pool_move, which finds the nearest same-tier
+                          neighbour), so this only aligns the number with what
+                          the buttons and the automation already do.
+                        */}
+                        <span className="w-5 text-xs text-muted-foreground">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {m.name ?? "—"}
+                        </span>
+                        <NotScheduledBadge labStatus={m.labStatus} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="mr-2 text-xs text-muted-foreground">
+                          已報告 {m.timesPresented} 次
+                        </span>
+                        {isAdmin && (
+                          <>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={i === 0 || move.isPending}
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: -1 })
+                              }
                             >
-                              <IconTrash className="h-3.5 w-3.5" />
+                              <IconChevronUp className="h-3.5 w-3.5" />
                             </Button>
-                          }
-                          title="移出報告順位？"
-                          description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
-                          variant="destructive"
-                          onConfirm={() => remove.mutate(m.userId)}
-                        />
-                      </>
-                    )}
-                  </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground"
+                              disabled={
+                                i === members.length - 1 || move.isPending
+                              }
+                              onClick={() =>
+                                move.mutate({ userId: m.userId, delta: 1 })
+                              }
+                            >
+                              <IconChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <ConfirmDialog
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                >
+                                  <IconTrash className="h-3.5 w-3.5" />
+                                </Button>
+                              }
+                              title="移出報告順位？"
+                              description={`將「${m.name ?? "此成員"}」移出報告順位名單，同屆其他人的順位會自動遞補。已排定的週次不會變動。`}
+                              variant="destructive"
+                              onConfirm={() => remove.mutate(m.userId)}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -280,7 +509,7 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <p className="text-xs text-muted-foreground">
-          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環
+          ＊排班表的編輯模式可依此順位一鍵填入空白週，資深屆先、同屆依順位循環。輪替只包含碩士生與博士生，標示「未排程」者不會被排入新的報告或提問。
         </p>
       )}
     </div>

@@ -12,7 +12,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(23);
+select plan(24);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -31,12 +31,15 @@ insert into public.teacher_papers (id, provided_date, paper_name, file_link) val
 -- M1: an ordinary presentation week owned by the presenter, no paper picked yet.
 -- M2: a week an admin will flag as a thesis.
 -- M3: an unclaimed week, for the claim path.
+-- M4: a week in a DIFFERENT semester (2041-09-10 → 上學期 130, while M1–M3 are
+--     下學期 128), so the guard test below has a real semester to try to jump to.
 insert into public.meetings
   (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id, location, start_time)
 values
   ('11111111-0000-0000-0000-000000000001', 2040, '第1週', '2040-03-05', false, 'GPres', 'eeeeeeee-0000-0000-0000-000000000002', 'EC 411', '15:30'),
   ('11111111-0000-0000-0000-000000000002', 2040, '第2週', '2040-03-12', false, 'GPres', 'eeeeeeee-0000-0000-0000-000000000002', 'EC 411', '15:30'),
-  ('11111111-0000-0000-0000-000000000003', 2040, '第3週', '2040-03-19', false, null,    null,                                   'EC 411', '15:30');
+  ('11111111-0000-0000-0000-000000000003', 2040, '第3週', '2040-03-19', false, null,    null,                                   'EC 411', '15:30'),
+  ('11111111-0000-0000-0000-000000000004', 2041, '第1週', '2041-09-10', false, null,    null,                                   'EC 411', '15:30');
 
 -- ═══ the guard: what a presenter may NOT write ══════════════════════════════
 set local role authenticated;
@@ -50,7 +53,8 @@ update public.meetings set
   is_speaker     = true,
   presenter      = 'Someone Else',
   paper_title    = 'a title I typed myself',
-  paper_link     = 'https://phishing.example/steal'
+  paper_link     = 'https://phishing.example/steal',
+  semester_id    = (select id from public.meeting_semesters where academic_year = 130 and term = 1)
 where id = '11111111-0000-0000-0000-000000000001';
 reset role;
 
@@ -88,6 +92,13 @@ select is(
   (select paper_link from public.meetings where id = '11111111-0000-0000-0000-000000000001'),
   NULL,
   'a presenter cannot supply a paper_link — it is never user-writable (#1079)');
+
+-- semester_id is a slot field like week_label: a presenter PATCHing their own row
+-- into another semester would renumber that semester's weeks around them.
+select is(
+  (select semester_id from public.meetings where id = '11111111-0000-0000-0000-000000000001'),
+  (select id from public.meeting_semesters where academic_year = 128 and term = 2),
+  'a presenter cannot move their own row into another semester');
 
 -- ═══ the guard: what a presenter MAY still write ════════════════════════════
 set local role authenticated;
