@@ -4,6 +4,8 @@
 // lives in lib/keycloak/lab-status.ts and the write in the cron route; keeping
 // the rules here is what makes them testable with `bun test`.
 
+import { parseAdmissionYear } from "@/lib/meetings/admission-year"
+
 export const LAB_STATUSES = [
   "teacher",
   "assistant",
@@ -44,15 +46,68 @@ export function parseLabStatus(v: string | null): LabStatus | null {
 }
 
 /**
+ * An admission-year cohort group: `/lab-member/<民國 year>`, exactly three
+ * zero-padded digits, in whatever range `parseAdmissionYear` accepts (today
+ * the realm's own 90–199 pattern for the `admissionYear` attribute — borrowed
+ * here, since Keycloak does not validate group names).
+ *
+ * A cohort says *when* someone joined, never *what* they are, so it is
+ * orthogonal to `LabStatus` and the sync skips it without reading its
+ * members. That is also why the match is deliberately narrow: `95`, `2026` or
+ * `113a` stay unrecognised, because any group this accepts is skipped
+ * unread, and a loose numeric match would turn a mis-named or unrelated
+ * group into a silent drop of everyone in it.
+ *
+ * What this does NOT guarantee: that a cohort's members also hold an identity
+ * group. On 2026-09-03, when the first four cohorts (112–115) appeared, all
+ * of them did. The fetch checks it every run and reports the exceptions via
+ * {@link findCohortOnlyUsernames}, because a member filed only under a cohort
+ * is otherwise indistinguishable downstream from having left.
+ */
+export function isCohortGroupPath(path: string): boolean {
+  if (!path.startsWith(LAB_MEMBER_PREFIX)) return false
+  const leaf = path.slice(LAB_MEMBER_PREFIX.length)
+  return /^\d{3}$/.test(leaf) && parseAdmissionYear(leaf) !== null
+}
+
+/**
  * Which children of `/lab-member` this code does not know how to file under a
- * `LabStatus`. Never skip one silently: the realm has already been
- * restructured once (a subgroup rename), and a renamed or newly added group
- * mapping to null would quietly drop everyone in it from the sync — which
- * looks, downstream, exactly like those people leaving. That is a decision
- * for a human, not something to `continue` past.
+ * `LabStatus`. Never skip one silently: the realm's group layout has changed
+ * before (a subgroup rename in 2026-08, cohort groups added in 2026-09), and
+ * a renamed or newly added group mapping to null would quietly drop everyone
+ * in it from the sync — which looks, downstream, exactly like those people
+ * leaving. That is a decision for a human, not something to `continue` past.
+ *
+ * The one shape that is recognised without being a status is a cohort group
+ * ({@link isCohortGroupPath}); everything else unknown still stops the sync.
  */
 export function findUnrecognisedGroupPaths(childPaths: string[]): string[] {
-  return childPaths.filter((path) => labStatusFromGroupPath(path) === null)
+  return childPaths.filter(
+    (path) => labStatusFromGroupPath(path) === null && !isCohortGroupPath(path)
+  )
+}
+
+/**
+ * Cohort members the identity groups never mentioned.
+ *
+ * The compensating control for {@link isCohortGroupPath}'s carve-out. A
+ * cohort is skipped by the sync, and that is only safe while everyone in it
+ * also holds an identity group. This names the people for whom that stopped
+ * being true — a newcomer dropped into `/lab-member/116` and nowhere else, or
+ * an identity group mis-renamed to a cohort-looking name — so the run can
+ * report them instead of letting them read as "left the lab". Sorted and
+ * de-duplicated: the same person can sit in two cohorts, and a stable order
+ * keeps the run log diffable night to night.
+ */
+export function findCohortOnlyUsernames(
+  cohortMembers: Iterable<string>,
+  byUsername: ReadonlyMap<string, LabStatus>
+): string[] {
+  const orphans = new Set<string>()
+  for (const username of cohortMembers) {
+    if (!byUsername.has(username)) orphans.add(username)
+  }
+  return [...orphans].sort()
 }
 
 /**

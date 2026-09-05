@@ -133,6 +133,15 @@ function SyncHealthLine({
         </p>
       )}
 
+      {/* A successful run only carries detail when it has something to
+          confess — today, members filed under a cohort group but no identity
+          group, whom the sync could not place and nothing else will list. */}
+      {health.lastRun?.status === "ok" && health.lastRun.detail && (
+        <p className="text-xs text-destructive">
+          同步完成，但有成員無法歸類：{health.lastRun.detail}
+        </p>
+      )}
+
       {health.unsynced.length > 0 && (
         <>
           <button
