@@ -200,6 +200,14 @@ export async function GET(request: Request) {
     }
   }
 
+  // An ok run normally carries no detail. A cohort-only member is the one
+  // thing worth saying on success: the sync wrote correctly and still left
+  // someone out, and nothing else in the system will mention them.
+  const detail =
+    fetched.cohortOnly.length > 0
+      ? `in a cohort group but no identity group: ${fetched.cohortOnly.join(", ")}`
+      : null
+
   return recordRun(
     supabase,
     {
@@ -207,6 +215,7 @@ export async function GET(request: Request) {
       scanned: rows.length,
       changed: updates.length,
       skippedNoUsername: fetched.skippedNoUsername,
+      detail,
     },
     {
       scanned: rows.length,
@@ -215,6 +224,7 @@ export async function GET(request: Request) {
       stampedAt,
       updates,
       skippedNoUsername: fetched.skippedNoUsername,
+      cohortOnly: fetched.cohortOnly,
     }
   )
 }

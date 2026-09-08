@@ -31,7 +31,11 @@ import {
   type EpicsResult,
 } from "@/lib/gitlab/client"
 import { parseEpicRef } from "@/lib/rooms/epic-refs"
-import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
+import {
+  nextOccurrenceOnOrAfter,
+  nextWeekdayOnOrAfter,
+} from "@/lib/rooms/recurrence"
+import { catchUpNewSeries } from "@/lib/rooms/recurring-run"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
@@ -580,6 +584,15 @@ export interface RecurringMeeting {
   includeAdvisor: boolean
   active: boolean
   createdBy: string
+  /**
+   * The next date this series meets, and whether a room is already held for
+   * it. Null `nextDate` only for an inactive series — an active one always
+   * has a next occurrence.
+   */
+  nextDate: string | null
+  nextBookedRoom: string | null
+  /** True when that occurrence exists as a booking, room or online-only. */
+  nextBooked: boolean
 }
 
 export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
@@ -591,19 +604,68 @@ export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
     .order("start_time")
   if (error) throw new Error(`讀取固定會議失敗:${error.message}`)
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    weekday: row.weekday,
-    startTime: row.start_time,
-    durationMinutes: row.duration_minutes,
-    intervalWeeks: row.interval_weeks,
-    anchorDate: row.anchor_date,
-    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
-    includeAdvisor: row.include_advisor,
-    active: row.active,
-    createdBy: row.created_by,
-  }))
+  const rows = data ?? []
+  const today = todayInTaipei()
+
+  // Next occurrence per series, then one query for the bookings that cover
+  // them. Read by recurring_id rather than by date+time: that link is what the
+  // cron and the catch-up write, and matching on the slot instead would claim
+  // somebody else's booking at the same hour in a different room.
+  const nextDates = new Map<string, string | null>(
+    rows.map((row) => [
+      row.id,
+      row.active
+        ? nextOccurrenceOnOrAfter(
+            {
+              weekday: row.weekday,
+              intervalWeeks: row.interval_weeks,
+              anchorDate: row.anchor_date,
+            },
+            today
+          )
+        : null,
+    ])
+  )
+
+  const wanted = [...nextDates.values()].filter((d) => d !== null)
+  const bookings = wanted.length
+    ? ((
+        await supabase
+          .from("rooms_bookings")
+          .select("recurring_id, date, room")
+          .eq("status", "booked")
+          .not("recurring_id", "is", null)
+          .in("date", wanted)
+      ).data ?? [])
+    : []
+
+  // Keyed on the pair, because a fortnightly and a weekly series can both be
+  // due on one date and each wants its own answer.
+  const booked = new Map(
+    bookings.map((b) => [`${b.recurring_id}:${b.date}`, b.room])
+  )
+
+  return rows.map((row) => {
+    const nextDate = nextDates.get(row.id) ?? null
+    const key = nextDate ? `${row.id}:${nextDate}` : null
+    const hasBooking = key !== null && booked.has(key)
+    return {
+      id: row.id,
+      title: row.title,
+      weekday: row.weekday,
+      startTime: row.start_time,
+      durationMinutes: row.duration_minutes,
+      intervalWeeks: row.interval_weeks,
+      anchorDate: row.anchor_date,
+      attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
+      includeAdvisor: row.include_advisor,
+      active: row.active,
+      createdBy: row.created_by,
+      nextDate,
+      nextBookedRoom: hasBooking ? (booked.get(key!) ?? null) : null,
+      nextBooked: hasBooking,
+    }
+  })
 }
 
 export interface CreateRecurringInput {
@@ -626,9 +688,18 @@ export interface CreateRecurringInput {
   issueRefs?: string[]
 }
 
+/** What the catch-up managed to do, so the form can say it out loud. */
+export interface CreateRecurringResult {
+  /** Occurrences inside the cron's blind window that were booked just now. */
+  booked: number
+  /** Ones that needed a room and could not get one. */
+  failed: number
+  errors: string[]
+}
+
 export async function createRecurringMeeting(
   input: CreateRecurringInput
-): Promise<void> {
+): Promise<CreateRecurringResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
@@ -654,25 +725,52 @@ export async function createRecurringMeeting(
   const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
 
   const supabase = await createClient()
-  const { error } = await supabase.from("rooms_recurring_meetings").insert({
-    title,
-    weekday: input.weekday,
-    start_time: input.startTime,
-    duration_minutes: input.durationMinutes,
-    interval_weeks: input.intervalWeeks,
-    anchor_date: anchorDate,
-    attendees: input.attendees as unknown as Json,
-    include_advisor: input.includeAdvisor,
-    created_by: user.id,
-    meeting_prefix: prefix,
-    group_name: input.groupName ?? null,
-    agenda: input.agenda?.trim() || null,
-    deliverables: epicLink.deliverables,
-    issue_refs: epicLink.issueRefs,
-  })
-  if (error) throw new Error(`建立固定會議失敗:${error.message}`)
+  const { data: created, error } = await supabase
+    .from("rooms_recurring_meetings")
+    .insert({
+      title,
+      weekday: input.weekday,
+      start_time: input.startTime,
+      duration_minutes: input.durationMinutes,
+      interval_weeks: input.intervalWeeks,
+      anchor_date: anchorDate,
+      attendees: input.attendees as unknown as Json,
+      include_advisor: input.includeAdvisor,
+      created_by: user.id,
+      meeting_prefix: prefix,
+      group_name: input.groupName ?? null,
+      agenda: input.agenda?.trim() || null,
+      deliverables: epicLink.deliverables,
+      issue_refs: epicLink.issueRefs,
+    })
+    .select("id")
+    .single()
+  if (error || !created) {
+    throw new Error(`建立固定會議失敗:${error?.message ?? "unknown"}`)
+  }
+
+  // The nightly run only ever looks at today + 7, so any occurrence already
+  // inside that window would never be booked by anything. Do it here, now,
+  // while the person who asked for it is still looking at the screen.
+  //
+  // Deliberately not fatal: the series exists either way, and a room that
+  // could not be got is something to report, not a reason to claim the series
+  // was not created.
+  let catchUp: CreateRecurringResult = { booked: 0, failed: 0, errors: [] }
+  try {
+    const run = await catchUpNewSeries(created.id)
+    catchUp = { booked: run.booked, failed: run.failed, errors: run.errors }
+  } catch (err) {
+    console.error("[rooms] recurring catch-up failed", err)
+    catchUp = {
+      booked: 0,
+      failed: 0,
+      errors: [err instanceof Error ? err.message : String(err)],
+    }
+  }
 
   revalidatePath("/rooms")
+  return catchUp
 }
 
 export async function setRecurringActive(

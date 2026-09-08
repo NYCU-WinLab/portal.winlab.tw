@@ -5,7 +5,10 @@
 // requires a credential that can already create clients. Supply a Keycloak
 // admin login once via KEYCLOAK_BOOTSTRAP_USERNAME / _PASSWORD (password
 // grant through the built-in `admin-cli` client), let this run, then delete
-// those two lines. Everything afterwards runs on the service accounts.
+// those two lines — which this command does for you. Everything the *portal*
+// needs afterwards runs on the service accounts, but this command does not:
+// it refuses to start without a bootstrap login, `--attr` included, so
+// attribute work means putting those two lines back for the run.
 //
 // Creating clients in a shared realm is outward-facing and not trivially
 // reversible, so the default is a dry run. `--apply` is the deliberate step.
@@ -38,8 +41,14 @@ type ClientSpec = {
 }
 
 // Split by blast radius, per the research record §6. The cli credential is
-// read-only by construction: a leaked laptop secret cannot mutate the realm,
-// and revoking it cannot take the deployed portal down.
+// read-only by construction: a leaked laptop secret cannot mutate the realm.
+//
+// Whether revoking it also affects the deployed portal is NOT settled here, and
+// §6.1 of the research record is wrong to say it cannot. The portal
+// authenticates with whatever KEYCLOAK_READ_CLIENT_ID / _SECRET name in its
+// hosting environment — a value this repository cannot see. Locally they name
+// this client, under a different variable prefix than the one written below.
+// Read the deployment's value before assuming a revocation is contained.
 const CLIENTS: ClientSpec[] = [
   {
     clientId: "winlab-portal-admin",
