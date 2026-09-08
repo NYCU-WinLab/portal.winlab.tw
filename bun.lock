@@ -25,7 +25,7 @@
         "tailwindcss": "^4.1.18",
         "turbo": "^2.8.17",
         "typescript": "6.0.3",
-        "typescript-7": "npm:typescript@^7.0.2",
+        "typescript-7": "npm:typescript@7.0.2",
       },
     },
     "apps/gallery": {
