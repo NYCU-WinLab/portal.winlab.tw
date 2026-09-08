@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import {
+  IconAlbum,
   IconExternalLink,
+  IconHistory,
   IconLayoutGrid,
   IconLogin,
   IconMenu2,
@@ -28,18 +30,24 @@ import { GalleryMentionBell } from "@/components/gallery-mention-bell"
 import { SignOutButton } from "@/components/sign-out-button"
 import type { GalleryNotification } from "@/lib/gallery/notifications"
 
-export type GalleryShellActive = "home" | "manage"
+export type GalleryShellActive = "home" | "manage" | "albums" | "memories"
 
 export function GalleryShellNav({
   active,
   signedIn,
   viewerId = null,
   mentionNotifications = [],
+  albumsAvailable = true,
+  memoriesAvailable = true,
+  notificationsAvailable = true,
 }: {
   active: GalleryShellActive
   signedIn: boolean
   viewerId?: string | null
   mentionNotifications?: GalleryNotification[]
+  albumsAvailable?: boolean
+  memoriesAvailable?: boolean
+  notificationsAvailable?: boolean
 }) {
   return (
     <div
@@ -48,7 +56,7 @@ export function GalleryShellNav({
         "relative z-10 flex shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4"
       )}
     >
-      {signedIn && viewerId ? (
+      {signedIn && viewerId && notificationsAvailable ? (
         <GalleryMentionBell
           viewerId={viewerId}
           initialNotifications={mentionNotifications}
@@ -59,13 +67,35 @@ export function GalleryShellNav({
         <GalleryNavLink href="https://portal.winlab.tw" external tone="shell">
           Portal
         </GalleryNavLink>
+        {albumsAvailable ? (
+          <GalleryNavLink
+            href="/albums"
+            active={active === "albums"}
+            tone="shell"
+          >
+            Albums
+          </GalleryNavLink>
+        ) : null}
+        {memoriesAvailable ? (
+          <GalleryNavLink
+            href="/memories"
+            active={active === "memories"}
+            tone="shell"
+          >
+            Memories
+          </GalleryNavLink>
+        ) : null}
         {signedIn ? (
           <>
             {active !== "manage" ? (
               <GalleryNavLink href="/upload" tone="shell">
-                Manage
+                Hang a photo
               </GalleryNavLink>
-            ) : null}
+            ) : (
+              <GalleryNavLink href="/" tone="shell">
+                Wall
+              </GalleryNavLink>
+            )}
             <SignOutButton className={galleryShellNavLinkClass()} />
           </>
         ) : (
@@ -113,6 +143,28 @@ export function GalleryShellNav({
                 Portal
               </a>
             </DropdownMenuItem>
+            {albumsAvailable ? (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/albums"
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <IconAlbum className="size-4 shrink-0" aria-hidden />
+                  Albums
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+            {memoriesAvailable ? (
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/memories"
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <IconHistory className="size-4 shrink-0" aria-hidden />
+                  Memories
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
             {signedIn && active !== "manage" ? (
               <DropdownMenuItem asChild>
                 <Link
@@ -120,7 +172,7 @@ export function GalleryShellNav({
                   className="flex cursor-pointer items-center gap-2"
                 >
                   <IconPhotoEdit className="size-4 shrink-0" aria-hidden />
-                  Manage
+                  Manage / upload
                 </Link>
               </DropdownMenuItem>
             ) : null}
@@ -131,7 +183,7 @@ export function GalleryShellNav({
                   className="flex cursor-pointer items-center gap-2"
                 >
                   <IconLayoutGrid className="size-4 shrink-0" aria-hidden />
-                  Gallery
+                  Back to wall
                 </Link>
               </DropdownMenuItem>
             ) : null}

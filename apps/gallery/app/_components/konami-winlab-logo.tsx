@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { describeKonamiWinLabAriaLabel } from "@/lib/gallery/konami-labels"
+
 /** Classic Konami: ↑↑↓↓←→←→BA (letters case-insensitive). */
 const SEQUENCE = [
   "ArrowUp",
@@ -325,7 +327,7 @@ export function KonamiWinlabLogo() {
       id="konami-winlab-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="WinLab"
+      aria-label={describeKonamiWinLabAriaLabel()}
       tabIndex={-1}
       className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm duration-300 data-open:animate-in data-open:fade-in-0"
       data-open

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -16,15 +16,27 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { Textarea } from "@workspace/ui/components/textarea"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
+import {
+  useAttendeeGroups,
+  useEpicDeliverables,
+  useGroupEpics,
+  useLabUsers,
+} from "@/hooks/rooms/use-lab-users"
+import type { GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCancelBooking,
   useConfirmBooking,
@@ -32,6 +44,8 @@ import {
 } from "@/hooks/rooms/use-room-booking"
 
 import { AttendeeSelect } from "./_components/attendee-select"
+import { DeliverablesField } from "./_components/deliverables-field"
+import { EpicField } from "./_components/epic-field"
 import { MeetingStatus } from "./_components/meeting-status"
 import { OnlineMeetings } from "./_components/online-meetings"
 import { RecurringTab } from "./_components/recurring-tab"
@@ -145,6 +159,40 @@ interface Selected {
   daySlots: AvailabilitySlot[]
 }
 
+/**
+ * What's in one 30-minute cell: when it is, and which rooms are behind the
+ * colour.
+ *
+ * Rooms are listed by tier rather than lumped together — "600A、345" reads as
+ * two equivalent options when one is free and the other is chargeable, which
+ * is the one distinction the whole colour scheme exists to make.
+ */
+function SlotTooltip({ date, slot }: { date: string; slot: AvailabilitySlot }) {
+  const tier = slotTier(slot)
+  const lines: { label: string; rooms: string[] }[] = [
+    { label: "免費", rooms: slot.freeRooms },
+    { label: "付費", rooms: slot.paidRooms },
+    { label: "本實驗室已借", rooms: slot.labRooms },
+  ].filter((l) => l.rooms.length > 0)
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="font-medium">
+        {formatDayLabel(date)} {slot.start}–{slot.end}
+      </div>
+      {tier === "none" ? (
+        <div className="text-muted-foreground">已滿,沒有可借的教室</div>
+      ) : (
+        lines.map(({ label, rooms }) => (
+          <div key={label} className="text-muted-foreground">
+            {label}:{rooms.join("、")}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 function DayRow({
   date,
   slots,
@@ -165,29 +213,21 @@ function DayRow({
         {formatDayLabel(date)}
       </span>
       <div className="flex flex-1 overflow-hidden rounded-md border">
-        {slots.map((slot, slotIndex) => {
-          const tier = slotTier(slot)
-          const detail =
-            tier === "none"
-              ? "已滿"
-              : tier === "free"
-                ? slot.freeRooms.join("、")
-                : tier === "lab"
-                  ? `本實驗室：${slot.labRooms.join("、")}`
-                  : slot.paidRooms.join("、")
-          return (
-            <button
-              key={slot.start}
+        {slots.map((slot, slotIndex) => (
+          <Tooltip key={slot.start}>
+            <TooltipTrigger
               type="button"
-              title={`${slot.start}–${slot.end}：${detail}`}
               onClick={() => onSelectSlot({ date, slotIndex, daySlots: slots })}
               className={cn(
                 "h-6 flex-1 cursor-pointer border-r transition-colors last:border-r-0",
-                TIER_STYLE[tier]
+                TIER_STYLE[slotTier(slot)]
               )}
             />
-          )
-        })}
+            <TooltipContent>
+              <SlotTooltip date={date} slot={slot} />
+            </TooltipContent>
+          </Tooltip>
+        ))}
       </div>
     </div>
   )
@@ -206,9 +246,33 @@ function BookingSuggestion({
 }) {
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
+  // Free text handed straight to GitLab, which opens the meeting's issue with
+  // it. Optional — a booking with no agenda is still a booking.
+  const [agenda, setAgenda] = useState("")
   // Which Keycloak group the attendees came from, if a group button was used.
   // Drives the topic prefix, which the user can see but not edit.
   const [groupName, setGroupName] = useState<string | null>(null)
+  // The epic this meeting reports into, if any. Picking one makes it the
+  // first kind of meeting: the pipeline marks that epic instead of opening a
+  // new one, and the agenda and deliverables come from it.
+  const [epic, setEpic] = useState<GitLabEpic | null>(null)
+  const epicsQuery = useGroupEpics(groupName)
+  const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
+
+  // An epic belongs to exactly one group, so switching groups invalidates the
+  // pick. Left in place it would be silently dropped server-side (the ref
+  // wouldn't match the new group's path) while the form still showed it.
+  useEffect(() => setEpic(null), [groupName])
+
+  /**
+   * Picking an epic pre-fills the agenda from its description, but only into
+   * an empty box — someone who has already typed something means it, and
+   * having it vanish on a dropdown change would be worse than no pre-fill.
+   */
+  function handleEpicChange(next: GitLabEpic | null) {
+    setEpic(next)
+    if (next?.description && !agenda.trim()) setAgenda(next.description)
+  }
   // Online-only: still a date and a time, just no room reserved.
   const [onlineOnly, setOnlineOnly] = useState(false)
   // On by default: the advisor attends essentially every meeting, and
@@ -259,11 +323,22 @@ function BookingSuggestion({
         startTime: startSlot.start,
         endTime: endSlot.end,
         titleSuffix,
+        agenda,
+        // Just the iid: the server resolves it against the group's own
+        // gitlab_path, so a reference to anything else can't be smuggled in.
+        issueRefs: epic ? [`&${epic.iid}`] : [],
         attendees: finalAttendees,
         groupName,
       },
       {
         onSuccess: (result) => {
+          // The server returns failures rather than throwing them, so this
+          // branch has to check — a thrown error would be redacted to
+          // something meaningless in production.
+          if (result.error) {
+            toast.error(result.error)
+            return
+          }
           if (result.inviteError) {
             toast.warning(`${what},但邀請信寄送失敗:${result.inviteError}`)
           } else {
@@ -343,6 +418,37 @@ function BookingSuggestion({
                     setGroupName(group.name)
                   }
                 />
+              </div>
+
+              <EpicField
+                id="booking-epic"
+                epics={epicsQuery.data}
+                value={epic?.iid ?? null}
+                onChange={handleEpicChange}
+              />
+
+              <DeliverablesField
+                result={deliverablesQuery.data}
+                loading={deliverablesQuery.isFetching}
+                hasEpic={!!epic}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="booking-agenda" className="text-xs">
+                  討論事項（可不填）
+                </Label>
+                <Textarea
+                  id="booking-agenda"
+                  value={agenda}
+                  onChange={(e) => setAgenda(e.target.value)}
+                  placeholder="這場會議要討論什麼"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {epic
+                    ? "從 epic 帶進來的,可以改。會一併送到 GitLab。"
+                    : "會一併帶到 GitLab,成為這場會議 epic 的內容。"}
+                </p>
               </div>
 
               <p className="rounded-md border bg-muted/50 p-2 text-xs text-muted-foreground">
@@ -433,6 +539,10 @@ function LabBookingCancel({
         onClick={() =>
           cancelBooking.mutate(match.id, {
             onSuccess: (result) => {
+              if (result.error) {
+                toast.error(result.error)
+                return
+              }
               if (result.inviteError) {
                 toast.warning(
                   `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`

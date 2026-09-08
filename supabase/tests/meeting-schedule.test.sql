@@ -1,4 +1,5 @@
--- meetings_swap / meetings_insert_week / meetings_remove_week regression suite —
+-- meetings_swap / meetings_insert_week / meetings_remove_week /
+-- meetings_append_week regression suite —
 -- runs via `supabase test db`. Mirrors questioner-rotation.test.sql conventions:
 -- seed as superuser (bypasses RLS), impersonate by switching to the
 -- `authenticated` role + setting request.jwt.claims (what auth.uid()/is_meetings_admin
@@ -11,7 +12,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(53);
+select plan(77);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -45,6 +46,15 @@ insert into public.user_profiles (id, email, name, roles) values
   ('aaaaaaaa-0000-0000-0000-000000000012', 'q2@test.local', 'Q2', '{}'::jsonb),
   ('aaaaaaaa-0000-0000-0000-000000000013', 'q3@test.local', 'Q3', '{}'::jsonb),
   ('aaaaaaaa-0000-0000-0000-000000000014', 'q4@test.local', 'Q4', '{}'::jsonb);
+
+-- Fixture profiles are active lab members unless a scenario below says
+-- otherwise. Since 20260831140000 the scheduling automation only considers
+-- members whose lab_status is set and is not 'alumni', so leaving these NULL
+-- would make every candidate set here empty and every assertion below vacuous.
+-- Written as a follow-up UPDATE rather than a column in each INSERT so the
+-- scenarios that DO care about lab_status (tier ordering, the alumni
+-- exclusions) can set theirs explicitly and stay untouched by this.
+update public.user_profiles set lab_status = 'master' where lab_status is null;
 
 -- ── meetings ─────────────────────────────────────────────────────────────────
 -- Swap year 2030
@@ -101,7 +111,7 @@ select throws_ok(
   'P0001', '不能與自己互換', 'cannot swap a meeting with itself');
 select throws_ok(
   $$ select public.meetings_swap('cccccccc-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000004') $$,
-  'P0001', '只能在同一年度內互換', 'cannot swap across years');
+  'P0001', '只能在同一學期內互換', 'cannot swap across semesters');
 select throws_ok(
   $$ select public.meetings_swap('cccccccc-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000003') $$,
   'P0001', '假期週不可互換', 'cannot swap a holiday week');
@@ -470,6 +480,279 @@ select is(
   (select paper_title from public.meetings where id = '77777777-0000-0000-0000-000000000003'),
   '講題Y',
   'editing a speaker week talk title persists (trigger leaves it, teacher_paper_id null)');
+
+-- ═══ tail regression: an appended week stays in ITS OWN semester ════════════
+-- The whole reason meeting_semesters exists. 上學期 of academic year 132 ends in
+-- January; five admin insert-weeks push the trailing slot across the
+-- January→February line, where re-deriving the semester from the date would say
+-- 下學期. The stored semester_id has to win: the tail keeps counting inside the
+-- semester it was appended to, and no second semester may be minted for the
+-- February/March dates.
+--
+-- Wednesday cadence (2044-01-13 …) on purpose, and 2044 is a leap year, so the
+-- arithmetic below is 02-24 + 7 = 03-02.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('66666666-0000-0000-0000-000000000001', 2044, '第1週', '2044-01-13', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('66666666-0000-0000-0000-000000000002', 2044, '第2週', '2044-01-20', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('66666666-0000-0000-0000-000000000003', 2044, '第3週', '2044-01-27', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023');
+
+-- Always insert at the same row: it is postponed one slot per call and never
+-- becomes the trailing week, so five calls append five weeks.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000001');
+reset role;
+
+select is(
+  (select count(*)::int from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)),
+  8,
+  'every week of the extended 上學期 — February and March tail included — stays in the original semester');
+select is(
+  (select count(*)::int from public.meeting_semesters where academic_year = 132),
+  1,
+  'pushing the tail past February mints no second semester for the February/March dates');
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)),
+  '第1週,第2週,第3週,第4週,第5週,第6週,第7週,第8週',
+  'the trailing labels keep counting inside the semester (第1..第8週, no restart, no second sequence)');
+select is(
+  (select scheduled_date from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)
+     and week_label = '第8週'),
+  '2044-03-02'::date,
+  '第8週 lands on 2044-03-02 — past the end of February, still 上學期 132');
+select is(
+  (select count(*)::int from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 132 and term = 1)
+     and year = 2044),
+  8,
+  'every appended week inherits the target row''s year (2044) — meetings.year keeps its meaning');
+
+-- ═══ two semesters in ONE `year` bucket are numbered independently ══════════
+-- Semester A: 4 Wednesdays from 2046-09-05 (上學期 135). Semester B: 3 Fridays
+-- from 2047-02-22 (下學期 135). Different weekday, different length, and both
+-- carry year = 2046 — exactly the bucket the old year-scoped logic shared, where
+-- an insert in A shifted B's rows and minted its label from B's numbers too.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('55555555-0000-0000-0000-00000000000a', 2046, '第1週', '2046-09-05', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('55555555-0000-0000-0000-00000000000b', 2046, '第2週', '2046-09-12', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('55555555-0000-0000-0000-00000000000c', 2046, '第3週', '2046-09-19', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'),
+  ('55555555-0000-0000-0000-00000000000d', 2046, '第4週', '2046-09-26', false, null, null),
+  ('55555555-0000-0000-0000-00000000001a', 2046, '第1週', '2047-02-22', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('55555555-0000-0000-0000-00000000001b', 2046, '第2週', '2047-03-01', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('55555555-0000-0000-0000-00000000001c', 2046, '第3週', '2047-03-08', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023');
+
+-- The swap guard is a SEMESTER guard, not the year guard it replaced. These two
+-- rows are the only pair in this file that can prove it: same meetings.year
+-- (2046), different semester (上學期 135 vs 下學期 135). The refusal asserted up at
+-- the top of this file uses rows from 2030 and 2033, which are different
+-- CALENDAR YEARS too, so it passed identically under the old year-based check —
+-- only the message changed. This one fails under that check and passes under
+-- this one.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_swap('55555555-0000-0000-0000-00000000000a','55555555-0000-0000-0000-00000000001a') $$,
+  'P0001', '只能在同一學期內互換',
+  'two rows in the SAME year bucket but different semesters cannot be swapped');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('55555555-0000-0000-0000-00000000000a');
+reset role;
+
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 1)),
+  '第1週,第2週,第3週,第4週,第5週',
+  'semester A is numbered 第1..第5週 from its own weeks after the insert');
+select is(
+  (select to_char(max(scheduled_date), 'YYYY-MM-DD Dy') from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 1)),
+  '2046-10-03 Wed',
+  'A''s appended week keeps A''s own Wednesday cadence (2046-09-26 + 7)');
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 2)),
+  '第1週,第2週,第3週',
+  'semester B still numbers 第1..第3週 — an insert in A never renumbers B');
+select is(
+  (select string_agg(to_char(scheduled_date, 'YYYY-MM-DD'), ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 135 and term = 2)),
+  '2047-02-22,2047-03-01,2047-03-08',
+  'B''s Friday dates are untouched by the insert in A (no cross-semester shift)');
+select isnt(
+  (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000001a'),
+  (select semester_id from public.meetings where id = '55555555-0000-0000-0000-00000000000b'),
+  'the two semesters sharing the year 2046 bucket are distinct entities');
+
+-- ═══ an appended week never lands on a date ANOTHER semester holds ══════════
+-- The one predicate in meetings_insert_week that is date-global rather than
+-- semester-scoped, and why: 上學期 137 ends on 2049-01-27, so its next slot would
+-- be 2049-02-03 — which 下學期 137 already occupies, because an appended 上學期
+-- week walks straight into 下學期's calendar months. One meeting per calendar date
+-- is a lab-wide invariant with no unique index behind it (and a doubled date makes
+-- the Nextcloud recording match ambiguous), so the free-date scan has to see rows
+-- outside its own semester and step past them to 2049-02-10.
+insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('44444444-0000-0000-0000-000000000001', 2049, '第1週', '2049-01-20', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'), -- 上學期 137
+  ('44444444-0000-0000-0000-000000000002', 2049, '第2週', '2049-01-27', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'), -- 上學期 137
+  ('44444444-0000-0000-0000-000000000009', 2049, '第1週', '2049-02-03', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'); -- 下學期 137
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('44444444-0000-0000-0000-000000000001');
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '44444444-0000-0000-0000-000000000002'),
+  '2049-02-10'::date,
+  'the appended slot steps past 2049-02-03 — a date another semester already holds');
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2049-02-03'),
+  1,
+  '2049-02-03 still holds exactly one meeting (no two rows share a calendar date)');
+
+-- ═══ meetings_append_week ═══════════════════════════════════════════════════
+-- The RPC that replaced the schedule tab's client-side append. Its whole reason
+-- to exist is that the client computed the label and the date from a YEAR-
+-- filtered row set, and a semester can outgrow one year bucket.
+--
+-- 上學期 141 is exactly that shape: six Fridays from 2052-12-06, the first four
+-- carrying year = 2052 and the last two year = 2053. A client looking at the
+-- 2052 tab sees 第1週..第4週 and would mint 第5週 — a number this semester already
+-- uses, on 2053-01-03 which it already occupies. The server sees all six.
+insert into public.meeting_semesters (id, academic_year, term, start_date, planned_weeks)
+values ('eeeeeeee-0000-0000-0000-0000000000f1', 141, 1, '2052-12-06', 16);
+
+insert into public.meetings (id, year, semester_id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('eeeeeeee-0000-0000-0000-000000000001', 2052, 'eeeeeeee-0000-0000-0000-0000000000f1', '第1週', '2052-12-06', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('eeeeeeee-0000-0000-0000-000000000002', 2052, 'eeeeeeee-0000-0000-0000-0000000000f1', '第2週', '2052-12-13', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('eeeeeeee-0000-0000-0000-000000000003', 2052, 'eeeeeeee-0000-0000-0000-0000000000f1', '第3週', '2052-12-20', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'),
+  ('eeeeeeee-0000-0000-0000-000000000004', 2052, 'eeeeeeee-0000-0000-0000-0000000000f1', '第4週', '2052-12-27', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000005', 2053, 'eeeeeeee-0000-0000-0000-0000000000f1', '第5週', '2053-01-03', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000006', 2053, 'eeeeeeee-0000-0000-0000-0000000000f1', '第6週', '2053-01-10', false, null, null);
+
+-- non-admin cannot append
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000009","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_append_week('eeeeeeee-0000-0000-0000-0000000000f1') $$,
+  '42501', NULL, 'a non-admin cannot call meetings_append_week');
+reset role;
+
+-- a semester with no weeks has no cadence and no last row to continue from
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_append_week('eeeeeeee-0000-0000-0000-00000000ffff') $$,
+  'P0001', '此學期還沒有任何週次，無法接續新增',
+  'appending to a semester that holds no weeks is refused, not guessed');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table appended_x as
+  select public.meetings_append_week('eeeeeeee-0000-0000-0000-0000000000f1') as id;
+reset role;
+
+select is(
+  (select week_label from public.meetings where id = (select id from appended_x)),
+  '第7週',
+  'the label is minted from the WHOLE semester (第7週), not from the 2052 year bucket a client would see');
+select is(
+  (select scheduled_date from public.meetings where id = (select id from appended_x)),
+  '2053-01-17'::date,
+  'the date is the semester''s own last date + 7, keeping its Friday cadence');
+select is(
+  (select year from public.meetings where id = (select id from appended_x)),
+  2053,
+  'the appended week inherits the year of the row it extends (2053), like meetings_insert_week');
+select is(
+  (select semester_id from public.meetings where id = (select id from appended_x)),
+  'eeeeeeee-0000-0000-0000-0000000000f1'::uuid,
+  'semester_id is stamped explicitly — the January date must not derive elsewhere');
+select is(
+  (select count(*)::int from public.meetings where semester_id = 'eeeeeeee-0000-0000-0000-0000000000f1'),
+  7,
+  'append adds exactly one row and shifts nothing (6 -> 7)');
+
+-- ═══ the free-date walk is bounded, and says so ═════════════════════════════
+-- 上學期 143 has been extended into February already (2055-02-05 carries an
+-- explicit 上學期 semester_id). Its next eight Fridays are the whole of 下學期
+-- 143's generated schedule. The old unbounded walk stepped over all of them and
+-- minted 2055-04-09 — four months out, still stamped 上學期 — and reported
+-- success. Both entry points must now refuse instead.
+insert into public.meeting_semesters (id, academic_year, term, start_date, planned_weeks) values
+  ('eeeeeeee-0000-0000-0000-0000000000b1', 143, 1, '2054-09-04', 16),
+  ('eeeeeeee-0000-0000-0000-0000000000b2', 143, 2, '2055-02-12', 8);
+
+insert into public.meetings (id, year, semester_id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('eeeeeeee-0000-0000-0000-000000000011', 2055, 'eeeeeeee-0000-0000-0000-0000000000b1', '第1週', '2055-01-29', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('eeeeeeee-0000-0000-0000-000000000012', 2055, 'eeeeeeee-0000-0000-0000-0000000000b1', '第2週', '2055-02-05', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('eeeeeeee-0000-0000-0000-000000000021', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第1週', '2055-02-12', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000022', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第2週', '2055-02-19', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000023', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第3週', '2055-02-26', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000024', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第4週', '2055-03-05', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000025', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第5週', '2055-03-12', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000026', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第6週', '2055-03-19', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000027', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第7週', '2055-03-26', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000028', 2055, 'eeeeeeee-0000-0000-0000-0000000000b2', '第8週', '2055-04-02', false, null, null);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+-- The full message, because naming the blocking dates IS the fix: without them
+-- the admin has no way to learn that the other term is in the way.
+select throws_ok(
+  $$ select public.meetings_append_week('eeeeeeee-0000-0000-0000-0000000000b1') $$,
+  'P0001',
+  '找不到可用的日期：2055-02-12 起連續 8 個同一星期幾的日期都已排定（2055-02-12、2055-02-19、2055-02-26、2055-03-05、2055-03-12、2055-03-19、2055-03-26、2055-04-02），請確認是否已與另一學期的排班重疊',
+  'append refuses when the next eight slots are taken, and names every blocking date');
+select throws_ok(
+  $$ select public.meetings_insert_week('eeeeeeee-0000-0000-0000-000000000011') $$,
+  'P0001', NULL,
+  'meetings_insert_week hits the same bounded walk and aborts its shuffle');
+reset role;
+
+select is(
+  (select string_agg(to_char(scheduled_date, 'YYYY-MM-DD') || '=' || week_label, ',' order by scheduled_date)
+   from public.meetings where semester_id = 'eeeeeeee-0000-0000-0000-0000000000b1'),
+  '2055-01-29=第1週,2055-02-05=第2週',
+  'the refused append and insert changed nothing — no row minted four months out');
+
+-- The ceiling is EIGHT candidates, not seven: 上學期 147 is blocked on its next
+-- seven Fridays and free on the eighth, which it takes.
+insert into public.meeting_semesters (id, academic_year, term, start_date, planned_weeks) values
+  ('eeeeeeee-0000-0000-0000-0000000000c1', 147, 1, '2058-09-06', 16),
+  ('eeeeeeee-0000-0000-0000-0000000000c2', 147, 2, '2059-02-07', 7);
+
+insert into public.meetings (id, year, semester_id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('eeeeeeee-0000-0000-0000-000000000031', 2059, 'eeeeeeee-0000-0000-0000-0000000000c1', '第1週', '2059-01-31', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000041', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第1週', '2059-02-07', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000042', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第2週', '2059-02-14', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000043', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第3週', '2059-02-21', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000044', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第4週', '2059-02-28', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000045', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第5週', '2059-03-07', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000046', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第6週', '2059-03-14', false, null, null),
+  ('eeeeeeee-0000-0000-0000-000000000047', 2059, 'eeeeeeee-0000-0000-0000-0000000000c2', '第7週', '2059-03-21', false, null, null);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table appended_c as
+  select public.meetings_append_week('eeeeeeee-0000-0000-0000-0000000000c1') as id;
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = (select id from appended_c)),
+  '2059-03-28'::date,
+  'seven blocked slots are walked past and the eighth candidate is taken — the bound is inclusive');
 
 select * from finish();
 rollback;

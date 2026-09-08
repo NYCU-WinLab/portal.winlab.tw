@@ -14,7 +14,11 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useAddMeeting } from "@/hooks/meetings/use-meetings"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
-import { typeFlags, type MeetingType } from "@/lib/meetings/meeting-type"
+import {
+  hasFreeFormTitle,
+  typeFlags,
+  type MeetingType,
+} from "@/lib/meetings/meeting-type"
 
 import { MeetingTypeSelect } from "./meeting-type-select"
 import { PresenterSelect } from "./presenter-select"
@@ -54,10 +58,12 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
     if (!canSubmit) return
     const flags = typeFlags(type)
 
+    // A thesis week is presented by a lab member, same as a plain presentation.
+    const hasPresenterUser = type === "presentation" || type === "thesis"
     const presenter =
       type === "speaker"
         ? speakerName.trim()
-        : type === "presentation" && presenterUserId !== "__none__"
+        : hasPresenterUser && presenterUserId !== "__none__"
           ? (users.find((u) => u.id === presenterUserId)?.name ?? null)
           : null
 
@@ -68,12 +74,15 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
         scheduledDate: date,
         isHoliday: flags.isHoliday,
         isSpeaker: flags.isSpeaker,
+        isThesis: flags.isThesis,
         presenter,
         presenterUserId:
-          type === "presentation" && presenterUserId !== "__none__"
+          hasPresenterUser && presenterUserId !== "__none__"
             ? presenterUserId
             : null,
-        paperTitle: type === "speaker" ? talkTitle.trim() || null : undefined,
+        paperTitle: hasFreeFormTitle(type)
+          ? talkTitle.trim() || null
+          : undefined,
       },
       {
         onSuccess: () => {
@@ -115,7 +124,7 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
             />
           </div>
 
-          {type === "presentation" && (
+          {(type === "presentation" || type === "thesis") && (
             <div className="flex flex-col gap-1.5">
               <Label>報告人</Label>
               <PresenterSelect
@@ -127,24 +136,30 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
           )}
 
           {type === "speaker" && (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label>講者姓名</Label>
-                <Input
-                  value={speakerName}
-                  onChange={(e) => setSpeakerName(e.target.value)}
-                  placeholder="吳凱強老師"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>講題（選填）</Label>
-                <Input
-                  value={talkTitle}
-                  onChange={(e) => setTalkTitle(e.target.value)}
-                  placeholder="演講主題"
-                />
-              </div>
-            </>
+            <div className="flex flex-col gap-1.5">
+              <Label>講者姓名</Label>
+              <Input
+                value={speakerName}
+                onChange={(e) => setSpeakerName(e.target.value)}
+                placeholder="吳凱強老師"
+              />
+            </div>
+          )}
+
+          {hasFreeFormTitle(type) && (
+            <div className="flex flex-col gap-1.5">
+              <Label>
+                {type === "thesis" ? "論文題目（選填）" : "講題（選填）"}
+              </Label>
+              <Input
+                value={talkTitle}
+                onChange={(e) => setTalkTitle(e.target.value)}
+                maxLength={300}
+                placeholder={
+                  type === "thesis" ? "報告人之後可自行填寫" : "演講主題"
+                }
+              />
+            </div>
           )}
         </div>
 

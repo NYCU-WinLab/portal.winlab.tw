@@ -10,7 +10,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(26);
+select plan(41);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -120,6 +120,12 @@ reset role;
 
 select is((select (ret->>'inserted')::int from gen_skip), 2, 'skips the one existing date, inserts the other 2');
 select is((select (ret->>'skipped')::int from gen_skip), 1, 'reports 1 skipped');
+-- The two skip reasons are reported separately: this one is a taken DATE, and
+-- the UI must not tell the admin their week numbers were already used.
+select is((select (ret->>'skipped_date')::int from gen_skip), 1,
+  'the skip is attributed to the taken date (skipped_date = 1)');
+select is((select (ret->>'skipped_label')::int from gen_skip), 0,
+  'no week number was in the way (skipped_label = 0)');
 select is(
   (select presenter from public.meetings where year = 2042 and scheduled_date = '2042-09-04'),
   '既有報告人', 'the pre-existing presenter is never overwritten');
@@ -138,6 +144,103 @@ reset role;
 
 select is((select (ret->>'inserted')::int from gen_again), 0, 're-running the same generate inserts nothing (idempotent)');
 select is((select (ret->>'skipped')::int from gen_again), 3, 're-running reports all 3 dates skipped');
+
+-- ═══ the semester records the plan it was generated from ════════════════════
+-- The basic 4-week generate at the top of this file opened 上學期 129
+-- (2040-09-06 → ROC academic year 129, term 1) on a semester that did not exist
+-- yet, so generate got to stamp its own metadata onto it.
+select is(
+  (select planned_weeks from public.meeting_semesters where academic_year = 129 and term = 1),
+  4,
+  'the generated semester records the p_weeks it was generated with (planned_weeks = 4)');
+
+-- ═══ two semesters in ONE `year` bucket each restart at 第1週 (第17週 fix) ════
+-- Both calls pass the same p_year, which is exactly the situation that used to
+-- run one continuous counter over a calendar year and overflow past 第16週.
+-- 2050-09-01 → 上學期 139; 2051-02-17 → 下學期 139.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_generate_semester(2050, '2050-09-01', 3, '[]'::jsonb);
+select public.meetings_generate_semester(2050, '2051-02-17', 3, '[]'::jsonb);
+reset role;
+
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 1)),
+  '第1週,第2週,第3週',
+  '上學期 139 is numbered 第1週..第3週');
+select is(
+  (select string_agg(week_label, ',' order by scheduled_date) from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 2)),
+  '第1週,第2週,第3週',
+  '下學期 139 restarts at 第1週 despite sharing the year 2050 bucket (no 第17週 overflow)');
+select isnt(
+  (select semester_id from public.meetings where scheduled_date = '2051-02-17'),
+  (select semester_id from public.meetings where scheduled_date = '2050-09-01'),
+  'the two generated semesters carry different semester_ids');
+
+-- ═══ regenerating a semester from a shifted start date adds nothing ═════════
+-- Same semester (2050-09-02 is still 上學期 139), one day later, so not one date
+-- collides — but every WEEK NUMBER is already taken. Re-running must not lay a
+-- second 第1週 beside the first; the shifted rows come back as `skipped`.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table gen_shifted as
+  select public.meetings_generate_semester(2050, '2050-09-02', 3, '[]'::jsonb) as ret;
+reset role;
+
+select is((select (ret->>'inserted')::int from gen_shifted), 0,
+  'a shifted-start regenerate of the same semester inserts nothing');
+select is((select (ret->>'skipped')::int from gen_shifted), 3,
+  'all 3 shifted rows are reported as skipped');
+-- The reason MATTERS here, and it is the opposite of the gen_skip case above:
+-- not one date collided, every week NUMBER did. Reported as a date collision it
+-- reads as "already scheduled, nothing to do", and the admin walks away from a
+-- schedule that was never created.
+select is((select (ret->>'skipped_date')::int from gen_shifted), 0,
+  'a shifted-start regenerate collides with no DATE (skipped_date = 0)');
+select is((select (ret->>'skipped_label')::int from gen_shifted), 3,
+  'all 3 skips are week-number collisions inside the semester (skipped_label = 3)');
+select is(
+  (select count(*)::int from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 1)),
+  3,
+  '上學期 139 still holds exactly 3 weeks — no second 第1週 was created');
+select is(
+  (select string_agg(to_char(scheduled_date, 'YYYY-MM-DD') || '=' || week_label, ',' order by scheduled_date)
+   from public.meetings
+   where semester_id = (select id from public.meeting_semesters where academic_year = 139 and term = 1)),
+  '2050-09-01=第1週,2050-09-08=第2週,2050-09-15=第3週',
+  'the pre-existing dates and labels are left exactly as they were');
+
+-- ═══ generate never lands on a date ANOTHER semester holds ══════════════════
+-- The date skip is date-global, not semester-scoped. 上學期 145 was extended into
+-- February (2057-02-07 / 02-14 carry an EXPLICIT 上學期 semester_id, which is what
+-- keeps an appended week in its own semester even though its date derives to
+-- 下學期). Generating 下學期 145 from 2057-02-14 therefore starts on a date that is
+-- already taken: it must be reported as `skipped`, not inserted on top. One
+-- meeting per calendar date is a lab-wide invariant that no constraint enforces.
+insert into public.meeting_semesters (id, academic_year, term, start_date, planned_weeks)
+values ('dddddddd-0000-0000-0000-0000000000a1', 145, 1, '2056-09-06', 16);
+
+insert into public.meetings (year, semester_id, week_label, scheduled_date, is_holiday) values
+  (2056, 'dddddddd-0000-0000-0000-0000000000a1', '第15週', '2057-02-07', false),
+  (2056, 'dddddddd-0000-0000-0000-0000000000a1', '第16週', '2057-02-14', false);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table gen_over_tail as
+  select public.meetings_generate_semester(2057, '2057-02-14', 3, '[]'::jsonb) as ret;
+reset role;
+
+select is((select (ret->>'skipped')::int from gen_over_tail), 1,
+  '2057-02-14 is reported as skipped — 上學期''s appended tail already holds that date');
+select is((select (ret->>'inserted')::int from gen_over_tail), 2,
+  'the other two dates are free and inserted');
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2057-02-14'),
+  1,
+  '2057-02-14 still holds exactly one meeting (no two rows share a calendar date)');
 
 select * from finish();
 rollback;

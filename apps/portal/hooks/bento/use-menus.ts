@@ -21,6 +21,7 @@ export function useMenus(opts: UseMenusOptions = {}) {
       let query = supabase
         .from("bento_menus")
         .select("*, menu_items:bento_menu_items(*)")
+        .order("is_pinned", { ascending: false })
         .order("is_active", { ascending: false })
         .order("name")
 
@@ -78,6 +79,31 @@ export function useToggleMenuActive() {
   })
 }
 
+export function useTogglePinned() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { id: string; nextPinned: boolean }) => {
+      const { data, error } = await supabase
+        .from("bento_menus")
+        .update({
+          is_pinned: params.nextPinned,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.menus.all })
+    },
+  })
+}
+
 export function useMenu(id: string | undefined) {
   const supabase = createClient()
 
@@ -92,52 +118,6 @@ export function useMenu(id: string | undefined) {
 
       if (error) throw error
       return data
-    },
-    enabled: !!id,
-  })
-}
-
-export function useMenuItemCounts(id: string | undefined) {
-  const supabase = createClient()
-
-  return useQuery({
-    queryKey: queryKeys.menus.stats(id!),
-    queryFn: async () => {
-      const { data: closedOrders } = await supabase
-        .from("bento_orders")
-        .select("id")
-        .eq("restaurant_id", id!)
-        .eq("status", "closed")
-
-      const itemCounts: Record<string, number> = {}
-
-      if (closedOrders && closedOrders.length > 0) {
-        const orderIds = closedOrders.map((o) => o.id)
-
-        const { data: orderItems } = await supabase
-          .from("bento_order_items")
-          .select("menu_item_id")
-          .in("order_id", orderIds)
-
-        if (orderItems) {
-          for (const item of orderItems) {
-            itemCounts[item.menu_item_id] =
-              (itemCounts[item.menu_item_id] || 0) + 1
-          }
-        }
-      }
-
-      const { data: menuItems } = await supabase
-        .from("bento_menu_items")
-        .select("id, name, price")
-        .eq("restaurant_id", id!)
-
-      const items = (menuItems || []).map((item) => ({
-        ...item,
-        order_count: itemCounts[item.id] || 0,
-      }))
-
-      return { items }
     },
     enabled: !!id,
   })
@@ -318,7 +298,6 @@ export function useUpdateMenu(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.menus.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.menus.detail(id) })
-      queryClient.invalidateQueries({ queryKey: queryKeys.menus.stats(id) })
     },
   })
 }

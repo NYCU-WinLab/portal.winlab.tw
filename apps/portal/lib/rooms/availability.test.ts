@@ -240,4 +240,55 @@ describe("suggestRoom", () => {
   test("returns null when the duration runs past the end of the day", () => {
     expect(suggestRoom(daySlots, 4, 2)).toBeNull()
   })
+
+  // Floor, then room number ascending, then the trailing letter reversed.
+  describe("room ordering", () => {
+    const oneSlot = (freeRooms: string[]): AvailabilitySlot[] => [
+      { start: "09:00", end: "09:30", freeRooms, paidRooms: [], labRooms: [] },
+    ]
+    const pick = (rooms: string[]) => suggestRoom(oneSlot(rooms), 0, 1)?.room
+
+    // 6 first, 7 last; everything else descends in between.
+    test("the floor decides first", () => {
+      expect(pick(["500A", "600A"])).toBe("600A")
+      expect(pick(["600A", "700A"])).toBe("600A")
+      expect(pick(["100A", "700A"])).toBe("100A")
+      expect(pick(["345", "513"])).toBe("513")
+      expect(pick(["203", "410"])).toBe("410")
+    })
+
+    test("within a floor, the lower room number wins", () => {
+      expect(pick(["610", "600"])).toBe("600")
+      expect(pick(["513", "500B"])).toBe("500B")
+      expect(pick(["ES705", "700A"])).toBe("700A")
+    })
+
+    // Reversed on purpose, and only once two rooms already share a number.
+    test("the later letter wins inside the same room number", () => {
+      expect(pick(["600A", "600B"])).toBe("600B")
+      expect(pick(["600B", "600A"])).toBe("600B")
+      expect(pick(["600A", "600C", "600B"])).toBe("600C")
+    })
+
+    test("a worse floor is never pulled ahead by its letter", () => {
+      expect(pick(["700B", "600A"])).toBe("600A")
+      expect(pick(["610B", "600A"])).toBe("600A")
+    })
+
+    test("a suffixed room beats the bare number it shares", () => {
+      expect(pick(["600", "600A"])).toBe("600A")
+    })
+
+    // A new seminar room needs no code change — this is the whole reason the
+    // key is the floor digit rather than a list of whole room numbers.
+    test("a room nobody has heard of still places by its floor", () => {
+      expect(pick(["601C", "700A"])).toBe("601C")
+      expect(pick(["ES705", "422"])).toBe("422")
+    })
+
+    test("something with no number at all sorts last, not first", () => {
+      expect(pick(["Lounge", "700A"])).toBe("700A")
+      expect(pick(["Lounge"])).toBe("Lounge")
+    })
+  })
 })

@@ -18,6 +18,8 @@ import {
   useMeetings,
   type SemesterHoliday,
 } from "@/hooks/meetings/use-meetings"
+import { useSemesters } from "@/hooks/meetings/use-semesters"
+import { semesterKeyForDate } from "@/lib/meetings/semester"
 
 interface Props {
   year: number
@@ -47,9 +49,18 @@ function formatMd(dateStr: string): string {
 export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   const generate = useGenerateSemester()
   // Cache hit — schedule-tab already fetched this year. Used to show which
-  // weeks the RPC will skip (dates that already exist) so a mis-picked start
-  // date can't silently produce a duplicate 第N週 schedule.
+  // weeks the RPC will skip so a mis-picked start date can't silently produce a
+  // duplicate 第N週 schedule. The RPC skips for TWO reasons and this preview has
+  // to mirror both, or the case it was built for — a start date shifted by a
+  // week, where no date collides but every number is taken — shows as sixteen
+  // insertable weeks and then inserts none.
   const { data: existing = [] } = useMeetings(year)
+  // Same trap schedule-tab fell into: without the semester list the week-number
+  // rule below silently switches itself off and the preview quietly reverts to
+  // the date-only rule it had before — looking exactly like a start date that
+  // collides with nothing. The banner further down is what stops a viewer
+  // believing an incomplete preview.
+  const { data: semesters = [], isError: semestersFailed } = useSemesters()
 
   const [startDate, setStartDate] = useState("")
   const [weeks, setWeeks] = useState(16)
@@ -63,6 +74,34 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
     [existing]
   )
 
+  // Which 第N週 numbers the semester this generate would open ALREADY holds —
+  // the server's second skip rule, mirrored. The semester is the one the start
+  // date falls in; if it hasn't been minted yet there is nothing to collide
+  // with and the set is empty.
+  //
+  // Known limitation, shared with `existingDates` above: `existing` is one
+  // `meetings.year` bucket, and a semester can span two, so a semester whose
+  // earlier half sits in the previous bucket contributes only the numbers
+  // visible here. The server is the authority and skips either way; this is a
+  // preview, and it now errs on the same side as the dates do.
+  const usedWeekNumbers = useMemo(() => {
+    const used = new Set<number>()
+    if (!startDate) return used
+    const key = semesterKeyForDate(startDate)
+    const target = semesters.find(
+      (s) => s.academicYear === key.academicYear && s.term === key.term
+    )
+    if (!target) return used
+    for (const m of existing) {
+      if (m.semesterId !== target.id) continue
+      // Prefix match, like the RPC's `^第N週` regex: 第2週(月考週) still counts
+      // as number 2 being taken.
+      const match = /^第(\d+)週/.exec(m.weekLabel ?? "")
+      if (match) used.add(Number(match[1]))
+    }
+    return used
+  }, [startDate, semesters, existing])
+
   const preview = useMemo(() => {
     if (!startDate || !weeksValid) return []
     // First-occurrence wins per date, matching the server's `limit 1` scan, and
@@ -75,18 +114,28 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
     }
     return Array.from({ length: weeks }, (_, i) => {
       const date = addDays(startDate, i * 7)
+      const no = i + 1
+      // Date first, then label — the order the RPC checks them in, so the
+      // reason shown is the reason the server will act on.
+      const skipReason = existingDates.has(date)
+        ? "date"
+        : usedWeekNumbers.has(no)
+          ? "label"
+          : null
       return {
-        no: i + 1,
+        no,
         date,
         reason: byDate.get(date) ?? null,
-        skip: existingDates.has(date),
+        skip: skipReason !== null,
+        skipReason,
       }
     })
-  }, [startDate, weeks, weeksValid, holidays, existingDates])
+  }, [startDate, weeks, weeksValid, holidays, existingDates, usedWeekNumbers])
 
-  // The year already has rows but none of them line up with the chosen cadence:
-  // the strongest signal that the start date is wrong and generate would append
-  // a parallel, duplicate-numbered schedule instead of filling this one.
+  // The year already has rows, and not one of the weeks about to be generated
+  // collides with them — neither by date nor by week number. That is the
+  // strongest signal left that the start date is wrong: generate would lay a
+  // parallel schedule beside the existing one instead of filling it.
   const misaligned =
     existing.length > 0 && preview.length > 0 && preview.every((w) => !w.skip)
 
@@ -201,6 +250,12 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
             )}
           </div>
 
+          {semestersFailed && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              讀取學期失敗，下方預覽只會標出「日期已存在」的週次，無法標出「週次編號已被此學期使用」的週次——仍可產生，伺服器一樣會略過重複的週次，但預覽此刻並不完整。
+            </p>
+          )}
+
           {misaligned && (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               此 {year} 年度已有 {existing.length}{" "}
@@ -210,7 +265,9 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
 
           {preview.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <Label>預覽（已存在的日期會自動略過，不覆寫）</Label>
+              <Label>
+                預覽（日期已排定、或該週次編號此學期已用過的，都會自動略過，不覆寫）
+              </Label>
               <div className="max-h-56 overflow-y-auto rounded-md border">
                 {preview.map((w) => (
                   <div
@@ -224,8 +281,13 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
                       第{w.no}週{w.reason ? `(${w.reason})` : ""}
                     </span>
                     <span className="flex items-center gap-2">
-                      {w.skip && (
-                        <span className="text-[10px]">已存在・略過</span>
+                      {w.skipReason === "date" && (
+                        <span className="text-[10px]">日期已存在・略過</span>
+                      )}
+                      {w.skipReason === "label" && (
+                        <span className="text-[10px]">
+                          此學期已有第{w.no}週・略過
+                        </span>
                       )}
                       {formatMd(w.date)}
                     </span>

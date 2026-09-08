@@ -29,6 +29,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import type { EgressStatus } from "@/lib/reimburse/types"
 
 import { addEgressAction } from "../actions"
+import { ApplicantSelect } from "./applicant-select"
 
 const EMPTY_FORM = {
   applicant_name: "",
@@ -49,6 +50,11 @@ export function AddEgressDialog() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    // The applicant combobox sits outside native form validation.
+    if (!formData.applicant_name) {
+      toast.error("請選擇申請人")
+      return
+    }
     setLoading(true)
     try {
       const result = await addEgressAction({
@@ -98,16 +104,12 @@ export function AddEgressDialog() {
                 <Label htmlFor="applicant_name">
                   申請人 <span className="text-red-500">*</span>
                 </Label>
-                <Input
+                <ApplicantSelect
                   id="applicant_name"
                   value={formData.applicant_name}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      applicant_name: e.target.value,
-                    })
+                  onSelect={(name) =>
+                    setFormData({ ...formData, applicant_name: name })
                   }
-                  required
                 />
               </div>
               <div className="grid gap-2">

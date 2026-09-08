@@ -11,10 +11,10 @@ import {
 import { POPPABLE_ZONGZI_SPOTS } from "@/lib/gallery/zongzi-seeds"
 
 describe("pickPoppableFootballs", () => {
-  test("count is always 2 or 3", () => {
+  test("count is always 1 or 2", () => {
     for (let i = 0; i < 20; i += 1) {
       const count = pickPoppableFootballCount()
-      expect(count === 2 || count === 3).toBe(true)
+      expect(count === 1 || count === 2).toBe(true)
     }
   })
 

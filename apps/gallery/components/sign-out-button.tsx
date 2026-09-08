@@ -3,10 +3,18 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { IconLogout } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
 import { createClient } from "@/lib/supabase/client"
+import {
+  describeSignOutAriaLabel,
+  describeSignOutLabel,
+  describeSigningOutLabel,
+} from "@/lib/gallery/busy-labels"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeCouldNotSignOut } from "@/lib/gallery/validation-toasts"
 
 export function SignOutButton({
   className,
@@ -19,11 +27,28 @@ export function SignOutButton({
   const router = useRouter()
 
   function onClick() {
+    if (pending) return
     startTransition(async () => {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.replace("/")
-      router.refresh()
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.auth.signOut()
+        if (error) {
+          toast.error(error.message || describeCouldNotSignOut())
+          return
+        }
+        try {
+          router.replace("/")
+        } catch {
+          toast.error(describeGalleryNavError("signedOutHome"))
+        }
+        try {
+          router.refresh()
+        } catch {
+          toast.error(describeGalleryNavError("refreshGalleryChrome"))
+        }
+      } catch {
+        toast.error(describeCouldNotSignOut())
+      }
     })
   }
 
@@ -32,7 +57,8 @@ export function SignOutButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      aria-label={iconOnly ? "Sign out" : undefined}
+      aria-busy={pending || undefined}
+      aria-label={iconOnly ? describeSignOutAriaLabel() : undefined}
       className={cn(
         className,
         "disabled:pointer-events-none disabled:opacity-50"
@@ -41,9 +67,9 @@ export function SignOutButton({
       {iconOnly ? (
         <IconLogout className="size-4" aria-hidden />
       ) : pending ? (
-        "Signing out…"
+        describeSigningOutLabel()
       ) : (
-        "Sign out"
+        describeSignOutLabel()
       )}
     </button>
   )

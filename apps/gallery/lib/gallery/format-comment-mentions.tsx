@@ -43,7 +43,7 @@ export function FormattedCommentMentions({
             return (
               <span
                 key={i}
-                className="rounded bg-blue-500/15 px-1 py-0.5 text-blue-700 dark:text-blue-300"
+                className="rounded bg-blue-500/15 px-1 py-0.5 text-blue-800"
               >
                 {part}
               </span>

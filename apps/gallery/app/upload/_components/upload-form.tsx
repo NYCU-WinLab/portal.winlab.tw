@@ -1,142 +1,63 @@
 "use client"
 
-import type { FormEvent } from "react"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import type { DragEvent, FormEvent } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { IconPhotoPlus, IconX } from "@tabler/icons-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
+import { toast } from "sonner"
 
-import { registerGalleryImage } from "@/app/upload/actions"
 import { gallerySans, gallerySerif } from "@/components/gallery-chrome"
-import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { useGalleryUpload } from "@/hooks/gallery/use-gallery-upload"
 import {
-  guessExtension,
-  resolveMediaMimeType,
-  type ResolvedMime,
-} from "@/lib/gallery/mime"
-import { createClient } from "@/lib/supabase/client"
+  describeDevelopingLabel,
+  describeCancelUploadLabel,
+} from "@/lib/gallery/busy-labels"
+import {
+  describeUntitledLabMomentPlaceholder,
+  describeUploadTagsPlaceholder,
+} from "@/lib/gallery/upload-form-labels"
+import { describeHangUploadLabel } from "@/lib/gallery/hang-upload-label"
+import { formatFailurePreview } from "@/lib/gallery/upload-errors"
+import { buildArtworkName } from "@/lib/gallery/upload-naming"
 import {
   VIDEO_MAX_DURATION_SECONDS,
   VIDEO_MAX_INPUT_BYTES,
-  compressVideo,
-  type CompressPhase,
-} from "@/lib/gallery/video-compress"
+} from "@/lib/gallery/upload-pipeline"
+import {
+  describeUploadFileEmpty,
+  describeUploadFileRequired,
+  describePickUploadMedia,
+} from "@/lib/gallery/validation-toasts"
 
-type Status =
-  | { kind: "idle" }
-  | {
-      kind: "working"
-      label: string
-      ratio: number
-      batch?: { current: number; total: number }
-    }
-
-type UploadFailure = {
-  file: File
-  detail: string
-  stage:
-    | "type"
-    | "video-processing"
-    | "storage-upload"
-    | "storage-verify"
-    | "db-insert"
-    | "unknown"
-  sequenceId: string | null
-  sequenceIndex: number | null
-}
-
-const PHASE_LABEL: Record<CompressPhase, string> = {
-  init: "Loading encoder",
-  probe: "Reading video",
-  compress: "Compressing to 720p",
-  poster: "Capturing cover frame",
-}
-
-class UploadFailureError extends Error {
-  constructor(
-    readonly stage: UploadFailure["stage"],
-    message: string
-  ) {
-    super(message)
-    this.name = "UploadFailureError"
-  }
-}
-
-function inferArtworkName(fileName: string): string {
-  const base = fileName.replace(/\.[^.]+$/, "").trim()
-  return base || "Untitled"
-}
-
-function buildArtworkName(
-  files: File[],
-  trimmedBaseName: string,
-  index: number
-): string {
-  const file = files[index]
-  if (!file) return trimmedBaseName || "Untitled"
-
-  if (files.length === 1) {
-    return trimmedBaseName || inferArtworkName(file.name)
-  }
-
-  if (!trimmedBaseName) {
-    return inferArtworkName(file.name)
-  }
-
-  return index === 0 ? trimmedBaseName : `${trimmedBaseName}${index}`
-}
-
-function describeUploadFailure(error: unknown): {
-  detail: string
-  stage: UploadFailure["stage"]
-} {
-  if (error instanceof UploadFailureError) {
-    return { detail: error.message, stage: error.stage }
-  }
-
-  const message = error instanceof Error ? error.message : String(error)
-  const lower = message.toLowerCase()
-
-  if (lower.includes("unsupported")) {
-    return { detail: message, stage: "type" }
-  }
-  if (lower.includes("verify upload") || lower.includes("file not found")) {
-    return { detail: message, stage: "storage-verify" }
-  }
-  if (lower.includes("database insert failed")) {
-    return { detail: message, stage: "db-insert" }
-  }
-  if (
-    lower.includes("compress") ||
-    lower.includes("poster") ||
-    lower.includes("video")
-  ) {
-    return { detail: message, stage: "video-processing" }
-  }
-  if (lower.includes("upload")) {
-    return { detail: message, stage: "storage-upload" }
-  }
-
-  return { detail: message, stage: "unknown" }
-}
-
-function formatFailurePreview(failure: UploadFailure): string {
-  return `${failure.file.name} [${failure.stage}] ${failure.detail}`
-}
-
-/** Client uploads bytes to Supabase Storage; server action only registers the row (no 413 on Vercel). */
-export function UploadForm() {
-  const router = useRouter()
+/** Thin UI — mime/compress/storage/register live in lib + useGalleryUpload. */
+export function UploadForm({
+  videoAvailable = true,
+  sequencesAvailable = true,
+}: {
+  videoAvailable?: boolean
+  sequencesAvailable?: boolean
+}) {
   const formRef = useRef<HTMLFormElement>(null)
-  const [pending, startTransition] = useTransition()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
+  const [tagsDraft, setTagsDraft] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [failedUploads, setFailedUploads] = useState<UploadFailure[]>([])
-  const [status, setStatus] = useState<Status>({ kind: "idle" })
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const [dragging, setDragging] = useState(false)
+  const {
+    pending,
+    status,
+    failedUploads,
+    setFailedUploads,
+    cancelUpload,
+    runUpload,
+    retryFailedUploads,
+  } = useGalleryUpload({ sequencesAvailable })
+
   const fileNames = selectedFiles.map((file) => file.name)
   const trimmedName = name.trim()
   const sequencePreview = useMemo(() => {
@@ -147,300 +68,123 @@ export function UploadForm() {
   }, [selectedFiles, trimmedName])
 
   useEffect(() => {
-    if (status.kind !== "working") return
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ""
+    const urls = selectedFiles.slice(0, 6).map((file) => {
+      if (
+        file.type.startsWith("image/") ||
+        (videoAvailable && file.type.startsWith("video/"))
+      ) {
+        return URL.createObjectURL(file)
+      }
+      return ""
+    })
+    setPreviewUrls(urls)
+    return () => {
+      for (const url of urls) {
+        if (url) URL.revokeObjectURL(url)
+      }
     }
+  }, [selectedFiles, videoAvailable])
 
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [status.kind])
-
-  async function runUpload(files: File[], baseName: string) {
-    const form = formRef.current
-    const trimmed = baseName.trim()
-    const supabase = createClient()
-    const { data: claimsData } = await supabase.auth.getClaims()
-    const userId = claimsData?.claims?.sub
-    if (!userId) {
-      toast.error("Not signed in.")
+  function assignFiles(files: File[]) {
+    if (pending || status.kind === "working") return
+    const next = files.filter((file) => {
+      if (file.size <= 0) return false
+      if (file.type.startsWith("image/")) return true
+      if (videoAvailable && file.type.startsWith("video/")) return true
+      return false
+    })
+    if (next.length === 0) {
+      toast.error(describePickUploadMedia(videoAvailable))
       return
     }
-
-    let successCount = 0
-    const failures: UploadFailure[] = []
-    const sequenceId = files.length > 1 ? crypto.randomUUID() : null
-    let wallPhotoId: string | null = null
-    const batch = files.length > 1 ? { total: files.length, current: 0 } : undefined
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!
-      const batchCurrent = i + 1
-      const labelPrefix = files.length > 1 ? `(${batchCurrent}/${files.length}) ` : ""
-
-      if (batch) {
-        setStatus({
-          kind: "working",
-          label: `Uploading ${batchCurrent} of ${files.length}`,
-          ratio: (i + 0.05) / files.length,
-          batch: { current: batchCurrent, total: files.length },
-        })
-      }
-
-      const resolved = resolveMediaMimeType(file)
-      if (!resolved) {
-        failures.push({
-          file,
-          stage: "type",
-          detail: `unsupported type: ${file.type || "unknown"}`,
-          sequenceId,
-          sequenceIndex: sequenceId ? i : null,
-        })
-        continue
-      }
-
-      const artworkName = buildArtworkName(files, trimmed, i)
-
-      try {
-        let registeredId: string
-        if (resolved.kind === "image") {
-          registeredId = await uploadImage({
-            supabase,
-            userId,
-            file,
-            resolved,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId,
-            sequenceIndex: sequenceId ? i : null,
-          })
-        } else {
-          registeredId = await uploadVideo({
-            supabase,
-            userId,
-            file,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId,
-            sequenceIndex: sequenceId ? i : null,
-          })
-        }
-
-        if (!wallPhotoId && (sequenceId ? i === 0 : true)) {
-          wallPhotoId = registeredId
-        }
-        successCount += 1
-      } catch (error) {
-        failures.push({
-          file,
-          ...describeUploadFailure(error),
-          sequenceId,
-          sequenceIndex: sequenceId ? i : null,
-        })
-      }
-    }
-
-    setStatus({ kind: "idle" })
-    setFailedUploads(failures)
-
-    if (successCount > 0) {
-      const suffix = successCount > 1 ? "s" : ""
-      if (wallPhotoId) {
-        const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-        toast.success(`Uploaded ${successCount} work${suffix}.`, {
-          action: {
-            label: "View on wall",
-            onClick: () => router.push(href),
-          },
-        })
-      } else {
-        toast.success(`Uploaded ${successCount} work${suffix}.`)
-      }
-
-      if (failures.length === 0) {
-        form?.reset()
-        setName("")
-        setSelectedFiles([])
-      }
-    }
-
-    if (failures.length > 0) {
-      const preview = failures.slice(0, 3).map(formatFailurePreview).join("; ")
-      const hidden = failures.length > 3 ? ` (+${failures.length - 3} more)` : ""
-      toast.error(`Failed ${failures.length}: ${preview}${hidden}`)
+    setFailedUploads([])
+    setSelectedFiles(next)
+    const input = fileInputRef.current
+    if (input) {
+      const transfer = new DataTransfer()
+      for (const file of next) transfer.items.add(file)
+      input.files = transfer.files
     }
   }
 
-  async function retryFailedUploads(failures: UploadFailure[]) {
-    if (failures.length === 0) return
-
-    const trimmed = name.trim()
-    const supabase = createClient()
-    const { data: claimsData } = await supabase.auth.getClaims()
-    const userId = claimsData?.claims?.sub
-    if (!userId) {
-      toast.error("Not signed in.")
-      return
-    }
-
-    let successCount = 0
-    let wallPhotoId: string | null = null
-    const nextFailures: UploadFailure[] = []
-    const total = failures.length
-
-    for (let i = 0; i < failures.length; i++) {
-      const failure = failures[i]!
-      const file = failure.file
-      const batchCurrent = i + 1
-      const labelPrefix = total > 1 ? `(${batchCurrent}/${total}) ` : ""
-
-      setStatus({
-        kind: "working",
-        label: `Retrying ${batchCurrent} of ${total}`,
-        ratio: (i + 0.05) / total,
-        batch: { current: batchCurrent, total },
-      })
-
-      const resolved = resolveMediaMimeType(file)
-      if (!resolved) {
-        nextFailures.push({
-          file,
-          stage: "type",
-          detail: `unsupported type: ${file.type || "unknown"}`,
-          sequenceId: failure.sequenceId,
-          sequenceIndex: failure.sequenceIndex,
-        })
-        continue
-      }
-
-      const artworkName =
-        failure.sequenceId && failure.sequenceIndex != null
-          ? trimmed
-            ? failure.sequenceIndex === 0
-              ? trimmed
-              : `${trimmed}${failure.sequenceIndex}`
-            : inferArtworkName(file.name)
-          : trimmed
-            ? trimmed
-            : inferArtworkName(file.name)
-
-      try {
-        let registeredId: string
-        if (resolved.kind === "image") {
-          registeredId = await uploadImage({
-            supabase,
-            userId,
-            file,
-            resolved,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId: failure.sequenceId,
-            sequenceIndex: failure.sequenceIndex,
-          })
-        } else {
-          registeredId = await uploadVideo({
-            supabase,
-            userId,
-            file,
-            artworkName,
-            setStatus,
-            labelPrefix,
-            sequenceId: failure.sequenceId,
-            sequenceIndex: failure.sequenceIndex,
-          })
-        }
-
-        if (
-          !wallPhotoId &&
-          (failure.sequenceId ? failure.sequenceIndex === 0 : true)
-        ) {
-          wallPhotoId = registeredId
-        }
-
-        successCount += 1
-      } catch (error) {
-        nextFailures.push({
-          file,
-          ...describeUploadFailure(error),
-          sequenceId: failure.sequenceId,
-          sequenceIndex: failure.sequenceIndex,
-        })
-      }
-    }
-
-    setStatus({ kind: "idle" })
-    setFailedUploads(nextFailures)
-
-    if (successCount > 0) {
-      const suffix = successCount > 1 ? "s" : ""
-      if (wallPhotoId) {
-        const href = buildGalleryPhotoHref({ photoId: wallPhotoId })
-        toast.success(`Uploaded ${successCount} work${suffix}.`, {
-          action: {
-            label: "View on wall",
-            onClick: () => router.push(href),
-          },
-        })
-      } else {
-        toast.success(`Uploaded ${successCount} work${suffix}.`)
-      }
-    }
-
-    if (nextFailures.length === 0) {
-      formRef.current?.reset()
-      setName("")
-      setSelectedFiles([])
-      return
-    }
-
-    const preview = nextFailures
-      .slice(0, 3)
-      .map(formatFailurePreview)
-      .join("; ")
-    const hidden =
-      nextFailures.length > 3
-        ? ` (+${nextFailures.length - 3} more)`
-        : ""
-    toast.error(`Still failed ${nextFailures.length}: ${preview}${hidden}`)
+  function resetForm() {
+    formRef.current?.reset()
+    setName("")
+    setTagsDraft("")
+    setSelectedFiles([])
+    setFailedUploads([])
   }
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const fileInput = formRef.current?.querySelector<HTMLInputElement>("#gallery-file")
-    const files = Array.from(fileInput?.files ?? [])
+    if (pending || status.kind === "working") return
+    const files = selectedFiles.length
+      ? selectedFiles
+      : Array.from(fileInputRef.current?.files ?? [])
 
     if (files.length === 0) {
-      toast.error("Pick a file.")
+      toast.error(describeUploadFileRequired())
       return
     }
     if (files.some((file) => file.size === 0)) {
-      toast.error("One of the selected files is empty.")
+      toast.error(describeUploadFileEmpty())
       return
     }
 
-    startTransition(async () => {
-      await runUpload(files, name)
-    })
+    const tagNames = tagsDraft
+      .split(/[,，]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    runUpload(files, name, { onAllSucceeded: resetForm, tagNames })
+  }
+
+  function onDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setDragging(false)
+    if (pending || status.kind === "working") return
+    assignFiles(Array.from(event.dataTransfer.files ?? []))
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-6">
+    <form
+      ref={formRef}
+      onSubmit={onSubmit}
+      aria-busy={pending || status.kind === "working"}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex flex-col gap-1.5">
+        <p
+          className={cn(
+            gallerySans(),
+            "text-[10px] tracking-[0.22em] text-muted-foreground uppercase"
+          )}
+        >
+          Darkroom tray
+        </p>
+        <h2
+          className={cn(gallerySerif(), "text-2xl text-foreground sm:text-3xl")}
+        >
+          Develop & hang
+        </h2>
+        <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+          {sequencesAvailable
+            ? "Drop polaroids onto the film strip — multi-select becomes one sequence story on the wall."
+            : "Drop polaroids onto the film strip — each file hangs as its own shot."}
+        </p>
+      </div>
+
       <div className="flex flex-col gap-2">
         <Label
           htmlFor="gallery-name"
           className={cn(gallerySerif(), "text-base")}
         >
-          Name (base name for single upload / sequence cover)
+          Title
         </Label>
         <Input
           id="gallery-name"
           name="name"
-          placeholder="Untitled, 2026"
+          placeholder={describeUntitledLabMomentPlaceholder()}
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={pending}
@@ -449,35 +193,187 @@ export function UploadForm() {
             "h-11 rounded-xl border-border/60 bg-background"
           )}
         />
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          {sequencesAvailable
+            ? "Base name for a single shot, or the cover title when you multi-select a sequence."
+            : "Base name applied to each selected shot."}
+        </p>
       </div>
+
+      <div className="flex flex-col gap-2">
+        <Label
+          htmlFor="gallery-tags"
+          className={cn(gallerySerif(), "text-base")}
+        >
+          Tags
+        </Label>
+        <Input
+          id="gallery-tags"
+          name="tags"
+          placeholder={describeUploadTagsPlaceholder()}
+          value={tagsDraft}
+          onChange={(e) => setTagsDraft(e.target.value)}
+          disabled={pending}
+          className={cn(
+            gallerySans(),
+            "h-11 rounded-xl border-border/60 bg-background"
+          )}
+        />
+        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
+          Optional. Comma-separated — applied to every shot in this upload.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-2">
         <Label
           htmlFor="gallery-file"
           className={cn(gallerySerif(), "text-base")}
         >
-          Images & videos
+          {videoAvailable ? "Photos & clips" : "Photos"}
         </Label>
-        <Input
+        <input
+          ref={fileInputRef}
           id="gallery-file"
           name="file"
           type="file"
-          accept="image/*,video/*"
-          required
+          accept={videoAvailable ? "image/*,video/*" : "image/*"}
+          required={selectedFiles.length === 0}
           multiple
-          onClick={() => setFailedUploads([])}
-          onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
           disabled={pending}
-          className={cn(
-            gallerySans(),
-            "h-11 rounded-xl border-border/60 bg-background file:mr-3 file:text-sm"
-          )}
+          className="sr-only"
+          onClick={() => setFailedUploads([])}
+          onChange={(e) => assignFiles(Array.from(e.target.files ?? []))}
         />
-        {fileNames.length > 0 ? (
-          <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
-            {fileNames.length} selected: {fileNames.slice(0, 3).join(", ")}
-            {fileNames.length > 3 ? ` (+${fileNames.length - 3} more)` : ""}
-          </p>
+        <label
+          htmlFor="gallery-file"
+          onDragEnter={(event) => {
+            event.preventDefault()
+            if (!pending) setDragging(true)
+          }}
+          onDragOver={(event) => {
+            event.preventDefault()
+            if (!pending) setDragging(true)
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault()
+            if (event.currentTarget.contains(event.relatedTarget as Node)) {
+              return
+            }
+            setDragging(false)
+          }}
+          onDrop={onDrop}
+          className={cn(
+            "gallery-upload-dropzone group relative cursor-pointer overflow-hidden rounded-xl border border-dashed transition-colors",
+            dragging
+              ? "border-foreground/40 bg-foreground/[0.06]"
+              : "border-zinc-900/20 bg-zinc-900/[0.03] hover:border-foreground/25 hover:bg-zinc-900/[0.05]",
+            pending && "pointer-events-none opacity-60"
+          )}
+        >
+          <div
+            aria-hidden
+            className="gallery-film-sprocket gallery-film-sprocket--left"
+          />
+          <div
+            aria-hidden
+            className="gallery-film-sprocket gallery-film-sprocket--right"
+          />
+          <div className="relative flex flex-col items-center gap-3 px-6 py-10 text-center sm:py-12">
+            <span className="inline-flex size-12 items-center justify-center rounded-full border border-zinc-900/15 bg-[#f7f7f5] shadow-[0_8px_20px_-10px_rgba(24,24,27,0.45)]">
+              <IconPhotoPlus className="size-5 text-foreground/80" />
+            </span>
+            <span className={cn(gallerySerif(), "text-xl text-foreground")}>
+              {selectedFiles.length > 0
+                ? `${selectedFiles.length} ready to develop`
+                : "Drop photos here"}
+            </span>
+            <span
+              className={cn(
+                gallerySans(),
+                "max-w-xs text-xs leading-relaxed text-muted-foreground"
+              )}
+            >
+              {selectedFiles.length > 0
+                ? "Click to replace, or hang them with Upload selected."
+                : videoAvailable
+                  ? "Click to browse — images, HEIC, and short clips welcome."
+                  : "Click to browse — images and HEIC welcome."}
+            </span>
+          </div>
+        </label>
+
+        {previewUrls.some(Boolean) ? (
+          <ul className="gallery-upload-preview-strip flex gap-2 overflow-x-auto py-1">
+            {selectedFiles.slice(0, 6).map((file, index) => {
+              const url = previewUrls[index]
+              const isVideo = file.type.startsWith("video/")
+              return (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="relative h-[4.75rem] w-16 shrink-0 overflow-hidden rounded-[1px] border-[3px] border-[#f7f7f5] bg-[#f7f7f5] shadow-[0_6px_16px_-8px_rgba(24,24,27,0.35)]"
+                >
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
+                    <img
+                      src={url}
+                      alt=""
+                      className="h-[calc(100%-0.55rem)] w-full object-cover"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+                      {isVideo ? "Clip" : "File"}
+                    </div>
+                  )}
+                  {isVideo ? (
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 top-0 flex h-[calc(100%-0.55rem)] items-center justify-center bg-black/20 text-[10px] font-medium text-white"
+                    >
+                      Video
+                    </span>
+                  ) : null}
+                </li>
+              )
+            })}
+            {selectedFiles.length > 6 ? (
+              <li
+                className={cn(
+                  gallerySans(),
+                  "flex h-[4.75rem] w-16 shrink-0 items-center justify-center rounded-[1px] border border-dashed border-border/70 text-xs text-muted-foreground"
+                )}
+              >
+                +{selectedFiles.length - 6}
+              </li>
+            ) : null}
+          </ul>
         ) : null}
+
+        {fileNames.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
+              {fileNames.length} selected: {fileNames.slice(0, 3).join(", ")}
+              {fileNames.length > 3 ? ` (+${fileNames.length - 3} more)` : ""}
+            </p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setSelectedFiles([])
+                setFailedUploads([])
+                if (fileInputRef.current) fileInputRef.current.value = ""
+              }}
+              className={cn(
+                gallerySans(),
+                "inline-flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              )}
+            >
+              <IconX className="size-3" aria-hidden />
+              Clear
+            </button>
+          </div>
+        ) : null}
+
         <p
           className={cn(
             gallerySans(),
@@ -486,17 +382,25 @@ export function UploadForm() {
         >
           Videos: max {VIDEO_MAX_DURATION_SECONDS}s and{" "}
           {VIDEO_MAX_INPUT_BYTES / 1024 / 1024} MB, auto-compressed to 720p mp4
-          in your browser.
+          in your browser. Gallery storage cap is 30 MB per file after
+          compression. HEIC/HEIF from iPhone are accepted.
         </p>
-        <p className={cn(gallerySans(), "text-xs text-muted-foreground")}>
-          Multi-select uploads are grouped as one sequence on the wall.
-        </p>
-        {selectedFiles.length > 1 && trimmedName ? (
+        {selectedFiles.length > 1 && trimmedName && sequencesAvailable ? (
           <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
-            <p className={cn(gallerySans(), "text-xs font-medium text-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-xs font-medium text-foreground"
+              )}
+            >
               Sequence naming preview
             </p>
-            <p className={cn(gallerySans(), "mt-1 text-xs text-muted-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "mt-1 text-xs text-muted-foreground"
+              )}
+            >
               {sequencePreview.join(", ")}
               {selectedFiles.length > sequencePreview.length
                 ? ` (+${selectedFiles.length - sequencePreview.length} more)`
@@ -506,12 +410,24 @@ export function UploadForm() {
         ) : null}
         {failedUploads.length > 0 ? (
           <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-3">
-            <p className={cn(gallerySans(), "text-sm font-medium text-foreground")}>
+            <p
+              className={cn(
+                gallerySans(),
+                "text-sm font-medium text-foreground"
+              )}
+            >
               Failed uploads
             </p>
-            <ul className={cn(gallerySans(), "mt-2 space-y-1 text-xs text-muted-foreground")}>
-              {failedUploads.slice(0, 4).map((failure) => (
-                <li key={`${failure.file.name}:${failure.stage}`}>
+            <ul
+              className={cn(
+                gallerySans(),
+                "mt-2 space-y-1 text-xs text-muted-foreground"
+              )}
+            >
+              {failedUploads.slice(0, 4).map((failure, index) => (
+                <li
+                  key={`${failure.file.name}:${failure.stage}:${failure.sequenceIndex ?? index}`}
+                >
                   {formatFailurePreview(failure)}
                 </li>
               ))}
@@ -522,8 +438,8 @@ export function UploadForm() {
                 size="sm"
                 disabled={pending}
                 onClick={() =>
-                  startTransition(async () => {
-                    await retryFailedUploads(failedUploads)
+                  retryFailedUploads(failedUploads, name, {
+                    onAllSucceeded: resetForm,
                   })
                 }
               >
@@ -543,7 +459,11 @@ export function UploadForm() {
         ) : null}
       </div>
       {status.kind === "working" ? (
-        <div className="flex flex-col gap-2">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex flex-col gap-2 rounded-xl border border-zinc-900/12 bg-zinc-900/[0.04] px-4 py-3"
+        >
           {status.batch ? (
             <p
               className={cn(
@@ -551,7 +471,7 @@ export function UploadForm() {
                 "text-sm font-medium text-foreground tabular-nums"
               )}
             >
-              {status.batch.current}/{status.batch.total}
+              Developing {status.batch.current}/{status.batch.total}
             </p>
           ) : null}
           <p className={cn(gallerySans(), "text-sm text-muted-foreground")}>
@@ -563,187 +483,31 @@ export function UploadForm() {
               style={{ width: `${Math.round(status.ratio * 100)}%` }}
             />
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={cancelUpload}
+            className={cn(gallerySans(), "self-start")}
+          >
+            {describeCancelUploadLabel()}
+          </Button>
         </div>
       ) : null}
       <Button
         type="submit"
         size="lg"
-        disabled={pending}
+        disabled={pending || status.kind === "working"}
+        aria-busy={pending || status.kind === "working" || undefined}
         className={cn(gallerySans(), "h-12 rounded-full")}
       >
-        {pending ? "Uploading…" : "Upload selected"}
+        {pending || status.kind === "working"
+          ? describeDevelopingLabel()
+          : describeHangUploadLabel({
+              fileCount: selectedFiles.length,
+              sequencesAvailable,
+            })}
       </Button>
     </form>
   )
-}
-
-type UploadCtx = {
-  supabase: ReturnType<typeof createClient>
-  userId: string
-  file: File
-  artworkName: string
-  setStatus: (s: Status) => void
-  labelPrefix: string
-  sequenceId: string | null
-  sequenceIndex: number | null
-}
-
-async function uploadImage(
-  ctx: UploadCtx & { resolved: ResolvedMime }
-): Promise<string> {
-  const {
-    supabase,
-    userId,
-    file,
-    resolved,
-    artworkName,
-    setStatus,
-    labelPrefix,
-    sequenceId,
-    sequenceIndex,
-  } = ctx
-  const ext = guessExtension(resolved.mime, file.name)
-  if (ext === "bin") {
-    throw new UploadFailureError(
-      "type",
-      "unsupported extension for this file"
-    )
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading ${file.name}`,
-    ratio: 0.4,
-  })
-
-  const objectPath = `${userId}/${crypto.randomUUID()}.${ext}`
-  const { error: uploadError } = await supabase.storage
-    .from("gallery")
-    .upload(objectPath, file, {
-      contentType: resolved.mime,
-      upsert: false,
-    })
-  if (uploadError) {
-    throw new UploadFailureError("storage-upload", uploadError.message)
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Registering ${file.name}`,
-    ratio: 0.85,
-  })
-
-  const result = await registerGalleryImage({
-    name: artworkName,
-    imagePath: objectPath,
-    mediaType: "image",
-    sequenceId,
-    sequenceIndex,
-  })
-  if (!result.ok) {
-    await supabase.storage.from("gallery").remove([objectPath])
-    throw new UploadFailureError(
-      result.error.includes("Database insert failed")
-        ? "db-insert"
-        : result.error.includes("verify upload") ||
-            result.error.includes("File not found")
-          ? "storage-verify"
-          : "unknown",
-      result.error
-    )
-  }
-  return result.id
-}
-
-async function uploadVideo(ctx: UploadCtx): Promise<string> {
-  const {
-    supabase,
-    userId,
-    file,
-    artworkName,
-    setStatus,
-    labelPrefix,
-    sequenceId,
-    sequenceIndex,
-  } = ctx
-
-  const compressed = await compressVideo(file, {
-    onProgress: (ratio, phase) => {
-      setStatus({
-        kind: "working",
-        label: `${labelPrefix}${PHASE_LABEL[phase]}`,
-        ratio,
-      })
-    },
-  })
-  if (!compressed.video || !compressed.poster) {
-    throw new UploadFailureError(
-      "video-processing",
-      "video compression did not return playable assets"
-    )
-  }
-
-  const videoId = crypto.randomUUID()
-  const posterId = crypto.randomUUID()
-  const videoPath = `${userId}/${videoId}.${compressed.videoExt}`
-  const posterPath = `${userId}/${posterId}.${compressed.posterExt}`
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading video`,
-    ratio: 0.3,
-  })
-  const { error: videoErr } = await supabase.storage
-    .from("gallery")
-    .upload(videoPath, compressed.video, {
-      contentType: compressed.videoMime,
-      upsert: false,
-    })
-  if (videoErr) {
-    throw new UploadFailureError("storage-upload", videoErr.message)
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Uploading cover`,
-    ratio: 0.7,
-  })
-  const { error: posterErr } = await supabase.storage
-    .from("gallery")
-    .upload(posterPath, compressed.poster, {
-      contentType: compressed.posterMime,
-      upsert: false,
-    })
-  if (posterErr) {
-    await supabase.storage.from("gallery").remove([videoPath])
-    throw new UploadFailureError("storage-upload", posterErr.message)
-  }
-
-  setStatus({
-    kind: "working",
-    label: `${labelPrefix}Registering`,
-    ratio: 0.9,
-  })
-  const result = await registerGalleryImage({
-    name: artworkName,
-    imagePath: videoPath,
-    mediaType: "video",
-    posterPath,
-    durationSeconds: compressed.durationSeconds,
-    sequenceId,
-    sequenceIndex,
-  })
-  if (!result.ok) {
-    await supabase.storage.from("gallery").remove([videoPath, posterPath])
-    throw new UploadFailureError(
-      result.error.includes("Database insert failed")
-        ? "db-insert"
-        : result.error.includes("verify upload") ||
-            result.error.includes("File not found")
-          ? "storage-verify"
-          : "unknown",
-      result.error
-    )
-  }
-  return result.id
 }

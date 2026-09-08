@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 /** Facebook-style reactions + WinLab point (👉👈) + cheers (🍻). One per user per work. */
 
 export const GALLERY_REACTIONS = [
@@ -72,6 +74,38 @@ export function formatReactionSummary(counts: ReactionCounts): string {
     .join(" · ")
 }
 
+/**
+ * Coerce the `{ reaction: count }` jsonb the gallery_wall_page view returns into
+ * a fully-populated ReactionCounts. Unknown keys are dropped and negative /
+ * non-integer counts are floored to a safe non-negative integer.
+ */
+export function normalizeReactionCounts(input: unknown): ReactionCounts {
+  const counts = buildEmptyCounts()
+  if (!input || typeof input !== "object") return counts
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!isGalleryReaction(key)) continue
+    const n = typeof value === "number" ? value : Number(value)
+    counts[key] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  }
+  return counts
+}
+
+/**
+ * Coerce the `{ reaction: [name, ...] }` jsonb the gallery_wall_page view
+ * returns into a fully-populated ReactionNames. Unknown keys and non-string
+ * entries are dropped; a missing key becomes an empty array.
+ */
+export function normalizeReactionNames(input: unknown): ReactionNames {
+  const names = buildEmptyNames()
+  if (!input || typeof input !== "object") return names
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!isGalleryReaction(key)) continue
+    if (!Array.isArray(value)) continue
+    names[key] = value.filter((v): v is string => typeof v === "string")
+  }
+  return names
+}
+
 type VoteRow = { image_id: string; user_id: string; reaction: string }
 
 export function aggregateReactions(
@@ -98,4 +132,31 @@ export function aggregateReactions(
   }
 
   return { countsByImage, namesByImage }
+}
+
+export function isGalleryReactionsUnavailable(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false
+  const message = error.message ?? ""
+  const code = error.code ?? ""
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    (/gallery_image_votes/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
+  )
+}
+
+export async function isGalleryReactionsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("gallery_image_votes")
+    .select("image_id")
+    .limit(1)
+  if (!error) return true
+  return !isGalleryReactionsUnavailable(error)
 }

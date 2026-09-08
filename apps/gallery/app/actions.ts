@@ -5,15 +5,35 @@ import { revalidatePath } from "next/cache"
 import {
   type GalleryReaction,
   isGalleryReaction,
+  isGalleryReactionsUnavailable,
 } from "@/lib/gallery/reactions"
-import { parseMentions, resolveMentionedProfiles } from "@/lib/gallery/mentions"
-import { isGalleryCommentEditUnavailable } from "@/lib/gallery/comment-edit"
+import {
+  isGalleryCommentEditUnavailable,
+  isGalleryCommentsUnavailable,
+} from "@/lib/gallery/comment-edit"
+import { isGalleryCommentLikesUnavailable } from "@/lib/gallery/comment-social"
+import {
+  describeBulkPinResult,
+  normalizeGalleryPinImageIds,
+} from "@/lib/gallery/bulk-pin"
+import {
+  describeMissingImageIdError,
+  describePinFailedError,
+  describePinFailedForPhotoError,
+  describePinUnavailableError,
+  describePleaseSignInFirst,
+} from "@/lib/gallery/action-errors"
+import { describeSelectAtLeastOnePhoto } from "@/lib/gallery/validation-toasts"
+import { isGalleryPinnedAtUnavailable } from "@/lib/gallery/manage-uploads"
+import {
+  isActivityNotificationsUnavailable,
+  isGalleryMentionsTableUnavailable,
+} from "@/lib/gallery/notifications"
 import {
   type GallerySeasonalThemeId,
   isGallerySeasonalThemeId,
 } from "@/lib/gallery/seasonal-themes"
 import { setGallerySeasonalThemeId } from "@/lib/gallery/settings"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 export type ReactionActionResult = { ok: true } | { ok: false; error: string }
@@ -21,103 +41,11 @@ export type CommentActionResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? {} : { data: T }))
   | { ok: false; error: string }
 
-async function syncGalleryReactionNotification(
-  admin: ReturnType<typeof createAdminClient>,
-  {
-    imageId,
-    actorUserId,
-    reaction,
-    mode,
-  }: {
-    imageId: string
-    actorUserId: string
-    reaction: GalleryReaction | null
-    mode: "insert" | "update" | "remove"
-  }
-) {
-  const { data: image } = await admin
-    .from("gallery_images")
-    .select("created_by")
-    .eq("id", imageId)
-    .maybeSingle()
-
-  if (!image?.created_by || image.created_by === actorUserId) return
-
-  const recipientId = image.created_by
-
-  if (mode === "remove") {
-    const { error } = await admin
-      .from("gallery_activity_notifications")
-      .delete()
-      .eq("kind", "reaction")
-      .eq("image_id", imageId)
-      .eq("actor_user_id", actorUserId)
-      .eq("recipient_user_id", recipientId)
-      .is("read_at", null)
-
-    if (error) {
-      console.error("[gallery] failed to remove reaction notification", error)
-    }
-    return
-  }
-
-  if (mode === "update" && reaction) {
-    const { data: updated, error } = await admin
-      .from("gallery_activity_notifications")
-      .update({ reaction, created_at: new Date().toISOString() })
-      .eq("kind", "reaction")
-      .eq("image_id", imageId)
-      .eq("actor_user_id", actorUserId)
-      .eq("recipient_user_id", recipientId)
-      .is("read_at", null)
-      .select("id")
-
-    if (error) {
-      console.error("[gallery] failed to update reaction notification", error)
-      return
-    }
-
-    if (!updated || updated.length === 0) {
-      const { error: insertError } = await admin
-        .from("gallery_activity_notifications")
-        .insert({
-          recipient_user_id: recipientId,
-          kind: "reaction",
-          image_id: imageId,
-          actor_user_id: actorUserId,
-          reaction,
-        })
-      if (insertError && insertError.code !== "23505") {
-        console.error(
-          "[gallery] failed to save reaction notification",
-          insertError
-        )
-      }
-    }
-    return
-  }
-
-  if (mode === "insert" && reaction) {
-    const { error } = await admin
-      .from("gallery_activity_notifications")
-      .insert({
-        recipient_user_id: recipientId,
-        kind: "reaction",
-        image_id: imageId,
-        actor_user_id: actorUserId,
-        reaction,
-      })
-    if (error && error.code !== "23505") {
-      console.error("[gallery] failed to save reaction notification", error)
-    }
-  }
-}
-
 export async function setGalleryReaction(
   imageId: string,
   reaction: GalleryReaction
 ): Promise<ReactionActionResult> {
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  if (!imageId) return { ok: false, error: describeMissingImageIdError() }
   if (!isGalleryReaction(reaction)) {
     return { ok: false, error: "Invalid reaction." }
   }
@@ -125,7 +53,7 @@ export async function setGalleryReaction(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: existing, error: fetchError } = await supabase
     .from("gallery_image_votes")
@@ -135,9 +63,17 @@ export async function setGalleryReaction(
     .maybeSingle()
 
   if (fetchError) {
+    if (isGalleryReactionsUnavailable(fetchError)) {
+      return {
+        ok: false,
+        error:
+          "Reactions are not available yet — apply the gallery reactions migration.",
+      }
+    }
     return { ok: false, error: `Reaction failed: ${fetchError.message}` }
   }
 
+  // Notification fan-out lives in gallery_notify_on_reaction (DB trigger).
   if (existing?.reaction === reaction) {
     const { error: deleteError } = await supabase
       .from("gallery_image_votes")
@@ -146,16 +82,15 @@ export async function setGalleryReaction(
       .eq("user_id", userId)
 
     if (deleteError) {
+      if (isGalleryReactionsUnavailable(deleteError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${deleteError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction: null,
-      mode: "remove",
-    })
   } else if (existing) {
     const { error: updateError } = await supabase
       .from("gallery_image_votes")
@@ -164,32 +99,30 @@ export async function setGalleryReaction(
       .eq("user_id", userId)
 
     if (updateError) {
+      if (isGalleryReactionsUnavailable(updateError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${updateError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction,
-      mode: "update",
-    })
   } else {
     const { error: insertError } = await supabase
       .from("gallery_image_votes")
       .insert({ image_id: imageId, user_id: userId, reaction })
 
     if (insertError) {
+      if (isGalleryReactionsUnavailable(insertError)) {
+        return {
+          ok: false,
+          error:
+            "Reactions are not available yet — apply the gallery reactions migration.",
+        }
+      }
       return { ok: false, error: `Reaction failed: ${insertError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryReactionNotification(admin, {
-      imageId,
-      actorUserId: userId,
-      reaction,
-      mode: "insert",
-    })
   }
 
   revalidatePath("/")
@@ -209,79 +142,13 @@ export type CreatedGalleryComment = {
   liked_by_me?: boolean
 }
 
-async function syncGalleryCommentMentions(
-  admin: ReturnType<typeof createAdminClient>,
-  commentId: string,
-  body: string,
-  authorId: string
-) {
-  const mentionNames = parseMentions(body)
-  const { data: existingRows } = await admin
-    .from("gallery_comment_mentions")
-    .select("mentioned_user_id")
-    .eq("comment_id", commentId)
-
-  const existingIds = new Set(
-    (existingRows ?? []).map((row) => row.mentioned_user_id)
-  )
-
-  if (mentionNames.length === 0) {
-    if (existingIds.size > 0) {
-      const { error } = await admin
-        .from("gallery_comment_mentions")
-        .delete()
-        .eq("comment_id", commentId)
-      if (error) {
-        console.error("[gallery] failed to clear comment mentions", error)
-      }
-    }
-    return
-  }
-
-  const { data: profiles } = await admin
-    .from("user_profiles")
-    .select("id, name")
-    .not("name", "is", null)
-
-  const matched = resolveMentionedProfiles(mentionNames, profiles ?? [])
-  const others = matched.filter((profile) => profile.id !== authorId)
-  const targetIds = new Set(others.map((profile) => profile.id))
-
-  const toRemove = [...existingIds].filter((id) => !targetIds.has(id))
-  if (toRemove.length > 0) {
-    const { error } = await admin
-      .from("gallery_comment_mentions")
-      .delete()
-      .eq("comment_id", commentId)
-      .in("mentioned_user_id", toRemove)
-    if (error) {
-      console.error("[gallery] failed to remove stale mentions", error)
-    }
-  }
-
-  const toAdd = others.filter((profile) => !existingIds.has(profile.id))
-  if (toAdd.length === 0) return
-
-  const { error: mentionError } = await admin
-    .from("gallery_comment_mentions")
-    .insert(
-      toAdd.map((profile) => ({
-        comment_id: commentId,
-        mentioned_user_id: profile.id,
-      }))
-    )
-  if (mentionError) {
-    console.error("[gallery] failed to save comment mentions", mentionError)
-  }
-}
-
 export async function addGalleryComment(
   imageId: string,
   body: string,
   parentId?: string | null
 ): Promise<CommentActionResult<CreatedGalleryComment>> {
   const trimmed = body.trim()
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  if (!imageId) return { ok: false, error: describeMissingImageIdError() }
   if (!trimmed) return { ok: false, error: "Comment cannot be empty." }
   if (trimmed.length > 1000) {
     return { ok: false, error: "Comment is too long (max 1000 chars)." }
@@ -290,24 +157,30 @@ export async function addGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
-  let parentAuthorId: string | null = null
   if (parentId) {
     const { data: parent, error: parentError } = await supabase
       .from("gallery_comments")
-      .select("id, image_id, created_by")
+      .select("id, image_id")
       .eq("id", parentId)
       .maybeSingle()
     if (parentError) {
+      if (isGalleryCommentsUnavailable(parentError)) {
+        return {
+          ok: false,
+          error:
+            "Comments are not available yet — apply the gallery comments migration.",
+        }
+      }
       return { ok: false, error: `Comment failed: ${parentError.message}` }
     }
     if (!parent || parent.image_id !== imageId) {
       return { ok: false, error: "Invalid parent comment." }
     }
-    parentAuthorId = parent.created_by
   }
 
+  // Reply + @mention fan-out lives in gallery_notify_on_comment (DB trigger).
   const { data, error } = await supabase
     .from("gallery_comments")
     .insert({
@@ -320,36 +193,17 @@ export async function addGalleryComment(
     .single()
 
   if (error || !data) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return {
       ok: false,
       error: `Comment failed: ${error?.message ?? "Unknown error."}`,
     }
-  }
-
-  const admin = createAdminClient()
-
-  if (parentAuthorId && parentAuthorId !== userId) {
-    const { error: replyNotifyError } = await admin
-      .from("gallery_activity_notifications")
-      .insert({
-        recipient_user_id: parentAuthorId,
-        kind: "reply",
-        image_id: imageId,
-        comment_id: data.id,
-        actor_user_id: userId,
-        body: trimmed.slice(0, 200),
-      })
-    if (replyNotifyError && replyNotifyError.code !== "23505") {
-      console.error(
-        "[gallery] failed to save reply notification",
-        replyNotifyError
-      )
-    }
-  }
-
-  const mentionNames = parseMentions(trimmed)
-  if (mentionNames.length > 0) {
-    await syncGalleryCommentMentions(admin, data.id, trimmed, userId)
   }
 
   revalidatePath("/", "layout")
@@ -379,7 +233,7 @@ export async function updateGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const updatedAt = new Date().toISOString()
   let data: CreatedGalleryComment | null = null
@@ -406,6 +260,13 @@ export async function updateGalleryComment(
       .maybeSingle()
 
     if (fallback.error || !fallback.data) {
+      if (isGalleryCommentsUnavailable(fallback.error)) {
+        return {
+          ok: false,
+          error:
+            "Comments are not available yet — apply the gallery comments migration.",
+        }
+      }
       return {
         ok: false,
         error: `Update failed: ${fallback.error?.message ?? "Comment edit is not available yet — apply the gallery comments update migration."}`,
@@ -417,15 +278,20 @@ export async function updateGalleryComment(
   }
 
   if (error || !data) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return {
       ok: false,
       error: `Update failed: ${error?.message ?? "Comment not found."}`,
     }
   }
 
-  const admin = createAdminClient()
-  await syncGalleryCommentMentions(admin, commentId, trimmed, userId)
-
+  // Mention re-sync lives in gallery_notify_on_comment (DB trigger on body).
   revalidatePath("/", "layout")
   return { ok: true, data }
 }
@@ -438,7 +304,7 @@ export async function deleteGalleryComment(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_comments")
@@ -447,62 +313,18 @@ export async function deleteGalleryComment(
     .eq("created_by", userId)
 
   if (error) {
+    if (isGalleryCommentsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Comments are not available yet — apply the gallery comments migration.",
+      }
+    }
     return { ok: false, error: `Delete failed: ${error.message}` }
   }
 
   revalidatePath("/")
   return { ok: true }
-}
-
-async function syncGalleryCommentLikeNotification(
-  admin: ReturnType<typeof createAdminClient>,
-  {
-    commentId,
-    actorUserId,
-    liked,
-  }: {
-    commentId: string
-    actorUserId: string
-    liked: boolean
-  }
-) {
-  const { data: comment } = await admin
-    .from("gallery_comments")
-    .select("created_by, image_id, body")
-    .eq("id", commentId)
-    .maybeSingle()
-
-  if (!comment?.created_by || comment.created_by === actorUserId) return
-
-  if (liked) {
-    const { error } = await admin
-      .from("gallery_activity_notifications")
-      .insert({
-        recipient_user_id: comment.created_by,
-        kind: "comment_like",
-        image_id: comment.image_id,
-        comment_id: commentId,
-        actor_user_id: actorUserId,
-        body: comment.body.slice(0, 200),
-      })
-    if (error && error.code !== "23505") {
-      console.error("[gallery] failed to save comment like notification", error)
-    }
-    return
-  }
-
-  const { error } = await admin
-    .from("gallery_activity_notifications")
-    .delete()
-    .eq("kind", "comment_like")
-    .eq("comment_id", commentId)
-    .eq("actor_user_id", actorUserId)
-    .eq("recipient_user_id", comment.created_by)
-    .is("read_at", null)
-
-  if (error) {
-    console.error("[gallery] failed to remove comment like notification", error)
-  }
 }
 
 export async function toggleGalleryCommentLike(
@@ -513,7 +335,7 @@ export async function toggleGalleryCommentLike(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: existing, error: fetchError } = await supabase
     .from("gallery_comment_likes")
@@ -523,10 +345,7 @@ export async function toggleGalleryCommentLike(
     .maybeSingle()
 
   if (fetchError) {
-    if (
-      fetchError.code === "42P01" ||
-      /gallery_comment_likes/i.test(fetchError.message)
-    ) {
+    if (isGalleryCommentLikesUnavailable(fetchError)) {
       return {
         ok: false,
         error:
@@ -536,6 +355,7 @@ export async function toggleGalleryCommentLike(
     return { ok: false, error: `Like failed: ${fetchError.message}` }
   }
 
+  // Comment-like notification fan-out lives in gallery_notify_on_comment_like.
   if (existing) {
     const { error: deleteError } = await supabase
       .from("gallery_comment_likes")
@@ -544,30 +364,30 @@ export async function toggleGalleryCommentLike(
       .eq("user_id", userId)
 
     if (deleteError) {
+      if (isGalleryCommentLikesUnavailable(deleteError)) {
+        return {
+          ok: false,
+          error:
+            "Comment likes are not available yet — apply the gallery comment likes migration.",
+        }
+      }
       return { ok: false, error: `Like failed: ${deleteError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryCommentLikeNotification(admin, {
-      commentId,
-      actorUserId: userId,
-      liked: false,
-    })
   } else {
     const { error: insertError } = await supabase
       .from("gallery_comment_likes")
       .insert({ comment_id: commentId, user_id: userId })
 
     if (insertError) {
+      if (isGalleryCommentLikesUnavailable(insertError)) {
+        return {
+          ok: false,
+          error:
+            "Comment likes are not available yet — apply the gallery comment likes migration.",
+        }
+      }
       return { ok: false, error: `Like failed: ${insertError.message}` }
     }
-
-    const admin = createAdminClient()
-    await syncGalleryCommentLikeNotification(admin, {
-      commentId,
-      actorUserId: userId,
-      liked: true,
-    })
   }
 
   const { count, error: countError } = await supabase
@@ -576,6 +396,13 @@ export async function toggleGalleryCommentLike(
     .eq("comment_id", commentId)
 
   if (countError) {
+    if (isGalleryCommentLikesUnavailable(countError)) {
+      return {
+        ok: false,
+        error:
+          "Comment likes are not available yet — apply the gallery comment likes migration.",
+      }
+    }
     return { ok: false, error: `Like failed: ${countError.message}` }
   }
 
@@ -595,7 +422,7 @@ export async function setGalleryCommentPin(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -623,7 +450,7 @@ export async function setGalleryCommentPin(
           "Comment pin is not available yet — apply the gallery comment pin migration.",
       }
     }
-    return { ok: false, error: `Pin failed: ${error.message}` }
+    return { ok: false, error: describePinFailedError(error.message) }
   }
 
   const pinnedAt = pinned ? new Date().toISOString() : null
@@ -635,12 +462,37 @@ export async function setGalleryImagePin(
   imageId: string,
   pinned: boolean
 ): Promise<CommentActionResult<{ pinned_at: string | null }>> {
-  if (!imageId) return { ok: false, error: "Missing image id." }
+  const result = await setGalleryImagesPin([imageId], pinned)
+  if (!result.ok) return result
+  if (result.data.ok === 0) {
+    return {
+      ok: false,
+      error: result.data.failed
+        ? describePinFailedForPhotoError()
+        : describeMissingImageIdError(),
+    }
+  }
+  return {
+    ok: true,
+    data: { pinned_at: pinned ? new Date().toISOString() : null },
+  }
+}
+
+export async function setGalleryImagesPin(
+  imageIds: string[],
+  pinned: boolean
+): Promise<
+  CommentActionResult<{ ok: number; failed: number; message: string }>
+> {
+  const ids = normalizeGalleryPinImageIds(imageIds)
+  if (ids.length === 0) {
+    return { ok: false, error: describeSelectAtLeastOnePhoto() }
+  }
 
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -655,26 +507,50 @@ export async function setGalleryImagePin(
     return { ok: false, error: "Only super admins can pin items on the wall." }
   }
 
-  const { error } = await supabase.rpc("gallery_admin_set_image_pin", {
-    p_image_id: imageId,
-    p_pinned: pinned,
-  })
+  let okCount = 0
+  let failed = 0
+  let firstError: string | null = null
 
-  if (error) {
-    if (/gallery_admin_set_image_pin/i.test(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Pin is not available yet — apply the gallery image pin migration.",
+  for (const imageId of ids) {
+    const { error } = await supabase.rpc("gallery_admin_set_image_pin", {
+      p_image_id: imageId,
+      p_pinned: pinned,
+    })
+
+    if (error) {
+      if (
+        /gallery_admin_set_image_pin/i.test(error.message) ||
+        isGalleryPinnedAtUnavailable(error)
+      ) {
+        return {
+          ok: false,
+          error: describePinUnavailableError(),
+        }
       }
+      failed += 1
+      firstError ??= error.message
+      continue
     }
-    return { ok: false, error: `Pin failed: ${error.message}` }
+    okCount += 1
   }
 
-  const pinnedAt = pinned ? new Date().toISOString() : null
+  if (okCount === 0) {
+    return {
+      ok: false,
+      error: describePinFailedError(firstError),
+    }
+  }
+
   revalidatePath("/", "layout")
   revalidatePath("/upload")
-  return { ok: true, data: { pinned_at: pinnedAt } }
+  return {
+    ok: true,
+    data: {
+      ok: okCount,
+      failed,
+      message: describeBulkPinResult({ pinned, ok: okCount, failed }),
+    },
+  }
 }
 
 export async function markGalleryActivityNotificationsRead(
@@ -688,7 +564,7 @@ export async function markGalleryActivityNotificationsRead(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_activity_notifications")
@@ -698,6 +574,13 @@ export async function markGalleryActivityNotificationsRead(
     .is("read_at", null)
 
   if (error) {
+    if (isActivityNotificationsUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Notifications are not available yet — apply the gallery activity notifications migration.",
+      }
+    }
     return {
       ok: false,
       error: `Could not mark notifications read: ${error.message}`,
@@ -720,7 +603,7 @@ export async function markGalleryMentionsRead(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { error } = await supabase
     .from("gallery_comment_mentions")
@@ -730,6 +613,13 @@ export async function markGalleryMentionsRead(
     .is("read_at", null)
 
   if (error) {
+    if (isGalleryMentionsTableUnavailable(error)) {
+      return {
+        ok: false,
+        error:
+          "Mentions are not available yet — apply the gallery comment mentions migration.",
+      }
+    }
     return {
       ok: false,
       error: `Could not mark mentions read: ${error.message}`,
@@ -751,7 +641,7 @@ export async function setGallerySeasonalTheme(
   const supabase = await createClient()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
-  if (!userId) return { ok: false, error: "Please sign in first." }
+  if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
