@@ -4,16 +4,17 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { UserCard } from "@/components/user-card"
-import type { EditableProfileResult } from "@/lib/profile/keycloak"
+import { accountConsoleUrl } from "@/lib/keycloak/admin"
+import type { ProfileFieldsResult } from "@/lib/profile/keycloak"
 import {
-  getEditableProfile,
+  getProfileFields,
   keycloakSubFromIdentities,
 } from "@/lib/profile/keycloak"
 import type { ProfileStats } from "@/lib/profile/stats"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
-import { ProfileEditForm } from "./_components/profile-edit-form"
+import { ProfileAccount } from "./_components/profile-account"
 import { ProfileStatsView } from "./_components/profile-stats"
 import { Section } from "./_components/profile-ui"
 
@@ -26,14 +27,15 @@ export default async function ProfilePage() {
   if (error) throw error
   const stats = data as ProfileStats | null
 
-  // Editable fields come from Keycloak, not Supabase. Hidden entirely when the
-  // session has no Keycloak identity or the admin env isn't configured; shown
-  // as a disabled notice when Keycloak is configured but unreachable, so an IdP
-  // outage costs the edit section and nothing else on this page.
+  // Account fields come from Keycloak, not Supabase, and are read-only here —
+  // the link at the bottom of the section is where they get changed. Hidden
+  // entirely when the session has no Keycloak identity or Keycloak isn't
+  // configured; shown as a notice when it's configured but unreachable, so an
+  // IdP outage costs this section and nothing else on the page.
   const authUser = await getCurrentAuthUser()
   const sub = keycloakSubFromIdentities(authUser?.identities)
-  const editable: EditableProfileResult = sub
-    ? await getEditableProfile(sub)
+  const account: ProfileFieldsResult = sub
+    ? await getProfileFields(sub)
     : { status: "unconfigured" }
 
   return (
@@ -60,13 +62,16 @@ export default async function ProfilePage() {
           avatarUrl={user.avatarUrl}
         />
 
-        {editable.status === "ok" ? (
-          <ProfileEditForm initial={editable.profile} />
+        {account.status === "ok" ? (
+          <ProfileAccount
+            profile={account.profile}
+            accountUrl={accountConsoleUrl()}
+          />
         ) : null}
-        {editable.status === "unavailable" ? (
+        {account.status === "unavailable" ? (
           <Section title="基本資料">
             <p className="px-4 py-3 text-xs text-muted-foreground">
-              目前無法讀取 Keycloak 帳號資料,暫時不能編輯。稍後再試一次。
+              目前無法讀取 Keycloak 帳號資料。稍後再試一次。
             </p>
           </Section>
         ) : null}

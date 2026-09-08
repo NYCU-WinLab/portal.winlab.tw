@@ -1,144 +1,81 @@
 "use client"
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-  type Dispatch,
-  type SetStateAction,
-} from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronUp,
-  IconDownload,
-  IconLink,
-  IconPin,
-  IconX,
-} from "@tabler/icons-react"
+import { IconPin } from "@tabler/icons-react"
 
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 import { toast } from "sonner"
 
 import { ReactionBar } from "@/app/_components/reaction-bar"
-import { GalleryComments } from "@/app/_components/gallery-comments"
-import { PinWallButton } from "@/app/_components/pin-wall-button"
-import { UploaderFilterLink } from "@/app/_components/uploader-filter-link"
-import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
-import { ReactionGlyph } from "@/app/_components/reaction-glyph"
+import { cacheGalleryMediaUrls } from "@/app/_components/gallery-service-worker"
+import {
+  GalleryLightboxMediaPane,
+  GalleryLightboxSocialAside,
+} from "@/app/_components/gallery-card-lightbox"
+import {
+  mediaUrlFromItem,
+  PlayBadge,
+  thumbUrlFromItem,
+} from "@/app/_components/gallery-card-media"
+import {
+  ReactionSummary,
+  useGalleryCardSocial,
+} from "@/app/_components/gallery-card-social"
+import { GalleryTitleEditor } from "@/app/_components/gallery-title-editor"
 import {
   galleryPillClass,
   galleryPolaroidClass,
   gallerySans,
-  gallerySerif,
 } from "@/components/gallery-chrome"
-import { setGalleryReaction } from "@/app/actions"
-import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
-import { getPolaroidFrame } from "@/lib/gallery/polaroid-frame"
+import { useLightboxGestures } from "@/hooks/use-lightbox-gestures"
+import { isTypingTarget } from "@/lib/gallery/keyboard"
+import { describeSequenceGaps } from "@/lib/gallery/manage-uploads"
+import { getPolaroidFrame, getPolaroidTape } from "@/lib/gallery/polaroid-frame"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
-import { loadLightboxSocial } from "@/lib/gallery/lightbox-social"
+import { shareOrCopyPhotoLink } from "@/lib/gallery/photo-share"
+import {
+  describePhotoLinkCopied,
+  describeSavedOriginal,
+} from "@/lib/gallery/photo-share-toast"
+import { describeFavoriteToast } from "@/lib/gallery/favorite-toast"
+import {
+  describeSignInToFavorite,
+  describeCouldNotDownload,
+} from "@/lib/gallery/download-labels"
+import { describeErrorMessage } from "@/lib/gallery/error-message"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import { describeNothingToDownload } from "@/lib/gallery/validation-toasts"
+import type { ArtworkNamePatch } from "@/lib/gallery/rename-artwork"
 import {
   nextSequenceIndex,
   resolveLightboxNextStep,
   resolveLightboxPrevStep,
 } from "@/lib/gallery/lightbox-nav"
+import { resolveLightboxShortcut } from "@/lib/gallery/lightbox-shortcuts"
+import { downloadGalleryOriginal } from "@/lib/gallery/download-original"
 import { getRotation } from "@/lib/gallery/rotation"
-import {
-  GALLERY_REACTIONS,
-  type GalleryReaction,
-  type ReactionCounts,
-  type ReactionNames,
-  totalReactions,
-} from "@/lib/gallery/reactions"
+import { toggleGalleryFavorite } from "@/app/actions/favorites"
 import type {
-  GalleryComment,
   GalleryImage,
   GalleryMember,
   GallerySequenceItem,
 } from "@/lib/gallery/types"
-import { getGalleryImageUrl, getGalleryThumbUrl } from "@/lib/gallery/url"
-import { createClient } from "@/lib/supabase/client"
 
-function applyReactionOptimistic(
-  prev: GalleryReaction | null,
-  reaction: GalleryReaction,
-  viewerName: string,
-  setCounts: Dispatch<SetStateAction<ReactionCounts>>,
-  setNamesByReaction: Dispatch<SetStateAction<ReactionNames>>,
-  setMyReaction: Dispatch<SetStateAction<GalleryReaction | null>>
-) {
-  if (prev === reaction) {
-    setCounts((c) => ({
-      ...c,
-      [reaction]: Math.max(0, c[reaction] - 1),
-    }))
-    setNamesByReaction((n) => ({
-      ...n,
-      [reaction]: n[reaction].filter((name) => name !== viewerName),
-    }))
-    setMyReaction(null)
-    return "removed" as const
-  }
-  if (prev) {
-    setCounts((c) => ({
-      ...c,
-      [prev]: Math.max(0, c[prev] - 1),
-      [reaction]: c[reaction] + 1,
-    }))
-    setNamesByReaction((n) => ({
-      ...n,
-      [prev]: n[prev].filter((name) => name !== viewerName),
-      [reaction]: n[reaction].includes(viewerName)
-        ? n[reaction]
-        : [...n[reaction], viewerName],
-    }))
-    setMyReaction(reaction)
-    return "updated" as const
-  }
-  setCounts((c) => ({ ...c, [reaction]: c[reaction] + 1 }))
-  setNamesByReaction((n) => ({
-    ...n,
-    [reaction]: n[reaction].includes(viewerName)
-      ? n[reaction]
-      : [...n[reaction], viewerName],
-  }))
-  setMyReaction(reaction)
-  return "added" as const
-}
-
-function mediaUrlFromItem(item: GallerySequenceItem): string {
-  return getGalleryImageUrl(item.image_path)
-}
-
-function thumbUrlFromItem(item: GallerySequenceItem): string {
-  if (item.media_type === "video" && item.poster_path) {
-    return getGalleryThumbUrl(item.poster_path)
-  }
-  return getGalleryThumbUrl(item.image_path)
-}
-
-function posterUrlFromItem(item: GallerySequenceItem): string | null {
-  return item.poster_path ? getGalleryImageUrl(item.poster_path) : null
-}
-
+/**
+ * Polaroid shell + lightbox orchestration.
+ * Media/sequence UI → gallery-card-lightbox + gallery-card-media.
+ * Reactions/comments/realtime → gallery-card-social.
+ */
 export function GalleryCard({
   image,
   isSignedIn,
@@ -146,15 +83,26 @@ export function GalleryCard({
   viewerName,
   members,
   isAdmin = false,
+  pinAvailable = true,
+  favoritesAvailable = true,
+  albumsAvailable = true,
+  tagsAvailable = true,
+  reactionsAvailable = true,
+  commentsAvailable = true,
   priorityLcp = false,
   initialOpen = false,
   highlightCommentId = null,
   open,
   onOpenChange,
   gridFocused = false,
+  wallFocusRef,
   hasWallPrev = false,
   hasWallNext = false,
   onWallNavigate,
+  onArtworkRenamed,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
 }: {
   image: GalleryImage
   isSignedIn: boolean
@@ -162,20 +110,34 @@ export function GalleryCard({
   viewerName: string
   members: GalleryMember[]
   isAdmin?: boolean
+  pinAvailable?: boolean
+  favoritesAvailable?: boolean
+  albumsAvailable?: boolean
+  tagsAvailable?: boolean
+  reactionsAvailable?: boolean
+  commentsAvailable?: boolean
   priorityLcp?: boolean
   initialOpen?: boolean
   highlightCommentId?: string | null
   open?: boolean
   onOpenChange?: (open: boolean) => void
   gridFocused?: boolean
+  /** Registers the polaroid open/select trigger for wall J/K focus. */
+  wallFocusRef?: (node: HTMLButtonElement | null) => void
   hasWallPrev?: boolean
   hasWallNext?: boolean
   onWallNavigate?: (direction: "prev" | "next") => void
+  onArtworkRenamed?: (patches: ArtworkNamePatch[]) => void
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelected?: (imageId: string, options?: { shiftKey?: boolean }) => void
 }) {
+  const isOwner = Boolean(viewerId && image.created_by === viewerId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const rotation = getRotation(image.id)
   const frame = getPolaroidFrame(image.id)
+  const tape = getPolaroidTape(image.id)
   const sequenceMedia: GallerySequenceItem[] =
     image.sequence_items.length > 0
       ? image.sequence_items
@@ -187,9 +149,15 @@ export function GalleryCard({
             media_type: image.media_type,
             poster_path: image.poster_path,
             created_at: image.created_at,
+            sequence_index: image.sequence_index,
+            tags: image.tags ?? [],
           },
         ]
   const isSequence = sequenceMedia.length > 1
+  const sequenceGapLabel = describeSequenceGaps(
+    image.sequence_missing_indexes ?? []
+  )
+  const showSequenceBadge = isSequence || Boolean(sequenceGapLabel)
   const [internalOpen, setInternalOpen] = useState(initialOpen)
   const isDialogOpen = open !== undefined ? open : internalOpen
   const setIsDialogOpen = (next: boolean) => {
@@ -202,7 +170,11 @@ export function GalleryCard({
     params.delete("photo")
     params.delete("comment")
     const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    try {
+      router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    } catch {
+      toast.error(describeGalleryNavError("closePhoto"))
+    }
   }
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -215,34 +187,29 @@ export function GalleryCard({
   const [lightboxFailed, setLightboxFailed] = useState(false)
   const [mediaLoaded, setMediaLoaded] = useState(false)
   const mediaRef = useRef<HTMLDivElement>(null)
-  const [isPending, startTransition] = useTransition()
-  const [counts, setCounts] = useState(image.reaction_counts)
-  const [myReaction, setMyReaction] = useState(image.my_reaction)
-  const [namesByReaction, setNamesByReaction] = useState(image.reaction_names)
-  const [comments, setComments] = useState<GalleryComment[]>([])
-  const [commentsLoaded, setCommentsLoaded] = useState(false)
   const [pinnedAt, setPinnedAt] = useState<string | null>(image.pinned_at)
-  const viewerIdRef = useRef(viewerId)
-  const isDialogOpenRef = useRef(isDialogOpen)
 
-  // Coalesce realtime bursts into a single refresh.
-  const refreshTimerRef = useRef<number | null>(null)
-  const refreshInFlightRef = useRef(false)
-  const refreshQueuedRef = useRef(false)
-
-  const canReact = isSignedIn && !isPending
-  const reactionTotal = totalReactions(counts)
-  const wallCommentCount = commentsLoaded
-    ? comments.length
-    : image.comment_count
-
-  useEffect(() => {
-    viewerIdRef.current = viewerId
-  }, [viewerId])
-
-  useEffect(() => {
-    isDialogOpenRef.current = isDialogOpen
-  }, [isDialogOpen])
+  const {
+    counts,
+    myReaction,
+    namesByReaction,
+    comments,
+    setComments,
+    canReact,
+    reactionBusy,
+    reactionTotal,
+    wallCommentCount,
+    onReact,
+    commentPinAvailable,
+    commentLikesAvailable,
+    reactionsAvailable: lightboxReactionsAvailable,
+  } = useGalleryCardSocial({
+    image,
+    viewerId,
+    viewerName,
+    isSignedIn,
+    isDialogOpen,
+  })
 
   useEffect(() => {
     setPinnedAt(image.pinned_at)
@@ -258,114 +225,23 @@ export function GalleryCard({
     setIsDialogOpen(next)
   }
 
-  const refreshSocial = useCallback(async () => {
-    if (!isDialogOpenRef.current) return
-    if (refreshInFlightRef.current) {
-      refreshQueuedRef.current = true
-      return
-    }
-
-    refreshInFlightRef.current = true
-    const supabase = createClient()
-    try {
-      const social = await loadLightboxSocial(
-        supabase,
-        image.id,
-        viewerIdRef.current
-      )
-      // Dialog might have been closed while the request was in-flight.
-      if (!isDialogOpenRef.current) return
-
-      setComments(social.comments)
-      setCommentsLoaded(true)
-      setCounts(social.reaction_counts)
-      setNamesByReaction(social.reaction_names)
-      setMyReaction(social.my_reaction)
-    } finally {
-      refreshInFlightRef.current = false
-      if (refreshQueuedRef.current) {
-        refreshQueuedRef.current = false
-        void refreshSocial()
-      }
-    }
-  }, [image.id])
-
-  const scheduleRefreshSocial = useCallback(() => {
-    if (!isDialogOpenRef.current) return
-    if (refreshTimerRef.current) {
-      window.clearTimeout(refreshTimerRef.current)
-    }
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null
-      void refreshSocial()
-    }, 150)
-  }, [refreshSocial])
-
-  useEffect(() => {
-    if (isDialogOpen) return
-    if (refreshTimerRef.current) {
-      window.clearTimeout(refreshTimerRef.current)
-      refreshTimerRef.current = null
-    }
-    refreshQueuedRef.current = false
-  }, [isDialogOpen])
-
-  useEffect(() => {
-    if (!isDialogOpen) return
-    void refreshSocial()
-  }, [isDialogOpen, refreshSocial])
-
-  useEffect(() => {
-    if (isDialogOpen) return
-    setComments([])
-    setCommentsLoaded(false)
-  }, [isDialogOpen])
-
-  useEffect(() => {
-    if (!isDialogOpen) return
-
-    const supabase = createClient()
-    const channelName = `gallery-lightbox:${image.id}:${crypto.randomUUID()}`
-    const channel = supabase.channel(channelName)
-
-    const onChange = () => {
-      scheduleRefreshSocial()
-    }
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "gallery_comments",
-          filter: `image_id=eq.${image.id}`,
-        },
-        onChange
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "gallery_image_votes",
-          filter: `image_id=eq.${image.id}`,
-        },
-        onChange
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [isDialogOpen, image.id, refreshSocial, scheduleRefreshSocial])
-
   useEffect(() => {
     if (isDialogOpen) return
     setActiveIndex(0)
     setLightboxFailed(false)
     setMobileDetailsOpen(false)
   }, [isDialogOpen])
+
+  useEffect(() => {
+    if (!isDialogOpen || !mediaUrl) return
+    const urls = [mediaUrl, thumbUrl].filter(Boolean)
+    for (const item of sequenceMedia) {
+      urls.push(mediaUrlFromItem(item), thumbUrlFromItem(item))
+    }
+    cacheGalleryMediaUrls(urls)
+    // sequenceMedia is derived from image; depend on image id + items length.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid looping on new array identity
+  }, [isDialogOpen, mediaUrl, thumbUrl, image.id, image.sequence_items])
 
   useEffect(() => {
     setLightboxFailed(false)
@@ -421,26 +297,163 @@ export function GalleryCard({
     onPrev: goLightboxPrev,
     onNext: goLightboxNext,
     onSwipeUp: () => setMobileDetailsOpen(true),
+    onSwipeDown: () => setMobileDetailsOpen(false),
   })
+
+  const [favorited, setFavorited] = useState(Boolean(image.is_favorited))
+  const favoriteBusyRef = useRef(false)
+  const shareBusyRef = useRef(false)
+  const downloadBusyRef = useRef(false)
+
+  useEffect(() => {
+    setFavorited(Boolean(image.is_favorited))
+  }, [image.id, image.is_favorited])
+
+  const copyShareLink = useCallback(async () => {
+    if (shareBusyRef.current) return
+    shareBusyRef.current = true
+    try {
+      const href = buildGalleryPhotoHref({
+        photoId: image.id,
+        commentId: highlightCommentId,
+      })
+      const url = `${window.location.origin}${href}`
+      const title = activeItem?.name ?? image.name
+      const result = await shareOrCopyPhotoLink({ url, title })
+      if (!result.ok) {
+        if (result.reason === "aborted") return
+        toast.error(result.message)
+        return
+      }
+      if (result.mode === "copied") toast.success(describePhotoLinkCopied())
+    } finally {
+      shareBusyRef.current = false
+    }
+  }, [activeItem?.name, highlightCommentId, image.id, image.name])
+
+  const toggleFavoriteFromKeyboard = useCallback(async () => {
+    if (!isSignedIn) {
+      toast.error(describeSignInToFavorite())
+      return
+    }
+    if (favoriteBusyRef.current) return
+    favoriteBusyRef.current = true
+    const next = !favorited
+    setFavorited(next)
+    try {
+      const result = await toggleGalleryFavorite(image.id, next)
+      if (!result.ok) {
+        setFavorited(!next)
+        toast.error(result.error)
+        return
+      }
+      toast.success(describeFavoriteToast(result.favorited))
+    } finally {
+      favoriteBusyRef.current = false
+    }
+  }, [favorited, image.id, isSignedIn])
+
+  const downloadOriginalFromKeyboard = useCallback(async () => {
+    if (downloadBusyRef.current) return
+    const path = activeItem?.image_path ?? image.image_path
+    const name = activeItem?.name ?? image.name
+    if (!path) {
+      toast.error(describeNothingToDownload())
+      return
+    }
+    downloadBusyRef.current = true
+    try {
+      await downloadGalleryOriginal({ displayName: name, imagePath: path })
+      toast.success(describeSavedOriginal())
+    } catch (error) {
+      toast.error(describeErrorMessage(error, describeCouldNotDownload()))
+    } finally {
+      downloadBusyRef.current = false
+    }
+  }, [activeItem?.image_path, activeItem?.name, image.image_path, image.name])
+
+  const [reactionOpenSignal, setReactionOpenSignal] = useState(0)
 
   useEffect(() => {
     if (!isDialogOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault()
+      if (isTypingTarget(event.target)) return
+      const action = resolveLightboxShortcut(event.key, {
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+      })
+      if (!action) return
+      event.preventDefault()
+      if (action === "prev") {
         goLightboxPrev()
         return
       }
-      if (event.key === "ArrowRight") {
-        event.preventDefault()
+      if (action === "next") {
         goLightboxNext()
+        return
+      }
+      if (action === "first") {
+        setActiveIndex(0)
+        return
+      }
+      if (action === "last") {
+        setActiveIndex(Math.max(0, sequenceMedia.length - 1))
+        return
+      }
+      if (action === "toggle-details") {
+        setMobileDetailsOpen((open) => !open)
+        return
+      }
+      if (action === "share") {
+        void copyShareLink()
+        return
+      }
+      if (action === "favorite") {
+        void toggleFavoriteFromKeyboard()
+        return
+      }
+      if (action === "download") {
+        // Click path busy state lives on DownloadOriginalButton; keyboard
+        // download is a one-shot toast flow without a dedicated control.
+        void downloadOriginalFromKeyboard()
+        return
+      }
+      if (action === "react") {
+        if (!lightboxReactionsAvailable || !canReact) return
+        setReactionOpenSignal((n) => n + 1)
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [goLightboxNext, goLightboxPrev, isDialogOpen])
+  }, [
+    canReact,
+    copyShareLink,
+    downloadOriginalFromKeyboard,
+    goLightboxNext,
+    goLightboxPrev,
+    isDialogOpen,
+    lightboxReactionsAvailable,
+    sequenceMedia.length,
+    toggleFavoriteFromKeyboard,
+  ])
+
+  // Prefetch adjacent sequence full-res for snappier story browsing.
+  useEffect(() => {
+    if (!isDialogOpen) return
+    const neighbors = [activeIndex - 1, activeIndex + 1]
+      .map((idx) => sequenceMedia[idx])
+      .filter(Boolean)
+    const urls = neighbors.flatMap((item) => [
+      mediaUrlFromItem(item!),
+      thumbUrlFromItem(item!),
+    ])
+    cacheGalleryMediaUrls(urls)
+    // sequenceMedia identity changes each render; key off length + active shot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment
+  }, [activeIndex, isDialogOpen, image.id, sequenceMedia.length])
 
   const handlePinSuccess = (nextPinnedAt: string | null) => {
     setPinnedAt(nextPinnedAt)
@@ -450,54 +463,16 @@ export function GalleryCard({
     }
   }
 
-  const copyShareLink = async () => {
-    const href = buildGalleryPhotoHref({
-      photoId: image.id,
-      commentId: highlightCommentId,
-    })
-    const url = `${window.location.origin}${href}`
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success("Link copied.")
-    } catch {
-      toast.error("Could not copy link.")
-    }
-  }
-
-  const onReact = (reaction: GalleryReaction) => {
-    if (!isSignedIn) {
-      toast.error("Please sign in before reacting.")
-      return
-    }
-
-    startTransition(async () => {
-      const result = await setGalleryReaction(image.id, reaction)
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
-
-      const outcome = applyReactionOptimistic(
-        myReaction,
-        reaction,
-        viewerName,
-        setCounts,
-        setNamesByReaction,
-        setMyReaction
-      )
-      if (outcome === "removed") toast.success("Reaction removed.")
-      else if (outcome === "updated") toast.success("Reaction updated.")
-      else toast.success("Reaction added.")
-    })
-  }
-
   return (
     <figure
       className={cn(
         "mx-auto w-full sm:max-w-none",
         frame.maxWidthClass,
         gridFocused &&
-          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background"
+          "rounded-sm ring-2 ring-ring ring-offset-2 ring-offset-background",
+        selectionMode &&
+          selected &&
+          "rounded-sm ring-2 ring-foreground/40 ring-offset-2 ring-offset-background"
       )}
     >
       <div className="flex justify-center px-3 py-3 sm:px-4 sm:py-4">
@@ -514,26 +489,66 @@ export function GalleryCard({
             } as React.CSSProperties
           }
         >
-          <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-            <div className={galleryPolaroidClass()}>
-              <DialogTrigger asChild>
+          <Dialog
+            open={selectionMode ? false : isDialogOpen}
+            onOpenChange={selectionMode ? undefined : handleDialogOpenChange}
+          >
+            <div
+              className={cn(
+                galleryPolaroidClass(),
+                tape === "tl" &&
+                  "gallery-polaroid-tape gallery-polaroid-tape--tl",
+                tape === "tr" &&
+                  "gallery-polaroid-tape gallery-polaroid-tape--tr",
+                tape === "clip" && "gallery-polaroid-clip",
+                selectionMode && selected && "ring-2 ring-foreground/30"
+              )}
+            >
+              {selectionMode ? (
                 <button
                   type="button"
-                  className="block w-full rounded-[2px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  ref={wallFocusRef}
+                  data-wall-focused={gridFocused ? "true" : undefined}
+                  aria-pressed={selected}
+                  aria-label={
+                    selected
+                      ? `Deselect ${activeItem?.name ?? image.name}`
+                      : `Select ${activeItem?.name ?? image.name}`
+                  }
+                  onClick={(event) =>
+                    onToggleSelected?.(image.id, { shiftKey: event.shiftKey })
+                  }
+                  className="relative block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {thumbFailed ? (
                     <div
                       className={cn(
-                        "flex w-full items-center justify-center bg-muted/80 px-4 text-center text-xs text-muted-foreground",
+                        "mx-2.5 mt-2.5 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-4 text-center shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
                         frame.aspectClass
                       )}
                     >
-                      Preview unavailable
+                      <Image
+                        src="/icons/mark.png"
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="size-9 object-contain opacity-40 grayscale"
+                        draggable={false}
+                        unoptimized
+                      />
+                      <span
+                        className={cn(
+                          gallerySans(),
+                          "text-[11px] tracking-wide text-zinc-500/90"
+                        )}
+                      >
+                        Preview unavailable
+                      </span>
                     </div>
                   ) : (
                     <div
                       className={cn(
-                        "relative overflow-hidden bg-neutral-100",
+                        "relative mx-2.5 mt-2.5 overflow-hidden bg-neutral-200/80 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
                         frame.aspectClass
                       )}
                     >
@@ -542,46 +557,115 @@ export function GalleryCard({
                         alt={activeItem?.name ?? image.name}
                         fill
                         priority={priorityLcp}
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 28vw"
                         className="object-cover"
+                        decoding="async"
                         onError={() => setThumbFailed(true)}
                       />
                       {activeIsVideo ? <PlayBadge /> : null}
-                      {pinnedAt ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
-                          )}
-                        >
-                          <IconPin className="size-3" aria-hidden />
-                          Pinned
-                        </div>
-                      ) : null}
-                      {isSequence ? (
-                        <div
-                          className={cn(
-                            gallerySans(),
-                            "absolute top-2.5 right-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
-                          )}
-                        >
-                          {image.sequence_count} shots
-                        </div>
-                      ) : null}
                     </div>
                   )}
-                  <div className="gallery-polaroid-caption px-3 pt-3 pb-4">
-                    <p
-                      className={cn(
-                        gallerySerif(),
-                        "truncate text-center text-sm leading-snug text-foreground/85"
-                      )}
-                    >
-                      {image.name}
-                    </p>
-                  </div>
+                  <span
+                    className={cn(
+                      "absolute top-4 left-4 flex size-6 items-center justify-center rounded-md border text-[11px] shadow-sm backdrop-blur-sm",
+                      selected
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border/80 bg-background/85 text-muted-foreground"
+                    )}
+                    aria-hidden
+                  >
+                    {selected ? "✓" : ""}
+                  </span>
                 </button>
-              </DialogTrigger>
+              ) : (
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    ref={wallFocusRef}
+                    data-wall-focused={gridFocused ? "true" : undefined}
+                    className="block w-full rounded-[1px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {thumbFailed ? (
+                      <div
+                        className={cn(
+                          "mx-2.5 mt-2.5 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-200/80 to-neutral-300/70 px-4 text-center shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src="/icons/mark.png"
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="size-9 object-contain opacity-40 grayscale"
+                          draggable={false}
+                          unoptimized
+                        />
+                        <span
+                          className={cn(
+                            gallerySans(),
+                            "text-[11px] tracking-wide text-zinc-500/90"
+                          )}
+                        >
+                          Preview unavailable
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "relative mx-2.5 mt-2.5 overflow-hidden bg-neutral-200/80 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]",
+                          frame.aspectClass
+                        )}
+                      >
+                        <Image
+                          src={thumbUrl}
+                          alt={activeItem?.name ?? image.name}
+                          fill
+                          priority={priorityLcp}
+                          sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 28vw"
+                          className="object-cover"
+                          decoding="async"
+                          onError={() => setThumbFailed(true)}
+                        />
+                        {activeIsVideo ? <PlayBadge /> : null}
+                        {pinnedAt ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 left-2.5 inline-flex items-center gap-0.5 rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-sm"
+                            )}
+                          >
+                            <IconPin className="size-3" aria-hidden />
+                            Pinned
+                          </div>
+                        ) : null}
+                        {showSequenceBadge ? (
+                          <div
+                            className={cn(
+                              gallerySans(),
+                              "absolute top-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                            )}
+                          >
+                            {sequenceGapLabel
+                              ? `Incomplete · ${image.sequence_count}`
+                              : `${image.sequence_count} shots`}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </button>
+                </DialogTrigger>
+              )}
+              {/* Caption sits outside DialogTrigger so owner edit controls are not nested buttons. */}
+              <div className="gallery-polaroid-caption px-3 pt-3.5 pb-5">
+                <GalleryTitleEditor
+                  imageId={image.id}
+                  name={image.name}
+                  canEdit={isOwner && !selectionMode}
+                  variant="polaroid"
+                  onRenamed={onArtworkRenamed}
+                />
+              </div>
             </div>
             <DialogContent
               showCloseButton={false}
@@ -598,278 +682,74 @@ export function GalleryCard({
               <DialogTitle className="sr-only">
                 {activeItem?.name ?? image.name}
               </DialogTitle>
+              <p className="sr-only" aria-live="polite" aria-atomic="true">
+                {activeItem?.name ?? image.name}
+                {isSequence
+                  ? ` · shot ${activeIndex + 1} of ${sequenceMedia.length}`
+                  : ""}
+              </p>
               <div className="gallery-lightbox-layout">
-                <div
-                  {...gestureProps}
-                  className="gallery-lightbox-media relative"
-                >
-                  <DialogClose
-                    aria-label="Close"
-                    className={cn(
-                      "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[max(env(safe-area-inset-right),0.75rem)] z-20",
-                      "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                      "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                      "transition-colors hover:bg-white",
-                      "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                    )}
-                  >
-                    <IconX className="h-5 w-5" />
-                  </DialogClose>
-                  <button
-                    type="button"
-                    onClick={() => void copyShareLink()}
-                    aria-label="Copy share link"
-                    className={cn(
-                      "absolute top-[max(env(safe-area-inset-top),0.75rem)] z-20",
-                      isSignedIn
-                        ? "right-[calc(max(env(safe-area-inset-right),0.75rem)+6rem)]"
-                        : "right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)]",
-                      "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                      "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                      "transition-colors hover:bg-white",
-                      "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                    )}
-                  >
-                    <IconLink className="h-5 w-5" />
-                  </button>
-                  {isSignedIn ? (
-                    <a
-                      href={mediaUrl}
-                      download
-                      aria-label="Save original"
-                      className={cn(
-                        "absolute top-[max(env(safe-area-inset-top),0.75rem)] right-[calc(max(env(safe-area-inset-right),0.75rem)+3rem)] z-20",
-                        "inline-flex h-11 w-11 items-center justify-center rounded-full",
-                        "bg-white/85 text-foreground shadow-lg backdrop-blur-sm",
-                        "transition-colors hover:bg-white",
-                        "focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                      )}
-                    >
-                      <IconDownload className="h-5 w-5" />
-                    </a>
-                  ) : null}
-                  {!mediaLoaded && !lightboxFailed ? (
-                    <div
-                      aria-hidden
-                      className="gallery-lightbox-image animate-pulse bg-muted/80"
-                    />
-                  ) : null}
-                  {lightboxFailed ? (
-                    <div className="max-w-[95vw] rounded-sm bg-muted px-8 py-16 text-center text-muted-foreground italic shadow-2xl">
-                      This {activeIsVideo ? "video" : "image"} cannot be
-                      previewed in your browser.
-                    </div>
-                  ) : activeIsVideo ? (
-                    <video
-                      src={mediaUrl}
-                      poster={
-                        activeItem
-                          ? (posterUrlFromItem(activeItem) ?? undefined)
-                          : undefined
-                      }
-                      controls
-                      autoPlay
-                      playsInline
-                      preload="metadata"
-                      className={cn(
-                        "gallery-lightbox-image",
-                        !mediaLoaded && "opacity-0"
-                      )}
-                      onLoadedData={() => setMediaLoaded(true)}
-                      onError={() => setLightboxFailed(true)}
-                    />
-                  ) : (
-                    <img
-                      src={mediaUrl}
-                      alt={activeItem?.name ?? image.name}
-                      className={cn(
-                        "gallery-lightbox-image",
-                        !mediaLoaded && "opacity-0"
-                      )}
-                      onLoad={() => setMediaLoaded(true)}
-                      onError={() => setLightboxFailed(true)}
-                    />
-                  )}
-                  {hasWallPrev || isSequence ? (
-                    <button
-                      type="button"
-                      onClick={goLightboxPrev}
-                      className="absolute top-1/2 left-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                      aria-label="Previous"
-                    >
-                      <IconChevronLeft className="h-5 w-5" />
-                    </button>
-                  ) : null}
-                  {hasWallNext || isSequence ? (
-                    <button
-                      type="button"
-                      onClick={goLightboxNext}
-                      className="absolute top-1/2 right-3 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                      aria-label="Next"
-                    >
-                      <IconChevronRight className="h-5 w-5" />
-                    </button>
-                  ) : null}
-                  {isSequence ? (
-                    <div className="absolute right-0 bottom-3 left-0 z-10 mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4">
-                      {sequenceMedia.map((item, idx) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setActiveIndex(idx)}
-                          className={cn(
-                            "h-2.5 w-2.5 rounded-full bg-white/50 transition-colors",
-                            idx === activeIndex && "bg-white"
-                          )}
-                          aria-label={`View shot ${idx + 1}`}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-                <aside
-                  className={cn(
-                    "gallery-lightbox-aside",
-                    mobileDetailsOpen && "gallery-lightbox-aside--expanded"
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="gallery-lightbox-aside-toggle md:hidden"
-                    aria-expanded={mobileDetailsOpen}
-                    onClick={() => setMobileDetailsOpen((open) => !open)}
-                  >
-                    <span
-                      aria-hidden
-                      className="mx-auto h-1 w-10 shrink-0 rounded-full bg-border/80"
-                    />
-                    <span className="flex w-full items-center justify-between gap-3 pt-2">
-                      <span className="min-w-0 text-left">
-                        <span
-                          className={cn(
-                            gallerySerif(),
-                            "block truncate text-base leading-snug text-foreground"
-                          )}
-                        >
-                          {activeItem?.name ?? image.name}
-                        </span>
-                        <span
-                          className={cn(
-                            gallerySans(),
-                            "mt-0.5 block text-[11px] text-muted-foreground"
-                          )}
-                        >
-                          {wallCommentCount > 0
-                            ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
-                            : "Comments & reactions"}
-                        </span>
-                      </span>
-                      {isAdmin ? (
-                        <PinWallButton
-                          imageId={image.id}
-                          pinnedAt={pinnedAt}
-                          onPinnedChange={handlePinSuccess}
-                          scrollToWallTop
-                          stopPropagation
-                          className="shrink-0"
-                        />
-                      ) : null}
-                      <IconChevronUp
-                        className={cn(
-                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                          mobileDetailsOpen && "rotate-180"
-                        )}
-                      />
-                    </span>
-                  </button>
-                  <div className="gallery-lightbox-aside-header space-y-3 border-b border-border/50 px-4 py-3 sm:px-5">
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2
-                          className={cn(
-                            gallerySerif(),
-                            "text-lg leading-snug text-foreground sm:text-xl"
-                          )}
-                        >
-                          {activeItem?.name ?? image.name}
-                        </h2>
-                        {pinnedAt ? (
-                          <span
-                            className={cn(
-                              gallerySans(),
-                              "inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
-                            )}
-                          >
-                            <IconPin className="size-3" aria-hidden />
-                            Pinned
-                          </span>
-                        ) : null}
-                      </div>
-                      <p
-                        className={cn(
-                          gallerySans(),
-                          "text-xs text-muted-foreground"
-                        )}
-                      >
-                        by{" "}
-                        {image.created_by && isSignedIn ? (
-                          <UploaderFilterLink uploaderId={image.created_by}>
-                            {image.uploader_name}
-                          </UploaderFilterLink>
-                        ) : (
-                          image.uploader_name
-                        )}
-                        {uploadedAt ? (
-                          <>
-                            <span aria-hidden> · </span>
-                            <time dateTime={uploadedAt}>
-                              {formatUploadedAt(uploadedAt)}
-                            </time>
-                          </>
-                        ) : null}
-                      </p>
-                      {isSequence ? (
-                        <p
-                          className={cn(
-                            gallerySans(),
-                            "text-[11px] text-muted-foreground/70"
-                          )}
-                        >
-                          Shot {activeIndex + 1} of {sequenceMedia.length}
-                        </p>
-                      ) : null}
-                    </div>
-                    {isAdmin ? (
-                      <div className="flex justify-end">
-                        <PinWallButton
-                          imageId={image.id}
-                          pinnedAt={pinnedAt}
-                          onPinnedChange={handlePinSuccess}
-                          scrollToWallTop
-                        />
-                      </div>
-                    ) : null}
-                    <ReactionBar
-                      counts={counts}
-                      myReaction={myReaction}
-                      canReact={canReact}
-                      onReact={onReact}
-                    />
-                  </div>
-                  <div className="gallery-lightbox-aside-comments flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-                    <GalleryComments
-                      imageId={image.id}
-                      comments={comments}
-                      onCommentsChange={setComments}
-                      isSignedIn={isSignedIn}
-                      viewerId={viewerId}
-                      viewerName={viewerName}
-                      members={members}
-                      isAdmin={isAdmin}
-                      highlightCommentId={highlightCommentId}
-                    />
-                  </div>
-                </aside>
+                <GalleryLightboxMediaPane
+                  gestureProps={gestureProps as Record<string, unknown>}
+                  image={image}
+                  activeItem={activeItem}
+                  activeIsVideo={activeIsVideo}
+                  mediaUrl={mediaUrl}
+                  isSignedIn={isSignedIn}
+                  isSequence={isSequence}
+                  sequenceMedia={sequenceMedia}
+                  activeIndex={activeIndex}
+                  setActiveIndex={setActiveIndex}
+                  hasWallPrev={hasWallPrev}
+                  hasWallNext={hasWallNext}
+                  mediaLoaded={mediaLoaded}
+                  setMediaLoaded={setMediaLoaded}
+                  lightboxFailed={lightboxFailed}
+                  setLightboxFailed={setLightboxFailed}
+                  goLightboxPrev={goLightboxPrev}
+                  goLightboxNext={goLightboxNext}
+                  copyShareLink={() => void copyShareLink()}
+                />
+                <GalleryLightboxSocialAside
+                  image={image}
+                  activeItem={activeItem}
+                  uploadedAt={uploadedAt}
+                  isSequence={isSequence}
+                  activeIndex={activeIndex}
+                  sequenceLength={sequenceMedia.length}
+                  sequenceMedia={sequenceMedia}
+                  isSignedIn={isSignedIn}
+                  isAdmin={isAdmin}
+                  pinAvailable={pinAvailable}
+                  favoritesAvailable={favoritesAvailable}
+                  albumsAvailable={albumsAvailable}
+                  tagsAvailable={tagsAvailable}
+                  isOwner={isOwner}
+                  viewerId={viewerId}
+                  viewerName={viewerName}
+                  members={members}
+                  highlightCommentId={highlightCommentId}
+                  mobileDetailsOpen={mobileDetailsOpen}
+                  setMobileDetailsOpen={setMobileDetailsOpen}
+                  pinnedAt={pinnedAt}
+                  handlePinSuccess={handlePinSuccess}
+                  wallCommentCount={wallCommentCount}
+                  counts={counts}
+                  myReaction={myReaction}
+                  canReact={canReact}
+                  reactionBusy={reactionBusy}
+                  onReact={onReact}
+                  reactionOpenSignal={reactionOpenSignal}
+                  comments={comments}
+                  setComments={setComments}
+                  onArtworkRenamed={onArtworkRenamed}
+                  favorited={favorited}
+                  onFavoritedChange={setFavorited}
+                  commentPinAvailable={commentPinAvailable}
+                  commentLikesAvailable={commentLikesAvailable}
+                  reactionsAvailable={lightboxReactionsAvailable}
+                  commentsAvailable={commentsAvailable}
+                />
               </div>
             </DialogContent>
           </Dialog>
@@ -879,121 +759,45 @@ export function GalleryCard({
         <div
           className={cn(
             "flex flex-wrap items-center gap-2",
-            reactionTotal > 0 ? "justify-between" : "justify-end"
+            reactionsAvailable && reactionTotal > 0
+              ? "justify-between"
+              : "justify-end"
           )}
         >
-          <ReactionSummary
-            total={reactionTotal}
-            counts={counts}
-            namesByReaction={namesByReaction}
-          />
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileDetailsOpen(true)
-                setIsDialogOpen(true)
-              }}
-              className={galleryPillClass()}
-            >
-              {wallCommentCount > 0
-                ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
-                : "Comment"}
-            </button>
-            <ReactionBar
+          {reactionsAvailable ? (
+            <ReactionSummary
+              total={reactionTotal}
               counts={counts}
-              myReaction={myReaction}
-              canReact={canReact}
-              onReact={onReact}
+              namesByReaction={namesByReaction}
             />
+          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {commentsAvailable ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDetailsOpen(true)
+                  setIsDialogOpen(true)
+                }}
+                className={galleryPillClass()}
+              >
+                {wallCommentCount > 0
+                  ? `${wallCommentCount} comment${wallCommentCount === 1 ? "" : "s"}`
+                  : "Comment"}
+              </button>
+            ) : null}
+            {reactionsAvailable ? (
+              <ReactionBar
+                counts={counts}
+                myReaction={myReaction}
+                canReact={canReact}
+                busy={reactionBusy}
+                onReact={onReact}
+              />
+            ) : null}
           </div>
         </div>
       </figcaption>
     </figure>
-  )
-}
-
-function ReactionSummary({
-  total,
-  counts,
-  namesByReaction,
-}: {
-  total: number
-  counts: ReactionCounts
-  namesByReaction: ReactionNames
-}) {
-  if (total === 0) return null
-
-  const entries = GALLERY_REACTIONS.flatMap((reaction) =>
-    namesByReaction[reaction].map((name) => ({ reaction, name }))
-  )
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            galleryPillClass(),
-            "max-w-full flex-wrap gap-x-1.5 gap-y-1"
-          )}
-          aria-label="Show who reacted"
-        >
-          {GALLERY_REACTIONS.filter((r) => counts[r] > 0).map((reaction) => (
-            <span
-              key={reaction}
-              className="inline-flex items-center gap-0.5 whitespace-nowrap"
-            >
-              <ReactionGlyph reaction={reaction} className="text-sm" />
-              <span className="tabular-nums">{counts[reaction]}</span>
-            </span>
-          ))}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        sideOffset={8}
-        className="w-56 rounded-xl p-3"
-      >
-        <ul className="max-h-52 space-y-1.5 overflow-y-auto text-sm">
-          {entries.map(({ reaction, name }, idx) => (
-            <li
-              key={`${reaction}-${name}-${idx}`}
-              className="flex min-w-0 items-center gap-2 select-none"
-            >
-              <ReactionGlyph
-                reaction={reaction}
-                className="shrink-0 text-base"
-              />
-              <span className="truncate">{name}</span>
-            </li>
-          ))}
-        </ul>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function PlayBadge() {
-  return (
-    <div
-      aria-hidden
-      className={cn(
-        "pointer-events-none absolute inset-0 flex items-center justify-center",
-        "bg-gradient-to-t from-black/30 via-transparent to-transparent"
-      )}
-    >
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85 text-foreground shadow-lg backdrop-blur-sm">
-        <svg
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden
-        >
-          <path d="M8 5v14l11-7z" />
-        </svg>
-      </div>
-    </div>
   )
 }

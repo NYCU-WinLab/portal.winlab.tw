@@ -62,8 +62,9 @@ function pickFromPool<T>(pool: T[], count: number, random: () => number): T[] {
   return copy.slice(0, Math.min(count, copy.length))
 }
 
+/** Keep seasonal easter eggs sparse so the paper wall still reads first. */
 export function pickPoppableZongziCount(random: () => number = Math.random) {
-  return 2 + Math.floor(random() * 2)
+  return 1 + Math.floor(random() * 2)
 }
 
 export function pickPoppableZongzi(

@@ -1,10 +1,14 @@
+import { parseLabStatus, type LabStatus } from "@/lib/meetings/lab-status"
+
 export interface Meeting {
   id: string
   year: number
+  semesterId: string
   weekLabel: string | null
   scheduledDate: string
   isHoliday: boolean
   isSpeaker: boolean
+  isThesis: boolean
   presenter: string | null
   presenterUserId: string | null
   pptUploaded: boolean
@@ -46,6 +50,19 @@ export interface QuestionPoolMember {
   timesAsked: number
 }
 
+export interface PresenterPoolMember {
+  userId: string
+  admissionYear: number
+  sortOrder: number
+  name: string | null
+  email: string | null
+  poolAddedAt: string
+  lastPresentedDate: string | null
+  timesPresented: number
+  labStatus: LabStatus | null
+  tierRank: number
+}
+
 export interface MeetingQuestioner {
   meetingId: string
   userId: string
@@ -53,13 +70,35 @@ export interface MeetingQuestioner {
   source: "auto" | "manual"
 }
 
+/**
+ * The unit `第N週` numbering restarts on.
+ *
+ * N is the Nth **calendar** week of the semester, not the Nth week the lab
+ * actually met: a holiday week occupies its number (the generate RPC writes
+ * `第N週(原因)`), and it keeps that number even if an admin later rewrites the
+ * label by hand (`大掃除`). Numbers are therefore only ever minted forward, as
+ * `max(第N) + 1` over the whole semester — nothing renumbers a semester
+ * automatically, on the client or in a migration. A positional re-derivation
+ * from "the weeks that look like `第N週`" would pull every week after a
+ * hand-relabelled holiday down by one.
+ */
+export interface Semester {
+  id: string
+  academicYear: number
+  term: 1 | 2
+  startDate: string
+  plannedWeeks: number | null
+}
+
 export interface DbMeeting {
   id: string
   year: number
+  semester_id: string
   week_label: string | null
   scheduled_date: string
   is_holiday: boolean
   is_speaker: boolean
+  is_thesis: boolean
   presenter: string | null
   presenter_user_id: string | null
   ppt_uploaded: boolean
@@ -73,6 +112,14 @@ export interface DbMeeting {
   location: string
   start_time: string
   created_at: string
+}
+
+export interface DbSemester {
+  id: string
+  academic_year: number
+  term: number
+  start_date: string
+  planned_weeks: number | null
 }
 
 export interface DbTeacherPaper {
@@ -100,14 +147,46 @@ export interface DbQuestionPoolMember {
   times_asked: number
 }
 
+export interface DbPresenterPoolMember {
+  user_id: string
+  admission_year: number
+  sort_order: number
+  name: string | null
+  email: string | null
+  pool_added_at: string
+  last_presented_date: string | null
+  times_presented: number
+  lab_status: string | null
+  tier_rank: number
+}
+
+export function toPresenterPoolMember(
+  row: DbPresenterPoolMember
+): PresenterPoolMember {
+  return {
+    userId: row.user_id,
+    admissionYear: row.admission_year,
+    sortOrder: row.sort_order,
+    name: row.name,
+    email: row.email,
+    poolAddedAt: row.pool_added_at,
+    lastPresentedDate: row.last_presented_date,
+    timesPresented: row.times_presented,
+    labStatus: parseLabStatus(row.lab_status),
+    tierRank: row.tier_rank,
+  }
+}
+
 export function toMeeting(row: DbMeeting): Meeting {
   return {
     id: row.id,
     year: row.year,
+    semesterId: row.semester_id,
     weekLabel: row.week_label,
     scheduledDate: row.scheduled_date,
     isHoliday: row.is_holiday,
     isSpeaker: row.is_speaker,
+    isThesis: row.is_thesis,
     presenter: row.presenter,
     presenterUserId: row.presenter_user_id,
     pptUploaded: row.ppt_uploaded,
@@ -122,6 +201,25 @@ export function toMeeting(row: DbMeeting): Meeting {
     startTime: row.start_time,
     createdAt: row.created_at,
   }
+}
+
+export function toSemester(row: DbSemester): Semester {
+  return {
+    id: row.id,
+    academicYear: row.academic_year,
+    term: row.term === 1 ? 1 : 2,
+    startDate: row.start_date,
+    plannedWeeks: row.planned_weeks,
+  }
+}
+
+/**
+ * Derived from academicYear/term only — start_date and planned_weeks are
+ * informational metadata and must never drive display text (a
+ * trigger-created semester's start_date is incidental, not authoritative).
+ */
+export function semesterLabel(s: Semester): string {
+  return `${s.academicYear} ${s.term === 1 ? "上" : "下"}學期`
 }
 
 export function toTag(row: DbTag): Tag {

@@ -13,6 +13,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/database.types"
 import type { AttendeeContact } from "./attendee-groups"
 import { bookRoom } from "./booking-client"
+import { fetchBusySlots } from "./client"
+import { describeConflict, findConflict } from "./conflict"
 import { taipeiIso } from "./date"
 import { meetingJoinUrl, sendBookingInvite } from "./invite-mail"
 import {
@@ -35,6 +37,14 @@ export interface PlaceBookingInput {
   online?: boolean
   /** The machine-readable half of the Teams topic, e.g. `tasa`. */
   meetingPrefix?: string | null
+  /** Keycloak group leaf, when the attendees came from a group button. */
+  groupName?: string | null
+  /** Free text: what the meeting is for. */
+  agenda?: string | null
+  /** GitLab `Deliverable::*` labels, already validated by the caller. */
+  deliverables?: readonly string[]
+  /** Epics this meeting belongs to, canonicalised as `group&iid`. */
+  issueRefs?: readonly string[]
 }
 
 export interface PlaceBookingOutcome {
@@ -89,9 +99,26 @@ export async function placeBooking(
 
   // An online-only meeting reserves nothing, so there is no external system
   // to call and no reservation id to record.
-  const externalId = input.room
-    ? await bookRoom({ room: input.room, start, end, subscriber })
-    : null
+  let externalId: string | null = null
+  if (input.room) {
+    // Re-checked here rather than trusted from the grid the user clicked:
+    // that grid is cached and can be well out of date, and booking on a stale
+    // picture turns into a bare HTTP status from the dept system with no clue
+    // which half-hour is the problem.
+    const busy = await fetchBusySlots(input.room, input.date)
+    const clash = findConflict(busy, input.room, start, end)
+    if (clash) {
+      throw new Error(
+        describeConflict(
+          input.room,
+          { startTime: input.startTime, endTime: input.endTime },
+          clash
+        )
+      )
+    }
+
+    externalId = await bookRoom({ room: input.room, start, end, subscriber })
+  }
 
   const { data: inserted, error } = await supabase
     .from("rooms_bookings")
@@ -107,6 +134,10 @@ export async function placeBooking(
       recurring_id: input.recurringId ?? null,
       online: input.online ?? false,
       meeting_prefix: input.meetingPrefix ?? null,
+      group_name: input.groupName ?? null,
+      agenda: input.agenda ?? null,
+      deliverables: input.deliverables ?? [],
+      issue_refs: input.issueRefs ?? [],
     })
     .select("id")
     .single()
@@ -131,6 +162,10 @@ export async function placeBooking(
       title: input.title,
       start,
       end,
+      groupName: input.groupName,
+      agenda: input.agenda,
+      deliverables: input.deliverables,
+      issueRefs: input.issueRefs,
     })
     meetingRequestId = triggered.requestId
   }

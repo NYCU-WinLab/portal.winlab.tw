@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { IconBell, IconThumbUp } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -26,6 +27,11 @@ import {
 } from "@/components/gallery-chrome"
 import { formatUploadedAt } from "@/lib/gallery/format-uploaded-at"
 import { buildGalleryPhotoHref } from "@/lib/gallery/photo-deep-link"
+import { describeGalleryNavError } from "@/lib/gallery/gallery-nav-errors"
+import {
+  notificationSummary,
+  truncateNotificationBody,
+} from "@/lib/gallery/notification-copy"
 import {
   fetchGalleryActivityNotification,
   fetchGalleryMentionNotification,
@@ -34,27 +40,6 @@ import {
   type GalleryNotification,
 } from "@/lib/gallery/notifications"
 import { createClient } from "@/lib/supabase/client"
-
-function truncateBody(body: string, max = 72): string {
-  const trimmed = body.trim()
-  if (trimmed.length <= max) return trimmed
-  return `${trimmed.slice(0, max - 1)}…`
-}
-
-function notificationSummary(notification: GalleryNotification): string {
-  const actor = notification.actor_name
-  const work = notification.image_name
-  if (notification.kind === "mention") {
-    return `${actor} mentioned you on ${work}`
-  }
-  if (notification.kind === "reply") {
-    return `${actor} replied to your comment on ${work}`
-  }
-  if (notification.kind === "comment_like") {
-    return `${actor} liked your comment on ${work}`
-  }
-  return `${actor} reacted to ${work}`
-}
 
 export function GalleryMentionBell({
   viewerId,
@@ -228,7 +213,9 @@ export function GalleryMentionBell({
     }
   }, [viewerId])
 
-  const markRead = async (items: GalleryNotification[]) => {
+  const markRead = async (
+    items: GalleryNotification[]
+  ): Promise<string | null> => {
     const mentionIds = items
       .map((item) => item.mention_comment_id)
       .filter((id): id is string => Boolean(id))
@@ -245,30 +232,42 @@ export function GalleryMentionBell({
         : Promise.resolve({ ok: true as const }),
     ])
 
-    return mentionResult.ok && activityResult.ok
+    if (!mentionResult.ok) return mentionResult.error
+    if (!activityResult.ok) return activityResult.error
+    return null
   }
 
   const openNotification = (notification: GalleryNotification) => {
     startTransition(async () => {
-      const ok = await markRead([notification])
-      if (!ok) return
+      const error = await markRead([notification])
+      if (error) {
+        toast.error(error)
+        return
+      }
       setNotifications((current) =>
         current.filter((item) => item.key !== notification.key)
       )
-      router.push(
-        buildGalleryPhotoHref({
-          photoId: notification.image_id,
-          commentId: notification.comment_id,
-        })
-      )
+      try {
+        router.push(
+          buildGalleryPhotoHref({
+            photoId: notification.image_id,
+            commentId: notification.comment_id,
+          })
+        )
+      } catch {
+        toast.error(describeGalleryNavError("openMentionedPhoto"))
+      }
     })
   }
 
   const markAllRead = () => {
     if (notifications.length === 0) return
     startTransition(async () => {
-      const ok = await markRead(notifications)
-      if (!ok) return
+      const error = await markRead(notifications)
+      if (error) {
+        toast.error(error)
+        return
+      }
       setNotifications([])
     })
   }
@@ -287,10 +286,13 @@ export function GalleryMentionBell({
               : "Notifications"
           }
           disabled={isPending}
+          aria-busy={isPending || undefined}
         >
           <IconBell className="size-4" aria-hidden />
           {unreadCount > 0 ? (
             <span
+              role="status"
+              aria-live="polite"
               className={cn(
                 gallerySans(),
                 "absolute -top-0.5 -right-0.5 flex min-w-[1rem] items-center justify-center rounded-full bg-foreground px-1 py-0.5 text-[9px] leading-none font-medium text-background"
@@ -313,6 +315,7 @@ export function GalleryMentionBell({
               className="text-[10px] tracking-wide text-muted-foreground uppercase transition-colors hover:text-foreground"
               onClick={markAllRead}
               disabled={isPending}
+              aria-busy={isPending || undefined}
             >
               Mark all read
             </button>
@@ -348,7 +351,7 @@ export function GalleryMentionBell({
               </span>
               {notification.body ? (
                 <span className="line-clamp-2 text-[11px] text-muted-foreground">
-                  {truncateBody(notification.body)}
+                  {truncateNotificationBody(notification.body)}
                 </span>
               ) : null}
               <span className="text-[10px] text-muted-foreground/80">

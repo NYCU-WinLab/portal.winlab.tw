@@ -17,7 +17,7 @@ interface Props {
   onValueChange: (type: MeetingType) => void
 }
 
-// Shared 報告 / 演講 / 假日 picker for the add- and edit-meeting dialogs, so the
+// Shared 報告 / 演講 / 碩論 / 假日 picker for the add- and edit-meeting dialogs, so the
 // option list and labels can't drift between the two (mirrors PresenterSelect /
 // PaperSelect living in this folder).
 export function MeetingTypeSelect({ value, onValueChange }: Props) {
@@ -35,6 +35,9 @@ export function MeetingTypeSelect({ value, onValueChange }: Props) {
         </SelectItem>
         <SelectItem value="speaker">
           {MEETING_TYPE_LABELS.speaker}(外部講者)
+        </SelectItem>
+        <SelectItem value="thesis">
+          {MEETING_TYPE_LABELS.thesis}(自訂題目)
         </SelectItem>
         <SelectItem value="holiday">
           {MEETING_TYPE_LABELS.holiday} / 暫停

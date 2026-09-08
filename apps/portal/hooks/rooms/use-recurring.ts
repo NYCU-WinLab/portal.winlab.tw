@@ -8,6 +8,7 @@ import {
   getRecurringMeetings,
   setRecurringActive,
   type CreateRecurringInput,
+  type CreateRecurringResult,
 } from "@/app/rooms/actions"
 
 import { queryKeys } from "./query-keys"
@@ -19,7 +20,9 @@ export function useRecurringMeetings() {
   })
 }
 
-function useRecurringMutation<TArgs>(fn: (args: TArgs) => Promise<void>) {
+function useRecurringMutation<TArgs, TResult = void>(
+  fn: (args: TArgs) => Promise<TResult>
+) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: fn,
@@ -30,8 +33,8 @@ function useRecurringMutation<TArgs>(fn: (args: TArgs) => Promise<void>) {
 }
 
 export function useCreateRecurring() {
-  return useRecurringMutation((input: CreateRecurringInput) =>
-    createRecurringMeeting(input)
+  return useRecurringMutation<CreateRecurringInput, CreateRecurringResult>(
+    (input) => createRecurringMeeting(input)
   )
 }
 

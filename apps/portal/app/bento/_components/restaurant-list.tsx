@@ -29,6 +29,7 @@ type RestaurantRow = {
   created_at: string
   additional?: string[] | null
   is_active: boolean
+  is_pinned: boolean
   menu_items: MenuItemRow[]
 }
 
@@ -41,8 +42,17 @@ export function RestaurantList() {
   const { data: disabledCount = 0 } = useDisabledMenuCount()
   const [search, setSearch] = useState("")
 
-  const filtered = ((restaurants ?? []) as RestaurantRow[]).filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
+  // Cards are collapsed by default, so name-only search would hide every dish
+  // behind a click. Matching item names too — and opening whatever matched —
+  // keeps "which store sells 牛丼" a one-step question.
+  const query = search.trim().toLowerCase()
+  const filtered = ((restaurants ?? []) as RestaurantRow[]).filter(
+    (r) =>
+      !query ||
+      r.name.toLowerCase().includes(query) ||
+      (r.menu_items ?? []).some((item) =>
+        item.name.toLowerCase().includes(query)
+      )
   )
 
   if (isLoading && !restaurants) {
@@ -92,7 +102,7 @@ export function RestaurantList() {
         <div className="relative">
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="搜尋店家..."
+            placeholder="搜尋店家或菜名..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -106,6 +116,7 @@ export function RestaurantList() {
               restaurant={restaurant}
               menuItems={restaurant.menu_items ?? []}
               isAdmin={isAdmin}
+              forceOpen={query.length > 0}
             />
           ))}
         </div>

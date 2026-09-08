@@ -53,6 +53,49 @@ export function endTimeOf(startTime: string, durationMinutes: number): string {
   return `${hh}:${mm}`
 }
 
+/**
+ * The first date on or after `from` that this series actually meets on.
+ *
+ * Walks day by day rather than jumping to the next matching weekday: for a
+ * fortnightly series the right answer is the next *in-phase* week, and the
+ * phase is what `occursOn` knows. Bounded at 8 weeks — two intervals of the
+ * longest cadence the form offers — so a rule that somehow matches nothing
+ * returns null instead of looping.
+ */
+export function nextOccurrenceOnOrAfter(
+  rule: RecurrenceRule,
+  from: string
+): string | null {
+  for (let i = 0; i < 56; i++) {
+    const date = shiftDays(from, i)
+    if (occursOn(rule, date)) return date
+  }
+  return null
+}
+
+/** Every date this series meets on within `[from, to]`, inclusive. */
+export function occurrencesBetween(
+  rule: RecurrenceRule,
+  from: string,
+  to: string
+): string[] {
+  const span = daysBetween(from, to)
+  if (span < 0) return []
+
+  const dates: string[] = []
+  for (let i = 0; i <= span; i++) {
+    const date = shiftDays(from, i)
+    if (occursOn(rule, date)) dates.push(date)
+  }
+  return dates
+}
+
+function shiftDays(from: string, days: number): string {
+  return new Date(atUtcMidnight(from).getTime() + days * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10)
+}
+
 /** The first date on or after `from` that falls on `weekday`. */
 export function nextWeekdayOnOrAfter(from: string, weekday: number): string {
   const start = atUtcMidnight(from)

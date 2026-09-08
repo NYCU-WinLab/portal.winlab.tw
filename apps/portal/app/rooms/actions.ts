@@ -19,9 +19,25 @@ import {
   computeDayAvailability,
   type AvailabilitySlot,
 } from "@/lib/rooms/availability"
-import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
-import { nextWeekdayOnOrAfter } from "@/lib/rooms/recurrence"
+import {
+  fetchAttendeeGroups,
+  gitlabPathForGroup,
+} from "@/lib/rooms/keycloak-groups"
+import {
+  fetchEpic,
+  fetchEpicDeliverables,
+  fetchOpenEpics,
+  type EpicDeliverablesResult,
+  type EpicsResult,
+} from "@/lib/gitlab/client"
+import { parseEpicRef } from "@/lib/rooms/epic-refs"
+import {
+  nextOccurrenceOnOrAfter,
+  nextWeekdayOnOrAfter,
+} from "@/lib/rooms/recurrence"
+import { catchUpNewSeries } from "@/lib/rooms/recurring-run"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
+import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import {
   meetingPipelineConfigured,
@@ -104,6 +120,99 @@ export async function getAttendeeGroups(): Promise<AttendeeGroupsResponse> {
     unmailableSample: [...new Set(groups.flatMap((g) => g.unmailable))].slice(
       0,
       5
+    ),
+  }
+}
+
+/**
+ * The open epics of the group a booking is being made for.
+ *
+ * Takes the Keycloak group leaf, not a GitLab path: the path is resolved from
+ * that group's `gitlab_path` attribute server-side, so this can only ever read
+ * a group the caller was already booking under.
+ */
+export async function getGroupEpics(
+  groupName: string | null
+): Promise<EpicsResult> {
+  const user = await getCurrentUser()
+  if (!user) return { status: "error", detail: "請先登入" }
+
+  return fetchOpenEpics(await gitlabPathForGroup(groupName))
+}
+
+/**
+ * What this meeting owes, for the form to show before anyone commits to it.
+ *
+ * Takes the Keycloak group leaf for the same reason `getGroupEpics` does: the
+ * GitLab path is resolved server-side, so this can't be pointed at an epic in
+ * some group the caller isn't booking under.
+ */
+export async function getEpicDeliverables(
+  groupName: string | null,
+  iid: number
+): Promise<EpicDeliverablesResult> {
+  const user = await getCurrentUser()
+  if (!user) return { status: "error", detail: "請先登入" }
+
+  const groupPath = await gitlabPathForGroup(groupName)
+  if (!groupPath) {
+    return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
+  }
+  return fetchEpicDeliverables(groupPath, iid)
+}
+
+/**
+ * What a booking's chosen epics actually are, and what they say this meeting
+ * owes.
+ *
+ * Both halves are resolved from GitLab rather than taken from the form. The
+ * references are pinned to the group being booked under — a reference to
+ * anything else is dropped rather than forwarded, since it would put a marker
+ * comment on some other project's epic. The deliverables then come from the
+ * issues linked under those epics, because the epic is the meeting and owes
+ * nothing itself. An ad-hoc meeting has no epic and therefore none.
+ *
+ * Never throws. A GitLab outage costs the booking its epic link, not the
+ * room — the pipeline's fallback for a booking with no ISSUE_REFS is to open
+ * a standalone epic, which is recoverable by hand.
+ */
+async function resolveEpicLink(
+  groupName: string | null | undefined,
+  requested: readonly string[]
+): Promise<{ issueRefs: string[]; deliverables: string[] }> {
+  const empty = { issueRefs: [], deliverables: [] }
+  if (requested.length === 0) return empty
+
+  const groupPath = await gitlabPathForGroup(groupName)
+  if (!groupPath) return empty
+
+  const refs = requested
+    .map((raw) => parseEpicRef(raw, groupPath))
+    .filter((ref) => ref !== null)
+    .filter((ref) => ref.groupPath === groupPath)
+
+  if (refs.length === 0) return empty
+
+  // Confirms each epic exists and is readable before it's stored. An epic
+  // that comes back null is dropped rather than failing the booking — the
+  // marker is worth losing, the room isn't.
+  const epics = (
+    await Promise.all(refs.map((ref) => fetchEpic(groupPath, ref.iid)))
+  ).filter((epic) => epic !== null)
+
+  // A failed read leaves the booking's deliverables empty rather than
+  // stopping it. The epic link is the part that matters and it survives; the
+  // labels are a summary that GitLab can restate later.
+  const deliverables = await Promise.all(
+    epics.map((epic) => fetchEpicDeliverables(groupPath, epic.iid))
+  )
+
+  return {
+    issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
+    // Re-normalised rather than concatenated: two epics can each be in
+    // canonical order and still interleave when joined.
+    deliverables: sanitizeDeliverables(
+      deliverables.flatMap((d) => (d.status === "ok" ? d.deliverables : []))
     ),
   }
 }
@@ -263,15 +372,41 @@ export interface ConfirmBookingInput {
   attendees: AttendeeContact[]
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
+  /**
+   * Epics this meeting belongs to. Any form the picker or a person produces;
+   * resolved against GitLab here. Empty means the pipeline opens a standalone
+   * epic for what is, by definition, an ad-hoc meeting.
+   *
+   * No `deliverables` field on purpose — they come from the epic, never from
+   * the form. A meeting with deliverables and no epic isn't ad-hoc.
+   */
+  issueRefs?: string[]
 }
 
-export type BookingResult = { inviteError?: string }
+export type BookingResult = {
+  inviteError?: string
+  /**
+   * Why the booking didn't happen, when it didn't.
+   *
+   * Returned rather than thrown because Next.js redacts errors thrown from a
+   * Server Action in production — every failure reached the user as "An error
+   * occurred in the Server Components render", including ones with a perfectly
+   * good explanation like the dept system's own rejection message.
+   */
+  error?: string
+}
+
+function failureText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 export async function confirmBooking(
   input: ConfirmBookingInput
 ): Promise<BookingResult> {
   const user = await getCurrentUser()
-  if (!user) throw new Error("請先登入")
+  if (!user) return { error: "請先登入" }
 
   // Derived server-side from the group and the attendee list, never taken
   // from the client: the prefix decides which project a Teams recording
@@ -282,23 +417,39 @@ export async function confirmBooking(
   })
   const title = composeTopic(prefix, input.titleSuffix)
 
-  const supabase = await createClient()
-  const outcome = await placeBooking(supabase, requireServiceAccount(), {
-    date: input.date,
-    room: input.room,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    title,
-    attendees: input.attendees,
-    organizer: { id: user.id, name: user.name, email: user.email ?? "" },
-    // Every meeting Portal books gets a Teams meeting — the point of the
-    // whole thing is that there's a recording to look back at afterwards.
-    online: true,
-    meetingPrefix: prefix,
-  })
+  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
 
-  revalidatePath("/rooms")
-  return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
+  const supabase = await createClient()
+  try {
+    const outcome = await placeBooking(supabase, requireServiceAccount(), {
+      date: input.date,
+      room: input.room,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      title,
+      attendees: input.attendees,
+      organizer: { id: user.id, name: user.name, email: user.email ?? "" },
+      // Every meeting Portal books gets a Teams meeting — the point of the
+      // whole thing is that there's a recording to look back at afterwards.
+      online: true,
+      meetingPrefix: prefix,
+      groupName: input.groupName ?? null,
+      agenda: input.agenda?.trim() || null,
+      // Both read back from GitLab rather than trusted from the form: the
+      // refs decide which epic a marker comment lands on, and the
+      // deliverables become labels on it.
+      deliverables: epicLink.deliverables,
+      issueRefs: epicLink.issueRefs,
+    })
+
+    revalidatePath("/rooms")
+    return outcome.inviteError ? { inviteError: outcome.inviteError } : {}
+  } catch (err) {
+    // Logged as well as returned: the log is what the standup reads, the
+    // return value is what the person staring at the dialog reads.
+    console.error("[rooms] booking failed", err)
+    return { error: failureText(err) }
+  }
 }
 
 /**
@@ -345,7 +496,7 @@ async function cancelTeamsMeeting(
 
 export async function cancelBooking(bookingId: string): Promise<BookingResult> {
   const user = await getCurrentUser()
-  if (!user) throw new Error("請先登入")
+  if (!user) return { error: "請先登入" }
 
   const subscriber = requireServiceAccount()
   const supabase = await createClient()
@@ -358,20 +509,25 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     .single()
 
   if (error || !booking) {
-    throw new Error("找不到這筆預約,或已經被取消")
+    return { error: "找不到這筆預約,或已經被取消" }
   }
   if (booking.requested_by !== user.id) {
-    throw new Error("只能取消自己建立的預約")
+    return { error: "只能取消自己建立的預約" }
   }
 
   // An online-only meeting reserved nothing, so there's nothing to release.
   if (booking.external_reservation_id && booking.room) {
-    await cancelRoomBooking(booking.external_reservation_id, {
-      room: booking.room,
-      start: taipeiIso(booking.date, booking.start_time),
-      end: taipeiIso(booking.date, booking.end_time),
-      subscriber,
-    })
+    try {
+      await cancelRoomBooking(booking.external_reservation_id, {
+        room: booking.room,
+        start: taipeiIso(booking.date, booking.start_time),
+        end: taipeiIso(booking.date, booking.end_time),
+        subscriber,
+      })
+    } catch (err) {
+      console.error("[rooms] cancel failed", err)
+      return { error: failureText(err) }
+    }
   }
 
   const { error: updateError } = await supabase
@@ -384,9 +540,9 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     .eq("id", bookingId)
 
   if (updateError) {
-    throw new Error(
-      `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`
-    )
+    return {
+      error: `外部系統已取消成功,但 Portal 稽核紀錄更新失敗:${updateError.message}——請通知管理員手動確認,避免紀錄跟實際狀態不一致`,
+    }
   }
 
   await cancelTeamsMeeting(booking.id, booking.date, booking.start_time)
@@ -428,6 +584,15 @@ export interface RecurringMeeting {
   includeAdvisor: boolean
   active: boolean
   createdBy: string
+  /**
+   * The next date this series meets, and whether a room is already held for
+   * it. Null `nextDate` only for an inactive series — an active one always
+   * has a next occurrence.
+   */
+  nextDate: string | null
+  nextBookedRoom: string | null
+  /** True when that occurrence exists as a booking, room or online-only. */
+  nextBooked: boolean
 }
 
 export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
@@ -439,19 +604,68 @@ export async function getRecurringMeetings(): Promise<RecurringMeeting[]> {
     .order("start_time")
   if (error) throw new Error(`讀取固定會議失敗:${error.message}`)
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    weekday: row.weekday,
-    startTime: row.start_time,
-    durationMinutes: row.duration_minutes,
-    intervalWeeks: row.interval_weeks,
-    anchorDate: row.anchor_date,
-    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
-    includeAdvisor: row.include_advisor,
-    active: row.active,
-    createdBy: row.created_by,
-  }))
+  const rows = data ?? []
+  const today = todayInTaipei()
+
+  // Next occurrence per series, then one query for the bookings that cover
+  // them. Read by recurring_id rather than by date+time: that link is what the
+  // cron and the catch-up write, and matching on the slot instead would claim
+  // somebody else's booking at the same hour in a different room.
+  const nextDates = new Map<string, string | null>(
+    rows.map((row) => [
+      row.id,
+      row.active
+        ? nextOccurrenceOnOrAfter(
+            {
+              weekday: row.weekday,
+              intervalWeeks: row.interval_weeks,
+              anchorDate: row.anchor_date,
+            },
+            today
+          )
+        : null,
+    ])
+  )
+
+  const wanted = [...nextDates.values()].filter((d) => d !== null)
+  const bookings = wanted.length
+    ? ((
+        await supabase
+          .from("rooms_bookings")
+          .select("recurring_id, date, room")
+          .eq("status", "booked")
+          .not("recurring_id", "is", null)
+          .in("date", wanted)
+      ).data ?? [])
+    : []
+
+  // Keyed on the pair, because a fortnightly and a weekly series can both be
+  // due on one date and each wants its own answer.
+  const booked = new Map(
+    bookings.map((b) => [`${b.recurring_id}:${b.date}`, b.room])
+  )
+
+  return rows.map((row) => {
+    const nextDate = nextDates.get(row.id) ?? null
+    const key = nextDate ? `${row.id}:${nextDate}` : null
+    const hasBooking = key !== null && booked.has(key)
+    return {
+      id: row.id,
+      title: row.title,
+      weekday: row.weekday,
+      startTime: row.start_time,
+      durationMinutes: row.duration_minutes,
+      intervalWeeks: row.interval_weeks,
+      anchorDate: row.anchor_date,
+      attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
+      includeAdvisor: row.include_advisor,
+      active: row.active,
+      createdBy: row.created_by,
+      nextDate,
+      nextBookedRoom: hasBooking ? (booked.get(key!) ?? null) : null,
+      nextBooked: hasBooking,
+    }
+  })
 }
 
 export interface CreateRecurringInput {
@@ -465,11 +679,27 @@ export interface CreateRecurringInput {
   includeAdvisor: boolean
   /** Keycloak group name, when the attendees came from a group button. */
   groupName?: string | null
+  /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
+  agenda?: string | null
+  /**
+   * Epics every occurrence of this series belongs to. Deliverables follow
+   * from them, as with a one-off booking.
+   */
+  issueRefs?: string[]
+}
+
+/** What the catch-up managed to do, so the form can say it out loud. */
+export interface CreateRecurringResult {
+  /** Occurrences inside the cron's blind window that were booked just now. */
+  booked: number
+  /** Ones that needed a room and could not get one. */
+  failed: number
+  errors: string[]
 }
 
 export async function createRecurringMeeting(
   input: CreateRecurringInput
-): Promise<void> {
+): Promise<CreateRecurringResult> {
   const user = await getCurrentUser()
   if (!user) throw new Error("請先登入")
 
@@ -489,23 +719,58 @@ export async function createRecurringMeeting(
   // form happened to be submitted.
   const anchorDate = nextWeekdayOnOrAfter(todayInTaipei(), input.weekday)
 
+  // Frozen at creation for the same reason the prefix is: the epic a standing
+  // series reports into shouldn't change under it because someone relabelled
+  // something in GitLab midway through a term.
+  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+
   const supabase = await createClient()
-  const { error } = await supabase.from("rooms_recurring_meetings").insert({
-    title,
-    weekday: input.weekday,
-    start_time: input.startTime,
-    duration_minutes: input.durationMinutes,
-    interval_weeks: input.intervalWeeks,
-    anchor_date: anchorDate,
-    attendees: input.attendees as unknown as Json,
-    include_advisor: input.includeAdvisor,
-    created_by: user.id,
-    meeting_prefix: prefix,
-    group_name: input.groupName ?? null,
-  })
-  if (error) throw new Error(`建立固定會議失敗:${error.message}`)
+  const { data: created, error } = await supabase
+    .from("rooms_recurring_meetings")
+    .insert({
+      title,
+      weekday: input.weekday,
+      start_time: input.startTime,
+      duration_minutes: input.durationMinutes,
+      interval_weeks: input.intervalWeeks,
+      anchor_date: anchorDate,
+      attendees: input.attendees as unknown as Json,
+      include_advisor: input.includeAdvisor,
+      created_by: user.id,
+      meeting_prefix: prefix,
+      group_name: input.groupName ?? null,
+      agenda: input.agenda?.trim() || null,
+      deliverables: epicLink.deliverables,
+      issue_refs: epicLink.issueRefs,
+    })
+    .select("id")
+    .single()
+  if (error || !created) {
+    throw new Error(`建立固定會議失敗:${error?.message ?? "unknown"}`)
+  }
+
+  // The nightly run only ever looks at today + 7, so any occurrence already
+  // inside that window would never be booked by anything. Do it here, now,
+  // while the person who asked for it is still looking at the screen.
+  //
+  // Deliberately not fatal: the series exists either way, and a room that
+  // could not be got is something to report, not a reason to claim the series
+  // was not created.
+  let catchUp: CreateRecurringResult = { booked: 0, failed: 0, errors: [] }
+  try {
+    const run = await catchUpNewSeries(created.id)
+    catchUp = { booked: run.booked, failed: run.failed, errors: run.errors }
+  } catch (err) {
+    console.error("[rooms] recurring catch-up failed", err)
+    catchUp = {
+      booked: 0,
+      failed: 0,
+      errors: [err instanceof Error ? err.message : String(err)],
+    }
+  }
 
   revalidatePath("/rooms")
+  return catchUp
 }
 
 export async function setRecurringActive(

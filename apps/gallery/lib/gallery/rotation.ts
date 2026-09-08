@@ -3,7 +3,8 @@
 //
 // We hash the id into a number, then map to [-MAX_DEG, +MAX_DEG]. UUID first
 // 8 hex chars is plenty of entropy for a tilt.
-const MAX_DEG = 4
+// Bold scatter: ±7.5° so the wall reads as hung photos, not a flat grid.
+export const GALLERY_ROTATION_MAX_DEG = 7.5
 
 export function getRotation(id: string): number {
   // Pull a stable 32-bit-ish int out of the id. UUID prefix works; for any
@@ -13,7 +14,7 @@ export function getRotation(id: string): number {
   // Map to roughly [-MAX_DEG, +MAX_DEG] with two decimal places of variation.
   const normalized = (safe % 1000) / 1000 // 0..0.999
   const signed = normalized * 2 - 1 // -1..0.999
-  return Number((signed * MAX_DEG).toFixed(2))
+  return Number((signed * GALLERY_ROTATION_MAX_DEG).toFixed(2))
 }
 
 function fallbackHash(input: string): number {

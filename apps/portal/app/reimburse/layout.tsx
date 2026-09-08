@@ -5,6 +5,8 @@ import { Toaster } from "@workspace/ui/components/sonner"
 
 import { PortalShell } from "@/components/portal-shell"
 
+import { QueryProvider } from "./_components/query-provider"
+
 export const metadata: Metadata = {
   title: "Reimburse | Portal",
   description: "WinLab cash-flow bookkeeping.",
@@ -16,7 +18,7 @@ export default function ReimburseLayout({
   children: React.ReactNode
 }) {
   return (
-    <>
+    <QueryProvider>
       <PortalShell
         appName="Reimburse"
         appHref="/reimburse"
@@ -29,6 +31,6 @@ export default function ReimburseLayout({
         {children}
       </PortalShell>
       <Toaster />
-    </>
+    </QueryProvider>
   )
 }

@@ -3,9 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GalleryReaction } from "@/lib/gallery/reactions"
 import {
   fetchGalleryMentionNotification,
+  isGalleryMentionsTableUnavailable,
   loadUnreadGalleryMentions,
   type GalleryMentionNotification,
 } from "@/lib/gallery/mention-notifications"
+
+export { isGalleryMentionsTableUnavailable } from "@/lib/gallery/mention-notifications"
 
 export type GalleryNotificationKind =
   | "mention"
@@ -135,9 +138,26 @@ export function isActivityNotificationsUnavailable(
   return (
     error.code === "PGRST205" ||
     error.code === "42P01" ||
-    /gallery_activity_notifications/i.test(message) ||
-    /schema cache/i.test(message)
+    (/gallery_activity_notifications/i.test(message) &&
+      (/schema cache/i.test(message) ||
+        /does not exist/i.test(message) ||
+        /could not find/i.test(message)))
   )
+}
+
+/** True when at least one notification source table is queryable. */
+export async function isGalleryNotificationsReady(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const [activity, mentions] = await Promise.all([
+    supabase.from("gallery_activity_notifications").select("id").limit(1),
+    supabase.from("gallery_comment_mentions").select("comment_id").limit(1),
+  ])
+  const activityOk =
+    !activity.error || !isActivityNotificationsUnavailable(activity.error)
+  const mentionsOk =
+    !mentions.error || !isGalleryMentionsTableUnavailable(mentions.error)
+  return activityOk || mentionsOk
 }
 
 export async function fetchGalleryActivityNotification(

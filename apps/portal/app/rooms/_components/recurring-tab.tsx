@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -17,19 +17,30 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { Textarea } from "@workspace/ui/components/textarea"
 
-import { useAttendeeGroups, useLabUsers } from "@/hooks/rooms/use-lab-users"
+import {
+  useAttendeeGroups,
+  useEpicDeliverables,
+  useGroupEpics,
+  useLabUsers,
+} from "@/hooks/rooms/use-lab-users"
+import type { GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCreateRecurring,
   useDeleteRecurring,
   useRecurringMeetings,
   useSetRecurringActive,
 } from "@/hooks/rooms/use-recurring"
+import type { RecurringMeeting } from "@/app/rooms/actions"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
+import { formatDayLabel } from "@/lib/rooms/date"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
+import { DeliverablesField } from "./deliverables-field"
+import { EpicField } from "./epic-field"
 import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
@@ -47,6 +58,38 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
 }
 
+/**
+ * When this series next meets, and whether a room is already held for it.
+ *
+ * Worth its own line because the two facts fail independently and neither was
+ * visible before: the cron books one week out, so a newly created series has a
+ * gap, and a booking can also fail later on because nothing was free. "下次
+ * 09/11(五)· 已訂 600B" answers both at a glance.
+ */
+function NextOccurrence({ meeting }: { meeting: RecurringMeeting }) {
+  if (!meeting.active) {
+    return (
+      <p className="text-xs text-muted-foreground">已停用,不會自動訂房。</p>
+    )
+  }
+  if (!meeting.nextDate) return null
+
+  return (
+    <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <span>下次:{formatDayLabel(meeting.nextDate)}</span>
+      {meeting.nextBooked ? (
+        <Badge variant="secondary">
+          已訂 {meeting.nextBookedRoom ?? "純線上"}
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="text-amber-600 dark:text-amber-500">
+          尚未訂房
+        </Badge>
+      )}
+    </p>
+  )
+}
+
 export function RecurringTab() {
   const { data: meetings, isLoading } = useRecurringMeetings()
   const { data: labUsers } = useLabUsers()
@@ -57,12 +100,26 @@ export function RecurringTab() {
 
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
+  const [agenda, setAgenda] = useState("")
+  // The epic every occurrence of this series reports into, if any.
+  const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [intervalWeeks, setIntervalWeeks] = useState(1)
   const [attendees, setAttendees] = useState<AttendeeContact[]>([])
   const [includeAdvisor, setIncludeAdvisor] = useState(true)
+
+  const epicsQuery = useGroupEpics(groupName)
+  const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
+
+  // An epic belongs to one group; switching groups invalidates the pick.
+  useEffect(() => setEpic(null), [groupName])
+
+  function handleEpicChange(next: GitLabEpic | null) {
+    setEpic(next)
+    if (next?.description && !agenda.trim()) setAgenda(next.description)
+  }
 
   // Mirrors what the server derives; the server recomputes rather than
   // trusting this.
@@ -75,6 +132,8 @@ export function RecurringTab() {
     create.mutate(
       {
         titleSuffix,
+        agenda,
+        issueRefs: epic ? [`&${epic.iid}`] : [],
         weekday,
         startTime,
         durationMinutes,
@@ -84,10 +143,24 @@ export function RecurringTab() {
         groupName,
       },
       {
-        onSuccess: () => {
-          toast.success("已建立固定會議")
+        onSuccess: (result) => {
+          // The catch-up runs inside the create, so its outcome belongs in the
+          // same toast — a series whose next meeting is days away is a
+          // different situation from one whose next meeting is tomorrow and
+          // just got a room, and the old single "已建立" said neither.
+          if (result.failed > 0) {
+            toast.warning(
+              `已建立固定會議,但近期 ${result.failed} 場沒訂到教室:${result.errors[0] ?? ""}`
+            )
+          } else if (result.booked > 0) {
+            toast.success(`已建立固定會議,並先訂了近期 ${result.booked} 場`)
+          } else {
+            toast.success("已建立固定會議")
+          }
           setTitleSuffix(DEFAULT_TOPIC_SUFFIX)
           setGroupName(null)
+          setAgenda("")
+          setEpic(null)
           setAttendees([])
         },
         onError: (err) => toast.error(errorMessage(err, "建立失敗")),
@@ -111,6 +184,34 @@ export function RecurringTab() {
           prefix={prefix}
           suffix={titleSuffix}
           onSuffixChange={setTitleSuffix}
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs">與會人員</Label>
+          <AttendeeSelect
+            users={labUsers ?? []}
+            groups={
+              groupsQuery.data?.status === "ok" ? groupsQuery.data.groups : []
+            }
+            value={attendees}
+            onChange={setAttendees}
+            advisorIncluded={includeAdvisor}
+            onAdvisorIncludedChange={setIncludeAdvisor}
+            onGroupPicked={(group) => setGroupName(group.name)}
+          />
+        </div>
+
+        <EpicField
+          id="recurring-epic"
+          epics={epicsQuery.data}
+          value={epic?.iid ?? null}
+          onChange={handleEpicChange}
+        />
+
+        <DeliverablesField
+          result={deliverablesQuery.data}
+          loading={deliverablesQuery.isFetching}
+          hasEpic={!!epic}
         />
 
         <div className="flex flex-col gap-1.5">
@@ -190,17 +291,15 @@ export function RecurringTab() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">與會人員</Label>
-          <AttendeeSelect
-            users={labUsers ?? []}
-            groups={
-              groupsQuery.data?.status === "ok" ? groupsQuery.data.groups : []
-            }
-            value={attendees}
-            onChange={setAttendees}
-            advisorIncluded={includeAdvisor}
-            onAdvisorIncludedChange={setIncludeAdvisor}
-            onGroupPicked={(group) => setGroupName(group.name)}
+          <Label htmlFor="recurring-agenda" className="text-xs">
+            討論事項（可不填）
+          </Label>
+          <Textarea
+            id="recurring-agenda"
+            value={agenda}
+            onChange={(e) => setAgenda(e.target.value)}
+            placeholder="每次會議固定要討論的事項"
+            rows={3}
           />
         </div>
 
@@ -244,6 +343,7 @@ export function RecurringTab() {
                 {WEEKDAYS[m.weekday]} {m.startTime}–
                 {endTimeOf(m.startTime, m.durationMinutes)}
               </p>
+              <NextOccurrence meeting={m} />
               {m.attendees.length > 0 && (
                 <p className="text-xs text-muted-foreground">
                   與會:{m.attendees.map((a) => a.name).join("、")}

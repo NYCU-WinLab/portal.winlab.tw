@@ -2,8 +2,34 @@ import { describe, expect, test } from "bun:test"
 
 import {
   formatGallerySupabaseError,
+  isCommentEdited,
   isGalleryCommentEditUnavailable,
+  isGalleryCommentsReady,
+  isGalleryCommentsUnavailable,
 } from "@/lib/gallery/comment-edit"
+
+describe("isCommentEdited", () => {
+  test("false without updated_at or when timestamps match", () => {
+    expect(isCommentEdited({ created_at: "2026-01-01T00:00:00.000Z" })).toBe(
+      false
+    )
+    expect(
+      isCommentEdited({
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+      })
+    ).toBe(false)
+  })
+
+  test("true when updated_at is later", () => {
+    expect(
+      isCommentEdited({
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:01.000Z",
+      })
+    ).toBe(true)
+  })
+})
 
 describe("isGalleryCommentEditUnavailable", () => {
   test("detects missing updated_at column", () => {
@@ -41,5 +67,68 @@ describe("formatGallerySupabaseError", () => {
         hint: "Perhaps you meant created_at",
       })
     ).toContain("code=42703")
+  })
+})
+
+describe("isGalleryCommentsUnavailable", () => {
+  test("detects missing comments table", () => {
+    expect(
+      isGalleryCommentsUnavailable({
+        code: "PGRST205",
+        message:
+          "Could not find the table 'public.gallery_comments' in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  test("ignores column-level soft-fails", () => {
+    expect(
+      isGalleryCommentsUnavailable({
+        code: "PGRST204",
+        message: "Could not find the 'updated_at' column of 'gallery_comments'",
+      })
+    ).toBe(false)
+  })
+})
+
+describe("isGalleryCommentsReady", () => {
+  test("is false when comments table is missing", async () => {
+    const client = {
+      from() {
+        return {
+          select() {
+            return {
+              limit() {
+                return Promise.resolve({
+                  error: {
+                    code: "PGRST205",
+                    message:
+                      "Could not find the table 'public.gallery_comments'",
+                  },
+                })
+              },
+            }
+          },
+        }
+      },
+    } as never
+    expect(await isGalleryCommentsReady(client)).toBe(false)
+  })
+
+  test("is true when the query succeeds", async () => {
+    const client = {
+      from() {
+        return {
+          select() {
+            return {
+              limit() {
+                return Promise.resolve({ error: null })
+              },
+            }
+          },
+        }
+      },
+    } as never
+    expect(await isGalleryCommentsReady(client)).toBe(true)
   })
 })

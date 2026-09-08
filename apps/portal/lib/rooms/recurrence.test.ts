@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import {
   endTimeOf,
+  nextOccurrenceOnOrAfter,
   nextWeekdayOnOrAfter,
+  occurrencesBetween,
   occursOn,
   weekdayOf,
 } from "./recurrence"
@@ -83,5 +85,58 @@ describe("nextWeekdayOnOrAfter", () => {
   test("wraps into the next week when the weekday has passed", () => {
     // Wednesday -> the following Monday, not the one just gone.
     expect(nextWeekdayOnOrAfter("2026-08-05", 1)).toBe("2026-08-10")
+  })
+})
+
+describe("nextOccurrenceOnOrAfter", () => {
+  // 2026-09-04 is a Friday, 09-08 a Tuesday.
+  const weekly = { weekday: 5, intervalWeeks: 1, anchorDate: "2026-09-04" }
+  const fortnightly = { weekday: 2, intervalWeeks: 2, anchorDate: "2026-09-08" }
+
+  test("returns the date itself when the series meets that day", () => {
+    expect(nextOccurrenceOnOrAfter(weekly, "2026-09-04")).toBe("2026-09-04")
+  })
+
+  test("walks forward to the next meeting day", () => {
+    expect(nextOccurrenceOnOrAfter(weekly, "2026-09-05")).toBe("2026-09-11")
+  })
+
+  // The weekday alone is not the answer for a fortnightly series: 09-15 is a
+  // Tuesday but an off week, so the next real occurrence is 09-22.
+  test("respects the fortnightly phase, not just the weekday", () => {
+    expect(nextOccurrenceOnOrAfter(fortnightly, "2026-09-09")).toBe(
+      "2026-09-22"
+    )
+    expect(nextOccurrenceOnOrAfter(fortnightly, "2026-09-08")).toBe(
+      "2026-09-08"
+    )
+  })
+})
+
+describe("occurrencesBetween", () => {
+  const weekly = { weekday: 5, intervalWeeks: 1, anchorDate: "2026-09-04" }
+  const fortnightly = { weekday: 2, intervalWeeks: 2, anchorDate: "2026-09-08" }
+
+  // The catch-up window a newly created series needs: tomorrow through the
+  // cron's lead day, inclusive at both ends.
+  test("lists every meeting day in the window", () => {
+    expect(occurrencesBetween(weekly, "2026-09-04", "2026-09-11")).toEqual([
+      "2026-09-04",
+      "2026-09-11",
+    ])
+  })
+
+  test("skips the off week of a fortnightly series", () => {
+    expect(occurrencesBetween(fortnightly, "2026-09-04", "2026-09-18")).toEqual(
+      ["2026-09-08"]
+    )
+  })
+
+  test("a window with no meeting day is empty, not an error", () => {
+    expect(occurrencesBetween(weekly, "2026-09-05", "2026-09-10")).toEqual([])
+  })
+
+  test("a reversed window is empty", () => {
+    expect(occurrencesBetween(weekly, "2026-09-11", "2026-09-04")).toEqual([])
   })
 })

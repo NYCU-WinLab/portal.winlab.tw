@@ -27,6 +27,13 @@ export interface PickableGroup {
   name: string
   description: string | null
   path: string
+  /**
+   * Whether this group is linked to a GitLab group at all. The path itself
+   * stays server-side: the browser only needs to know whether to offer an
+   * epic picker, and the action resolves the path again from Keycloak so a
+   * caller can't point it at some other group.
+   */
+  gitlabLinked: boolean
   members: AttendeeContact[]
   /**
    * Group members Keycloak gave us with no email address — they can't be
@@ -35,8 +42,25 @@ export interface PickableGroup {
   unmailable: string[]
 }
 
+/**
+ * Only project groups are offered as booking groups.
+ *
+ * The realm also carries role groups — Master Students, Teacher, Graduated
+ * Students — and those answer "who is this person" rather than "what is this
+ * meeting about". Booking under one would produce a topic prefix like
+ * `master-students`, file the recording under a project that doesn't exist,
+ * and leave the epic picker looking for a `gitlab_path` a role group will
+ * never have.
+ */
+const PROJECT_GROUP_PREFIX = "/winlab-projects/"
+
+export function isProjectGroup(group: Pick<AttendeeGroup, "path">): boolean {
+  return group.path.startsWith(PROJECT_GROUP_PREFIX)
+}
+
 export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
   return groups
+    .filter(isProjectGroup)
     .map((group) => {
       const members: AttendeeContact[] = []
       const unmailable: string[] = []
@@ -62,6 +86,7 @@ export function toPickableGroups(groups: AttendeeGroup[]): PickableGroup[] {
         name: group.name,
         description: group.description,
         path: group.path,
+        gitlabLinked: !!group.gitlabPath,
         members,
         unmailable,
       }
