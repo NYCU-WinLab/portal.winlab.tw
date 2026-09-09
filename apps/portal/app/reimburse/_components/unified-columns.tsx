@@ -6,6 +6,7 @@ import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 
+import type { ReimburseTableFeatures } from "@/lib/reimburse/table-features"
 import type { Ingress, Reimbursement, Transaction } from "@/lib/reimburse/types"
 
 import { DeleteEgressButton } from "./delete-egress-button"
@@ -30,7 +31,11 @@ const STATUS_LABEL: Record<Reimbursement["status"], string> = {
   rejected: "已拒絕",
 }
 
-function EditActionCell({ row }: { row: Row<Transaction> }) {
+function EditActionCell({
+  row,
+}: {
+  row: Row<ReimburseTableFeatures, Transaction>
+}) {
   const [open, setOpen] = useState(false)
   const data = row.original
 
@@ -76,8 +81,10 @@ function EditActionCell({ row }: { row: Row<Transaction> }) {
   )
 }
 
-export function getUnifiedColumns(isAdmin: boolean): ColumnDef<Transaction>[] {
-  const columns: ColumnDef<Transaction>[] = [
+export function getUnifiedColumns(
+  isAdmin: boolean
+): ColumnDef<ReimburseTableFeatures, Transaction>[] {
+  const columns: ColumnDef<ReimburseTableFeatures, Transaction>[] = [
     {
       id: "date",
       header: () => <span>日期</span>,
@@ -189,8 +196,6 @@ export function getUnifiedColumns(isAdmin: boolean): ColumnDef<Transaction>[] {
       id: "actions",
       header: () => <span>操作</span>,
       cell: ({ row }) => <EditActionCell row={row} />,
-      enableSorting: false,
-      enableHiding: false,
     })
   }
 
