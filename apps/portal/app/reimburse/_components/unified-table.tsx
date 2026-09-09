@@ -2,9 +2,9 @@
 
 import {
   flexRender,
-  getCoreRowModel,
-  useReactTable,
+  useTable,
   type ColumnDef,
+  type RowData,
 } from "@tanstack/react-table"
 
 import {
@@ -16,19 +16,24 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 
-interface UnifiedTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
+import {
+  reimburseTableFeatures,
+  type ReimburseTableFeatures,
+} from "@/lib/reimburse/table-features"
+
+interface UnifiedTableProps<TData extends RowData> {
+  columns: ColumnDef<ReimburseTableFeatures, TData>[]
   data: TData[]
 }
 
-export function UnifiedTable<TData, TValue>({
+export function UnifiedTable<TData extends RowData>({
   columns,
   data,
-}: UnifiedTableProps<TData, TValue>) {
-  const table = useReactTable({
+}: UnifiedTableProps<TData>) {
+  const table = useTable({
+    features: reimburseTableFeatures,
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
   })
 
   return (
@@ -54,7 +59,7 @@ export function UnifiedTable<TData, TValue>({
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
+                {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
