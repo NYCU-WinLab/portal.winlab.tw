@@ -25,12 +25,6 @@ const twd = new Intl.NumberFormat("zh-TW", {
   minimumFractionDigits: 0,
 })
 
-const STATUS_LABEL: Record<Reimbursement["status"], string> = {
-  pending: "待審核",
-  approved: "已審核",
-  rejected: "已拒絕",
-}
-
 function EditActionCell({
   row,
 }: {
@@ -153,40 +147,17 @@ export function getUnifiedColumns(
       },
     },
     {
-      id: "comment",
-      header: () => <span>備註</span>,
-      cell: ({ row }) => {
-        const data = row.original
-        if (data.type === "egress") {
-          return (
-            <span className="text-muted-foreground">
-              {data.itemComment ?? "—"}
-            </span>
-          )
-        }
-        return <span className="text-muted-foreground">—</span>
-      },
-    },
-    {
       id: "transferDate",
       header: () => <span>轉帳日期</span>,
       cell: ({ row }) => {
         const data = row.original
-        if (data.type === "egress" && data.transferDate) {
+        if (data.type !== "egress") {
+          return <span className="text-muted-foreground">—</span>
+        }
+        if (data.transferDate) {
           return <span>{dateFmt.format(new Date(data.transferDate))}</span>
         }
-        return <span className="text-muted-foreground">—</span>
-      },
-    },
-    {
-      id: "status",
-      header: () => <span>狀態</span>,
-      cell: ({ row }) => {
-        const data = row.original
-        if (data.type === "egress") {
-          return <span>{STATUS_LABEL[data.status]}</span>
-        }
-        return <span className="text-muted-foreground">—</span>
+        return <span className="text-muted-foreground">未轉帳</span>
       },
     },
   ]
