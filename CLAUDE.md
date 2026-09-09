@@ -32,7 +32,8 @@ bun install                      # `prepare` script installs husky hooks
 bun run dev                      # all dev servers (portal on :3000)
 bun run build                    # turbo build (respects ^build deps)
 bun run lint                     # eslint
-bun run typecheck                # tsc --noEmit
+bun run typecheck                # TypeScript 7, via the typescript-7 alias
+                                 # bare `tsc` / `bunx tsc` is still 6.0.3
 bun run format                   # prettier --write
 
 bun run dev --filter=portal         # portal only

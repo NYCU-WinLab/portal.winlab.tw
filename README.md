@@ -61,7 +61,8 @@ bun run dev                       # everything (portal :3000, gallery :3005)
 bun run dev --filter=portal       # just portal
 bun run dev --filter=gallery      # just gallery (:3005)
 bun run build                     # turbo build
-bun run typecheck                 # tsc --noEmit
+bun run typecheck                 # TypeScript 7, via the typescript-7 alias
+                                  # bare `tsc` / `bunx tsc` is still 6.0.3
 bun run lint                      # eslint
 bun run format                    # prettier --write
 ```
