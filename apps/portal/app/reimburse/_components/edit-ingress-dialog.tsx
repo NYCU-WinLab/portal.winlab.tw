@@ -56,7 +56,6 @@ export function EditIngressDialog({
         ingress_date: formData.ingress_date,
         ingress_amount: parseFloat(formData.ingress_amount),
         ingress_comment: formData.ingress_comment || null,
-        ingress_files: [],
       })
 
       if (result.success) {

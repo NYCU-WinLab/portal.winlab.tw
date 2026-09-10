@@ -2139,15 +2139,10 @@ export type Database = {
           created_at: string
           id: string
           invoice_date: string
-          invoice_files: string[]
           item_amount: number
-          item_comment: string | null
           item_name: string
-          status: string
           transfer_date: string | null
           transfer_fee: number | null
-          transfer_files: string[] | null
-          updated_at: string
           user_id: string | null
         }
         Insert: {
@@ -2155,15 +2150,10 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_date: string
-          invoice_files?: string[]
           item_amount: number
-          item_comment?: string | null
           item_name: string
-          status?: string
           transfer_date?: string | null
           transfer_fee?: number | null
-          transfer_files?: string[] | null
-          updated_at?: string
           user_id?: string | null
         }
         Update: {
@@ -2171,15 +2161,10 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_date?: string
-          invoice_files?: string[]
           item_amount?: number
-          item_comment?: string | null
           item_name?: string
-          status?: string
           transfer_date?: string | null
           transfer_fee?: number | null
-          transfer_files?: string[] | null
-          updated_at?: string
           user_id?: string | null
         }
         Relationships: [
@@ -2199,8 +2184,6 @@ export type Database = {
           ingress_amount: number
           ingress_comment: string | null
           ingress_date: string
-          ingress_files: string[]
-          updated_at: string
           user_id: string | null
         }
         Insert: {
@@ -2209,8 +2192,6 @@ export type Database = {
           ingress_amount: number
           ingress_comment?: string | null
           ingress_date: string
-          ingress_files?: string[]
-          updated_at?: string
           user_id?: string | null
         }
         Update: {
@@ -2219,8 +2200,6 @@ export type Database = {
           ingress_amount?: number
           ingress_comment?: string | null
           ingress_date?: string
-          ingress_files?: string[]
-          updated_at?: string
           user_id?: string | null
         }
         Relationships: [

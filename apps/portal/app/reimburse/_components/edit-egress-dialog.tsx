@@ -15,16 +15,8 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
-import { Textarea } from "@workspace/ui/components/textarea"
 
-import type { EgressStatus, Reimbursement } from "@/lib/reimburse/types"
+import type { Reimbursement } from "@/lib/reimburse/types"
 
 import { updateEgressAction } from "../actions"
 import { ApplicantSelect } from "./applicant-select"
@@ -40,11 +32,9 @@ function toFormData(data: Reimbursement) {
     applicant_name: data.applicantName,
     item_name: data.itemName,
     item_amount: data.itemAmount.toString(),
-    item_comment: data.itemComment ?? "",
     invoice_date: data.invoiceDate,
     transfer_date: data.transferDate ?? "",
     transfer_fee: data.transferFee?.toString() ?? "",
-    status: data.status,
   }
 }
 
@@ -74,13 +64,11 @@ export function EditEgressDialog({
         applicant_name: formData.applicant_name,
         item_name: formData.item_name,
         item_amount: parseFloat(formData.item_amount),
-        item_comment: formData.item_comment || null,
         invoice_date: formData.invoice_date,
         transfer_date: formData.transfer_date || null,
         transfer_fee: formData.transfer_fee
           ? parseFloat(formData.transfer_fee)
           : null,
-        status: formData.status,
       })
 
       if (result.success) {
@@ -169,20 +157,6 @@ export function EditEgressDialog({
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-item_comment">備註</Label>
-              <Textarea
-                id="edit-item_comment"
-                rows={3}
-                value={formData.item_comment}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    item_comment: e.target.value,
-                  })
-                }
-              />
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-transfer_date">轉帳日期</Label>
@@ -214,27 +188,6 @@ export function EditEgressDialog({
                   }
                 />
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-status">狀態</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    status: value as EgressStatus,
-                  })
-                }
-              >
-                <SelectTrigger id="edit-status" className="w-full">
-                  <SelectValue placeholder="選擇狀態" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">待審核</SelectItem>
-                  <SelectItem value="approved">已審核</SelectItem>
-                  <SelectItem value="rejected">已拒絕</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
