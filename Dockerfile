@@ -11,7 +11,7 @@
 # NEXT_PUBLIC_* are BUILD-TIME public values (baked here; winfra-paas build
 # passes no --build-arg). Server secrets go in at RUNTIME via set_secret (envFrom).
 
-FROM oven/bun:1.3.11 AS builder
+FROM oven/bun:1.4.2 AS builder
 WORKDIR /app
 # COPY . . so the frozen lockfile matches EVERY workspace (incl. apps/gallery).
 COPY . .
@@ -24,7 +24,7 @@ ENV NEXT_PUBLIC_SUPABASE_URL="https://yissfqcdmzsxwfnzrflz.supabase.co" \
     NODE_ENV=production
 RUN bunx turbo build --filter=portal
 
-FROM oven/bun:1.3.11-slim AS runner
+FROM oven/bun:1.4.2-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # The whole workspace tree: node_modules is hoisted to the repo root (bun
