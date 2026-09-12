@@ -25,7 +25,7 @@ import {
   useGroupEpics,
   useLabUsers,
 } from "@/hooks/rooms/use-lab-users"
-import type { GitLabEpic } from "@/lib/gitlab/epics"
+import { agendaAfterEpicSelection, type GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCreateRecurring,
   useDeleteRecurring,
@@ -101,7 +101,7 @@ export function RecurringTab() {
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [agenda, setAgenda] = useState("")
-  // The epic every occurrence of this series reports into, if any.
+  // A group series may reuse a Sync container; no selection stays ad-hoc.
   const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
@@ -118,8 +118,9 @@ export function RecurringTab() {
 
   function handleEpicChange(next: GitLabEpic | null) {
     setEpic(next)
-    if (next?.description && !agenda.trim()) setAgenda(next.description)
+    setAgenda((current) => agendaAfterEpicSelection(current, next, epic))
   }
+  const invalidRecurringEpic = epic !== null && epic.classification !== "sync"
 
   // Mirrors what the server derives; the server recomputes rather than
   // trusting this.
@@ -206,12 +207,13 @@ export function RecurringTab() {
           epics={epicsQuery.data}
           value={epic?.iid ?? null}
           onChange={handleEpicChange}
+          mode="recurring"
         />
 
         <DeliverablesField
           result={deliverablesQuery.data}
           loading={deliverablesQuery.isFetching}
-          hasEpic={!!epic}
+          epic={epic}
         />
 
         <div className="flex flex-col gap-1.5">
@@ -312,7 +314,7 @@ export function RecurringTab() {
         <Button
           size="sm"
           className="h-7 self-end"
-          disabled={create.isPending}
+          disabled={create.isPending || invalidRecurringEpic}
           onClick={handleCreate}
         >
           {create.isPending ? "建立中…" : "建立"}

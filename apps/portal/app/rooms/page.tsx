@@ -36,7 +36,7 @@ import {
   useGroupEpics,
   useLabUsers,
 } from "@/hooks/rooms/use-lab-users"
-import type { GitLabEpic } from "@/lib/gitlab/epics"
+import { agendaAfterEpicSelection, type GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCancelBooking,
   useConfirmBooking,
@@ -252,9 +252,8 @@ function BookingSuggestion({
   // Which Keycloak group the attendees came from, if a group button was used.
   // Drives the topic prefix, which the user can see but not edit.
   const [groupName, setGroupName] = useState<string | null>(null)
-  // The epic this meeting reports into, if any. Picking one makes it the
-  // first kind of meeting: the pipeline marks that epic instead of opening a
-  // new one, and the agenda and deliverables come from it.
+  // The durable GitLab routing source. The server resolves its classification
+  // again; this client object is display state only.
   const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const epicsQuery = useGroupEpics(groupName)
   const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
@@ -265,14 +264,17 @@ function BookingSuggestion({
   useEffect(() => setEpic(null), [groupName])
 
   /**
-   * Picking an epic pre-fills the agenda from its description, but only into
-   * an empty box — someone who has already typed something means it, and
-   * having it vanish on a dropdown change would be worse than no pre-fill.
+   * Only an ordinary single meeting may pre-fill from its description.
+   * Container administration and Report snapshots are never booking agendas.
    */
   function handleEpicChange(next: GitLabEpic | null) {
     setEpic(next)
-    if (next?.description && !agenda.trim()) setAgenda(next.description)
+    setAgenda((current) => agendaAfterEpicSelection(current, next, epic))
   }
+  const reportUnavailable =
+    epic?.classification === "report" &&
+    (epic.reviewIterationId === undefined ||
+      deliverablesQuery.data?.status !== "ok")
   // Online-only: still a date and a time, just no room reserved.
   const [onlineOnly, setOnlineOnly] = useState(false)
   // On by default: the advisor attends essentially every meeting, and
@@ -430,7 +432,7 @@ function BookingSuggestion({
               <DeliverablesField
                 result={deliverablesQuery.data}
                 loading={deliverablesQuery.isFetching}
-                hasEpic={!!epic}
+                epic={epic}
               />
 
               <div className="flex flex-col gap-1.5">
@@ -446,7 +448,9 @@ function BookingSuggestion({
                 />
                 <p className="text-xs text-muted-foreground">
                   {epic
-                    ? "從 epic 帶進來的,可以改。會一併送到 GitLab。"
+                    ? epic.classification === "meeting"
+                      ? "單場 Meeting description 可帶入後修改；送出時以你看到的文字為準。"
+                      : "只送出你輸入的本場討論事項；不會複製 Sync/Report 的行政 description。"
                     : "會一併帶到 GitLab,成為這場會議 epic 的內容。"}
                 </p>
               </div>
@@ -460,7 +464,7 @@ function BookingSuggestion({
               <Button
                 size="sm"
                 className="h-7 self-end"
-                disabled={confirmBooking.isPending}
+                disabled={confirmBooking.isPending || reportUnavailable}
                 onClick={handleConfirm}
               >
                 {confirmBooking.isPending
