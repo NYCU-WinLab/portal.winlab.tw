@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -258,10 +258,13 @@ function BookingSuggestion({
   const epicsQuery = useGroupEpics(groupName)
   const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
 
-  // An epic belongs to exactly one group, so switching groups invalidates the
-  // pick. Left in place it would be silently dropped server-side (the ref
-  // wouldn't match the new group's path) while the form still showed it.
-  useEffect(() => setEpic(null), [groupName])
+  function handleGroupChange(next: string | null) {
+    if (next !== groupName) {
+      setAgenda((current) => agendaAfterEpicSelection(current, null, epic))
+      setEpic(null)
+    }
+    setGroupName(next)
+  }
 
   /**
    * Only an ordinary single meeting may pre-fill from its description.
@@ -417,7 +420,7 @@ function BookingSuggestion({
                   advisorIncluded={includeAdvisor}
                   onAdvisorIncludedChange={setIncludeAdvisor}
                   onGroupPicked={(group: PickableGroup) =>
-                    setGroupName(group.name)
+                    handleGroupChange(group.name)
                   }
                 />
               </div>

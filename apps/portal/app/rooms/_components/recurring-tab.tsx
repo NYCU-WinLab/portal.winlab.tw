@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -113,8 +113,13 @@ export function RecurringTab() {
   const epicsQuery = useGroupEpics(groupName)
   const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
 
-  // An epic belongs to one group; switching groups invalidates the pick.
-  useEffect(() => setEpic(null), [groupName])
+  function handleGroupChange(next: string | null) {
+    if (next !== groupName) {
+      setAgenda((current) => agendaAfterEpicSelection(current, null, epic))
+      setEpic(null)
+    }
+    setGroupName(next)
+  }
 
   function handleEpicChange(next: GitLabEpic | null) {
     setEpic(next)
@@ -198,7 +203,7 @@ export function RecurringTab() {
             onChange={setAttendees}
             advisorIncluded={includeAdvisor}
             onAdvisorIncludedChange={setIncludeAdvisor}
-            onGroupPicked={(group) => setGroupName(group.name)}
+            onGroupPicked={(group) => handleGroupChange(group.name)}
           />
         </div>
 
