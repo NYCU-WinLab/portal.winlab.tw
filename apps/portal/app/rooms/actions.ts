@@ -29,6 +29,7 @@ import {
   gitlabPathForGroup,
 } from "@/lib/rooms/keycloak-groups"
 import {
+  fetchEpic,
   fetchEpicDeliverables,
   fetchOpenEpics,
   type EpicDeliverablesResult,
@@ -130,7 +131,11 @@ export async function getEpicDeliverables(
   if (!groupPath) {
     return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
   }
-  return fetchEpicDeliverables(groupPath, iid)
+  const epic = await fetchEpic(groupPath, iid)
+  if (!epic) {
+    return { status: "error", detail: `讀不到 Epic &${iid}` }
+  }
+  return fetchEpicDeliverables(groupPath, epic)
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
@@ -334,8 +339,8 @@ export interface CreateRecurringInput {
   /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
   agenda?: string | null
   /**
-   * Epics every occurrence of this series belongs to. Deliverables follow
-   * from them, as with a one-off booking.
+   * Optional Sync container reused by every occurrence. A selected Report or
+   * single Meeting is rejected server-side.
    */
   issueRefs?: string[]
 }
@@ -388,7 +393,11 @@ export async function createRecurringMeeting(
   // Frozen at creation for the same reason the prefix is: the epic a standing
   // series reports into shouldn't change under it because someone relabelled
   // something in GitLab midway through a term.
-  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+  const epicLink = await resolveEpicLink(
+    input.groupName,
+    input.issueRefs ?? [],
+    true
+  )
 
   const supabase = await createClient()
   const { data: created, error } = await supabase
