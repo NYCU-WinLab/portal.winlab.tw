@@ -343,6 +343,9 @@ describe("agendaAfterEpicSelection", () => {
     expect(
       agendaAfterEpicSelection(previous.description, epic("report"), previous)
     ).toBe("")
+    expect(agendaAfterEpicSelection(previous.description, null, previous)).toBe(
+      ""
+    )
     expect(
       agendaAfterEpicSelection("My edited agenda", epic("sync"), previous)
     ).toBe("My edited agenda")
