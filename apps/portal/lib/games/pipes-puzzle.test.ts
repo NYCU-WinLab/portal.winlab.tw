@@ -254,19 +254,27 @@ describe("getConnected", () => {
 })
 
 describe("getEndpoints", () => {
-  test("returns degree-1 cells of the solved tree, excluding the source", () => {
+  test("returns exactly the solved tree's leaves, excluding the source", () => {
     const p = getPuzzle(7)
-    const eps = getEndpoints(p.solved, p.source)
-    for (const [r, c] of eps) {
-      // never the source
-      expect(r === p.source[0] && c === p.source[1]).toBe(false)
-      // exactly one connection bit set
-      const mask = p.solved[r]![c]!
-      const degree = [TOP, RIGHT, BOTTOM, LEFT].filter((b) => mask & b).length
-      expect(degree).toBe(1)
-    }
-    // a 36-cell spanning tree always has at least 2 leaves
-    expect(eps.length).toBeGreaterThanOrEqual(2)
+    const leaves: [number, number][] = []
+    p.solved.forEach((row, r) =>
+      row.forEach((mask, c) => {
+        const degree = [TOP, RIGHT, BOTTOM, LEFT].filter((b) => mask & b).length
+        if (degree === 1) leaves.push([r, c])
+      })
+    )
+    // The 36-cell grid `generateSolved` builds is always a spanning tree, and
+    // any tree with >= 2 nodes has >= 2 leaves (degree-1 cells) — a theorem,
+    // true regardless of where the source lands or what degree it has.
+    expect(leaves.length).toBeGreaterThanOrEqual(2)
+
+    // getEndpoints' actual contract: exactly those leaves, minus the source
+    // (which can be one of the tree's >= 2 leaves, so this set can be a
+    // single cell short of `leaves` — that's fine, it's still >= 1).
+    const isSource = ([r, c]: [number, number]) =>
+      r === p.source[0] && c === p.source[1]
+    const expected = leaves.filter((cell) => !isSource(cell))
+    expect(getEndpoints(p.solved, p.source)).toEqual(expected)
   })
 
   test("is deterministic for a given level", () => {

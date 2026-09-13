@@ -4,6 +4,9 @@
 // every player gets the same 6×6 grid for the same level number. The grid is
 // always a spanning tree rooted at the center (source), which guarantees the
 // puzzle is solvable — every cell can be rotated back to its solved mask.
+// Shuffling (see `shuffleInPlace`) only ever calls the passed-in `rng`, so the
+// sequence of draws — and therefore the puzzle — is identical across JS
+// engines and Bun builds, not just across runs on one binary.
 
 export const PIPES_GRID = 6
 export const PIPES_LEVEL_COUNT = 100
@@ -29,6 +32,19 @@ function mulberry32(seed: number): () => number {
   }
 }
 
+// Fisher-Yates (back-to-front), using only the supplied `rng`. Unlike
+// `Array.prototype.sort` with a `() => rng() - 0.5` comparator — which is
+// non-transitive and whose result for a given input is left
+// implementation-defined by the spec — this produces the same permutation
+// for the same `rng` draws on every engine and build.
+function shuffleInPlace<T>(items: T[], rng: () => number): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[items[i], items[j]] = [items[j]!, items[i]!]
+  }
+  return items
+}
+
 function generateSolved(
   rows: number,
   cols: number,
@@ -43,12 +59,15 @@ function generateSolved(
 
   function dfs(r: number, c: number): void {
     visited.add(`${r},${c}`)
-    const dirs = [
-      { dr: -1, dc: 0, from: TOP, to: BOTTOM },
-      { dr: 0, dc: 1, from: RIGHT, to: LEFT },
-      { dr: 1, dc: 0, from: BOTTOM, to: TOP },
-      { dr: 0, dc: -1, from: LEFT, to: RIGHT },
-    ].sort(() => rng() - 0.5)
+    const dirs = shuffleInPlace(
+      [
+        { dr: -1, dc: 0, from: TOP, to: BOTTOM },
+        { dr: 0, dc: 1, from: RIGHT, to: LEFT },
+        { dr: 1, dc: 0, from: BOTTOM, to: TOP },
+        { dr: 0, dc: -1, from: LEFT, to: RIGHT },
+      ],
+      rng
+    )
 
     for (const { dr, dc, from, to } of dirs) {
       const nr = r + dr
