@@ -52,3 +52,74 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+
+  container:
+    name: container build · boot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Builds the FULL image, not just `--target builder`. The regression that
+      # motivated this gate (#1134) crashed at build time, but the same module
+      # load also happens under `next start` -- an image built on a good Bun
+      # with the runner left on a bad one boots fine and then 500s every
+      # request. Building the builder stage alone would have called that green.
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: portal:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # `next build` succeeding does not mean the server runs. Boot it and take
+      # one real request. Unauthenticated "/" redirects to /auth/login, so a
+      # redirect is the healthy answer; a 5xx means the server came up and is
+      # broken, which is precisely the failure mode a build-only check misses.
+      - name: Boot the image and take one request
+        run: |
+          # A failing `docker run` exits non-zero, and `bash -e` fails the step
+          # on the assignment -- that, not a string check on $cid, is what
+          # catches a port conflict or a missing image. Then confirm the
+          # container is actually up, so one that starts and dies immediately
+          # is reported as such instead of timing out below.
+          cid=$(docker run -d -p 3000:3000 portal:ci)
+          sleep 2
+          if [ "$(docker inspect -f '{{.State.Running}}' "$cid")" != "true" ]; then
+            echo "::error::container exited immediately"
+            docker logs "$cid" 2>&1 | tail -40
+            exit 1
+          fi
+
+          # Take curl's EXIT STATUS as the signal, never its stdout with a
+          # `|| echo 000` fallback: curl already writes "000" without a
+          # trailing newline when there is no response, so the fallback
+          # concatenates into "000000" -- which is != "000", so the retry loop
+          # breaks on the first tick, and which matches no arm below, so the
+          # step goes green having measured nothing. This gate exists to catch
+          # silent passes; it must not be one.
+          code=000
+          for _ in $(seq 1 45); do
+            if code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/); then
+              break
+            fi
+            code=000
+            sleep 2
+          done
+          echo "container answered HTTP $code"
+          docker logs "$cid" 2>&1 | tail -40
+          docker rm -f "$cid" >/dev/null
+
+          # Allow-list, not a deny-list: the old `case` had no default arm, so
+          # anything that wasn't 000 or 5xx passed -- a 404 from a broken auth
+          # redirect included. Not pinned to 307 exactly, because whether "/"
+          # redirects or renders is a product decision; "the container serves
+          # something that isn't an error" is what this gate is entitled to say.
+          case "$code" in
+            2* | 3*) echo "healthy" ;;
+            000) echo "::error::container never answered"; exit 1 ;;
+            *) echo "::error::container answered $code -- it booted but cannot serve"; exit 1 ;;
+          esac
