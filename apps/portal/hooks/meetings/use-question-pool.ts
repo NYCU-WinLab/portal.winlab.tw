@@ -19,6 +19,12 @@ const TABLE = "meeting_question_pool"
 // Reads the WIDENED rotation view (question pool ∪ presenter pool). Feeds
 // questioners-field.tsx's manual-swap candidate list, which should see the
 // full union of eligible questioners.
+//
+// Ordered by rate — the same leading key meetings_sync_questioners picks with —
+// so the panel's running order and the automation never disagree about who is
+// next. The picker's second key (recent co-pairing) is per-meeting and cannot
+// exist in a flat list, so the two can still differ on ties; rate is the part
+// that has to match.
 export function useQuestionPool() {
   const supabase = createClient()
 
@@ -28,6 +34,7 @@ export function useQuestionPool() {
       const { data, error } = await supabase
         .from(VIEW)
         .select("*")
+        .order("rate", { ascending: true })
         .order("last_asked_date", { ascending: true, nullsFirst: true })
         .order("pool_added_at", { ascending: true })
         .order("user_id", { ascending: true })
@@ -49,6 +56,7 @@ export function useQuestionPoolMembers() {
       const { data, error } = await supabase
         .from(MEMBERS_VIEW)
         .select("*")
+        .order("rate", { ascending: true })
         .order("last_asked_date", { ascending: true, nullsFirst: true })
         .order("pool_added_at", { ascending: true })
         .order("user_id", { ascending: true })
