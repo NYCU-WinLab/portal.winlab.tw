@@ -118,7 +118,7 @@ select ok(
 -- Named table by table rather than schema-wide, unlike everything above: this
 -- is not a property of the whole schema (authenticated legitimately holds the
 -- same privileges here, governed by RLS), it is a property of three tables
--- whose writes now rewrite the future schedule. 20260915000003 explains why.
+-- whose writes now rewrite the future schedule. 20260914163759 explains why.
 select is(
   (select count(*)::int
      from unnest(array['public.meeting_question_pool',
@@ -132,11 +132,16 @@ select is(
 );
 
 -- The counter-assertions. Without them a future migration could satisfy the
--- line above by revoking these tables from everyone, and the admin panel would
--- stop working with the suite still green.
+-- line above by revoking these tables from everyone and the suite would stay
+-- green. The first one is load-bearing: useAddPoolMember upserts
+-- meeting_question_pool directly from the browser client
+-- (hooks/meetings/use-question-pool.ts), so that grant is a live dependency.
+-- The presenter-pool one is not — every write there goes through the
+-- meetings_pool_* RPCs — it is here so the pair reads as "the revoke was
+-- surgical", matching assertions 7-8 above.
 select ok(
   has_table_privilege('authenticated', 'public.meeting_question_pool', 'INSERT'),
-  'authenticated keeps INSERT on meeting_question_pool — RLS is what gates it'
+  'authenticated keeps INSERT on meeting_question_pool — the browser client upserts it directly'
 );
 select ok(
   has_table_privilege('authenticated', 'public.meeting_presenter_pool', 'DELETE'),

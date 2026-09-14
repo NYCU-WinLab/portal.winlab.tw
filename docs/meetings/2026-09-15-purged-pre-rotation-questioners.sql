@@ -1,4 +1,4 @@
--- Rollback for 20260915000002_purge_pre_rotation_questioners.sql (#1143).
+-- Rollback for 20260914163728_purge_pre_rotation_questioners.sql (#1143).
 --
 -- The eighteen meeting_questioners rows that migration deleted, captured from
 -- prod on 2026-09-15 before it ran. All six meetings are 寒假 weeks in
