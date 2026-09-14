@@ -397,9 +397,17 @@ begin
   end if;
 
   -- +7 保留這個學期實際跑的星期幾（沒有寫死星期一，也沒有假設 16 週），
-  -- 再跨過任何已被佔用的日期。走訪有上界，所以撞上一整段已排定的日期時會
-  -- 報錯，而不是把新的一週丟到幾個月之後。
+  -- 再跨過任何已被佔用的日期。這個走訪只認「有沒有被佔用」，不認學期邊界，
+  -- 所以連續 8 週都被排滿時，它會直接跨過 v_to 走進下一個學期——底下用
+  -- v_from..v_to 再檢查一次，把這種情況擋下來，而不是讓它悄悄插進另一個
+  -- 學期。
   v_new_date := public.meetings_next_free_date(v_max_date + 7);
+
+  if v_new_date > v_to then
+    raise exception '此學期已經排到最後一天 %，下一個空位落在下學期，請改對下學期呼叫 append_week',
+      v_to
+      using errcode = 'P0001';
+  end if;
 
   insert into public.meetings
     (week_label, scheduled_date, is_holiday, presenter, presenter_user_id)
@@ -617,8 +625,11 @@ begin
     raise exception 'Forbidden: 僅管理員可排定報告人' using errcode = '42501';
   end if;
 
-  -- Serialize concurrent fills of the same year, mirroring
-  -- meetings_generate_semester's lock discipline.
+  -- Serialize concurrent fills of the same calendar year with an advisory
+  -- lock keyed on p_year — the same pg_advisory_xact_lock technique
+  -- meetings_generate_semester uses, keyed there on its own semester-window
+  -- start date instead, since the two functions operate over different
+  -- windows (a calendar year here vs. a semester there).
   perform pg_advisory_xact_lock(hashtext('meetings_fill_presenters:' || p_year::text));
 
   select array_agg(p.user_id

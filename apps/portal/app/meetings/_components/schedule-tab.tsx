@@ -193,7 +193,7 @@ export function ScheduleTab({ year }: { year: number }) {
       return
     }
     if (!blankId) return
-    toast.success("已插入一週，後續週次已順延", {
+    toast.success("已插入一週，之後每一週都已順延一格（不限學期或年度）", {
       action: {
         label: "復原",
         onClick: () => removeWeek.mutate(blankId!),
@@ -203,7 +203,8 @@ export function ScheduleTab({ year }: { year: number }) {
 
   function handleRemove(id: string) {
     removeWeek.mutate(id, {
-      onSuccess: () => toast.success("已刪除，後續週次已遞補"),
+      onSuccess: () =>
+        toast.success("已刪除，之後每一週都已遞補一格（不限學期或年度）"),
     })
   }
 
@@ -215,9 +216,10 @@ export function ScheduleTab({ year }: { year: number }) {
 
   // The year bucket is empty, so there is no group to extend and no semester to
   // name. append_week has nothing to append to here, which is why this one path
-  // stays on useAddMeeting — and useAddMeeting is exactly right for it: the
-  // meetings_set_semester trigger derives the semester from the chosen date,
-  // the same way the page-level add-meeting dialog relies on it.
+  // stays on useAddMeeting instead: it just inserts a row at scheduledDate, and
+  // meeting_semester_start/meeting_semester_end derive that row's semester from
+  // the date on every read — there is nothing to stamp at insert time, the same
+  // way the page-level add-meeting dialog relies on it.
   function handleAddFirstWeek() {
     addMeeting.mutate({
       weekLabel: "第1週",

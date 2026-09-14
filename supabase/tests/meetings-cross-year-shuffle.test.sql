@@ -78,22 +78,21 @@
 -- its own window. Minting again inside either window must return the term's
 -- own holiday label (寒假 / 暑假), not 第17週.
 --
--- ── GROUP 4 (academic year 153): append_week's label follows the NEW date ──
+-- ── GROUP 4 (academic year 153): append_week refuses to cross into the next
+-- semester ───────────────────────────────────────────────────────────────
 -- 上學期 153 holds one row, 第15週 (2065-01-27) -- the only row anywhere in
 -- academic year 153. meetings_append_week(153, 1) continues from 2065-01-27,
--- and next_free_date's +7 lands it on 2065-02-03: past 1/31, inside 下學期
--- 153's window. meetings_mint_week_label is called on THAT new date, so it
--- must scope to 下學期's (empty) window and mint 第1週 -- not continue 上學期's
--- own sequence to 第16週, which is the wrong answer a version of
--- meetings_append_week that priced the label off the CALLER's (academic_year,
--- term) window instead of the new date would produce. 第1週 vs 第16週 is the
--- divergence carried over from Task 4, previously unasserted anywhere.
+-- and next_free_date's +7 lands on 2065-02-03: past 1/31, inside 下學期 153's
+-- window. append_week now checks the new date against its own v_from..v_to
+-- before inserting anything, so a call bound to 上學期 that would land past
+-- 1/31 raises P0001 instead of minting a 下學期 label (第1週) under a 上學期
+-- call -- the wrong-semester row this group used to lock in.
 
 begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(12);
+select plan(11);
 
 -- ── actors ───────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -236,24 +235,21 @@ select is(
   '暑假',
   '下學期 numbering used up (第16週 already exists): mint returns 暑假, not 第17週');
 
--- ── GROUP 4: append_week's label follows the NEW date's semester ──────────
+-- ── GROUP 4: append_week refuses to cross into the next semester ──────────
 insert into public.meetings (id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
   ('b1b10000-0000-0000-0000-000000000031', '第15週', '2065-01-27', false, null, null); -- 上學期 153, the only row in academic year 153
 
+-- next_free_date (2065-01-27 + 7 = 2065-02-03) lands past 1/31, inside
+-- 下學期 153's window -- outside the 上學期 window append_week was asked to
+-- extend, so it raises instead of inserting a 下學期-numbered row under a
+-- 上學期 call.
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"a1a10000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-create temp table g4_appended as
-  select public.meetings_append_week(153, 1::smallint) as id;
+select throws_ok(
+  $$ select public.meetings_append_week(153, 1::smallint) $$,
+  'P0001', NULL,
+  'append_week raises instead of landing the new week past 1/31 in the next semester');
 reset role;
-
-select is(
-  (select scheduled_date from public.meetings where id = (select id from g4_appended)),
-  '2065-02-03'::date,
-  'append_week''s next_free_date (2065-01-27 + 7) lands past 1/31, inside 下學期 153''s window');
-select is(
-  (select week_label from public.meetings where id = (select id from g4_appended)),
-  '第1週',
-  'the label is minted from the NEW date''s (下學期) empty window -- 第1週, not a continuation of 上學期''s 第15週 to 第16週');
 
 select * from finish();
 rollback;

@@ -344,12 +344,20 @@ export function ScheduleEditRow({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={anchored}
-                onSelect={() => onInsert(meeting.id)}
-              >
-                在此插入一週
-              </DropdownMenuItem>
+              <ConfirmDialog
+                trigger={
+                  <DropdownMenuItem
+                    disabled={anchored}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    在此插入一週
+                  </DropdownMenuItem>
+                }
+                title="在此插入一週"
+                description="確定插入一週?這一週之後的每一週都會往後順延一格，不限這個學期或這一年"
+                confirmText="插入"
+                onConfirm={() => onInsert(meeting.id)}
+              />
               <ConfirmDialog
                 trigger={
                   <DropdownMenuItem
@@ -361,7 +369,7 @@ export function ScheduleEditRow({
                   </DropdownMenuItem>
                 }
                 title="刪除此週"
-                description="確定刪除這週?後面各週會往前遞補"
+                description="確定刪除這週?這一週之後的每一週都會往前遞補一格，不限這個學期或這一年"
                 confirmText="刪除"
                 variant="destructive"
                 onConfirm={() => onRemove(meeting.id)}
