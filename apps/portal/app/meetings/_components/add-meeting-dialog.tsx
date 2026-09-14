@@ -69,7 +69,6 @@ export function AddMeetingDialog({ year, open, onOpenChange }: Props) {
 
     addMeeting.mutate(
       {
-        year,
         weekLabel: weekLabel || null,
         scheduledDate: date,
         isHoliday: flags.isHoliday,

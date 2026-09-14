@@ -30,13 +30,9 @@ import { useFillPresenters } from "@/hooks/meetings/use-presenter-pool"
 import { useQuestionersByYear } from "@/hooks/meetings/use-questioners"
 import { useMeetingsAdmin } from "@/hooks/meetings/use-meetings-admin"
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
-import { useSemesters } from "@/hooks/meetings/use-semesters"
 import { getCurrentMeetingId } from "@/lib/meetings/schedule"
-import {
-  semesterLabel,
-  type Meeting,
-  type Semester,
-} from "@/lib/meetings/types"
+import { semesterKeyForDate, semesterWindow } from "@/lib/meetings/semester"
+import { semesterLabel, type Meeting } from "@/lib/meetings/types"
 
 import { ConfirmDialog } from "./confirm-dialog"
 import { FileCell } from "./file-cell"
@@ -45,46 +41,44 @@ import { MeetingEditDialog } from "./meeting-edit-dialog"
 import { ScheduleEditRow } from "./schedule-edit-row"
 
 interface SemesterGroup {
-  semesterId: string
-  /** Absent when the row's semester isn't in `useSemesters()`' result. */
-  semester: Semester | undefined
+  /** `"115-1"`，只用來當 React key 與 Map 的鍵。 */
+  key: string
+  academicYear: number
+  term: 1 | 2
   rows: Meeting[]
   firstDate: string
-  lastDate: string
 }
 
 /**
- * Groups the year bucket's rows by semester, ordered by each group's earliest
- * real `scheduledDate` — never by the semester's own `startDate`, which is
- * incidental metadata when a semester was minted by the safety-net trigger.
- * The dates are the authority: inside one year bucket the 下學期 genuinely
- * precedes the 上學期, and the two belong to different academic years.
+ * 把這個年份頁籤的列按學期分組。學期從每一列自己的日期推導——不再有
+ * semester_id 欄位，也不再需要一支查詢：分組永遠成立，不會失敗。
+ *
+ * 依各組最早的實際日期排序。同一個年份頁籤裡下學期確實可能排在上學期前面
+ * （1 月是上學期的尾巴、2 月是下學期的開頭），而兩者屬於不同學年度。
  */
-function groupBySemester(
-  meetings: Meeting[],
-  semesters: Semester[]
-): SemesterGroup[] {
-  const byId = new Map(semesters.map((s) => [s.id, s]))
-  const rowsBySemester = new Map<string, Meeting[]>()
+function groupBySemester(meetings: Meeting[]): SemesterGroup[] {
+  const byKey = new Map<string, SemesterGroup>()
   for (const m of meetings) {
-    const rows = rowsBySemester.get(m.semesterId)
-    if (rows) rows.push(m)
-    else rowsBySemester.set(m.semesterId, [m])
+    const { academicYear, term } = semesterKeyForDate(m.scheduledDate)
+    const key = `${academicYear}-${term}`
+    const group = byKey.get(key)
+    if (group) {
+      group.rows.push(m)
+      // ISO 日期字串的字典序就是時序。
+      if (m.scheduledDate < group.firstDate) group.firstDate = m.scheduledDate
+    } else {
+      byKey.set(key, {
+        key,
+        academicYear,
+        term,
+        rows: [m],
+        firstDate: m.scheduledDate,
+      })
+    }
   }
-  // ISO dates sort lexicographically, so string compare is chronological.
-  return Array.from(rowsBySemester, ([semesterId, rows]) => ({
-    semesterId,
-    semester: byId.get(semesterId),
-    rows,
-    firstDate: rows.reduce(
-      (min, r) => (r.scheduledDate < min ? r.scheduledDate : min),
-      rows[0]!.scheduledDate
-    ),
-    lastDate: rows.reduce(
-      (max, r) => (r.scheduledDate > max ? r.scheduledDate : max),
-      rows[0]!.scheduledDate
-    ),
-  })).sort((a, b) => a.firstDate.localeCompare(b.firstDate))
+  return Array.from(byKey.values()).sort((a, b) =>
+    a.firstDate.localeCompare(b.firstDate)
+  )
 }
 
 function spanDate(dateStr: string): string {
@@ -98,29 +92,25 @@ function spanDate(dateStr: string): string {
   })
 }
 
+/**
+ * 標題印的是學期**完整**的日期窗（8/1–1/31 或 2/1–7/31），不是這個頁籤剛好
+ * 看得到的那幾列的頭尾。一個學期會橫跨兩個年份頁籤，印可見範圍會讓同一個
+ * 學期在兩頁顯示成兩段不同的區間，而它其實是同一段。
+ */
 function groupHeading(group: SemesterGroup): string {
-  const span = `${spanDate(group.firstDate)} – ${spanDate(group.lastDate)}`
-  return group.semester
-    ? `${semesterLabel(group.semester)}（${span}）`
-    : // An unknown semester still gets its rows shown, headed by the span
-      // alone — dropping them would hide real meetings.
-      span
+  const window = semesterWindow(group.rows[0]!.scheduledDate)
+  const span = `${spanDate(window.start)} – ${spanDate(window.end)}`
+  const label = semesterLabel({
+    academicYear: group.academicYear,
+    term: group.term,
+  })
+  return `${label}（${span}）`
 }
 
 export function ScheduleTab({ year }: { year: number }) {
   const { user } = useAuth()
   const { isAdmin } = useMeetingsAdmin()
   const { data: meetings = [], isLoading } = useMeetings(year)
-  // The error matters as much as the data. groupHeading falls back to a bare
-  // date span when a row's semester is missing from this list — a deliberate
-  // fallback for the rare unknown semester — so a query that failed OUTRIGHT
-  // renders exactly like a successful one, with every header silently
-  // degraded. The banner below is what tells the two apart.
-  const {
-    data: semesters = [],
-    isError: semestersFailed,
-    error: semestersError,
-  } = useSemesters()
   const { data: questioners } = useQuestionersByYear(year)
   const { data: users = [] } = useLabUsers()
   const deleteMeeting = useDeleteMeeting()
@@ -139,7 +129,7 @@ export function ScheduleTab({ year }: { year: number }) {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
   const showEditMode = isAdmin && editMode
-  const groups = groupBySemester(meetings, semesters)
+  const groups = groupBySemester(meetings)
   const colCount = showEditMode ? 11 : 9
   // Swap candidates: only real student-presentation weeks — holidays, speaker
   // weeks and thesis weeks are anchored and can't be swapped (meetings_swap
@@ -217,15 +207,10 @@ export function ScheduleTab({ year }: { year: number }) {
     })
   }
 
-  // Per group: the semester id is the ONLY thing sent. The label and the date
-  // are computed by meetings_append_week, because this component cannot compute
-  // either one correctly — `group.rows` comes from useMeetings(year) and a
-  // semester can span two year buckets, so a 上學期 running September→January is
-  // half-visible here and the client's max(第N)+1 would re-mint a number the
-  // semester already uses. The RPC also enforces the date-global occupancy
-  // invariant a plain insert bypassed (#1103).
+  // 只送學期。日期與標籤都由伺服器從整個學期算，不是從這個頁籤剛好看得到的
+  // 那一段——一個學期會橫跨兩個年份頁籤。
   function handleAddWeek(group: SemesterGroup) {
-    appendWeek.mutate(group.semesterId)
+    appendWeek.mutate({ academicYear: group.academicYear, term: group.term })
   }
 
   // The year bucket is empty, so there is no group to extend and no semester to
@@ -235,7 +220,6 @@ export function ScheduleTab({ year }: { year: number }) {
   // the same way the page-level add-meeting dialog relies on it.
   function handleAddFirstWeek() {
     addMeeting.mutate({
-      year,
       weekLabel: "第1週",
       scheduledDate: `${year}-01-01`,
       isHoliday: false,
@@ -334,13 +318,6 @@ export function ScheduleTab({ year }: { year: number }) {
         </div>
       )}
 
-      {semestersFailed && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          讀取學期失敗，下方分組只會顯示日期範圍，看不到學年度與上／下學期：
-          {semestersError instanceof Error ? semestersError.message : "unknown"}
-        </p>
-      )}
-
       <div className="overflow-x-auto rounded-md border">
         <Table className="min-w-[860px]">
           <TableHeader>
@@ -374,7 +351,7 @@ export function ScheduleTab({ year }: { year: number }) {
           </TableHeader>
           <TableBody>
             {groups.map((group) => (
-              <Fragment key={group.semesterId}>
+              <Fragment key={group.key}>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   {/* A heading for the rows below it, so it is a th with
                       scope="rowgroup" — the value that means "applies to the
@@ -405,11 +382,20 @@ export function ScheduleTab({ year }: { year: number }) {
                         isOwn={isOwn}
                         questioners={questioners?.get(m.id) ?? []}
                         // Same semester only: meetings_swap refuses a
-                        // cross-semester swap ("只能在同一學期內互換"), so
-                        // offering one would only ever advertise a failure.
-                        otherWeeks={presentationMeetings.filter(
-                          (o) => o.id !== m.id && o.semesterId === m.semesterId
-                        )}
+                        // cross-semester swap ("只能在同一學期內互換"), and it
+                        // decides that by comparing each row's derived
+                        // semester window — there's no stored semester id to
+                        // compare any more. `m` is one of `group.rows`, so its
+                        // derived key already equals `group`'s; only `o` needs
+                        // deriving.
+                        otherWeeks={presentationMeetings.filter((o) => {
+                          if (o.id === m.id) return false
+                          const key = semesterKeyForDate(o.scheduledDate)
+                          return (
+                            key.academicYear === group.academicYear &&
+                            key.term === group.term
+                          )
+                        })}
                         users={users}
                         isDragging={dragId === m.id}
                         isDropTarget={dropTargetId === m.id}

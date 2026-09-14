@@ -38,7 +38,8 @@ export default function MeetingsPage() {
   // it, so both the default and the forward limit come from the data. While the
   // bounds load, the empty-table fallbacks stand in and resolve to the calendar
   // year — the same answer as before, on every day but new year's.
-  const { data: bounds = { upcoming: null, latest: null } } = useScheduleYears()
+  const { data: bounds = { upcomingDate: null, latestDate: null } } =
+    useScheduleYears()
   const year =
     Number(searchParams.get("year")) ||
     defaultScheduleYear(bounds, CALENDAR_YEAR)

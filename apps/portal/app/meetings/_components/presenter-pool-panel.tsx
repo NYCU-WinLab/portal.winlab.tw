@@ -20,7 +20,6 @@ import {
   useRemovePresenter,
   useUpsertPresenter,
 } from "@/hooks/meetings/use-presenter-pool"
-import { useSemesters } from "@/hooks/meetings/use-semesters"
 import {
   admissionYearLabel,
   parseAdmissionYear,
@@ -187,18 +186,18 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
     isSuccess: labUsersLoaded,
     isError: labUsersIsError,
   } = useLabUsers()
-  const { data: semesters = [] } = useSemesters()
-  // See lib/meetings/semester.ts's currentAcademicYear doc comment for why
-  // "current" means the latest semester that has already started, not the
-  // latest by start_date. Compared against today in Asia/Taipei, same as
-  // use-schedule-years.ts, since the DB session runs in UTC. Memoized so the
-  // date is read once per render pass rather than inside the JSX expression.
+  // See lib/meetings/semester.ts's currentAcademicYear doc comment: it's just
+  // the academic year today falls in, now that semesters derive from dates
+  // instead of being a table with their own start_date. Compared against
+  // today in Asia/Taipei, same as use-schedule-years.ts, since the DB session
+  // runs in UTC. Memoized so the date is read once per render pass rather
+  // than inside the JSX expression.
   const academicYear = useMemo(() => {
     const today = new Intl.DateTimeFormat("sv-SE", {
       timeZone: "Asia/Taipei",
     }).format(new Date())
-    return currentAcademicYear(semesters, today)
-  }, [semesters])
+    return currentAcademicYear(today)
+  }, [])
   const upsert = useUpsertPresenter()
   const remove = useRemovePresenter()
   const move = useMovePresenter()

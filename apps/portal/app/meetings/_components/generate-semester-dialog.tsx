@@ -18,8 +18,7 @@ import {
   useMeetings,
   type SemesterHoliday,
 } from "@/hooks/meetings/use-meetings"
-import { useSemesters } from "@/hooks/meetings/use-semesters"
-import { semesterKeyForDate } from "@/lib/meetings/semester"
+import { semesterWindow } from "@/lib/meetings/semester"
 
 interface Props {
   year: number
@@ -55,12 +54,6 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   // week, where no date collides but every number is taken — shows as sixteen
   // insertable weeks and then inserts none.
   const { data: existing = [] } = useMeetings(year)
-  // Same trap schedule-tab fell into: without the semester list the week-number
-  // rule below silently switches itself off and the preview quietly reverts to
-  // the date-only rule it had before — looking exactly like a start date that
-  // collides with nothing. The banner further down is what stops a viewer
-  // believing an incomplete preview.
-  const { data: semesters = [], isError: semestersFailed } = useSemesters()
 
   const [startDate, setStartDate] = useState("")
   const [weeks, setWeeks] = useState(16)
@@ -75,32 +68,29 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
   )
 
   // Which 第N週 numbers the semester this generate would open ALREADY holds —
-  // the server's second skip rule, mirrored. The semester is the one the start
-  // date falls in; if it hasn't been minted yet there is nothing to collide
-  // with and the set is empty.
+  // the server's second skip rule, mirrored. The semester is derived straight
+  // from the start date's window; there's no semester list to fail to load
+  // any more, so this always runs.
   //
-  // Known limitation, shared with `existingDates` above: `existing` is one
-  // `meetings.year` bucket, and a semester can span two, so a semester whose
-  // earlier half sits in the previous bucket contributes only the numbers
-  // visible here. The server is the authority and skips either way; this is a
-  // preview, and it now errs on the same side as the dates do.
+  // Known limitation: `existing` comes from `useMeetings(year)`, a single
+  // calendar-year slice, and a semester can span two. So a semester whose
+  // earlier half sits in the previous year's bucket contributes only the
+  // numbers visible here. The server is the authority and skips either way;
+  // this is a preview, and it now errs on the same side as the dates do.
   const usedWeekNumbers = useMemo(() => {
     const used = new Set<number>()
     if (!startDate) return used
-    const key = semesterKeyForDate(startDate)
-    const target = semesters.find(
-      (s) => s.academicYear === key.academicYear && s.term === key.term
-    )
-    if (!target) return used
+    const window = semesterWindow(startDate)
     for (const m of existing) {
-      if (m.semesterId !== target.id) continue
+      if (m.scheduledDate < window.start || m.scheduledDate > window.end)
+        continue
       // Prefix match, like the RPC's `^第N週` regex: 第2週(月考週) still counts
       // as number 2 being taken.
       const match = /^第(\d+)週/.exec(m.weekLabel ?? "")
       if (match) used.add(Number(match[1]))
     }
     return used
-  }, [startDate, semesters, existing])
+  }, [startDate, existing])
 
   const preview = useMemo(() => {
     if (!startDate || !weeksValid) return []
@@ -149,7 +139,6 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
     if (!canSubmit) return
     generate.mutate(
       {
-        year,
         startDate,
         weeks,
         // Trim the label in the payload too, so the stored week_label matches
@@ -249,12 +238,6 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
               </div>
             )}
           </div>
-
-          {semestersFailed && (
-            <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              讀取學期失敗，下方預覽只會標出「日期已存在」的週次，無法標出「週次編號已被此學期使用」的週次——仍可產生，伺服器一樣會略過重複的週次，但預覽此刻並不完整。
-            </p>
-          )}
 
           {misaligned && (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
