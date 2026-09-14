@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(81);
+select plan(95);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -1385,6 +1385,266 @@ select is(
      and column_name = 'is_active'),
   7,
   'is_active is still column 7 of the rotation view, with rate appended after it'
+);
+
+-- ═══ Scenario H: nobody is staffed onto a meeting older than their own join
+--     date, and every writer shares one advisory lock (#1143, #1145) ════════
+--
+-- Scenario G left its members in the two pool tables and every earlier
+-- scenario's 2019–2021 join dates are older than anything here, so H starts by
+-- emptying both pools: with them present every candidate is eligible for every
+-- date and the predicate under test can never bind.
+--
+-- H does NOT clear `meetings`, so it inherits F's and G's weeks and therefore
+-- their freeze line. That is fine because every assertion here is scoped to an
+-- f5… meeting id — but a Scenario I appended after this one would inherit
+-- three scenarios' weeks, so clear them there if it needs a known freeze line.
+delete from public.meeting_question_pool;
+delete from public.meeting_presenter_pool;
+
+insert into auth.users (id) values
+  ('f4000000-0000-0000-0000-0000000000f0'),
+  ('f4000000-0000-0000-0000-00000000000a'),
+  ('f4000000-0000-0000-0000-00000000000b'),
+  ('f4000000-0000-0000-0000-00000000000c'),
+  ('f4000000-0000-0000-0000-00000000000d'),
+  ('f4000000-0000-0000-0000-0000000000ad')
+on conflict (id) do nothing;
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('f4000000-0000-0000-0000-0000000000f0', 'hp@test.local',  'HP',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000a', 'ha@test.local',  'HA',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000b', 'hb@test.local',  'HB',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000c', 'hc@test.local',  'HC',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000d', 'hd@test.local',  'HD',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-0000000000ad', 'hadm@test.local','HADM', '{"meetings": ["admin"]}'::jsonb, 'master')
+on conflict (id) do update
+  set name = excluded.name, roles = excluded.roles, lab_status = excluded.lab_status;
+
+-- HM0  predates every member — the 2026-01 case in miniature.
+-- HM3  only HA and HB have joined: one slot must stay open.
+-- HM1  HA, HB and HD have joined; HC has not.
+-- HMTZ HC's created_at is 2098-05-31 18:00Z, which is 2098-06-01 02:00 in
+--      Taipei. This week is the day the UTC reading would say yes and the
+--      Taipei reading says no — the whole reason the comparison is written
+--      `at time zone 'Asia/Taipei'`.
+-- HM2  the Taipei date itself. `<=` admits it, so HC becomes eligible.
+insert into public.meetings
+  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+values
+  ('f5000000-0000-0000-0000-0000000000a0', 2018, 'H 制度上路前',   '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a3', 2098, 'H 只有兩人入池', '2098-01-02', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a1', 2098, 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a4', 2098, 'H 時區邊界前一天', '2098-05-31', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a2', 2098, 'H HC 入池當天',  '2098-06-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('f4000000-0000-0000-0000-00000000000a', '2098-01-01 00:00:01+00'),
+  ('f4000000-0000-0000-0000-00000000000b', '2098-01-02 00:00:02+00'),
+  ('f4000000-0000-0000-0000-00000000000d', '2098-01-03 00:00:03+00'),
+  ('f4000000-0000-0000-0000-00000000000c', '2098-05-31 18:00:00+00');
+
+-- ── the pool trigger's rebalance obeys the same rule ───────────────────────
+-- Asserted BEFORE the explicit clear below, because this is the only coverage
+-- meetings_rebalance_questioners_exec gets for the join-date rule — the pool
+-- inserts above are statement-trigger events (20260914083733) and it has
+-- already staffed every future week in the table.
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a3'),
+  2,
+  'the pool trigger''s rebalance leaves a slot open rather than reaching back past a join date'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'and does not put the too-new member on the week that predates them'
+);
+
+delete from public.meeting_questioners
+where meeting_id in ('f5000000-0000-0000-0000-0000000000a0',
+                     'f5000000-0000-0000-0000-0000000000a3',
+                     'f5000000-0000-0000-0000-0000000000a1',
+                     'f5000000-0000-0000-0000-0000000000a4',
+                     'f5000000-0000-0000-0000-0000000000a2');
+
+-- ── the pre-rotation week: an admin re-running sync writes nothing ─────────
+-- Called as superuser, so auth.uid() is null and 20260914092541's ordinary-
+-- member guard does not apply — this is the path that stayed open, and the one
+-- that produced eighteen rows across six 2026 January–February weeks.
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a0');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a0'),
+  0,
+  'a meeting older than every member''s join date is staffed by nobody, admin or not'
+);
+
+-- ── a week only two members had joined by ──────────────────────────────────
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a3');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a3'),
+  2,
+  'the third slot stays open rather than being filled by someone who had not joined'
+);
+
+-- ── a week between join dates: three eligible, the fourth is not ───────────
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a1');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'),
+  3,
+  'the three members who had joined fill the week'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'a member who joined after the meeting is not picked for it'
+);
+
+-- ── auto-pick reaches for the eligible member, it does not just give up ────
+-- Without HD here, "HC was skipped" and "everybody was skipped" look identical
+-- — a predicate that excluded the whole pool would pass the assertions above.
+-- Pinning HA and HB and then removing HA leaves exactly one eligible candidate
+-- (HD) and one ineligible one (HC), so the two outcomes separate.
+delete from public.meeting_questioners
+where meeting_id = 'f5000000-0000-0000-0000-0000000000a1';
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f5000000-0000-0000-0000-0000000000a1', 'f4000000-0000-0000-0000-00000000000a', 'auto'),
+  ('f5000000-0000-0000-0000-0000000000a1', 'f4000000-0000-0000-0000-00000000000b', 'auto');
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"f4000000-0000-0000-0000-0000000000ad","role":"authenticated"}',
+  true
+);
+
+select public.meetings_replace_questioner(
+  'f5000000-0000-0000-0000-0000000000a1',
+  'f4000000-0000-0000-0000-00000000000a');
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000d'
+  ),
+  'auto-pick fills the vacancy with the eligible member'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'and still does not reach for the too-new one'
+);
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'),
+  2,
+  'the roster is the same size it was before the replacement'
+);
+
+-- ── the Taipei boundary, both sides of it ──────────────────────────────────
+-- HC joined at 2098-05-31 18:00Z = 2098-06-01 02:00 Taipei. Comparing the raw
+-- UTC date would make them eligible for the 05-31 week; comparing the Taipei
+-- date does not. Both assertions are needed: the first alone would also pass
+-- if the filter rejected HC everywhere.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f5000000-0000-0000-0000-0000000000a4', 'f4000000-0000-0000-0000-00000000000a', 'auto'),
+  ('f5000000-0000-0000-0000-0000000000a2', 'f4000000-0000-0000-0000-00000000000a', 'auto');
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"f4000000-0000-0000-0000-0000000000ad","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       'f5000000-0000-0000-0000-0000000000a4',
+       'f4000000-0000-0000-0000-00000000000a',
+       'f4000000-0000-0000-0000-00000000000c') $$,
+  'P0001',
+  '替補人選在本週次之後才加入成員池',
+  'a 02:00-Taipei join date is rejected for the previous Taipei day, not admitted on its UTC date'
+);
+
+select lives_ok(
+  $$ select public.meetings_replace_questioner(
+       'f5000000-0000-0000-0000-0000000000a2',
+       'f4000000-0000-0000-0000-00000000000a',
+       'f4000000-0000-0000-0000-00000000000c') $$,
+  'and is accepted on the Taipei date itself — the comparison is <=, not <'
+);
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a2'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'and the named replacement actually lands on the roster'
+);
+
+-- ── #1145: one key, spelled identically, and taken before anything else ────
+-- Matched as an uncommented `perform` statement rather than anywhere in the
+-- text: a `like '%hashtext(...)%'` would still pass with the call commented
+-- out, or replaced by session-level pg_advisory_lock. Signatures are given in
+-- full so `regprocedure` cannot raise "function name is not unique" and abort
+-- the file the day one of these gains an overload.
+select is(
+  (select count(*)::int
+     from unnest(array['public.meetings_sync_questioners(uuid)',
+                       'public.meetings_replace_questioner(uuid,uuid,uuid)',
+                       'public.meetings_rebalance_questioners_exec(boolean)',
+                       'public.meetings_swap(uuid,uuid)',
+                       'public.meetings_claim(uuid)']) f(sig)
+    where pg_get_functiondef(f.sig::regprocedure)
+          ~ '(^|\n)\s*perform pg_advisory_xact_lock\(hashtext\(''meetings_rebalance_questioners''\)\);'),
+  5,
+  'every function that reaches meeting_questioners takes the same advisory key, as a live statement'
+);
+
+-- Lock ORDER, which is the bug this replaced a re-entrancy assertion to catch.
+-- Taking the key after `select * into v_meeting` means a caller that waits
+-- resumes holding a pre-wait snapshot and branches on it; taking it after
+-- `for update` on a meetings row closes a deadlock cycle against the
+-- rebalance, whose own FK insert wants `for key share` on the same row. Both
+-- were reproduced with two connections before being fixed.
+select is(
+  (select count(*)::int
+     from unnest(array['public.meetings_sync_questioners(uuid)',
+                       'public.meetings_replace_questioner(uuid,uuid,uuid)',
+                       'public.meetings_swap(uuid,uuid)',
+                       'public.meetings_claim(uuid)']) f(sig)
+    cross join lateral (select pg_get_functiondef(f.sig::regprocedure) as d) x
+    where position('pg_advisory_xact_lock' in x.d) > 0
+      and position('pg_advisory_xact_lock' in x.d) < least(
+            coalesce(nullif(position('select * into v_meeting' in x.d), 0), 2147483647),
+            coalesce(nullif(position('for update'              in x.d), 0), 2147483647),
+            coalesce(nullif(position('select * into v_a'       in x.d), 0), 2147483647))),
+  4,
+  'and takes it before the first meetings read or row lock, not after'
 );
 
 select * from finish();
