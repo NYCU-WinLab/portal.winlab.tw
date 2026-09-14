@@ -11,9 +11,10 @@ const TABLE = "meetings"
 
 /**
  * The two facts /meetings needs about the schedule before it can pick a year to
- * show: which bucket the next meeting is in, and how far the buckets run. Two
- * `limit(1)` reads rather than pulling the table down — see
- * `lib/meetings/schedule-year.ts` for why neither can be derived from the clock.
+ * show: the date of the next meeting, and the date of the last row in the
+ * whole schedule. Two `limit(1)` reads rather than pulling the table down —
+ * see `lib/meetings/schedule-year.ts` for why neither can be derived from the
+ * clock.
  */
 export function useScheduleYears() {
   const supabase = createClient()
@@ -31,20 +32,20 @@ export function useScheduleYears() {
       const [upcoming, latest] = await Promise.all([
         supabase
           .from(TABLE)
-          .select("year")
+          .select("scheduled_date")
           .gte("scheduled_date", today)
-          // Holidays are rows but not meetings. Counting one would send the page
-          // to whichever bucket holds the next 元旦 / 月考週 marker instead of the
-          // bucket holding the next actual presentation — which is the whole
-          // question being asked here.
+          // Holidays are rows but not meetings. Counting one would return the
+          // date of the next 元旦 / 月考週 marker instead of the date of the
+          // next actual presentation — which is the whole question being
+          // asked here.
           .eq("is_holiday", false)
           .order("scheduled_date", { ascending: true })
           .limit(1)
           .maybeSingle(),
         supabase
           .from(TABLE)
-          .select("year")
-          .order("year", { ascending: false })
+          .select("scheduled_date")
+          .order("scheduled_date", { ascending: false })
           .limit(1)
           .maybeSingle(),
       ])
@@ -53,8 +54,8 @@ export function useScheduleYears() {
       if (latest.error) throw new Error(latest.error.message)
 
       return {
-        upcoming: upcoming.data?.year ?? null,
-        latest: latest.data?.year ?? null,
+        upcomingDate: upcoming.data?.scheduled_date ?? null,
+        latestDate: latest.data?.scheduled_date ?? null,
       }
     },
   })

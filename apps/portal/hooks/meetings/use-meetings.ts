@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import type { TablesInsert } from "@/lib/supabase/database.types"
 import { toMeeting, type DbMeeting, type Meeting } from "@/lib/meetings/types"
+import type { SemesterKey } from "@/lib/meetings/semester"
 
 import { queryKeys } from "./query-keys"
 
@@ -52,10 +53,14 @@ export function useMeetings(year: number) {
   return useQuery({
     queryKey: queryKeys.meetings.byYear(year),
     queryFn: async (): Promise<Meeting[]> => {
+      // 頁籤是西元年，過濾就用西元年的日期區間。以前這裡讀的是 meetings.year
+      // 欄位——一份在列被搬動時不會跟著更新的狀態，於是跨年搬過去的人會留在
+      // 舊的頁籤上。日期是列上唯一會被編輯的東西，所以用它。
       const { data, error } = await supabase
         .from(TABLE)
         .select("*")
-        .eq("year", year)
+        .gte("scheduled_date", `${year}-01-01`)
+        .lte("scheduled_date", `${year}-12-31`)
         .order("scheduled_date", { ascending: true })
       if (error) throw new Error(error.message || "讀取排班失敗")
       return (data as DbMeeting[]).map(toMeeting)
@@ -229,21 +234,11 @@ export function useAdminUpdateMeeting() {
 }
 
 /**
- * Adds a meeting at an ARBITRARY date — the page-level add-meeting dialog, and
- * the first week of an empty year bucket.
+ * 在**任意**日期新增一場會議——頁面層的新增對話框，以及空年份的第一週。
  *
- * This hook never sets `semester_id`, and takes no option to. The database
- * derives it from `scheduled_date` (`meetings_set_semester`, a BEFORE INSERT
- * trigger that fills the column only when it is NULL), which is the right
- * answer here: when a date is picked out of thin air, the semester it falls in
- * IS the semester it belongs to.
- *
- * Appending inside a KNOWN semester is a different question with a different
- * answer, and it does not belong here — a week appended to the end of 上學期 can
- * legitimately fall in February, where the date-derived guess would move it into
- * 下學期 and restart its numbering. Use `useAppendMeetingWeek` for that: it lets
- * the server compute the label and the date from the whole semester and stamps
- * `semester_id` explicitly.
+ * 與 `useAppendMeetingWeek` 的差別現在只剩「誰決定日期」：這裡是人挑的，
+ * 那裡是伺服器從學期的最後一列算出來的。兩者都不再需要煩惱學期歸屬——
+ * 日期落在哪個學期，它就屬於哪個學期。
  */
 export function useAddMeeting() {
   const supabase = createClient()
@@ -251,7 +246,6 @@ export function useAddMeeting() {
 
   return useMutation({
     mutationFn: async (row: {
-      year: number
       weekLabel: string | null
       scheduledDate: string
       isHoliday: boolean
@@ -261,19 +255,7 @@ export function useAddMeeting() {
       presenterUserId: string | null
       paperTitle?: string | null
     }) => {
-      // `semester_id` is NOT NULL with no column DEFAULT — only the
-      // meetings_set_semester trigger fills it — and codegen can't see
-      // triggers, so the generated Insert type marks it required. Typing the
-      // payload as `Omit<…, "semester_id">` is what keeps every OTHER column
-      // fully checked, including any column a future migration makes required:
-      // the object literal still has to satisfy the generated shape, so such a
-      // change surfaces here as an error rather than being swallowed.
-      //
-      // The cast at `.insert()` is the narrowest one that compiles: it asserts
-      // exactly the one thing TypeScript cannot know — that the trigger
-      // supplies the missing column — and nothing else.
-      const payload: Omit<TablesInsert<"meetings">, "semester_id"> = {
-        year: row.year,
+      const payload: TablesInsert<"meetings"> = {
         week_label: row.weekLabel,
         scheduled_date: row.scheduledDate,
         is_holiday: row.isHoliday,
@@ -292,7 +274,7 @@ export function useAddMeeting() {
 
       const { data, error } = await supabase
         .from(TABLE)
-        .insert(payload as TablesInsert<"meetings">)
+        .insert(payload)
         .select("id")
         .single()
       if (error) throw new Error(addMeetingErrorMessage(error))
@@ -374,24 +356,21 @@ export function useInsertMeetingWeek() {
 }
 
 /**
- * Appends one week to the END of a semester. Both values are computed by the
- * server: this hook deliberately sends nothing but the semester id.
+ * 在某個學期的最後面追加一週。日期與標籤都由伺服器算，這個 hook 只送學期。
  *
- * The client used to compute them, from `useMeetings(year)` — a YEAR-filtered
- * row set. A semester can span two `meetings.year` buckets (a 上學期 running
- * September→January does), so the browser saw a truncated slice of it, minted a
- * `第N週` the semester already used, and reported success. The RPC also enforces
- * the date-global "one meeting per calendar date" invariant that a plain
- * `.insert()` walked straight past (#1103).
+ * 學期不再是一列資料，所以參數是 (學年度, 學期) 這對值——就是
+ * `semesterKeyForDate()` 回傳的東西。伺服器從整個學期的日期窗算，而不是從
+ * 呼叫端剛好看得到的那一段：一個學期會橫跨兩個年份頁籤。
  */
 export function useAppendMeetingWeek() {
   const supabase = createClient()
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async (semesterId: string): Promise<string> => {
+    mutationFn: async (key: SemesterKey): Promise<string> => {
       const { data, error } = await supabase.rpc("meetings_append_week", {
-        p_semester_id: semesterId,
+        p_academic_year: key.academicYear,
+        p_term: key.term,
       })
       if (error) throw new Error(error.message || "新增週次失敗")
       return data as string
@@ -453,13 +432,11 @@ export function useGenerateSemester() {
 
   return useMutation({
     mutationFn: async (input: {
-      year: number
       startDate: string
       weeks: number
       holidays: SemesterHoliday[]
     }): Promise<GenerateSemesterResult> => {
       const { data, error } = await supabase.rpc("meetings_generate_semester", {
-        p_year: input.year,
         p_start_date: input.startDate,
         p_weeks: input.weeks,
         p_holidays: input.holidays,

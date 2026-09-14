@@ -1,55 +1,47 @@
-// Which schedule year /meetings opens on, and how far forward the arrows reach.
+// /meetings 開在哪一年，以及前進箭頭能走多遠。
 //
-// `meetings.year` is a schedule BUCKET stamped when a row is created, not the
-// calendar year of `scheduled_date`: meetings_generate_semester writes the
-// p_year it was handed, meetings_insert_week inherits it from the row it
-// shifts, and neither ever recomputes it from the date. A full year of weekly
-// slots is 52 × 7 = 364 days, so a schedule that opens in the first week of
-// January always spills its last slot into the next calendar year — the 2026
-// bucket runs 2026-01-05 through 2027-01-04.
+// 兩個問題都從資料回答，不從時鐘。以前的 `new Date().getFullYear()` 預設值
+// 會在 1 月 1 日打開一個沒有任何列的年份，而下一場會議就在左邊一格。
 //
-// Two things broke because the page assumed bucket == calendar year:
-//
-//   * `new Date().getFullYear()` as the default meant that on 1 January the page
-//     would open a calendar year with no rows, while the next real meeting sat
-//     in the previous bucket one click to the left.
-//   * capping the forward arrow at the calendar year made next year's bucket
-//     unreachable, so an admin could never open it to generate its semester.
-//
-// Both are answered from the data instead of from the clock.
+// 這個檔案曾經還要處理第二件事：meetings.year 是一個「建立時蓋一次」的 bucket，
+// 和日期的年份可以不一樣。那個欄位已經不存在了——頁籤是日期年份的純函數，所以
+// 這裡只剩「下一場會議在哪一年」和「最遠能到哪一年」兩個問題。
 
 export interface ScheduleYearBounds {
   /**
-   * Bucket holding the earliest non-holiday meeting on or after today, if any.
-   * Holiday rows are excluded deliberately: a 元旦 or 月考週 marker is a row but
-   * not a meeting, and letting one answer "where is the next meeting" sends the
-   * page to a bucket that has nothing to show.
+   * 今天或之後最早的非假期會議日期（ISO `YYYY-MM-DD`）。
+   * 假期是列但不是會議：讓一列元旦或月考週來回答「下一場會議在哪」，會把頁面
+   * 送到一個沒東西可看的年份。
    */
-  upcoming: number | null
-  /** Highest bucket that has any row at all. */
-  latest: number | null
+  upcomingDate: string | null
+  /** 整份排班最後一列的日期。 */
+  latestDate: string | null
+}
+
+function yearOf(dateStr: string | null): number | null {
+  return dateStr ? Number(dateStr.slice(0, 4)) : null
 }
 
 /**
- * The year to open when the URL doesn't name one: wherever the next meeting
- * actually lives. Falls back to the last bucket that exists (the schedule has
- * run out), then to the calendar year (empty table — a fresh install).
+ * URL 沒指定年份時要開哪一年：下一場會議真正所在的那一年。沒有未來的會議就
+ * 退回排班最後一列所在的年份，再退回日曆年（空資料表——全新安裝）。
  */
 export function defaultScheduleYear(
   bounds: ScheduleYearBounds,
   calendarYear: number
 ): number {
-  return bounds.upcoming ?? bounds.latest ?? calendarYear
+  return (
+    yearOf(bounds.upcomingDate) ?? yearOf(bounds.latestDate) ?? calendarYear
+  )
 }
 
 /**
- * Furthest year the forward arrow may reach — always one past anything that
- * exists, so an admin can open an empty next year and generate it. Without the
- * +1 the schedule can never be extended past whatever is already there.
+ * 前進箭頭能到的最遠年份——永遠比現有資料多一年，這樣管理員才能打開一個空的
+ * 明年去產生排班。沒有這個 +1，排班就永遠無法被延長到現有資料之後。
  */
 export function maxNavigableYear(
   bounds: ScheduleYearBounds,
   calendarYear: number
 ): number {
-  return Math.max(calendarYear, bounds.latest ?? calendarYear) + 1
+  return Math.max(calendarYear, yearOf(bounds.latestDate) ?? calendarYear) + 1
 }

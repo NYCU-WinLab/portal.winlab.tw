@@ -1506,33 +1506,6 @@ export type Database = {
           },
         ]
       }
-      meeting_semesters: {
-        Row: {
-          academic_year: number
-          created_at: string
-          id: string
-          planned_weeks: number | null
-          start_date: string
-          term: number
-        }
-        Insert: {
-          academic_year: number
-          created_at?: string
-          id?: string
-          planned_weeks?: number | null
-          start_date: string
-          term: number
-        }
-        Update: {
-          academic_year?: number
-          created_at?: string
-          id?: string
-          planned_weeks?: number | null
-          start_date?: string
-          term?: number
-        }
-        Relationships: []
-      }
       meeting_tags: {
         Row: {
           color: string | null
@@ -1571,13 +1544,11 @@ export type Database = {
           presenter_user_id: string | null
           question_group_number: number | null
           scheduled_date: string
-          semester_id: string
           start_time: string
           teacher_paper_id: string | null
           video_link: string | null
           video_uploaded: boolean
           week_label: string | null
-          year: number
         }
         Insert: {
           created_at?: string
@@ -1595,13 +1566,11 @@ export type Database = {
           presenter_user_id?: string | null
           question_group_number?: number | null
           scheduled_date: string
-          semester_id: string
           start_time?: string
           teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
-          year: number
         }
         Update: {
           created_at?: string
@@ -1619,13 +1588,11 @@ export type Database = {
           presenter_user_id?: string | null
           question_group_number?: number | null
           scheduled_date?: string
-          semester_id?: string
           start_time?: string
           teacher_paper_id?: string | null
           video_link?: string | null
           video_uploaded?: boolean
           week_label?: string | null
-          year?: number
         }
         Relationships: [
           {
@@ -1640,13 +1607,6 @@ export type Database = {
             columns: ["presenter_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meetings_semester_id_fkey"
-            columns: ["semester_id"]
-            isOneToOne: false
-            referencedRelation: "meeting_semesters"
             referencedColumns: ["id"]
           },
           {
@@ -3082,18 +3042,17 @@ export type Database = {
       }
       leave_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       meeting_academic_year: { Args: { p_date: string }; Returns: number }
-      meeting_semester_for_date: { Args: { p_date: string }; Returns: string }
+      meeting_semester_end: { Args: { p_date: string }; Returns: string }
+      meeting_semester_start: { Args: { p_date: string }; Returns: string }
       meeting_term: { Args: { p_date: string }; Returns: number }
-      meetings_append_week: { Args: { p_semester_id: string }; Returns: string }
+      meetings_append_week: {
+        Args: { p_academic_year: number; p_term: number }
+        Returns: string
+      }
       meetings_claim: { Args: { p_meeting_id: string }; Returns: undefined }
       meetings_fill_presenters: { Args: { p_year: number }; Returns: Json }
       meetings_generate_semester: {
-        Args: {
-          p_holidays?: Json
-          p_start_date: string
-          p_weeks: number
-          p_year: number
-        }
+        Args: { p_holidays?: Json; p_start_date: string; p_weeks: number }
         Returns: Json
       }
       meetings_insert_week: {
@@ -3104,6 +3063,7 @@ export type Database = {
         Args: { p_status: string }
         Returns: boolean
       }
+      meetings_mint_week_label: { Args: { p_date: string }; Returns: string }
       meetings_next_free_date: { Args: { p_from: string }; Returns: string }
       meetings_pool_compact: {
         Args: { p_admission_year: number }
