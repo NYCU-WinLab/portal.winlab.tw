@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/lib/supabase/server"
+import type { Database, TablesUpdate } from "@/lib/supabase/database.types"
 
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL!
 const NEXTCLOUD_USERNAME = process.env.NEXTCLOUD_USERNAME!
@@ -13,7 +14,7 @@ const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm)$/i
 const PROPFIND_BODY = `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:prop><d:displayname/><oc:fileid/></d:prop></d:propfind>`
 
 function createServiceClient() {
-  return createSupabaseClient(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!
   )
@@ -123,7 +124,14 @@ export async function POST(request: NextRequest) {
   const { data: meetings, error } = await service
     .from("meetings")
     .select("id, scheduled_date, ppt_link, video_link")
-    .eq("year", year)
+    // The folder is Meetings/<year>, and files land there by date, so the
+    // rows to scan are "rows whose date falls in this year". This used to be
+    // .eq("year", year) — that column didn't update when a row got shifted
+    // across the year boundary, so the scan and the folder pointed at two
+    // different years and that meeting's recording never linked on either
+    // side.
+    .gte("scheduled_date", `${year}-01-01`)
+    .lte("scheduled_date", `${year}-12-31`)
     .eq("is_holiday", false)
 
   if (error) {
@@ -136,7 +144,7 @@ export async function POST(request: NextRequest) {
   await Promise.all(
     (meetings ?? []).map(async (m) => {
       const date: string = m.scheduled_date
-      const patch: Record<string, unknown> = {}
+      const patch: TablesUpdate<"meetings"> = {}
 
       const pptUrl = pptFiles.get(date)
       if (pptUrl && !m.ppt_link) {
