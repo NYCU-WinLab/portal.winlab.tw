@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(52);
+select plan(74);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -918,6 +918,297 @@ delete from public.meeting_question_pool
                     'a0000000-0000-0000-0000-000000000004',
                     'a0000000-0000-0000-0000-000000000005',
                     'a0000000-0000-0000-0000-000000000006');
+
+-- ═══ Scenario F: rate, rebalance, and the co-pairing tie-break ═════════════
+-- CLEAN SLATE, and it has to be. The rebalance's freeze line is
+-- min(scheduled_date) over EVERY upcoming meeting in the table, so a single
+-- leftover row from an earlier scenario would move it and make everything
+-- below non-deterministic.
+--
+-- Claims are cleared too: set_config(..., true) is transaction-local, so a JWT
+-- left behind by an earlier scenario is still what auth.uid() reads here — and
+-- lab_status_write_guard rejects a lab_status write whenever auth.uid() is
+-- non-null outside service_role.
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+delete from public.meetings;
+delete from public.meeting_question_pool;
+delete from public.meeting_presenter_pool;
+
+insert into auth.users (id) values
+  ('f0000000-0000-0000-0000-000000000001'), -- R1
+  ('f0000000-0000-0000-0000-000000000002'), -- R2
+  ('f0000000-0000-0000-0000-000000000003'), -- R3
+  ('f0000000-0000-0000-0000-000000000004'), -- R4
+  ('f0000000-0000-0000-0000-000000000005'), -- R5
+  ('f0000000-0000-0000-0000-000000000006'), -- R6, presents W3
+  ('f0000000-0000-0000-0000-000000000090'), -- PA, presenter only
+  ('f0000000-0000-0000-0000-000000000091')  -- AL, graduated
+on conflict (id) do nothing;
+
+insert into public.user_profiles (id, email, name, lab_status) values
+  ('f0000000-0000-0000-0000-000000000001', 'fr1@test.local', 'FR1', 'master'),
+  ('f0000000-0000-0000-0000-000000000002', 'fr2@test.local', 'FR2', 'master'),
+  ('f0000000-0000-0000-0000-000000000003', 'fr3@test.local', 'FR3', 'master'),
+  ('f0000000-0000-0000-0000-000000000004', 'fr4@test.local', 'FR4', 'master'),
+  ('f0000000-0000-0000-0000-000000000005', 'fr5@test.local', 'FR5', 'master'),
+  ('f0000000-0000-0000-0000-000000000006', 'fr6@test.local', 'FR6', 'master'),
+  ('f0000000-0000-0000-0000-000000000090', 'fpa@test.local', 'FPA', 'master'),
+  ('f0000000-0000-0000-0000-000000000091', 'fal@test.local', 'FAL', 'alumni')
+on conflict (id) do update
+  set name = excluded.name, lab_status = excluded.lab_status;
+
+-- A0 is history; B0 is the freeze line; B1..B3 are the rebalance's range.
+-- B3's presenter is R6, which is what makes R6's denominator differ from
+-- everyone else's.
+insert into public.meetings
+  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+values
+  ('f0000000-0000-0000-0000-0000000000a0', 2020, 'F 過去',   '2020-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b0', 2099, 'F 凍結週', '2099-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b1', 2099, 'F 第1週',  '2099-03-09', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b2', 2099, 'F 第2週',  '2099-03-16', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b3', 2099, 'F 第3週',  '2099-03-23', false, false, 'f0000000-0000-0000-0000-000000000006');
+
+-- History: R1/R2/R3 questioned the 2020 week. Far enough back that it feeds
+-- times_asked without reaching the 56-day co-pairing window of anything below.
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f0000000-0000-0000-0000-0000000000a0', 'f0000000-0000-0000-0000-000000000001', 'auto'),
+  ('f0000000-0000-0000-0000-0000000000a0', 'f0000000-0000-0000-0000-000000000002', 'auto'),
+  ('f0000000-0000-0000-0000-0000000000a0', 'f0000000-0000-0000-0000-000000000003', 'auto');
+
+-- THE TRIGGER FIRES HERE. One statement, one rebalance, and B1..B3 get staffed
+-- without anything else being called.
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('f0000000-0000-0000-0000-000000000001', '2019-01-01 00:00:01+00'),
+  ('f0000000-0000-0000-0000-000000000002', '2019-01-01 00:00:02+00'),
+  ('f0000000-0000-0000-0000-000000000003', '2019-01-01 00:00:03+00'),
+  ('f0000000-0000-0000-0000-000000000004', '2019-01-01 00:00:04+00'),
+  ('f0000000-0000-0000-0000-000000000005', '2019-01-01 00:00:05+00'),
+  ('f0000000-0000-0000-0000-000000000006', '2019-01-01 00:00:06+00'),
+  ('f0000000-0000-0000-0000-000000000091', '2019-01-01 00:00:07+00');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id in ('f0000000-0000-0000-0000-0000000000b1',
+                        'f0000000-0000-0000-0000-0000000000b2',
+                        'f0000000-0000-0000-0000-0000000000b3')),
+  9,
+  'adding pool members rebalances the upcoming rosters without anyone pressing a button'
+);
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f0000000-0000-0000-0000-0000000000b0'),
+  0,
+  'the nearest upcoming meeting is left exactly as it was'
+);
+
+-- The compound failure the design document called out in §9.1 ②: a graduated
+-- member stops being assigned, so their rate sinks to the floor, and a pass
+-- that hunts for the lowest rate would hand them the roster.
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where user_id = 'f0000000-0000-0000-0000-000000000091'
+  ),
+  'an alumnus is never handed a slot, however low their rate'
+);
+
+select ok(
+  (select is_active from public.meeting_question_rotation
+   where user_id = 'f0000000-0000-0000-0000-000000000091') is false,
+  'the rotation view reports the alumnus inactive rather than hiding the row'
+);
+
+-- Column-order regression. `create or replace view` cannot reorder or drop a
+-- column, so is_active has to survive in place while rate appends after it —
+-- the exact trap the implementation plan walked into by rewriting the view
+-- from a pre-20260831140200 baseline.
+select ok(
+  (select is_active from public.meeting_question_rotation
+   where user_id = 'f0000000-0000-0000-0000-000000000001') is true
+  and (select rate from public.meeting_question_rotation
+       where user_id = 'f0000000-0000-0000-0000-000000000001') is not null,
+  'the rotation view kept is_active in place and gained rate beside it'
+);
+
+select ok(
+  (select is_active from public.meeting_question_pool_members
+   where user_id = 'f0000000-0000-0000-0000-000000000001') is true
+  and (select rate from public.meeting_question_pool_members
+       where user_id = 'f0000000-0000-0000-0000-000000000001') is not null,
+  'the narrow panel view kept is_active in place and gained rate beside it'
+);
+
+-- Denominator: A0, B1, B2, B3 all carry questioners; B0 carries none and is
+-- therefore nobody's missed chance.
+select is(
+  (select opportunities from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000001'),
+  4,
+  'a week with no questioners at all is nobody''s opportunity'
+);
+
+select is(
+  (select opportunities from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000006'),
+  3,
+  'the week a member presents is not counted as a chance they missed'
+);
+
+select is(
+  (select times_asked from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000001'),
+  1,
+  'times_asked counts only the weeks that have already happened'
+);
+
+select ok(
+  (select times_asked_scheduled from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000001') > 0,
+  'a week that is merely scheduled is reported separately, not as one already done'
+);
+
+select is(
+  (select round(rate, 6) from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000001'),
+  (select round(((times_asked + times_asked_scheduled)::numeric / opportunities), 6)
+   from public.meeting_questioner_stats
+   where user_id = 'f0000000-0000-0000-0000-000000000001'),
+  'rate is (asked + scheduled) over opportunities'
+);
+
+-- Nine slots across six eligible members. Rate fairness means three people get
+-- two weeks and three get one; nobody is drawn into all three.
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id in ('f0000000-0000-0000-0000-0000000000b1',
+                         'f0000000-0000-0000-0000-0000000000b2',
+                         'f0000000-0000-0000-0000-0000000000b3')
+    group by user_id having count(*) = 3
+  ),
+  'no one is drawn into all three rebalanced weeks while others wait'
+);
+
+-- A statement that changes nothing must not rewrite every future roster.
+create temporary table f_noop as
+  select meeting_id, user_id, source from public.meeting_questioners;
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('f0000000-0000-0000-0000-000000000001', '2019-01-01 00:00:01+00')
+on conflict (user_id) do nothing;
+
+select ok(
+  not exists (
+    (select meeting_id, user_id, source from f_noop)
+    except
+    (select meeting_id, user_id, source from public.meeting_questioners)
+  ) and not exists (
+    (select meeting_id, user_id, source from public.meeting_questioners)
+    except
+    (select meeting_id, user_id, source from f_noop)
+  ),
+  'an insert that adds nobody leaves every roster alone'
+);
+
+-- source = 'manual' is an admin's deliberate choice and outranks the rotation.
+delete from public.meeting_questioners
+  where meeting_id = 'f0000000-0000-0000-0000-0000000000b2';
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f0000000-0000-0000-0000-0000000000b2', 'f0000000-0000-0000-0000-000000000001', 'manual');
+
+select lives_ok(
+  $$ select public.meetings_rebalance_questioners(false) $$,
+  'a rebalance runs for the owner without a JWT, the way a migration would'
+);
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f0000000-0000-0000-0000-0000000000b2'
+      and user_id = 'f0000000-0000-0000-0000-000000000001'
+      and source = 'manual'
+  ),
+  'a manual assignment survives a rebalance'
+);
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f0000000-0000-0000-0000-0000000000b2'),
+  3,
+  'the rebalance tops a manually-seeded week back up to three'
+);
+
+select is(
+  (public.meetings_rebalance_questioners(true) ->> 'frozenDate'),
+  '2099-03-02',
+  'the freeze line is the nearest meeting that has not happened yet'
+);
+
+create temporary table f_dry as
+  select meeting_id, user_id, source from public.meeting_questioners;
+
+select ok(
+  (public.meetings_rebalance_questioners(true) -> 'roster') <> '[]'::jsonb,
+  'a dry run still reports the roster it would write'
+);
+
+select ok(
+  not exists (
+    (select meeting_id, user_id, source from f_dry)
+    except
+    (select meeting_id, user_id, source from public.meeting_questioners)
+  ) and not exists (
+    (select meeting_id, user_id, source from public.meeting_questioners)
+    except
+    (select meeting_id, user_id, source from f_dry)
+  ),
+  'a dry run writes nothing'
+);
+
+-- ── the co-pairing tie-break, measured directly ────────────────────────────
+-- C1 is seven days before C2; C3 is over four months before it. R1 sits on C2,
+-- so a candidate is scored on whether they recently sat WITH R1.
+insert into public.meetings
+  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+values
+  ('f0000000-0000-0000-0000-0000000000c3', 2098, 'CP 很久以前', '2098-01-05', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c1', 2098, 'CP 上週',     '2098-05-04', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c2', 2098, 'CP 本週',     '2098-05-11', false, false, 'f0000000-0000-0000-0000-000000000090');
+
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f0000000-0000-0000-0000-0000000000c1', 'f0000000-0000-0000-0000-000000000001', 'manual'),
+  ('f0000000-0000-0000-0000-0000000000c1', 'f0000000-0000-0000-0000-000000000002', 'manual'),
+  ('f0000000-0000-0000-0000-0000000000c3', 'f0000000-0000-0000-0000-000000000001', 'manual'),
+  ('f0000000-0000-0000-0000-0000000000c3', 'f0000000-0000-0000-0000-000000000003', 'manual'),
+  ('f0000000-0000-0000-0000-0000000000c2', 'f0000000-0000-0000-0000-000000000001', 'manual');
+
+select is(
+  public.meetings_recent_copair_count(
+    'f0000000-0000-0000-0000-000000000002',
+    'f0000000-0000-0000-0000-0000000000c2'),
+  1,
+  'a candidate who sat with this week''s roster last week scores one'
+);
+
+select is(
+  public.meetings_recent_copair_count(
+    'f0000000-0000-0000-0000-000000000003',
+    'f0000000-0000-0000-0000-0000000000c2'),
+  0,
+  'a pairing older than 56 days has stopped counting'
+);
+
+select is(
+  public.meetings_recent_copair_count(
+    'f0000000-0000-0000-0000-000000000004',
+    'f0000000-0000-0000-0000-0000000000c2'),
+  0,
+  'a candidate who has never sat with them scores zero'
+);
 
 select * from finish();
 rollback;
