@@ -17,7 +17,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(10);
+select plan(14);
 
 -- ── 1-6. no public relation hands anon or authenticated these three ────────
 -- Covers views and materialised views too (relkind v/m), which carry the same
@@ -112,6 +112,39 @@ select ok(
 select ok(
   not has_table_privilege('authenticated', 'public.pgtap_default_privilege_probe', 'TRIGGER'),
   'a newly created table does not hand authenticated TRIGGER'
+);
+
+-- ── 11-14. #1144: the questioner tables hand anon no DML ──────────────────
+-- Named table by table rather than schema-wide, unlike everything above: this
+-- is not a property of the whole schema (authenticated legitimately holds the
+-- same privileges here, governed by RLS), it is a property of three tables
+-- whose writes now rewrite the future schedule. 20260915000003 explains why.
+select is(
+  (select count(*)::int
+     from unnest(array['public.meeting_question_pool',
+                       'public.meeting_presenter_pool',
+                       'public.meeting_questioners']) t(rel)
+    where has_table_privilege('anon', t.rel, 'INSERT')
+       or has_table_privilege('anon', t.rel, 'UPDATE')
+       or has_table_privilege('anon', t.rel, 'DELETE')),
+  0,
+  'anon holds no INSERT/UPDATE/DELETE on any of the three questioner tables'
+);
+
+-- The counter-assertions. Without them a future migration could satisfy the
+-- line above by revoking these tables from everyone, and the admin panel would
+-- stop working with the suite still green.
+select ok(
+  has_table_privilege('authenticated', 'public.meeting_question_pool', 'INSERT'),
+  'authenticated keeps INSERT on meeting_question_pool — RLS is what gates it'
+);
+select ok(
+  has_table_privilege('authenticated', 'public.meeting_presenter_pool', 'DELETE'),
+  'authenticated keeps DELETE on meeting_presenter_pool — RLS is what gates it'
+);
+select ok(
+  has_table_privilege('anon', 'public.meeting_question_pool', 'SELECT'),
+  'anon keeps SELECT — deliberately left, and empty under RLS either way'
 );
 
 select * from finish();

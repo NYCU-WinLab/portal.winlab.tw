@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(81);
+select plan(90);
 
 -- ── seed actors (as superuser — bypasses RLS) ───────────────────────────────
 insert into auth.users (id) values
@@ -1385,6 +1385,164 @@ select is(
      and column_name = 'is_active'),
   7,
   'is_active is still column 7 of the rotation view, with rate appended after it'
+);
+
+-- ═══ Scenario H: nobody is staffed onto a meeting older than their own join
+--     date, and every writer shares one advisory lock (#1143, #1145) ════════
+--
+-- Scenario G left its members in the two pool tables and every earlier
+-- scenario's 2019–2021 join dates are older than anything here, so H starts by
+-- emptying both pools: with them present every candidate is eligible for every
+-- date and the predicate under test can never bind. Each delete and insert
+-- below is a statement-trigger event (20260914083733) that rebalances every
+-- future week in the table, so the three meetings this scenario asserts on are
+-- cleared and staffed explicitly rather than trusted to whatever the trigger
+-- last planned.
+delete from public.meeting_question_pool;
+delete from public.meeting_presenter_pool;
+
+insert into auth.users (id) values
+  ('f4000000-0000-0000-0000-0000000000f0'),
+  ('f4000000-0000-0000-0000-00000000000a'),
+  ('f4000000-0000-0000-0000-00000000000b'),
+  ('f4000000-0000-0000-0000-00000000000c'),
+  ('f4000000-0000-0000-0000-0000000000ad')
+on conflict (id) do nothing;
+
+insert into public.user_profiles (id, email, name, roles, lab_status) values
+  ('f4000000-0000-0000-0000-0000000000f0', 'hp@test.local',  'HP',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000a', 'ha@test.local',  'HA',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000b', 'hb@test.local',  'HB',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-00000000000c', 'hc@test.local',  'HC',  '{}'::jsonb, 'master'),
+  ('f4000000-0000-0000-0000-0000000000ad', 'hadm@test.local','HADM', '{"meetings": ["admin"]}'::jsonb, 'master')
+on conflict (id) do update
+  set name = excluded.name, roles = excluded.roles, lab_status = excluded.lab_status;
+
+-- HM0 predates every member's join date — the 2026-01 case in miniature.
+-- HM1 sits between HA/HB's join date and HC's. HM2 is after all three.
+insert into public.meetings
+  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+values
+  ('f5000000-0000-0000-0000-0000000000a0', 2018, 'H 制度上路前', '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a1', 2098, 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a2', 2098, 'H 晚於 HC 入池', '2098-09-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
+
+insert into public.meeting_question_pool (user_id, created_at) values
+  ('f4000000-0000-0000-0000-00000000000a', '2098-01-01 00:00:01+00'),
+  ('f4000000-0000-0000-0000-00000000000b', '2098-01-01 00:00:02+00'),
+  ('f4000000-0000-0000-0000-00000000000c', '2098-06-01 00:00:00+00');
+
+delete from public.meeting_questioners
+where meeting_id in ('f5000000-0000-0000-0000-0000000000a0',
+                     'f5000000-0000-0000-0000-0000000000a1',
+                     'f5000000-0000-0000-0000-0000000000a2');
+
+-- ── the pre-rotation week: an admin re-running sync writes nothing ─────────
+-- Called as superuser, so auth.uid() is null and 20260914092541's ordinary-
+-- member guard does not apply — this is the path that stayed open, and the one
+-- that produced eighteen rows across six January-2026 weeks.
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a0');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a0'),
+  0,
+  'a meeting older than every member''s join date is staffed by nobody, admin or not'
+);
+
+-- ── a week between two join dates: the later member is not a candidate ─────
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a1');
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'),
+  2,
+  'the slot the too-new member would have filled stays open rather than being mis-filled'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'a member who joined after the meeting is not picked for it'
+);
+
+-- ── and is a candidate again once the meeting is after their join date ─────
+select public.meetings_sync_questioners('f5000000-0000-0000-0000-0000000000a2');
+
+select ok(
+  exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a2'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'the same member IS picked for a meeting after their join date — the filter is per meeting, not a ban'
+);
+
+-- ── meetings_replace_questioner enforces the same rule, both halves ────────
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"f4000000-0000-0000-0000-0000000000ad","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$ select public.meetings_replace_questioner(
+       'f5000000-0000-0000-0000-0000000000a1',
+       'f4000000-0000-0000-0000-00000000000a',
+       'f4000000-0000-0000-0000-00000000000c') $$,
+  'P0001',
+  '替補人選在本週次之後才加入成員池',
+  'naming a too-new replacement by hand is an error, not a silent no-op'
+);
+
+-- Auto-pick on the same week: HB already holds the other slot and HC is not a
+-- candidate, so the removal leaves a gap rather than fabricating a filler.
+select public.meetings_replace_questioner(
+  'f5000000-0000-0000-0000-0000000000a1',
+  'f4000000-0000-0000-0000-00000000000a');
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'),
+  1,
+  'auto-pick leaves the slot open when the only remaining member joined too late'
+);
+select ok(
+  not exists (
+    select 1 from public.meeting_questioners
+    where meeting_id = 'f5000000-0000-0000-0000-0000000000a1'
+      and user_id = 'f4000000-0000-0000-0000-00000000000c'
+  ),
+  'auto-pick does not reach for the too-new member either'
+);
+
+-- ── #1145: one key, spelled identically in all three writers ───────────────
+-- The literal is what makes them exclude each other; hashtext of a typo is a
+-- different lock and nothing would fail loudly. This is the guard against that.
+select is(
+  (select count(*)::int
+     from unnest(array['meetings_sync_questioners',
+                       'meetings_replace_questioner',
+                       'meetings_rebalance_questioners_exec']) f(n)
+    where pg_get_functiondef(('public.' || f.n)::regproc)
+          like '%hashtext(''meetings_rebalance_questioners'')%'),
+  3,
+  'sync, replace and rebalance all take the same advisory lock key'
+);
+
+-- Re-entrancy, which is what lets meetings_fill_presenters call sync once per
+-- week inside a loop it already holds a different lock for. Weak by nature —
+-- a same-session request always succeeds — but it pins the assumption, and
+-- pgTAP cannot open the second connection a real contention test would need.
+select ok(
+  pg_try_advisory_xact_lock(hashtext('meetings_rebalance_questioners')),
+  'the shared lock is re-entrant within one transaction'
 );
 
 select * from finish();
