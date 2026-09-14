@@ -47,6 +47,7 @@ function BulletinChatSkeleton() {
 const baseApps = [
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/bento", label: "Bento", note: "便當訂購" },
+  { href: "/door", label: "Door", note: "門禁開關" },
   { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
   { href: "/games", label: "Games", note: "小遊戲" },
   { href: "/leave", label: "Leave", note: "請假登記" },
