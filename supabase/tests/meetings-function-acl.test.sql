@@ -18,13 +18,15 @@
 --
 -- Signatures and expected grantees were read from the running local DB
 -- (pg_proc.proacl via aclexplode) rather than assumed from the migrations:
---   meeting_semester_for_date(date)                          -> {postgres,service_role}
 --   meetings_next_free_date(date)                             -> {postgres,service_role}
---   meetings_generate_semester(int, date, int, jsonb)         -> {authenticated,postgres,service_role}
+--   meeting_semester_start(date)                              -> {-,anon,authenticated,postgres,service_role}
+--   meeting_semester_end(date)                                -> {-,anon,authenticated,postgres,service_role}
+--   meetings_mint_week_label(date)                            -> {postgres,service_role}
+--   meetings_generate_semester(date, int, jsonb)              -> {authenticated,postgres,service_role}
 --   meetings_insert_week(uuid)                                -> {authenticated,postgres,service_role}
 --   meetings_remove_week(uuid)                                -> {authenticated,postgres,service_role}
 --   meetings_swap(uuid, uuid)                                 -> {authenticated,postgres,service_role}
---   meetings_append_week(uuid)                                -> {authenticated,postgres,service_role}
+--   meetings_append_week(int, smallint)                       -> {authenticated,postgres,service_role}
 --
 -- `a.grantee` from aclexplode() is an `oid`, not a role name — casting it
 -- straight to text yields the numeric oid. The cast has to go through
@@ -33,7 +35,7 @@
 -- IMPORTANT — grant ordering: the blanket
 --   grant execute on all functions in schema public to authenticated;
 -- does not just get *tested against* here, it actively MUTATES proacl —
--- confirmed live: running it grants meeting_semester_for_date to
+-- confirmed live: running it grants meetings_mint_week_label to
 -- authenticated too, same as any other function. So every assertion below
 -- runs BEFORE that grant, capturing the ACL exactly as the migrations left
 -- it. The grant still runs at the end of this file (matching the suite-wide
@@ -44,25 +46,45 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(7);
+select plan(9);
 
 -- ═══ internal helpers: owner + service_role only, not even authenticated ═══
--- Both are called only from inside another SECURITY DEFINER function (a
--- trigger, or an admin RPC's own body) — never directly by a signed-in user.
-select is(
-  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
-   from aclexplode((select proacl from pg_proc
-                    where oid = 'public.meeting_semester_for_date(date)'::regprocedure)) a),
-  array['postgres', 'service_role'],
-  'meeting_semester_for_date stays callable only by the owner and service_role'
-);
-
+-- Called only from inside another SECURITY DEFINER function (a trigger, or an
+-- admin RPC's own body) — never directly by a signed-in user.
 select is(
   (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
    from aclexplode((select proacl from pg_proc
                     where oid = 'public.meetings_next_free_date(date)'::regprocedure)) a),
   array['postgres', 'service_role'],
   'meetings_next_free_date stays callable only by the owner and service_role'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meetings_mint_week_label(date)'::regprocedure)) a),
+  array['postgres', 'service_role'],
+  'meetings_mint_week_label stays callable only by the owner and service_role'
+);
+
+-- ═══ pure date math: immutable, touches no table, safe for anyone ══════════
+-- Same class as meeting_academic_year — no revoke was written for these, so
+-- they carry the ordinary new-function ACL (owner, service_role, and the
+-- platform's default anon/authenticated grants, plus PUBLIC itself).
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meeting_semester_start(date)'::regprocedure)) a),
+  array['-', 'anon', 'authenticated', 'postgres', 'service_role'],
+  'meeting_semester_start is callable by anyone, same class as meeting_academic_year'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meeting_semester_end(date)'::regprocedure)) a),
+  array['-', 'anon', 'authenticated', 'postgres', 'service_role'],
+  'meeting_semester_end is callable by anyone, same class as meeting_academic_year'
 );
 
 -- ═══ admin RPCs: anon (and public) revoked, authenticated still granted ════
@@ -72,7 +94,7 @@ select is(
 select is(
   (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
    from aclexplode((select proacl from pg_proc
-                    where oid = 'public.meetings_generate_semester(int, date, int, jsonb)'::regprocedure)) a),
+                    where oid = 'public.meetings_generate_semester(date, int, jsonb)'::regprocedure)) a),
   array['authenticated', 'postgres', 'service_role'],
   'meetings_generate_semester is callable by authenticated + service_role, anon is absent'
 );
@@ -104,7 +126,7 @@ select is(
 select is(
   (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
    from aclexplode((select proacl from pg_proc
-                    where oid = 'public.meetings_append_week(uuid)'::regprocedure)) a),
+                    where oid = 'public.meetings_append_week(int, smallint)'::regprocedure)) a),
   array['authenticated', 'postgres', 'service_role'],
   'meetings_append_week is callable by authenticated + service_role, anon is absent'
 );

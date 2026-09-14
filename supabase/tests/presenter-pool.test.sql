@@ -219,20 +219,20 @@ select is(
   'A,B,C,D', 'the roster is back to A,B,C,D before the fill test');
 
 -- ═══ fill ═══════════════════════════════════════════════════════════════════
-insert into public.meetings (year, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
-  (2040, '第1週', '2040-09-06', false, false, NULL, NULL),                                    -- → A
-  (2040, '第2週(月考週)', '2040-09-13', true, false, NULL, NULL),                              -- holiday, skipped
-  (2040, '第3週', '2040-09-20', false, false, NULL, NULL),                                    -- → B
+insert into public.meetings (week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
+  ('第1週', '2040-09-06', false, false, NULL, NULL),                                    -- → A
+  ('第2週(月考週)', '2040-09-13', true, false, NULL, NULL),                              -- holiday, skipped
+  ('第3週', '2040-09-20', false, false, NULL, NULL),                                    -- → B
   -- No presenter name on this one: with a name it would be skipped by the
   -- "already taken" filter even if the is_speaker clause were deleted, so the
   -- test would prove nothing about speaker weeks.
-  (2040, '第4週', '2040-09-27', false, true, NULL, NULL),                                     -- speaker, skipped
-  (2040, '第5週', '2040-10-04', false, false, NULL, NULL),                                    -- → C
-  (2040, '第6週', '2040-10-11', false, false, 'P', 'bbbbbbbb-0000-0000-0000-000000000002'),   -- taken, skipped
-  (2040, '第7週', '2040-10-18', false, false, '客座', NULL),                                   -- free-text, skipped
-  (2040, '第8週', '2040-10-25', false, false, NULL, NULL),                                    -- → D
-  (2040, '第9週', '2040-11-01', false, false, NULL, NULL),                                    -- → A (wraps)
-  (2040, '第0週', '2020-01-01', false, false, NULL, NULL);                                    -- past, skipped
+  ('第4週', '2040-09-27', false, true, NULL, NULL),                                     -- speaker, skipped
+  ('第5週', '2040-10-04', false, false, NULL, NULL),                                    -- → C
+  ('第6週', '2040-10-11', false, false, 'P', 'bbbbbbbb-0000-0000-0000-000000000002'),   -- taken, skipped
+  ('第7週', '2040-10-18', false, false, '客座', NULL),                                   -- free-text, skipped
+  ('第8週', '2040-10-25', false, false, NULL, NULL),                                    -- → D
+  ('第9週', '2040-11-01', false, false, NULL, NULL),                                    -- → A (wraps)
+  ('第0週', '2020-01-01', false, false, NULL, NULL);                                    -- past, skipped
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
@@ -300,12 +300,12 @@ select is((select (ret->>'poolSize')::int from fill_empty), 0, 'an empty roster 
 insert into public.teacher_papers (id, provided_date, paper_name) values
   ('dddddddd-0000-0000-0000-000000000001', '2035-01-01', 'A paper A already gave');
 
-insert into public.meetings (year, week_label, scheduled_date, presenter, presenter_user_id, teacher_paper_id) values
-  (2035, '第1週', '2035-01-01', 'A', 'bbbbbbbb-0000-0000-0000-000000000011',
+insert into public.meetings (week_label, scheduled_date, presenter, presenter_user_id, teacher_paper_id) values
+  ('第1週', '2035-01-01', 'A', 'bbbbbbbb-0000-0000-0000-000000000011',
    'dddddddd-0000-0000-0000-000000000001');
 
-insert into public.meetings (year, week_label, scheduled_date, teacher_paper_id) values
-  (2043, '第1週', '2043-09-07', 'dddddddd-0000-0000-0000-000000000001');
+insert into public.meetings (week_label, scheduled_date, teacher_paper_id) values
+  ('第1週', '2043-09-07', 'dddddddd-0000-0000-0000-000000000001');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}', true);
@@ -404,10 +404,10 @@ insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) 
   ('d0000000-0000-0000-0000-000000000013', 113, 2);
 
 -- 未來日期寫死，避免測試隨時鐘飄移。fill 只碰 scheduled_date >= 今天(台北)。
-insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker)
 values
-  ('d0000000-0000-0000-0000-0000000000a1', 2099, 'T2 第1週', '2099-03-02', false, false),
-  ('d0000000-0000-0000-0000-0000000000a2', 2099, 'T2 第2週', '2099-03-09', false, false);
+  ('d0000000-0000-0000-0000-0000000000a1', 'T2 第1週', '2099-03-02', false, false),
+  ('d0000000-0000-0000-0000-0000000000a2', 'T2 第2週', '2099-03-09', false, false);
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -434,7 +434,7 @@ select is(
   'fill_presenters moves on to the next roster member for the second week'
 );
 
-delete from public.meetings where year = 2099;
+delete from public.meetings where scheduled_date between '2099-01-01' and '2099-12-31';
 delete from public.meeting_presenter_pool
   where user_id in ('d0000000-0000-0000-0000-000000000012',
                     'd0000000-0000-0000-0000-000000000013');
@@ -587,10 +587,10 @@ insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) 
   ('e0000000-0000-0000-0000-000000000005', 120, 4),
   ('e0000000-0000-0000-0000-000000000006', 120, 5);
 
-insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker)
 values
-  ('e0000000-0000-0000-0000-0000000000a1', 2091, 'E 第1週', '2091-03-05', false, false),
-  ('e0000000-0000-0000-0000-0000000000a2', 2091, 'E 第2週', '2091-03-12', false, false);
+  ('e0000000-0000-0000-0000-0000000000a1', 'E 第1週', '2091-03-05', false, false),
+  ('e0000000-0000-0000-0000-0000000000a2', 'E 第2週', '2091-03-12', false, false);
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -630,8 +630,8 @@ select is(
 delete from public.meeting_presenter_pool
   where user_id = 'e0000000-0000-0000-0000-000000000002';
 
-insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
-values ('e0000000-0000-0000-0000-0000000000a3', 2092, 'E 第3週', '2092-03-04', false, false);
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker)
+values ('e0000000-0000-0000-0000-0000000000a3', 'E 第3週', '2092-03-04', false, false);
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -677,10 +677,10 @@ insert into public.meeting_presenter_pool (user_id, admission_year, sort_order) 
   ('e1000000-0000-0000-0000-000000000004', 121, 3);
 
 -- First batch: two weeks exist, so R One and R Two take them.
-insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker)
 values
-  ('e1000000-0000-0000-0000-0000000000b1', 2093, 'R 第1週', '2093-03-02', false, false),
-  ('e1000000-0000-0000-0000-0000000000b2', 2093, 'R 第2週', '2093-03-09', false, false);
+  ('e1000000-0000-0000-0000-0000000000b1', 'R 第1週', '2093-03-02', false, false),
+  ('e1000000-0000-0000-0000-0000000000b2', 'R 第2週', '2093-03-09', false, false);
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -691,10 +691,10 @@ select public.meetings_fill_presenters(2093);
 reset role;
 
 -- Second batch: the rest of the term is generated later and filled again.
-insert into public.meetings (id, year, week_label, scheduled_date, is_holiday, is_speaker)
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker)
 values
-  ('e1000000-0000-0000-0000-0000000000b3', 2093, 'R 第3週', '2093-03-16', false, false),
-  ('e1000000-0000-0000-0000-0000000000b4', 2093, 'R 第4週', '2093-03-23', false, false);
+  ('e1000000-0000-0000-0000-0000000000b3', 'R 第3週', '2093-03-16', false, false),
+  ('e1000000-0000-0000-0000-0000000000b4', 'R 第4週', '2093-03-23', false, false);
 
 set local role authenticated;
 select set_config('request.jwt.claims',

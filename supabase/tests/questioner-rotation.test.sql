@@ -101,14 +101,14 @@ insert into public.user_profiles (id, email, name, roles) values
 update public.user_profiles set lab_status = 'master' where lab_status is null;
 
 -- meetings for each scenario, distinct scheduled_date values throughout.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000003', 2026, '2026-01-06', false, null),                                       -- m2_hist (past)
-  ('10000000-0000-0000-0000-000000000001', 2026, '2026-02-03', false, '00000000-0000-0000-0000-000000000002'),     -- m1
-  ('10000000-0000-0000-0000-000000000002', 2026, '2026-02-10', false, '00000000-0000-0000-0000-000000000003'),     -- m2
-  ('10000000-0000-0000-0000-000000000004', 2026, '2026-02-17', false, '00000000-0000-0000-0000-000000000031'),     -- m4
-  ('10000000-0000-0000-0000-000000000005', 2026, '2026-02-24', false, '00000000-0000-0000-0000-000000000004'),     -- m5
-  ('10000000-0000-0000-0000-000000000006', 2026, '2026-03-03', false, null),                                       -- m6 (unclaimed)
-  ('10000000-0000-0000-0000-000000000007', 2026, '2026-03-10', false, '00000000-0000-0000-0000-000000000007');     -- m7
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000003', '2026-01-06', false, null),                                       -- m2_hist (past)
+  ('10000000-0000-0000-0000-000000000001', '2026-02-03', false, '00000000-0000-0000-0000-000000000002'),     -- m1
+  ('10000000-0000-0000-0000-000000000002', '2026-02-10', false, '00000000-0000-0000-0000-000000000003'),     -- m2
+  ('10000000-0000-0000-0000-000000000004', '2026-02-17', false, '00000000-0000-0000-0000-000000000031'),     -- m4
+  ('10000000-0000-0000-0000-000000000005', '2026-02-24', false, '00000000-0000-0000-0000-000000000004'),     -- m5
+  ('10000000-0000-0000-0000-000000000006', '2026-03-03', false, null),                                       -- m6 (unclaimed)
+  ('10000000-0000-0000-0000-000000000007', '2026-03-10', false, '00000000-0000-0000-0000-000000000007');     -- m7
 
 -- pre-existing meeting_questioners rows that scenarios 2 and 4 depend on.
 insert into public.meeting_questioners (meeting_id, user_id, source) values
@@ -445,9 +445,9 @@ reset role;
 -- ═══ Scenario 9: removing a pool member cleans FUTURE rosters, keeps PAST ═══
 -- The only scenario that depends on future-vs-past, so meeting dates are
 -- relative to current_date (not fixed literals like the others).
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000009', 2026, current_date + 30, false, '00000000-0000-0000-0000-000000000002'), -- mFuture
-  ('10000000-0000-0000-0000-00000000000a', 2026, current_date - 30, false, '00000000-0000-0000-0000-000000000003'); -- mPast
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000009', current_date + 30, false, '00000000-0000-0000-0000-000000000002'), -- mFuture
+  ('10000000-0000-0000-0000-00000000000a', current_date - 30, false, '00000000-0000-0000-0000-000000000003'); -- mPast
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('00000000-0000-0000-0000-000000000091', '2020-09-01 00:00:01+00'),
@@ -528,8 +528,8 @@ delete from public.meeting_question_pool where user_id in (
 -- the presenter pool, is still excluded from their own week.
 -- Reuses user_profiles rows 011/012/013 (freed by Scenario 1's cleanup) and
 -- presenter 002; meeting m10 on a distinct date.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000010', 2026, '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000010', '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
 
 insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
   ('00000000-0000-0000-0000-000000000002', 113, 1, '2020-10-01 00:00:00+00'), -- the presenter, also in the roster
@@ -590,8 +590,8 @@ delete from public.meeting_presenter_pool where user_id in (
 -- Reuses freed user_profiles rows 021/022/023 (freed by Scenario 2's
 -- cleanup) — none are in any pool when this scenario starts. Meeting m11 on
 -- a distinct date; presenter reuses S2 Presenter (003, not in any pool now).
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000011', 2026, '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000011', '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
 
 insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
   ('00000000-0000-0000-0000-000000000021', 113, 1, '2020-11-01 00:00:00+00'); -- presenter-pool-ONLY member (021 is NOT in meeting_question_pool)
@@ -668,8 +668,8 @@ insert into public.user_profiles (id, email, name, roles, lab_status) values
 -- is no missing slot left to trigger a backfill that would silently restore
 -- him, so the loss is real and observable — not masked by the same-call
 -- backfill the way a naive test would be.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000012', 2026, current_date + 31, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter (current_date + 30 is scenario 9's mFuture, above)
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000012', current_date + 31, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter (current_date + 30 is scenario 9's mFuture, above)
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('00000000-0000-0000-0000-000000000101', '2020-12-01 00:00:01+00'),
@@ -814,8 +814,8 @@ select is(
 
 -- Only one candidate is active, so the backfill can fill exactly one of the
 -- three slots. Before 20260831140200 it would have filled all three.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('a0000000-0000-0000-0000-0000000000c1', 2094, '2094-03-03', false, 'a0000000-0000-0000-0000-000000000002');
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('a0000000-0000-0000-0000-0000000000c1', '2094-03-03', false, 'a0000000-0000-0000-0000-000000000002');
 
 select public.meetings_sync_questioners('a0000000-0000-0000-0000-0000000000c1');
 
