@@ -6,7 +6,7 @@
 -- On prod that read as 洪翊婕 已報告 4 次 when two had happened, and five people
 -- showing 1 who had presented none.
 --
--- The same split is applied to the questioner rotation in 20260914100100. Note
+-- The same split is applied to the questioner rotation in 20260914083537. Note
 -- the asymmetry between the two: the questioner ROTATION still orders by a rate
 -- whose numerator includes scheduled assignments, because a picker that ignored
 -- them would re-pick someone already booked solid. The presenter roster has no

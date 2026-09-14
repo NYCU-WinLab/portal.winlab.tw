@@ -24,7 +24,7 @@
 -- It calls the ENGINE, not the admin-checked wrapper. Authorization for a pool
 -- write is RLS's job and has already happened by the time this runs; asking
 -- again here can only produce false negatives, and did — see
--- 20260914100300's header.
+-- 20260914083707's header.
 --
 -- THIS MAKES POOL EDITS REWRITE FUTURE ROSTERS. Adding one member reshuffles
 -- every week after the next one — that is the point, but it means a roster can

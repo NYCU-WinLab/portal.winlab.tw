@@ -49,7 +49,7 @@ select plan(11);
 -- ═══ the rebalance engine: owner ONLY ══════════════════════════════════════
 -- meetings_rebalance_questioners_exec carries NO permission check of its own —
 -- the admin gate lives in the wrapper, and the pool trigger deliberately skips
--- it (20260914100300's header). That makes this revoke the only thing standing
+-- it (20260914083707's header). That makes this revoke the only thing standing
 -- between a signed-in non-admin and a call that rewrites every future
 -- questioner roster. Not even service_role: nothing reaches it except the two
 -- SECURITY DEFINER callers, which run as the owner.

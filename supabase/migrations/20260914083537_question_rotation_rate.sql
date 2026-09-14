@@ -10,7 +10,7 @@
 -- times_asked and last_asked_date keep their names but change MEANING: they
 -- now count only what has already happened, which is what the panels display.
 -- rate is what the picker orders by, and it deliberately includes scheduled
--- assignments (see 20260914100000 for why).
+-- assignments (see 20260914083508 for why).
 create or replace view public.meeting_question_rotation
 with (security_invoker = true) as
 with pool as (
