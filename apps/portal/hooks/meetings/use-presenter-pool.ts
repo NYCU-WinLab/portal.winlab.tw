@@ -52,6 +52,8 @@ export function useUpsertPresenter() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.presenterPool.all })
+      // A new member is an INSERT, which rebalances every future roster.
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       toast.success("已更新報告順位名單")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -73,6 +75,8 @@ export function useRemovePresenter() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.presenterPool.all })
+      // A DELETE rebalances every future roster.
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       toast.success("已移出報告順位名單")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -125,7 +129,7 @@ export function useFillPresenters() {
     onSuccess: ({ filled, poolSize, excluded }) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
       // Assigning a presenter re-syncs that week's questioners server-side.
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       // The roster view derives 已報告次數 and last-presented from `meetings`,
       // so a fill changes it too — without this the admin keeps reading the
       // pre-fill counts they are about to reorder by.

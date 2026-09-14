@@ -39,7 +39,7 @@ export function useRebalanceQuestioners() {
   const apply = useMutation({
     mutationFn: () => run(false),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
       toast.success(

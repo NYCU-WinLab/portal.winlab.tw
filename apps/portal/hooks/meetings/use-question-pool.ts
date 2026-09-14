@@ -83,6 +83,10 @@ export function useAddPoolMember() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
+      // Since 20260914083733 a pool insert rebalances every future roster, so
+      // the schedule on screen is stale too — the same reason
+      // useRemovePoolMember has always done this.
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       toast.success("已加入成員池")
     },
     onError: (e: Error) => toast.error(e.message),
@@ -107,7 +111,7 @@ export function useRemovePoolMember() {
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
       // Upcoming rosters may have changed — refresh questioners too.
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       toast.success("已移出成員池")
     },
     onError: (e: Error) => toast.error(e.message),
