@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { IconPlus, IconTrash } from "@tabler/icons-react"
+import { IconPlus, IconScale, IconTrash } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 
 import { useLabUsers } from "@/hooks/meetings/use-lab-users"
@@ -11,6 +11,7 @@ import {
   useQuestionPoolMembers,
   useRemovePoolMember,
 } from "@/hooks/meetings/use-question-pool"
+import { useRebalanceQuestioners } from "@/hooks/meetings/use-rebalance-questioners"
 
 import { ConfirmDialog } from "./confirm-dialog"
 
@@ -36,7 +37,19 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
   } = useLabUsers()
   const addMember = useAddPoolMember()
   const removeMember = useRemovePoolMember()
+  const { preview, apply } = useRebalanceQuestioners()
   const [adding, setAdding] = useState(false)
+
+  // apply re-runs the RPC rather than committing the previewed plan, so the two
+  // can differ if the pool or the schedule moved in between. Showing what was
+  // actually written — rather than tearing the list down on success — is what
+  // makes that visible instead of silent.
+  const applied = Boolean(apply.data)
+  const shown = apply.data ?? preview.data
+  const dismiss = () => {
+    preview.reset()
+    apply.reset()
+  }
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">載入中…</p>
@@ -65,17 +78,85 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
           額外提問成員（報告人以外）
         </p>
         {isAdmin && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-            onClick={() => setAdding((v) => !v)}
-          >
-            <IconPlus className="h-3 w-3" />
-            新增成員
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={preview.isPending || apply.isPending}
+              className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={() => preview.mutate()}
+            >
+              <IconScale className="h-3 w-3" />
+              重新平衡
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={apply.isPending}
+              className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={() => setAdding((v) => !v)}
+            >
+              <IconPlus className="h-3 w-3" />
+              新增成員
+            </Button>
+          </div>
         )}
       </div>
+
+      {isAdmin && shown && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3">
+          <p className="text-xs text-muted-foreground">
+            {!shown.frozenDate
+              ? "目前沒有可重新平衡的未來週次"
+              : applied
+                ? `已套用：${shown.frozenDate} 當週維持不動，其後 ${shown.weeks} 週共 ${shown.assigned} 個名額已重新分配`
+                : `預覽：${shown.frozenDate} 當週維持不動，其後 ${shown.weeks} 週共 ${shown.assigned} 個名額會重新分配`}
+          </p>
+          {shown.roster.length > 0 && (
+            <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+              {shown.roster.map((w) => (
+                <div
+                  key={w.meetingId}
+                  className="flex items-baseline justify-between gap-3 text-xs"
+                >
+                  <span className="shrink-0 text-muted-foreground">
+                    {new Date(w.date).toLocaleDateString("zh-TW", {
+                      month: "numeric",
+                      day: "numeric",
+                    })}
+                  </span>
+                  <span className="text-right">
+                    {w.questioners.length > 0
+                      ? w.questioners.join("、")
+                      : "（無人可排）"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            {!applied && (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                disabled={apply.isPending || shown.roster.length === 0}
+                onClick={() => apply.mutate()}
+              >
+                {apply.isPending ? "套用中…" : "確認套用"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground"
+              disabled={apply.isPending}
+              onClick={dismiss}
+            >
+              {applied ? "關閉" : "取消"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {isAdmin && adding && (
         <div className="flex flex-wrap gap-1.5 rounded-lg border p-2">
@@ -95,7 +176,7 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                 key={u.id}
                 type="button"
                 disabled={addMember.isPending}
-                onClick={() => addMember.mutate(u.id)}
+                onClick={() => addMember.mutate(u.id, { onSuccess: dismiss })}
                 className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70"
               >
                 {u.name ?? u.id}
@@ -128,6 +209,8 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                 </span>
                 <span className="text-xs text-muted-foreground">
                   已提問 {m.timesAsked} 次
+                  {m.timesAskedScheduled > 0 &&
+                    `・已排定 ${m.timesAskedScheduled} 次`}
                 </span>
                 {isAdmin && (
                   <ConfirmDialog
@@ -143,7 +226,9 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                     title="移出成員池？"
                     description={`將「${m.name ?? "此成員"}」移出提問小組成員池，過去的提問紀錄仍會保留，但之後不會再被排入輪替。`}
                     variant="destructive"
-                    onConfirm={() => removeMember.mutate(m.userId)}
+                    onConfirm={() =>
+                      removeMember.mutate(m.userId, { onSuccess: dismiss })
+                    }
                   />
                 )}
               </div>
@@ -155,7 +240,12 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <p className="text-xs text-muted-foreground">
           ＊每週自動依公平輪替排定 3
-          位提問人；候選人＝報告順位名單＋此處額外成員，當週報告人不會被排入自己那週
+          位提問人；候選人＝報告順位名單＋此處額外成員，當週報告人不會被排入自己那週。
+          排序依「已排次數 ÷
+          加入後的機會數」，所以晚加入的人不會因為來得晚而被當成欠很多次。
+          任一成員池增刪（含報告順位名單）都會自動重新平衡一次；「重新平衡」按鈕是在沒有增刪時手動觸發。
+          重新平衡會重寫往後每一週的名單，已經排到的人可能因此被換掉 ——
+          只有最近一場尚未發生的會議與所有手動指定不會被動到。
         </p>
       )}
     </div>

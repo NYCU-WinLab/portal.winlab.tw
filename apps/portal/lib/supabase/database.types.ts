@@ -2753,6 +2753,7 @@ export type Database = {
           sort_order: number | null
           tier_rank: number | null
           times_presented: number | null
+          times_presented_scheduled: number | null
           user_id: string | null
         }
         Relationships: [
@@ -2771,8 +2772,11 @@ export type Database = {
           is_active: boolean | null
           last_asked_date: string | null
           name: string | null
+          opportunities: number | null
           pool_added_at: string | null
+          rate: number | null
           times_asked: number | null
+          times_asked_scheduled: number | null
           user_id: string | null
         }
         Relationships: [
@@ -2791,8 +2795,23 @@ export type Database = {
           is_active: boolean | null
           last_asked_date: string | null
           name: string | null
+          opportunities: number | null
           pool_added_at: string | null
+          rate: number | null
           times_asked: number | null
+          times_asked_scheduled: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      meeting_questioner_stats: {
+        Row: {
+          last_asked_date: string | null
+          opportunities: number | null
+          pool_added_at: string | null
+          rate: number | null
+          times_asked: number | null
+          times_asked_scheduled: number | null
           user_id: string | null
         }
         Relationships: []
@@ -3117,6 +3136,18 @@ export type Database = {
       meetings_pool_upsert: {
         Args: { p_admission_year: number; p_user: string }
         Returns: undefined
+      }
+      meetings_rebalance_questioners: {
+        Args: { p_dry_run?: boolean }
+        Returns: Json
+      }
+      meetings_rebalance_questioners_exec: {
+        Args: { p_dry_run: boolean }
+        Returns: Json
+      }
+      meetings_recent_copair_count: {
+        Args: { p_meeting_id: string; p_user: string }
+        Returns: number
       }
       meetings_remove_from_pool: {
         Args: { p_user: string }
