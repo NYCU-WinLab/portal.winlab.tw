@@ -2,10 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react"
 
-import { IconDoorEnter } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { getDoorState, openDoor } from "../actions"
@@ -15,6 +13,8 @@ const FLASH_MS = 2000
 
 type Phase = "idle" | "opening" | "opened"
 
+// The whole viewport is the button. Corners from PortalShell sit above it
+// (z-50), so they stay clickable.
 export function DoorPanel({
   configured,
   initialOnline,
@@ -46,57 +46,67 @@ export function DoorPanel({
     return () => clearTimeout(id)
   }, [phase])
 
+  const busy = pending || phase === "opening"
+
   const unlock = () => {
+    if (busy) return
     setPhase("opening")
     startTransition(async () => {
       const result = await openDoor()
       if (result.ok) {
         setOnline(true)
         setPhase("opened")
-        toast.success("Door opened")
       } else {
+        setOnline(false)
         setPhase("idle")
         toast.error(result.error)
       }
     })
   }
 
-  if (!configured) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Door API is not configured. Set DOOR_API_URL and DOOR_API_SECRET.
-      </p>
-    )
-  }
+  const emoji = !configured
+    ? "🔧"
+    : online === false
+      ? "🚫"
+      : phase === "opened"
+        ? "🏃"
+        : phase === "opening"
+          ? "🔓"
+          : "🚪"
 
-  const opened = phase === "opened"
-  const busy = pending || phase === "opening"
+  const label = !configured
+    ? "Door API is not configured"
+    : online === false
+      ? "Door controller unreachable"
+      : phase === "opened"
+        ? "Door opened"
+        : phase === "opening"
+          ? "Opening"
+          : "Open the door"
 
   return (
-    <div className="flex flex-col items-center gap-8 py-10">
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className={cn(
-            "flex size-28 items-center justify-center rounded-full border transition-colors",
-            opened
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : "border-border bg-muted text-muted-foreground"
-          )}
-        >
-          <IconDoorEnter className="size-12" stroke={1.5} />
-        </div>
-        <p className="text-2xl font-medium">
-          {opened ? "Opened" : busy ? "Opening…" : "Ready"}
-        </p>
-        {online === false && (
-          <p className="text-xs text-muted-foreground">
-            Door controller unreachable
-          </p>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={!configured || busy}
+      onClick={unlock}
+      className={cn(
+        "fixed inset-0 z-40 flex items-center justify-center bg-background outline-none select-none",
+        "focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
+        "disabled:cursor-default",
+        configured && !busy && "cursor-pointer"
+      )}
+    >
+      <span
+        className={cn(
+          "text-[8rem] leading-none transition-transform duration-200 sm:text-[12rem]",
+          phase === "opening" && "scale-90",
+          phase === "opened" && "scale-110"
         )}
-      </div>
-      <Button size="lg" className="min-w-40" disabled={busy} onClick={unlock}>
-        Open
-      </Button>
-    </div>
+      >
+        {emoji}
+      </span>
+    </button>
   )
 }

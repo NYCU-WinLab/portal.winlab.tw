@@ -13,13 +13,5 @@ export default async function DoorPage() {
       )
     : null
 
-  return (
-    <div className="flex flex-col gap-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-medium">Door</h1>
-        <p className="text-sm text-muted-foreground">實驗室門禁。</p>
-      </div>
-      <DoorPanel configured={configured} initialOnline={online} />
-    </div>
-  )
+  return <DoorPanel configured={configured} initialOnline={online} />
 }
