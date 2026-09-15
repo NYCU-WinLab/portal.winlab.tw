@@ -36,3 +36,45 @@
 .door-shake {
   animation: door-shake 0.4s ease-in-out;
 }
+
+/* Particle fountain while opening: 🔒 🔓 shoot up from the centre and fall.
+   Horizontal drift and vertical arc run on separate elements so each can
+   keep its own easing; per-particle values come in as custom properties. */
+@keyframes door-particle-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--dx));
+  }
+}
+
+@keyframes door-particle-y {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  35% {
+    transform: translateY(var(--up)) rotate(var(--spin));
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translateY(70vh) rotate(calc(var(--spin) * 2));
+    opacity: 0;
+  }
+}
+
+.door-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  line-height: 1;
+  pointer-events: none;
+  animation: door-particle-x var(--t) linear forwards;
+}
+
+.door-particle > span {
+  display: block;
+  animation: door-particle-y var(--t) ease-out forwards;
+}
