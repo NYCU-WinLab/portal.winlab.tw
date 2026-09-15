@@ -37,21 +37,16 @@ export function LockParticles({ active }: { active: boolean }) {
 
   useEffect(() => {
     if (!active) return
-    const timers = new Set<ReturnType<typeof setTimeout>>()
     const spawner = setInterval(() => {
       const p = makeParticle()
       setParticles((list) => [...list.slice(-(MAX_PARTICLES - 1)), p])
-      const t = setTimeout(() => {
-        timers.delete(t)
+      setTimeout(() => {
         setParticles((list) => list.filter((x) => x.id !== p.id))
       }, p.duration + 50)
-      timers.add(t)
     }, SPAWN_MS)
-    return () => {
-      clearInterval(spawner)
-      // Let in-flight particles land; only their removal timers keep running.
-      timers.forEach((t) => t)
-    }
+    // Only the spawner stops here. Each particle's removal timeout keeps
+    // running so it lands instead of vanishing when spawning stops.
+    return () => clearInterval(spawner)
   }, [active])
 
   return (
