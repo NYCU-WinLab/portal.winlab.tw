@@ -68,32 +68,32 @@ describe("currentAcademicYear", () => {
 describe("semesterWindow", () => {
   it("runs 上學期 from 8/1 to the following 1/31", () => {
     expect(semesterWindow("2026-08-01")).toEqual({
-      start: "2026-08-01",
-      end: "2027-01-31",
+      firstDay: "2026-08-01",
+      lastDay: "2027-01-31",
     })
   })
 
   it("keeps January inside the PREVIOUS year's 上學期", () => {
     expect(semesterWindow("2027-01-04")).toEqual({
-      start: "2026-08-01",
-      end: "2027-01-31",
+      firstDay: "2026-08-01",
+      lastDay: "2027-01-31",
     })
   })
 
   it("opens 下學期 on 2/1 and closes it on 7/31", () => {
     expect(semesterWindow("2027-02-01")).toEqual({
-      start: "2027-02-01",
-      end: "2027-07-31",
+      firstDay: "2027-02-01",
+      lastDay: "2027-07-31",
     })
   })
 
   it("puts 1/31 and 2/1 in different semesters", () => {
-    expect(semesterWindow("2027-01-31").end).toBe("2027-01-31")
-    expect(semesterWindow("2027-02-01").start).toBe("2027-02-01")
+    expect(semesterWindow("2027-01-31").lastDay).toBe("2027-01-31")
+    expect(semesterWindow("2027-02-01").firstDay).toBe("2027-02-01")
   })
 
   it("puts 7/31 and 8/1 in different semesters", () => {
-    expect(semesterWindow("2026-07-31").end).toBe("2026-07-31")
-    expect(semesterWindow("2026-08-01").start).toBe("2026-08-01")
+    expect(semesterWindow("2026-07-31").lastDay).toBe("2026-07-31")
+    expect(semesterWindow("2026-08-01").firstDay).toBe("2026-08-01")
   })
 })

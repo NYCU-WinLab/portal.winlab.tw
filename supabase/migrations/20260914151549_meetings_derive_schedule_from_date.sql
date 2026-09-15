@@ -459,6 +459,18 @@ revoke all on function public.meetings_next_free_date(date) from public, anon, a
 
 -- ── 10. swap：同學期守衛改成比較推導出來的學期 ──────────────────────────────
 -- 只有守衛那幾行變了，其餘整支照抄 20260828120001 的版本。
+--
+-- Rebalance key BEFORE the row locks: PR #1146's fix (20260914170716, still
+-- unreleased as of this migration) moves the rebalance advisory lock ahead of
+-- these two row locks to close a deadlock cycle with
+-- meetings_rebalance_questioners_exec. That migration sorts AFTER this one, so
+-- on a from-scratch replay it would simply overwrite this definition and win
+-- outright — but prod already has 20260914170716 applied and does not yet have
+-- this migration, so prod's apply order is this one first, then
+-- 20260915043315 (the merge fix). Without the lock here, that order would
+-- leave meetings_swap briefly missing it between the two migrations,
+-- reopening the exact deadlock window #1146 closed. Taking it here too makes
+-- both apply orders converge on the same intermediate state.
 create or replace function public.meetings_swap(p_a uuid, p_b uuid)
 returns void
 language plpgsql
@@ -475,6 +487,9 @@ begin
   if p_a = p_b then
     raise exception '不能與自己互換' using errcode = 'P0001';
   end if;
+
+  -- Rebalance key BEFORE the row locks. See 20260914170716's header.
+  perform pg_advisory_xact_lock(hashtext('meetings_rebalance_questioners'));
 
   -- lock both rows in a stable id order to avoid deadlocks under concurrent edits
   perform 1 from public.meetings where id = least(p_a, p_b) for update;

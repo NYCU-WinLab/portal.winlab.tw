@@ -82,7 +82,7 @@ export function GenerateSemesterDialog({ year, open, onOpenChange }: Props) {
     if (!startDate) return used
     const window = semesterWindow(startDate)
     for (const m of existing) {
-      if (m.scheduledDate < window.start || m.scheduledDate > window.end)
+      if (m.scheduledDate < window.firstDay || m.scheduledDate > window.lastDay)
         continue
       // Prefix match, like the RPC's `^第N週` regex: 第2週(月考週) still counts
       // as number 2 being taken.

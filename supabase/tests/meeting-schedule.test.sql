@@ -39,7 +39,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(64);
+select plan(73);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -669,6 +669,127 @@ select is(
      and public.meeting_term(scheduled_date) = 1),
   7,
   'append adds exactly one row and shifts nothing (6 -> 7)');
+
+-- ═══ meetings_next_free_date's 8-candidate walk is bounded, and says so ═════
+-- The walk inside meetings_next_free_date (called by both meetings_insert_week
+-- and meetings_append_week) tries at most 8 same-weekday candidates before
+-- giving up — that loop (`for i in 1 .. 8 loop`) is untouched by this
+-- migration. Only its two callers were rewritten to drop semester/year
+-- scoping. This block restores the regression coverage a prior fix for this
+-- bug class relied on, so a future rewrite of either caller cannot silently
+-- reintroduce an unbounded (or off-by-one) walk.
+--
+-- 上學期 148 (2059-08-01..2060-01-31): one seeded row sits on the window's own
+-- last day, so its next 8 weekly candidates (2060-02-07..2060-03-27) all fall
+-- PAST 1/31 -- outside the window append_week was asked to extend. That is
+-- deliberate: append_week's OWN v_new_date > v_to guard (a separate assertion,
+-- meetings-cross-year-shuffle.test.sql GROUP 4/5) would otherwise fire first
+-- and mask the exhaustion raise being tested here. Exhaustion happens INSIDE
+-- meetings_next_free_date, before append_week ever gets a value back to check
+-- against v_to, so this stays a clean test of the walk's own bound.
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('66666666-0000-0000-0000-000000000001', '第1週', '2060-01-31', false, 'PA', 'aaaaaaaa-0000-0000-0000-000000000021'),
+  ('66666666-0000-0000-0000-000000000011', '卡位1', '2060-02-07', true, null, null),
+  ('66666666-0000-0000-0000-000000000012', '卡位2', '2060-02-14', true, null, null),
+  ('66666666-0000-0000-0000-000000000013', '卡位3', '2060-02-21', true, null, null),
+  ('66666666-0000-0000-0000-000000000014', '卡位4', '2060-02-28', true, null, null),
+  ('66666666-0000-0000-0000-000000000015', '卡位5', '2060-03-06', true, null, null),
+  ('66666666-0000-0000-0000-000000000016', '卡位6', '2060-03-13', true, null, null),
+  ('66666666-0000-0000-0000-000000000017', '卡位7', '2060-03-20', true, null, null),
+  ('66666666-0000-0000-0000-000000000018', '卡位8', '2060-03-27', true, null, null);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+-- The full message, because naming the blocking dates IS the fix: without
+-- them the admin has no way to learn what is in the way.
+select throws_ok(
+  $$ select public.meetings_append_week(148, 1::smallint) $$,
+  'P0001',
+  '找不到可用的日期：2060-02-07 起連續 8 個同一星期幾的日期都已排定（2060-02-07、2060-02-14、2060-02-21、2060-02-28、2060-03-06、2060-03-13、2060-03-20、2060-03-27），請確認是否有連續的假期週或演講週擋住',
+  'append_week refuses when the next eight weekly candidates are all occupied, and names every blocked date');
+reset role;
+
+select is(
+  (select count(*)::int from public.meetings
+   where public.meeting_academic_year(scheduled_date) = 148
+     and public.meeting_term(scheduled_date) = 1),
+  1,
+  'the refused append_week call minted nothing (上學期 148 still holds only its one seeded row)');
+
+-- meetings_insert_week hits the identical bounded walk on its own trailing
+-- mint (its moving-set / shift logic was rewritten independently of
+-- append_week's, so this is not redundant with the coverage above). Unlike
+-- append_week, insert_week has no semester-window guard to collide with, so
+-- this fixture also carries the inclusive-8th-candidate proof: free the 8th
+-- blocker and the identical call must succeed, landing exactly on it.
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('66666666-0000-0000-0000-000000000021', '第1週', '2060-05-01', false, 'PB', 'aaaaaaaa-0000-0000-0000-000000000022'),
+  ('66666666-0000-0000-0000-000000000031', '卡位1', '2060-05-08', true, null, null),
+  ('66666666-0000-0000-0000-000000000032', '卡位2', '2060-05-15', true, null, null),
+  ('66666666-0000-0000-0000-000000000033', '卡位3', '2060-05-22', true, null, null),
+  ('66666666-0000-0000-0000-000000000034', '卡位4', '2060-05-29', true, null, null),
+  ('66666666-0000-0000-0000-000000000035', '卡位5', '2060-06-05', true, null, null),
+  ('66666666-0000-0000-0000-000000000036', '卡位6', '2060-06-12', true, null, null),
+  ('66666666-0000-0000-0000-000000000037', '卡位7', '2060-06-19', true, null, null),
+  ('66666666-0000-0000-0000-000000000038', '卡位8', '2060-06-26', true, null, null);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_insert_week('66666666-0000-0000-0000-000000000021') $$,
+  'P0001',
+  '找不到可用的日期：2060-05-08 起連續 8 個同一星期幾的日期都已排定（2060-05-08、2060-05-15、2060-05-22、2060-05-29、2060-06-05、2060-06-12、2060-06-19、2060-06-26），請確認是否有連續的假期週或演講週擋住',
+  'meetings_insert_week hits the same bounded walk on its own trailing mint and aborts its shuffle');
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '66666666-0000-0000-0000-000000000021'),
+  '2060-05-01'::date,
+  'the refused insert_week call mutated nothing — the target row never moved');
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2060-05-01'),
+  1,
+  'the refused insert_week call did not insert a blank row either — nothing was written at all');
+
+-- The bound is EIGHT, not seven: free the 8th candidate and the identical
+-- call now succeeds. insert_week moves the target itself to the freed slot
+-- and backfills a blank row at the vacated original date.
+delete from public.meetings where id = '66666666-0000-0000-0000-000000000038';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_insert_week('66666666-0000-0000-0000-000000000021');
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = '66666666-0000-0000-0000-000000000021'),
+  '2060-06-26'::date,
+  'seven blocked candidates are walked past and the eighth (now free) is taken — the bound is inclusive');
+select is(
+  (select presenter from public.meetings where scheduled_date = '2060-05-01'),
+  null,
+  'the vacated original date is backfilled with a genuinely blank row, not left empty');
+
+-- ═══ one meeting per calendar date is still a hard DB constraint (#1103) ═══
+-- Orphaned by the meeting_semesters.test.sql deletion: that file's subject was
+-- the semesters table, but this assertion of meetings_scheduled_date_uniq
+-- (20260828160000) was riding along in it for unrelated reasons and was lost
+-- with the rest of the file. The index is untouched by this migration and
+-- still live — restoring the coverage here. See that migration's comment for
+-- why this is a POLICY choice, not a physical law.
+insert into public.meetings (week_label, scheduled_date, is_holiday)
+values ('卡位', '2060-08-01', false);
+
+select throws_ok(
+  $$ insert into public.meetings (week_label, scheduled_date, is_holiday)
+     values ('卡位2', '2060-08-01', false) $$,
+  '23505', null,
+  'a second meeting on an already-occupied scheduled_date is rejected (meetings_scheduled_date_uniq)');
+
+select is(
+  (select count(*)::int from public.meetings where scheduled_date = '2060-08-01'),
+  1,
+  'the rejected duplicate-date insert did not silently create a second row');
 
 select * from finish();
 rollback;

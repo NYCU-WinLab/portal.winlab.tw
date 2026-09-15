@@ -39,18 +39,24 @@ export function semesterKeyForDate(dateStr: string): SemesterKey {
  * 界線寫死：上學期 8/1 – 隔年 1/31，下學期 2/1 – 7/31。和
  * `semesterKeyForDate` 一樣用切字串而不是 `new Date()`：後者把裸日期讀成
  * UTC 午夜，在 UTC 以西會退一天，而一天的位移就足以在 8/1 或 2/1 翻學期。
+ *
+ * 欄位刻意不叫 `start`/`end`：那組名字在別處常常預設 exclusive end，換成
+ * `firstDay`/`lastDay`把「兩端皆含」這件事直接寫進型別，讓呼叫端用
+ * `<=`/`>=` 而不是誤用 `<` 漏掉 1/31 或 7/31。
  */
 export function semesterWindow(dateStr: string): {
-  start: string
-  end: string
+  firstDay: string
+  lastDay: string
 } {
   const [y, m] = dateStr.split("-")
   const year = Number(y)
   const month = Number(m)
 
-  if (month >= 8) return { start: `${year}-08-01`, end: `${year + 1}-01-31` }
-  if (month === 1) return { start: `${year - 1}-08-01`, end: `${year}-01-31` }
-  return { start: `${year}-02-01`, end: `${year}-07-31` }
+  if (month >= 8)
+    return { firstDay: `${year}-08-01`, lastDay: `${year + 1}-01-31` }
+  if (month === 1)
+    return { firstDay: `${year - 1}-08-01`, lastDay: `${year}-01-31` }
+  return { firstDay: `${year}-02-01`, lastDay: `${year}-07-31` }
 }
 
 /**

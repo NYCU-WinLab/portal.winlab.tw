@@ -15,10 +15,15 @@
 -- request.jwt.claims (what is_meetings_admin() reads), assert as superuser
 -- (reset role) for direct-table verification.
 --
--- ── CALENDAR YEARS 2061-2065 ONLY ────────────────────────────────────────────
--- Verified unused by all 23 existing suites (which occupy 2020, 2026-27,
--- 2030-33, 2035-43, 2046-53, 2091-99). This file shares one database with all
--- of them; a year collision would silently corrupt another file's fixture.
+-- ── CALENDAR YEARS 2061-2066 ONLY ────────────────────────────────────────────
+-- Checked at the time of writing by grepping every other suite for `20\d\d-`
+-- date literals: the other 23 files' fixture years range from 2018 through
+-- 2099 but cluster in a handful of bands nowhere near this one (2020s, 2030s,
+-- low-2040s to low-2050s, low-2090s). This file shares one database with all
+-- of them; a year collision would silently corrupt another file's fixture. The
+-- exact occupied set will drift as suites are added or edited — re-grep
+-- before reusing years anywhere near this range rather than trusting this
+-- note to still be exhaustive.
 --
 -- ── FIXTURE ORDERING IS LOAD-BEARING (same rule as meeting-schedule.test.sql) ─
 -- meetings_insert_week/meetings_append_week shift or scan every PRESENTATION
@@ -87,12 +92,21 @@
 -- before inserting anything, so a call bound to 上學期 that would land past
 -- 1/31 raises P0001 instead of minting a 下學期 label (第1週) under a 上學期
 -- call -- the wrong-semester row this group used to lock in.
+--
+-- ── GROUP 5 (academic year 154, 下學期): the same guard's ALLOWED boundary ──
+-- GROUP 4 only proves the `v_new_date > v_to` raise fires. It says nothing
+-- about `>=` vs `>` at the guard itself -- a mutant that tightened the raise
+-- to `>=` would block a perfectly legal append landing exactly on the
+-- semester's own last day and still pass every other assertion in this file.
+-- 下學期 154 (2066-02-01..2066-07-31) holds one row one week short of the
+-- window's last day, so the mint's own +7 lands EXACTLY on v_to (2066-07-31)
+-- with nothing in the way: append_week must succeed, not raise.
 
 begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(11);
+select plan(12);
 
 -- ── actors ───────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -250,6 +264,21 @@ select throws_ok(
   'P0001', NULL,
   'append_week raises instead of landing the new week past 1/31 in the next semester');
 reset role;
+
+-- ── GROUP 5 fixture: a mint landing EXACTLY on v_to must succeed ───────────
+insert into public.meetings (id, week_label, scheduled_date, is_holiday, presenter, presenter_user_id) values
+  ('b1b10000-0000-0000-0000-000000000041', '第15週', '2066-07-24', false, null, null); -- 下學期 154, one week short of 7/31
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"a1a10000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temp table g5_appended as
+  select public.meetings_append_week(154, 2::smallint) as id;
+reset role;
+
+select is(
+  (select scheduled_date from public.meetings where id = (select id from g5_appended)),
+  '2066-07-31'::date,
+  'a mint landing exactly on the semester''s last day (v_to) succeeds -- the guard is `>`, not `>=`');
 
 select * from finish();
 rollback;

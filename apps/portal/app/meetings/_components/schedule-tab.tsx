@@ -99,7 +99,7 @@ function spanDate(dateStr: string): string {
  */
 function groupHeading(group: SemesterGroup): string {
   const window = semesterWindow(group.rows[0]!.scheduledDate)
-  const span = `${spanDate(window.start)} – ${spanDate(window.end)}`
+  const span = `${spanDate(window.firstDay)} – ${spanDate(window.lastDay)}`
   const label = semesterLabel({
     academicYear: group.academicYear,
     term: group.term,
