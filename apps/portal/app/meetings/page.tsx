@@ -34,11 +34,14 @@ export default function MeetingsPage() {
   const searchParams = useSearchParams()
   const { isAdmin } = useMeetingsAdmin()
 
-  // meetings.year is a schedule bucket, not the calendar year of the dates in
-  // it, so both the default and the forward limit come from the data. While the
-  // bounds load, the empty-table fallbacks stand in and resolve to the calendar
-  // year — the same answer as before, on every day but new year's.
-  const { data: bounds = { upcoming: null, latest: null } } = useScheduleYears()
+  // Defaulting the tab to `new Date().getFullYear()` would open an empty year
+  // right at the calendar boundary — the next meeting can sit in the other
+  // year from today's date (see schedule-year.ts) — so both the default and
+  // the forward limit come from the data instead. While the bounds load, the
+  // empty-table fallbacks stand in and resolve to the calendar year — the
+  // same answer as before, on every day but new year's.
+  const { data: bounds = { upcomingDate: null, latestDate: null } } =
+    useScheduleYears()
   const year =
     Number(searchParams.get("year")) ||
     defaultScheduleYear(bounds, CALENDAR_YEAR)

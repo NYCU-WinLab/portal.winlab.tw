@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
-import { currentAcademicYear, semesterKeyForDate } from "./semester"
+import {
+  currentAcademicYear,
+  semesterKeyForDate,
+  semesterWindow,
+} from "./semester"
 
 // Every case here is checked against the SQL these functions mirror
 // (public.meeting_academic_year / public.meeting_term). The boundaries are the
@@ -52,21 +56,44 @@ describe("semesterKeyForDate", () => {
 })
 
 describe("currentAcademicYear", () => {
-  const semesters = [
-    { academicYear: 113, startDate: "2024-09-01" },
-    { academicYear: 114, startDate: "2025-09-01" },
-    { academicYear: 115, startDate: "2026-09-01" },
-  ]
-
-  it("picks the latest semester that has already started", () => {
-    expect(currentAcademicYear(semesters, "2026-01-15")).toBe(114)
+  it("returns the academic year today's date falls in", () => {
+    expect(currentAcademicYear("2026-01-15")).toBe(114)
   })
 
-  it("falls back to the newest semester when none has started yet", () => {
-    expect(currentAcademicYear(semesters, "2020-01-01")).toBe(115)
+  it("crosses into the next academic year on 1 August", () => {
+    expect(currentAcademicYear("2026-08-01")).toBe(115)
+  })
+})
+
+describe("semesterWindow", () => {
+  it("runs 上學期 from 8/1 to the following 1/31", () => {
+    expect(semesterWindow("2026-08-01")).toEqual({
+      firstDay: "2026-08-01",
+      lastDay: "2027-01-31",
+    })
   })
 
-  it("returns null for an empty semester list", () => {
-    expect(currentAcademicYear([], "2026-01-15")).toBeNull()
+  it("keeps January inside the PREVIOUS year's 上學期", () => {
+    expect(semesterWindow("2027-01-04")).toEqual({
+      firstDay: "2026-08-01",
+      lastDay: "2027-01-31",
+    })
+  })
+
+  it("opens 下學期 on 2/1 and closes it on 7/31", () => {
+    expect(semesterWindow("2027-02-01")).toEqual({
+      firstDay: "2027-02-01",
+      lastDay: "2027-07-31",
+    })
+  })
+
+  it("puts 1/31 and 2/1 in different semesters", () => {
+    expect(semesterWindow("2027-01-31").lastDay).toBe("2027-01-31")
+    expect(semesterWindow("2027-02-01").firstDay).toBe("2027-02-01")
+  })
+
+  it("puts 7/31 and 8/1 in different semesters", () => {
+    expect(semesterWindow("2026-07-31").lastDay).toBe("2026-07-31")
+    expect(semesterWindow("2026-08-01").firstDay).toBe("2026-08-01")
   })
 })

@@ -16,7 +16,7 @@ interface RawQuestionerRow {
   source: "auto" | "manual"
   assigned_at: string
   user_profiles: { name: string | null } | null
-  meetings: { year: number } | null
+  meetings: { scheduled_date: string } | null
 }
 
 export function useQuestionersByYear(year: number) {
@@ -28,9 +28,10 @@ export function useQuestionersByYear(year: number) {
       const { data, error } = await supabase
         .from(TABLE)
         .select(
-          "meeting_id, user_id, source, assigned_at, user_profiles(name), meetings!inner(year)"
+          "meeting_id, user_id, source, assigned_at, user_profiles(name), meetings!inner(scheduled_date)"
         )
-        .eq("meetings.year", year)
+        .gte("meetings.scheduled_date", `${year}-01-01`)
+        .lte("meetings.scheduled_date", `${year}-12-31`)
         .order("assigned_at", { ascending: true })
       if (error) throw new Error(error.message || "讀取提問人失敗")
 

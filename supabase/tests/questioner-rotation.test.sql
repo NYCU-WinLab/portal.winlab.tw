@@ -101,14 +101,14 @@ insert into public.user_profiles (id, email, name, roles) values
 update public.user_profiles set lab_status = 'master' where lab_status is null;
 
 -- meetings for each scenario, distinct scheduled_date values throughout.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000003', 2026, '2026-01-06', false, null),                                       -- m2_hist (past)
-  ('10000000-0000-0000-0000-000000000001', 2026, '2026-02-03', false, '00000000-0000-0000-0000-000000000002'),     -- m1
-  ('10000000-0000-0000-0000-000000000002', 2026, '2026-02-10', false, '00000000-0000-0000-0000-000000000003'),     -- m2
-  ('10000000-0000-0000-0000-000000000004', 2026, '2026-02-17', false, '00000000-0000-0000-0000-000000000031'),     -- m4
-  ('10000000-0000-0000-0000-000000000005', 2026, '2026-02-24', false, '00000000-0000-0000-0000-000000000004'),     -- m5
-  ('10000000-0000-0000-0000-000000000006', 2026, current_date + 20, false, null),                                  -- m6 (unclaimed) — relative, not a literal: scenario 6 claims it as an ordinary member, and a member can no longer cause a PAST week to be staffed (20260914092541). current_date + 30/31 belong to scenarios 9/10.
-  ('10000000-0000-0000-0000-000000000007', 2026, '2026-03-10', false, '00000000-0000-0000-0000-000000000007');     -- m7
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000003', '2026-01-06', false, null),                                       -- m2_hist (past)
+  ('10000000-0000-0000-0000-000000000001', '2026-02-03', false, '00000000-0000-0000-0000-000000000002'),     -- m1
+  ('10000000-0000-0000-0000-000000000002', '2026-02-10', false, '00000000-0000-0000-0000-000000000003'),     -- m2
+  ('10000000-0000-0000-0000-000000000004', '2026-02-17', false, '00000000-0000-0000-0000-000000000031'),     -- m4
+  ('10000000-0000-0000-0000-000000000005', '2026-02-24', false, '00000000-0000-0000-0000-000000000004'),     -- m5
+  ('10000000-0000-0000-0000-000000000006', current_date + 20, false, null),                                  -- m6 (unclaimed) — relative, not a literal: scenario 6 claims it as an ordinary member, and a member can no longer cause a PAST week to be staffed (20260914092541). current_date + 30/31 belong to scenarios 9/10.
+  ('10000000-0000-0000-0000-000000000007', '2026-03-10', false, '00000000-0000-0000-0000-000000000007');     -- m7
 
 -- pre-existing meeting_questioners rows that scenarios 2 and 4 depend on.
 insert into public.meeting_questioners (meeting_id, user_id, source) values
@@ -452,9 +452,9 @@ reset role;
 -- ═══ Scenario 9: removing a pool member cleans FUTURE rosters, keeps PAST ═══
 -- The only scenario that depends on future-vs-past, so meeting dates are
 -- relative to current_date (not fixed literals like the others).
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000009', 2026, current_date + 30, false, '00000000-0000-0000-0000-000000000002'), -- mFuture
-  ('10000000-0000-0000-0000-00000000000a', 2026, current_date - 30, false, '00000000-0000-0000-0000-000000000003'); -- mPast
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000009', current_date + 30, false, '00000000-0000-0000-0000-000000000002'), -- mFuture
+  ('10000000-0000-0000-0000-00000000000a', current_date - 30, false, '00000000-0000-0000-0000-000000000003'); -- mPast
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('00000000-0000-0000-0000-000000000091', '2020-09-01 00:00:01+00'),
@@ -535,8 +535,8 @@ delete from public.meeting_question_pool where user_id in (
 -- the presenter pool, is still excluded from their own week.
 -- Reuses user_profiles rows 011/012/013 (freed by Scenario 1's cleanup) and
 -- presenter 002; meeting m10 on a distinct date.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000010', 2026, '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000010', '2026-05-05', false, '00000000-0000-0000-0000-000000000002'); -- m10, presenter = S1 Presenter
 
 insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
   ('00000000-0000-0000-0000-000000000002', 113, 1, '2020-10-01 00:00:00+00'), -- the presenter, also in the roster
@@ -597,8 +597,8 @@ delete from public.meeting_presenter_pool where user_id in (
 -- Reuses freed user_profiles rows 021/022/023 (freed by Scenario 2's
 -- cleanup) — none are in any pool when this scenario starts. Meeting m11 on
 -- a distinct date; presenter reuses S2 Presenter (003, not in any pool now).
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000011', 2026, '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000011', '2026-06-02', false, '00000000-0000-0000-0000-000000000003'); -- m11
 
 insert into public.meeting_presenter_pool (user_id, admission_year, sort_order, created_at) values
   ('00000000-0000-0000-0000-000000000021', 113, 1, '2020-11-01 00:00:00+00'); -- presenter-pool-ONLY member (021 is NOT in meeting_question_pool)
@@ -675,8 +675,8 @@ insert into public.user_profiles (id, email, name, roles, lab_status) values
 -- is no missing slot left to trigger a backfill that would silently restore
 -- him, so the loss is real and observable — not masked by the same-call
 -- backfill the way a naive test would be.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('10000000-0000-0000-0000-000000000012', 2026, current_date + 31, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter (current_date + 30 is scenario 9's mFuture, above)
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('10000000-0000-0000-0000-000000000012', current_date + 31, false, '00000000-0000-0000-0000-000000000004'); -- m12, presenter reuses S5 Presenter (current_date + 30 is scenario 9's mFuture, above)
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('00000000-0000-0000-0000-000000000101', '2020-12-01 00:00:01+00'),
@@ -837,8 +837,8 @@ select is(
 
 -- Only one candidate is active, so the backfill can fill exactly one of the
 -- three slots. Before 20260831140200 it would have filled all three.
-insert into public.meetings (id, year, scheduled_date, is_holiday, presenter_user_id) values
-  ('a0000000-0000-0000-0000-0000000000c1', 2094, '2094-03-03', false, 'a0000000-0000-0000-0000-000000000002');
+insert into public.meetings (id, scheduled_date, is_holiday, presenter_user_id) values
+  ('a0000000-0000-0000-0000-0000000000c1', '2094-03-03', false, 'a0000000-0000-0000-0000-000000000002');
 
 select public.meetings_sync_questioners('a0000000-0000-0000-0000-0000000000c1');
 
@@ -986,13 +986,13 @@ on conflict (id) do update
 -- B3's presenter is R6, which is what makes R6's denominator differ from
 -- everyone else's.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f0000000-0000-0000-0000-0000000000a0', 2020, 'F 過去',   '2020-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b0', 2099, 'F 凍結週', '2099-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b1', 2099, 'F 第1週',  '2099-03-09', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b2', 2099, 'F 第2週',  '2099-03-16', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b3', 2099, 'F 第3週',  '2099-03-23', false, false, 'f0000000-0000-0000-0000-000000000006');
+  ('f0000000-0000-0000-0000-0000000000a0', 'F 過去',   '2020-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b0', 'F 凍結週', '2099-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b1', 'F 第1週',  '2099-03-09', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b2', 'F 第2週',  '2099-03-16', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b3', 'F 第3週',  '2099-03-23', false, false, 'f0000000-0000-0000-0000-000000000006');
 
 -- History: R1/R2/R3 questioned the 2020 week. Far enough back that it feeds
 -- times_asked without reaching the 56-day co-pairing window of anything below.
@@ -1196,11 +1196,11 @@ select ok(
 -- C1 is seven days before C2; C3 is over four months before it. R1 sits on C2,
 -- so a candidate is scored on whether they recently sat WITH R1.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f0000000-0000-0000-0000-0000000000c3', 2098, 'CP 很久以前', '2098-01-05', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000c1', 2098, 'CP 上週',     '2098-05-04', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000c2', 2098, 'CP 本週',     '2098-05-11', false, false, 'f0000000-0000-0000-0000-000000000090');
+  ('f0000000-0000-0000-0000-0000000000c3', 'CP 很久以前', '2098-01-05', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c1', 'CP 上週',     '2098-05-04', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c2', 'CP 本週',     '2098-05-11', false, false, 'f0000000-0000-0000-0000-000000000090');
 
 insert into public.meeting_questioners (meeting_id, user_id, source) values
   ('f0000000-0000-0000-0000-0000000000c1', 'f0000000-0000-0000-0000-000000000001', 'manual'),
@@ -1269,12 +1269,12 @@ on conflict (id) do update
 -- GS is the nearest upcoming meeting but is a SPEAKER week, so it has no
 -- presenter and no roster. GF is the first week that actually has one.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f3000000-0000-0000-0000-0000000000a1', 2097, 'G 演講週', '2097-03-01', false, true,  null),
-  ('f3000000-0000-0000-0000-0000000000b0', 2097, 'G 最近一場', '2097-03-08', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
-  ('f3000000-0000-0000-0000-0000000000b1', 2097, 'G 第1週', '2097-03-15', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
-  ('f3000000-0000-0000-0000-0000000000b2', 2097, 'G 第2週', '2097-03-22', false, false, 'f2000000-0000-0000-0000-0000000000f0');
+  ('f3000000-0000-0000-0000-0000000000a1', 'G 演講週', '2097-03-01', false, true,  null),
+  ('f3000000-0000-0000-0000-0000000000b0', 'G 最近一場', '2097-03-08', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
+  ('f3000000-0000-0000-0000-0000000000b1', 'G 第1週', '2097-03-15', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
+  ('f3000000-0000-0000-0000-0000000000b2', 'G 第2週', '2097-03-22', false, false, 'f2000000-0000-0000-0000-0000000000f0');
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('f2000000-0000-0000-0000-00000000000a', '2019-01-01 00:00:01+00'),
@@ -1430,13 +1430,13 @@ on conflict (id) do update
 --      `at time zone 'Asia/Taipei'`.
 -- HM2  the Taipei date itself. `<=` admits it, so HC becomes eligible.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f5000000-0000-0000-0000-0000000000a0', 2018, 'H 制度上路前',   '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a3', 2098, 'H 只有兩人入池', '2098-01-02', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a1', 2098, 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a4', 2098, 'H 時區邊界前一天', '2098-05-31', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a2', 2098, 'H HC 入池當天',  '2098-06-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
+  ('f5000000-0000-0000-0000-0000000000a0', 'H 制度上路前',   '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a3', 'H 只有兩人入池', '2098-01-02', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a1', 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a4', 'H 時區邊界前一天', '2098-05-31', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a2', 'H HC 入池當天',  '2098-06-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('f4000000-0000-0000-0000-00000000000a', '2098-01-01 00:00:01+00'),

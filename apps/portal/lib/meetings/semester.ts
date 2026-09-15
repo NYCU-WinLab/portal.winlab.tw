@@ -1,16 +1,13 @@
-// Which semester a date falls in — the client-side mirror of the SQL pair
-// public.meeting_academic_year / public.meeting_term
-// (supabase/migrations/20260828120000_meeting-semesters.sql).
+// 哪個日期屬於哪個學期 —— SQL 端 public.meeting_academic_year /
+// public.meeting_term / public.meeting_semester_start / meeting_semester_end
+// 的鏡像（supabase/migrations/20260914151549_meetings_derive_schedule_from_date.sql）。
 //
-// KEEP THE TWO IN SYNC. The database is the authority: it stamps semester_id at
-// generation and inherits it on insert, and this function is never allowed to
-// decide what a stored row belongs to. It exists for one job — telling the
-// generate dialog which semester a not-yet-generated start date WILL open, so
-// the preview can show the same skips the RPC will apply.
+// KEEP THE TWO IN SYNC。界線是寫死的規則，不是存起來的資料：學期不再是一張
+// 表，`meetings` 也不再有 semester_id，所以兩邊都只是同一條規則的實作，沒有
+// 一邊是「權威」。改動任何一邊都必須同時改另一邊，並更新兩邊的邊界測試。
 //
-// ROC academic year with an AUGUST boundary: teaching starts in September, so
-// August onward belongs to the year just beginning, and January — the tail of
-// 上學期 — still belongs to the year before.
+// ROC 學年度，8 月為界：教學從 9 月開始，所以 8 月起屬於正要開始的那個學年度，
+// 而 1 月——上學期的尾巴——仍屬於前一年。
 
 export interface SemesterKey {
   /** ROC academic year, e.g. 114. */
@@ -36,26 +33,42 @@ export function semesterKeyForDate(dateStr: string): SemesterKey {
 }
 
 /**
- * Which academic year the presenter roster's tier grade labels (`碩二`, …)
- * should be computed against — "current" meaning the latest semester that
- * has already started, not the latest by start_date. Those diverge the
- * moment next year's semester row exists (an admin routinely creates it
- * months ahead): `semesters.at(-1)` would then report next year's
- * academicYear while the lab is still living in the current one.
+ * 該日期所屬學期的日期窗，**兩端皆含**。SQL 端
+ * `meeting_semester_start` / `meeting_semester_end` 的鏡像——兩邊必須同步。
  *
- * `today` must be a `YYYY-MM-DD` string already resolved to the lab's
- * timezone (Asia/Taipei) — this function does no clock reads of its own, so
- * it stays pure and the caller controls when "now" is sampled.
+ * 界線寫死：上學期 8/1 – 隔年 1/31，下學期 2/1 – 7/31。和
+ * `semesterKeyForDate` 一樣用切字串而不是 `new Date()`：後者把裸日期讀成
+ * UTC 午夜，在 UTC 以西會退一天，而一天的位移就足以在 8/1 或 2/1 翻學期。
  *
- * Falls back to the newest semester when none has started yet, so a
- * database seeded with future-only semesters still labels something.
- * `semesters` is assumed sorted ascending by startDate, same as
- * useSemesters()'s query order.
+ * 欄位刻意不叫 `start`/`end`：那組名字在別處常常預設 exclusive end，換成
+ * `firstDay`/`lastDay`把「兩端皆含」這件事直接寫進型別，讓呼叫端用
+ * `<=`/`>=` 而不是誤用 `<` 漏掉 1/31 或 7/31。
  */
-export function currentAcademicYear(
-  semesters: { academicYear: number; startDate: string }[],
-  today: string
-): number | null {
-  const started = semesters.filter((s) => s.startDate <= today)
-  return (started.at(-1) ?? semesters.at(-1))?.academicYear ?? null
+export function semesterWindow(dateStr: string): {
+  firstDay: string
+  lastDay: string
+} {
+  const [y, m] = dateStr.split("-")
+  const year = Number(y)
+  const month = Number(m)
+
+  if (month >= 8)
+    return { firstDay: `${year}-08-01`, lastDay: `${year + 1}-01-31` }
+  if (month === 1)
+    return { firstDay: `${year - 1}-08-01`, lastDay: `${year}-01-31` }
+  return { firstDay: `${year}-02-01`, lastDay: `${year}-07-31` }
+}
+
+/**
+ * 報告順位名單的年級標籤（`碩二`…）該用哪個學年度計算——就是今天所在的學年度。
+ *
+ * 以前這個函式要吃一份 semesters 清單，因為學期是資料表，而
+ * `semesters.at(-1)` 會在管理員提前幾個月建好下學期時回報未來的學年度。
+ * 學期改成從日期推導之後，這個歧義消失了：今天在哪個學年度就是哪個。
+ *
+ * `today` 必須是已經換算到 Asia/Taipei 的 `YYYY-MM-DD` 字串——這個函式不自己
+ * 讀時鐘，好讓它保持純函式，由呼叫端決定何時取樣「現在」。
+ */
+export function currentAcademicYear(today: string): number {
+  return semesterKeyForDate(today).academicYear
 }

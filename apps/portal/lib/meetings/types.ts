@@ -1,9 +1,8 @@
 import { parseLabStatus, type LabStatus } from "@/lib/meetings/lab-status"
+import type { SemesterKey } from "@/lib/meetings/semester"
 
 export interface Meeting {
   id: string
-  year: number
-  semesterId: string
   weekLabel: string | null
   scheduledDate: string
   isHoliday: boolean
@@ -79,30 +78,8 @@ export interface MeetingQuestioner {
   source: "auto" | "manual"
 }
 
-/**
- * The unit `第N週` numbering restarts on.
- *
- * N is the Nth **calendar** week of the semester, not the Nth week the lab
- * actually met: a holiday week occupies its number (the generate RPC writes
- * `第N週(原因)`), and it keeps that number even if an admin later rewrites the
- * label by hand (`大掃除`). Numbers are therefore only ever minted forward, as
- * `max(第N) + 1` over the whole semester — nothing renumbers a semester
- * automatically, on the client or in a migration. A positional re-derivation
- * from "the weeks that look like `第N週`" would pull every week after a
- * hand-relabelled holiday down by one.
- */
-export interface Semester {
-  id: string
-  academicYear: number
-  term: 1 | 2
-  startDate: string
-  plannedWeeks: number | null
-}
-
 export interface DbMeeting {
   id: string
-  year: number
-  semester_id: string
   week_label: string | null
   scheduled_date: string
   is_holiday: boolean
@@ -121,14 +98,6 @@ export interface DbMeeting {
   location: string
   start_time: string
   created_at: string
-}
-
-export interface DbSemester {
-  id: string
-  academic_year: number
-  term: number
-  start_date: string
-  planned_weeks: number | null
 }
 
 export interface DbTeacherPaper {
@@ -194,8 +163,6 @@ export function toPresenterPoolMember(
 export function toMeeting(row: DbMeeting): Meeting {
   return {
     id: row.id,
-    year: row.year,
-    semesterId: row.semester_id,
     weekLabel: row.week_label,
     scheduledDate: row.scheduled_date,
     isHoliday: row.is_holiday,
@@ -217,23 +184,12 @@ export function toMeeting(row: DbMeeting): Meeting {
   }
 }
 
-export function toSemester(row: DbSemester): Semester {
-  return {
-    id: row.id,
-    academicYear: row.academic_year,
-    term: row.term === 1 ? 1 : 2,
-    startDate: row.start_date,
-    plannedWeeks: row.planned_weeks,
-  }
-}
-
 /**
- * Derived from academicYear/term only — start_date and planned_weeks are
- * informational metadata and must never drive display text (a
- * trigger-created semester's start_date is incidental, not authoritative).
+ * 從學年度與學期推導，這是它現在僅有的兩個輸入。學期不再是一列資料，所以
+ * 也不再有 start_date / planned_weeks 這種會誤導顯示文字的欄位。
  */
-export function semesterLabel(s: Semester): string {
-  return `${s.academicYear} ${s.term === 1 ? "上" : "下"}學期`
+export function semesterLabel(key: SemesterKey): string {
+  return `${key.academicYear} ${key.term === 1 ? "上" : "下"}學期`
 }
 
 export function toTag(row: DbTag): Tag {

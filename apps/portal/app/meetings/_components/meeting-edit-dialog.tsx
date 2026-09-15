@@ -132,6 +132,11 @@ export function MeetingEditDialog({
   open,
   onOpenChange,
 }: Props) {
+  // Nextcloud 的資料夾是跟著日期走的，所以年份也從日期取。以前這裡讀
+  // meeting.year，而那個欄位在列被搬過年底時不會更新——於是掃描會去找錯的
+  // 資料夾，那場的錄影永遠連不上。
+  const folderYear = meeting.scheduledDate.slice(0, 4)
+
   const { data: users = [] } = useLabUsers()
   const { data: papers = [] } = useTeacherPapers()
   const { data: assignments = [] } = usePaperAssignments()
@@ -215,7 +220,7 @@ export function MeetingEditDialog({
   function checkVideo() {
     setVideoChecking(true)
     fetch(
-      `/api/meetings/check-video?year=${meeting.year}&date=${encodeURIComponent(meeting.scheduledDate)}`
+      `/api/meetings/check-video?year=${folderYear}&date=${encodeURIComponent(meeting.scheduledDate)}`
     )
       .then((r) => r.json())
       .then(({ videoLink: found }: { videoLink: string | null }) => {
@@ -254,7 +259,7 @@ export function MeetingEditDialog({
     try {
       const fd = new FormData()
       fd.append("file", file)
-      fd.append("year", String(meeting.year))
+      fd.append("year", folderYear)
       fd.append("type", fileType)
       if (fileType === "ppt") {
         fd.append("paperTitle", uploadTitle)
@@ -406,7 +411,10 @@ export function MeetingEditDialog({
                 </div>
               </div>
               {(isPresentation || isThesis) && (
-                <QuestionersField meetingId={meeting.id} year={meeting.year} />
+                <QuestionersField
+                  meetingId={meeting.id}
+                  year={Number(folderYear)}
+                />
               )}
             </>
           )}
