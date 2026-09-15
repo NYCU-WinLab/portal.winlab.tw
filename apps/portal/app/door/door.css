@@ -1,0 +1,61 @@
+/* Motion for /door. Kept local to the route instead of the shared globals. */
+
+@keyframes door-wiggle {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+/* Runner enters from the right, hops twice, exits left. */
+@keyframes door-run {
+  0% {
+    transform: translateX(70vw) translateY(0);
+  }
+  25% {
+    transform: translateX(35vw) translateY(-8%);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(-35vw) translateY(-8%);
+  }
+  100% {
+    transform: translateX(-80vw) translateY(0);
+  }
+}
+
+@keyframes door-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-10px);
+  }
+  40% {
+    transform: translateX(10px);
+  }
+  60% {
+    transform: translateX(-7px);
+  }
+  80% {
+    transform: translateX(7px);
+  }
+}
+
+.door-wiggle {
+  animation: door-wiggle 0.3s ease-in-out infinite;
+}
+
+.door-run {
+  animation: door-run 2s linear forwards;
+}
+
+.door-shake {
+  animation: door-shake 0.4s ease-in-out;
+}
