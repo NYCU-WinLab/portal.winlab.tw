@@ -46,7 +46,46 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(9);
+select plan(13);
+
+-- ═══ the rebalance engine: owner ONLY ══════════════════════════════════════
+-- meetings_rebalance_questioners_exec carries NO permission check of its own —
+-- the admin gate lives in the wrapper, and the pool trigger deliberately skips
+-- it (20260914083707's header). That makes this revoke the only thing standing
+-- between a signed-in non-admin and a call that rewrites every future
+-- questioner roster. Not even service_role: nothing reaches it except the two
+-- SECURITY DEFINER callers, which run as the owner.
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meetings_rebalance_questioners_exec(boolean)'::regprocedure)) a),
+  array['postgres'],
+  'the rebalance engine is callable by nobody but its owner'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meetings_pool_changed()'::regprocedure)) a),
+  array['postgres'],
+  'the pool trigger function is not part of the callable surface'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meetings_rebalance_questioners(boolean)'::regprocedure)) a),
+  array['authenticated', 'postgres', 'service_role'],
+  'the admin-checked rebalance wrapper is the only rebalance entry point users hold'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from aclexplode((select proacl from pg_proc
+                    where oid = 'public.meetings_recent_copair_count(uuid, uuid)'::regprocedure)) a),
+  array['authenticated', 'postgres', 'service_role'],
+  'the co-pairing tie-break helper is readable by signed-in users, not anon'
+);
 
 -- ═══ internal helpers: owner + service_role only, not even authenticated ═══
 -- Called only from inside another SECURITY DEFINER function (a trigger, or an

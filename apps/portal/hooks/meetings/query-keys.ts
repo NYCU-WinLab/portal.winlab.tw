@@ -30,6 +30,7 @@ export const queryKeys = {
     all: ["meetings", "lab-status-health"] as const,
   },
   questioners: {
+    all: ["meetings", "questioners"] as const,
     byYear: (year: number) => ["meetings", "questioners", year] as const,
   },
 }

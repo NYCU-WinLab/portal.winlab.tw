@@ -452,6 +452,8 @@ export function PresenterPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                       <div className="flex items-center gap-1">
                         <span className="mr-2 text-xs text-muted-foreground">
                           已報告 {m.timesPresented} 次
+                          {m.timesPresentedScheduled > 0 &&
+                            `・已排定 ${m.timesPresentedScheduled} 次`}
                         </span>
                         {isAdmin && (
                           <>

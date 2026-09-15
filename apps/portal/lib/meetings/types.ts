@@ -45,8 +45,16 @@ export interface QuestionPoolMember {
   name: string | null
   email: string | null
   poolAddedAt: string
+  /** 只算已發生的場次；已排定但尚未到的在 timesAskedScheduled。 */
   lastAskedDate: string | null
   timesAsked: number
+  timesAskedScheduled: number
+  opportunities: number
+  /**
+   * (已提問 + 已排定) / 加入後的機會數。輪替就是照這個值由小到大挑人，
+   * 所以面板的排序必須跟它一致，否則畫面上的「下一位」會跟實際排出來的人不同。
+   */
+  rate: number
 }
 
 export interface PresenterPoolMember {
@@ -60,6 +68,7 @@ export interface PresenterPoolMember {
   timesPresented: number
   labStatus: LabStatus | null
   tierRank: number
+  timesPresentedScheduled: number
 }
 
 export interface MeetingQuestioner {
@@ -114,6 +123,9 @@ export interface DbQuestionPoolMember {
   pool_added_at: string
   last_asked_date: string | null
   times_asked: number
+  times_asked_scheduled: number
+  opportunities: number
+  rate: number
 }
 
 export interface DbPresenterPoolMember {
@@ -127,6 +139,7 @@ export interface DbPresenterPoolMember {
   times_presented: number
   lab_status: string | null
   tier_rank: number
+  times_presented_scheduled: number
 }
 
 export function toPresenterPoolMember(
@@ -143,6 +156,7 @@ export function toPresenterPoolMember(
     timesPresented: row.times_presented,
     labStatus: parseLabStatus(row.lab_status),
     tierRank: row.tier_rank,
+    timesPresentedScheduled: row.times_presented_scheduled,
   }
 }
 
@@ -212,5 +226,23 @@ export function toQuestionPoolMember(
     poolAddedAt: row.pool_added_at,
     lastAskedDate: row.last_asked_date,
     timesAsked: row.times_asked,
+    timesAskedScheduled: row.times_asked_scheduled,
+    opportunities: row.opportunities,
+    rate: row.rate,
   }
+}
+
+export interface RebalanceWeek {
+  meetingId: string
+  date: string
+  questioners: string[]
+}
+
+export interface RebalanceResult {
+  dryRun: boolean
+  /** 被保留不動的那一場（最近一次尚未發生的會議）。沒有未來會議時為 null。 */
+  frozenDate: string | null
+  weeks: number
+  assigned: number
+  roster: RebalanceWeek[]
 }

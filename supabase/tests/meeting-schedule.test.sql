@@ -112,6 +112,16 @@ select public.meetings_sync_questioners('cccccccc-0000-0000-0000-000000000001');
 select public.meetings_sync_questioners('cccccccc-0000-0000-0000-000000000002');
 
 -- MX questioners incl. P4 (manual) so the swap-in presenter collides -> eviction
+--
+-- Cleared first: since 20260914083733 an insert into either pool table
+-- rebalances every future week, so the rows seeded at line 77 already gave MX
+-- and I3 an automatic roster. These scenarios need a SPECIFIC roster, not
+-- whatever the rotation picked, so the generated one is discarded rather than
+-- appended to.
+delete from public.meeting_questioners
+where meeting_id in ('cccccccc-0000-0000-0000-000000000005',
+                     'dddddddd-0000-0000-0000-000000000004');
+
 insert into public.meeting_questioners (meeting_id, user_id, source) values
   ('cccccccc-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000005', 'manual'), -- P4 (will become presenter after swap)
   ('cccccccc-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000011', 'auto'),

@@ -17,7 +17,7 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(58);
+select plan(60);
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -720,6 +720,44 @@ select is(
 
 delete from public.meetings where id::text like 'e1000000-0000-0000-0000-0000000000b%';
 delete from public.meeting_presenter_pool where admission_year = 121;
+
+-- ═══ 已報告 vs 已排定 ══════════════════════════════════════════════════════
+-- times_presented used to count future rows too, so the panel claimed people
+-- had given talks that are still on the calendar. The split is the fix; this
+-- pins both halves.
+insert into auth.users (id) values ('f1000000-0000-0000-0000-000000000051')
+on conflict (id) do nothing;
+insert into public.user_profiles (id, email, name, lab_status) values
+  ('f1000000-0000-0000-0000-000000000051', 'p51@test.local', 'P51', 'master')
+on conflict (id) do update
+  set name = excluded.name, lab_status = excluded.lab_status;
+
+insert into public.meeting_presenter_pool (user_id, admission_year, sort_order)
+  values ('f1000000-0000-0000-0000-000000000051', 199, 1);
+
+insert into public.meetings
+  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+values
+  ('f1000000-0000-0000-0000-0000000000f1', 2026, 'P 過去', '2026-04-06', false, false, 'f1000000-0000-0000-0000-000000000051'),
+  ('f1000000-0000-0000-0000-0000000000f2', 2099, 'P 未來', '2099-09-07', false, false, 'f1000000-0000-0000-0000-000000000051');
+
+select is(
+  (select times_presented from public.meeting_presenter_roster
+   where user_id = 'f1000000-0000-0000-0000-000000000051'),
+  1::bigint,
+  'times_presented counts only presentations that have happened'
+);
+
+select is(
+  (select times_presented_scheduled from public.meeting_presenter_roster
+   where user_id = 'f1000000-0000-0000-0000-000000000051'),
+  1,
+  'a scheduled presentation is reported separately, not as one already given'
+);
+
+delete from public.meetings where id::text like 'f1000000-0000-0000-0000-0000000000f%';
+delete from public.meeting_presenter_pool
+  where user_id = 'f1000000-0000-0000-0000-000000000051';
 
 select * from finish();
 rollback;
