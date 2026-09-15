@@ -10,25 +10,6 @@
   }
 }
 
-/* Runner enters from the right, hops twice, exits left. */
-@keyframes door-run {
-  0% {
-    transform: translateX(70vw) translateY(0);
-  }
-  25% {
-    transform: translateX(35vw) translateY(-8%);
-  }
-  50% {
-    transform: translateX(0) translateY(0);
-  }
-  75% {
-    transform: translateX(-35vw) translateY(-8%);
-  }
-  100% {
-    transform: translateX(-80vw) translateY(0);
-  }
-}
-
 @keyframes door-shake {
   0%,
   100% {
@@ -49,11 +30,7 @@
 }
 
 .door-wiggle {
-  animation: door-wiggle 0.3s ease-in-out infinite;
-}
-
-.door-run {
-  animation: door-run 2s linear forwards;
+  animation: door-wiggle 0.4s ease-in-out infinite;
 }
 
 .door-shake {

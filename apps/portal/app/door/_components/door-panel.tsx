@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import { useEffect, useState, useTransition } from "react"
 
 import { toast } from "sonner"
@@ -11,24 +10,18 @@ import { getDoorState, openDoor } from "../actions"
 import { playUnlockSound } from "./unlock-sound"
 
 const POLL_MS = 5000
-const RUN_MS = 2000
-const OPENING_FRAME_MS = 150
+const OPENED_MS = 2000
+const FRAME_MS = 200
+
+// Frame sequences the panel cycles through while in a phase.
+const OPENING_FRAMES = ["🔒", "🔓"]
+const OPENED_FRAMES = ["🏃", "💨"]
 
 type Phase = "idle" | "opening" | "opened"
-type Glyph = "door" | "lock" | "unlock" | "runner" | "blocked" | "wrench"
-
-const GLYPHS: Glyph[] = [
-  "door",
-  "lock",
-  "unlock",
-  "runner",
-  "blocked",
-  "wrench",
-]
 
 // The whole viewport is the button. Corners from PortalShell sit above it
-// (z-50), so they stay clickable. Emoji are vendored Noto SVGs (public/door)
-// so they stay crisp at any size, unlike the system emoji font's bitmaps.
+// (z-50), so they stay clickable. Native emoji on purpose; the large size is
+// capped at 10rem (160 px) so Apple's bitmap emoji renders 1:1 and stays sharp.
 export function DoorPanel({
   configured,
   initialOnline,
@@ -59,14 +52,14 @@ export function DoorPanel({
   }, [configured])
 
   useEffect(() => {
-    if (phase !== "opening") return
-    const id = setInterval(() => setFrame((f) => f + 1), OPENING_FRAME_MS)
+    if (phase === "idle") return
+    const id = setInterval(() => setFrame((f) => f + 1), FRAME_MS)
     return () => clearInterval(id)
   }, [phase])
 
   useEffect(() => {
     if (phase !== "opened") return
-    const id = setTimeout(() => setPhase("idle"), RUN_MS)
+    const id = setTimeout(() => setPhase("idle"), OPENED_MS)
     return () => clearTimeout(id)
   }, [phase])
 
@@ -75,11 +68,13 @@ export function DoorPanel({
   const unlock = () => {
     if (busy) return
     playUnlockSound()
+    setFrame(0)
     setPhase("opening")
     startTransition(async () => {
       const result = await openDoor()
       if (result.ok) {
         setOnline(true)
+        setFrame(0)
         setPhase("opened")
       } else {
         setOnline(false)
@@ -90,17 +85,15 @@ export function DoorPanel({
     })
   }
 
-  const glyph: Glyph = !configured
-    ? "wrench"
+  const emoji = !configured
+    ? "🔧"
     : online === false
-      ? "blocked"
+      ? "🚫"
       : phase === "opened"
-        ? "runner"
+        ? OPENED_FRAMES[frame % OPENED_FRAMES.length]
         : phase === "opening"
-          ? frame % 2 === 0
-            ? "lock"
-            : "unlock"
-          : "door"
+          ? OPENING_FRAMES[frame % OPENING_FRAMES.length]
+          : "🚪"
 
   const label = !configured
     ? "Door API is not configured"
@@ -111,6 +104,8 @@ export function DoorPanel({
         : phase === "opening"
           ? "Opening"
           : "Open the door"
+
+  const offline = configured && online === false
 
   return (
     <button
@@ -127,29 +122,14 @@ export function DoorPanel({
       )}
     >
       <span
-        key={glyph === "blocked" ? shake : glyph === "runner" ? phase : 0}
+        key={offline ? shake : 0}
         className={cn(
-          "relative size-40 sm:size-64",
-          glyph === "lock" || glyph === "unlock" ? "door-wiggle" : null,
-          glyph === "runner" && "door-run",
-          glyph === "blocked" && shake > 0 && "door-shake"
+          "text-[8rem] leading-none sm:text-[10rem]",
+          !offline && phase !== "idle" && "door-wiggle",
+          offline && shake > 0 && "door-shake"
         )}
       >
-        {GLYPHS.map((g) => (
-          <Image
-            key={g}
-            src={`/door/${g}.svg`}
-            alt=""
-            fill
-            unoptimized
-            priority={g === "door"}
-            draggable={false}
-            className={cn(
-              "object-contain",
-              g === glyph ? "opacity-100" : "opacity-0"
-            )}
-          />
-        ))}
+        {emoji}
       </span>
     </button>
   )
