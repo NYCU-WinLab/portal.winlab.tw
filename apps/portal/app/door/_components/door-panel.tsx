@@ -13,7 +13,7 @@ const POLL_MS = 5000
 const OPENED_MS = 2000
 const FRAME_MS = 500
 
-// Frames cycled while opening; opened is a single glyph with the wiggle.
+// Frames cycled while opening; opened is a single still glyph.
 const OPENING_FRAMES = ["🔒", "🔓"]
 
 type Phase = "idle" | "opening" | "opened"
@@ -123,7 +123,7 @@ export function DoorPanel({
         key={offline ? shake : 0}
         className={cn(
           "text-[8rem] leading-none sm:text-[10rem]",
-          !offline && phase !== "idle" && "door-wiggle",
+          !offline && phase === "opening" && "door-wiggle",
           offline && shake > 0 && "door-shake"
         )}
       >
