@@ -2,24 +2,28 @@
 
 import { useEffect, useState, useTransition } from "react"
 
-import { IconDoor, IconDoorOff } from "@tabler/icons-react"
+import { IconDoorEnter } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { closeDoor, getDoorState, openDoor } from "../actions"
+import { getDoorState, openDoor } from "../actions"
 
-const POLL_MS = 3000
+const POLL_MS = 5000
+const FLASH_MS = 2000
+
+type Phase = "idle" | "opening" | "opened"
 
 export function DoorPanel({
   configured,
-  initialOpen,
+  initialOnline,
 }: {
   configured: boolean
-  initialOpen: boolean | null
+  initialOnline: boolean | null
 }) {
-  const [open, setOpen] = useState<boolean | null>(initialOpen)
+  const [online, setOnline] = useState<boolean | null>(initialOnline)
+  const [phase, setPhase] = useState<Phase>("idle")
   const [pending, startTransition] = useTransition()
 
   useEffect(() => {
@@ -27,8 +31,7 @@ export function DoorPanel({
     let cancelled = false
     const tick = async () => {
       const result = await getDoorState()
-      if (cancelled) return
-      setOpen(result.ok ? result.state.open : null)
+      if (!cancelled) setOnline(result.ok)
     }
     const id = setInterval(tick, POLL_MS)
     return () => {
@@ -37,16 +40,26 @@ export function DoorPanel({
     }
   }, [configured])
 
-  const run = (action: typeof openDoor, label: string) =>
+  useEffect(() => {
+    if (phase !== "opened") return
+    const id = setTimeout(() => setPhase("idle"), FLASH_MS)
+    return () => clearTimeout(id)
+  }, [phase])
+
+  const unlock = () => {
+    setPhase("opening")
     startTransition(async () => {
-      const result = await action()
+      const result = await openDoor()
       if (result.ok) {
-        setOpen(result.state.open)
-        toast.success(label)
+        setOnline(true)
+        setPhase("opened")
+        toast.success("Door opened")
       } else {
+        setPhase("idle")
         toast.error(result.error)
       }
     })
+  }
 
   if (!configured) {
     return (
@@ -56,7 +69,8 @@ export function DoorPanel({
     )
   }
 
-  const unknown = open === null
+  const opened = phase === "opened"
+  const busy = pending || phase === "opening"
 
   return (
     <div className="flex flex-col items-center gap-8 py-10">
@@ -64,42 +78,25 @@ export function DoorPanel({
         <div
           className={cn(
             "flex size-28 items-center justify-center rounded-full border transition-colors",
-            unknown && "border-border bg-muted text-muted-foreground",
-            open === true &&
-              "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-            open === false && "border-border bg-background text-foreground"
+            opened
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "border-border bg-muted text-muted-foreground"
           )}
         >
-          {open ? (
-            <IconDoor className="size-12" stroke={1.5} />
-          ) : (
-            <IconDoorOff className="size-12" stroke={1.5} />
-          )}
+          <IconDoorEnter className="size-12" stroke={1.5} />
         </div>
-        <p className="text-2xl font-medium tabular-nums">
-          {unknown ? "Unknown" : open ? "Open" : "Closed"}
+        <p className="text-2xl font-medium">
+          {opened ? "Opened" : busy ? "Opening…" : "Ready"}
         </p>
         <p className="text-xs text-muted-foreground">
-          {unknown ? "Door API unreachable" : "目前狀態"}
+          {online === false
+            ? "Door controller unreachable"
+            : "按一下觸發一次開門，門禁那邊決定開多久"}
         </p>
       </div>
-      <div className="flex gap-3">
-        <Button
-          size="lg"
-          disabled={pending || open === true}
-          onClick={() => run(openDoor, "Door opened")}
-        >
-          Open
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          disabled={pending || open === false}
-          onClick={() => run(closeDoor, "Door closed")}
-        >
-          Close
-        </Button>
-      </div>
+      <Button size="lg" className="min-w-40" disabled={busy} onClick={unlock}>
+        Open
+      </Button>
     </div>
   )
 }

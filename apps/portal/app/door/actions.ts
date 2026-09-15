@@ -7,7 +7,7 @@
 import {
   doorConfigured,
   fetchDoorState,
-  setDoorOpen,
+  pulseDoor,
   type DoorState,
 } from "@/lib/door/client"
 import { getCurrentUser } from "@/lib/user"
@@ -35,10 +35,8 @@ export async function getDoorState(): Promise<DoorResult> {
   return guarded(fetchDoorState)
 }
 
+// One-shot unlock: a short relay pulse. The access controller decides how long
+// the door actually stays unlocked.
 export async function openDoor(): Promise<DoorResult> {
-  return guarded(() => setDoorOpen(true))
-}
-
-export async function closeDoor(): Promise<DoorResult> {
-  return guarded(() => setDoorOpen(false))
+  return guarded(() => pulseDoor())
 }
