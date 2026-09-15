@@ -1,4 +1,4 @@
--- Regression suite for the three bugs 20260914151549 fixed by deriving both
+-- Regression suite for the three bugs 20260915080357 fixed by deriving both
 -- the calendar year and the academic semester from meetings.scheduled_date
 -- instead of trusting meetings.year / meetings.semester_id (now gone):
 --

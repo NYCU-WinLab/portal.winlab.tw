@@ -1,7 +1,7 @@
 -- Merge fix: two independent changes landed on meetings_swap in the same
 -- release and this is their merge, not a third opinion.
 --
--- This branch (20260914151549) dropped meetings.semester_id and rewrote the
+-- This branch (20260915080357) dropped meetings.semester_id and rewrote the
 -- swap's same-semester guard to compare derived semester windows instead.
 -- Concurrently on main, PR #1146 followed by its review-fixes migration
 -- (20260914170716) moved the rebalance advisory lock to before the two row
@@ -11,7 +11,7 @@
 -- that no longer exists.
 --
 -- Redeclared whole, combining both: the lock-order fix from 20260914170716
--- kept verbatim, and the semester guard from 20260914151549 kept verbatim.
+-- kept verbatim, and the semester guard from 20260915080357 kept verbatim.
 create or replace function public.meetings_swap(p_a uuid, p_b uuid)
 returns void
 language plpgsql

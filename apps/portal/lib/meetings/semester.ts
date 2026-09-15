@@ -1,6 +1,6 @@
 // 哪個日期屬於哪個學期 —— SQL 端 public.meeting_academic_year /
 // public.meeting_term / public.meeting_semester_start / meeting_semester_end
-// 的鏡像（supabase/migrations/20260914151549_meetings_derive_schedule_from_date.sql）。
+// 的鏡像（supabase/migrations/20260915080357_meetings_derive_schedule_from_date.sql）。
 //
 // KEEP THE TWO IN SYNC。界線是寫死的規則，不是存起來的資料：學期不再是一張
 // 表，`meetings` 也不再有 semester_id，所以兩邊都只是同一條規則的實作，沒有
