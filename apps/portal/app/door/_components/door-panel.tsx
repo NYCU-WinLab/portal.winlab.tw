@@ -11,11 +11,10 @@ import { playUnlockSound } from "./unlock-sound"
 
 const POLL_MS = 5000
 const OPENED_MS = 2000
-const FRAME_MS = 200
+const FRAME_MS = 500
 
-// Frame sequences the panel cycles through while in a phase.
+// Frames cycled while opening; opened is a single glyph with the wiggle.
 const OPENING_FRAMES = ["🔒", "🔓"]
-const OPENED_FRAMES = ["🏃", "💨"]
 
 type Phase = "idle" | "opening" | "opened"
 
@@ -52,7 +51,7 @@ export function DoorPanel({
   }, [configured])
 
   useEffect(() => {
-    if (phase === "idle") return
+    if (phase !== "opening") return
     const id = setInterval(() => setFrame((f) => f + 1), FRAME_MS)
     return () => clearInterval(id)
   }, [phase])
@@ -74,7 +73,6 @@ export function DoorPanel({
       const result = await openDoor()
       if (result.ok) {
         setOnline(true)
-        setFrame(0)
         setPhase("opened")
       } else {
         setOnline(false)
@@ -90,7 +88,7 @@ export function DoorPanel({
     : online === false
       ? "🚫"
       : phase === "opened"
-        ? OPENED_FRAMES[frame % OPENED_FRAMES.length]
+        ? "🏃"
         : phase === "opening"
           ? OPENING_FRAMES[frame % OPENING_FRAMES.length]
           : "🚪"
