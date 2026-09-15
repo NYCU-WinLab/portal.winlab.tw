@@ -7,14 +7,21 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { getDoorState, openDoor } from "../actions"
+import { LockParticles } from "./lock-particles"
+import { playUnlockSound } from "./unlock-sound"
 
 const POLL_MS = 5000
-const FLASH_MS = 2000
+const OPENED_MS = 2000
+const FRAME_MS = 500
+
+// Frames cycled while opening; opened is a single still glyph.
+const OPENING_FRAMES = ["🔒", "🔓"]
 
 type Phase = "idle" | "opening" | "opened"
 
 // The whole viewport is the button. Corners from PortalShell sit above it
-// (z-50), so they stay clickable.
+// (z-50), so they stay clickable. Native emoji on purpose; the large size is
+// capped at 10rem (160 px) so Apple's bitmap emoji renders 1:1 and stays sharp.
 export function DoorPanel({
   configured,
   initialOnline,
@@ -24,6 +31,8 @@ export function DoorPanel({
 }) {
   const [online, setOnline] = useState<boolean | null>(initialOnline)
   const [phase, setPhase] = useState<Phase>("idle")
+  const [frame, setFrame] = useState(0)
+  const [shake, setShake] = useState(0)
   const [pending, startTransition] = useTransition()
 
   useEffect(() => {
@@ -31,7 +40,9 @@ export function DoorPanel({
     let cancelled = false
     const tick = async () => {
       const result = await getDoorState()
-      if (!cancelled) setOnline(result.ok)
+      if (cancelled) return
+      setOnline(result.ok)
+      if (!result.ok) setShake((n) => n + 1)
     }
     const id = setInterval(tick, POLL_MS)
     return () => {
@@ -41,8 +52,14 @@ export function DoorPanel({
   }, [configured])
 
   useEffect(() => {
+    if (phase !== "opening") return
+    const id = setInterval(() => setFrame((f) => f + 1), FRAME_MS)
+    return () => clearInterval(id)
+  }, [phase])
+
+  useEffect(() => {
     if (phase !== "opened") return
-    const id = setTimeout(() => setPhase("idle"), FLASH_MS)
+    const id = setTimeout(() => setPhase("idle"), OPENED_MS)
     return () => clearTimeout(id)
   }, [phase])
 
@@ -50,6 +67,8 @@ export function DoorPanel({
 
   const unlock = () => {
     if (busy) return
+    playUnlockSound()
+    setFrame(0)
     setPhase("opening")
     startTransition(async () => {
       const result = await openDoor()
@@ -58,6 +77,7 @@ export function DoorPanel({
         setPhase("opened")
       } else {
         setOnline(false)
+        setShake((n) => n + 1)
         setPhase("idle")
         toast.error(result.error)
       }
@@ -71,7 +91,7 @@ export function DoorPanel({
       : phase === "opened"
         ? "🏃"
         : phase === "opening"
-          ? "🔓"
+          ? OPENING_FRAMES[frame % OPENING_FRAMES.length]
           : "🚪"
 
   const label = !configured
@@ -84,6 +104,8 @@ export function DoorPanel({
           ? "Opening"
           : "Open the door"
 
+  const offline = configured && online === false
+
   return (
     <button
       type="button"
@@ -92,17 +114,19 @@ export function DoorPanel({
       disabled={!configured || busy}
       onClick={unlock}
       className={cn(
-        "fixed inset-0 z-40 flex items-center justify-center bg-background outline-none select-none",
+        "fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-background outline-none select-none",
         "focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
         "disabled:cursor-default",
         configured && !busy && "cursor-pointer"
       )}
     >
+      <LockParticles active={phase === "opening"} />
       <span
+        key={offline ? shake : 0}
         className={cn(
-          "text-[8rem] leading-none transition-transform duration-200 sm:text-[12rem]",
-          phase === "opening" && "scale-90",
-          phase === "opened" && "scale-110"
+          "relative text-[8rem] leading-none sm:text-[10rem]",
+          !offline && phase === "opening" && "door-wiggle",
+          offline && shake > 0 && "door-shake"
         )}
       >
         {emoji}

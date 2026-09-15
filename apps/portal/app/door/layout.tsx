@@ -4,6 +4,8 @@ import { Toaster } from "@workspace/ui/components/sonner"
 
 import { PortalShell } from "@/components/portal-shell"
 
+import "./door.css"
+
 export const metadata: Metadata = {
   title: "Door | Portal",
   description: "實驗室門禁開關。",
