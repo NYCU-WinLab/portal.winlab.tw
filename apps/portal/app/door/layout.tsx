@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { Toaster } from "@workspace/ui/components/sonner"
 
@@ -17,15 +16,7 @@ export default function DoorLayout({
 }) {
   return (
     <>
-      <PortalShell
-        appName="Door"
-        appHref="/door"
-        bottomLeft={
-          <Link href="/" className="transition-colors hover:text-foreground">
-            Portal
-          </Link>
-        }
-      >
+      <PortalShell appName="Door" appHref="/" containerClassName="p-0">
         {children}
       </PortalShell>
       <Toaster />
