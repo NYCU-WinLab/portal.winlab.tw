@@ -467,7 +467,7 @@ revoke all on function public.meetings_next_free_date(date) from public, anon, a
 -- on a from-scratch replay it would simply overwrite this definition and win
 -- outright — but prod already has 20260914170716 applied and does not yet have
 -- this migration, so prod's apply order is this one first, then
--- 20260915043315 (the merge fix). Without the lock here, that order would
+-- 20260915080421 (the merge fix). Without the lock here, that order would
 -- leave meetings_swap briefly missing it between the two migrations,
 -- reopening the exact deadlock window #1146 closed. Taking it here too makes
 -- both apply orders converge on the same intermediate state.
