@@ -88,11 +88,11 @@ export function DoorPanel({
         <p className="text-2xl font-medium">
           {opened ? "Opened" : busy ? "Opening…" : "Ready"}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {online === false
-            ? "Door controller unreachable"
-            : "按一下觸發一次開門，門禁那邊決定開多久"}
-        </p>
+        {online === false && (
+          <p className="text-xs text-muted-foreground">
+            Door controller unreachable
+          </p>
+        )}
       </div>
       <Button size="lg" className="min-w-40" disabled={busy} onClick={unlock}>
         Open
