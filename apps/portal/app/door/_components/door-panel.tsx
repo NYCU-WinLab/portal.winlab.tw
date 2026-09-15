@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { getDoorState, openDoor } from "../actions"
+import { LockParticles } from "./lock-particles"
 import { playUnlockSound } from "./unlock-sound"
 
 const POLL_MS = 5000
@@ -119,10 +120,11 @@ export function DoorPanel({
         configured && !busy && "cursor-pointer"
       )}
     >
+      <LockParticles active={phase === "opening"} />
       <span
         key={offline ? shake : 0}
         className={cn(
-          "text-[8rem] leading-none sm:text-[10rem]",
+          "relative text-[8rem] leading-none sm:text-[10rem]",
           !offline && phase === "opening" && "door-wiggle",
           offline && shake > 0 && "door-shake"
         )}
