@@ -736,10 +736,10 @@ insert into public.meeting_presenter_pool (user_id, admission_year, sort_order)
   values ('f1000000-0000-0000-0000-000000000051', 199, 1);
 
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f1000000-0000-0000-0000-0000000000f1', 2026, 'P 過去', '2026-04-06', false, false, 'f1000000-0000-0000-0000-000000000051'),
-  ('f1000000-0000-0000-0000-0000000000f2', 2099, 'P 未來', '2099-09-07', false, false, 'f1000000-0000-0000-0000-000000000051');
+  ('f1000000-0000-0000-0000-0000000000f1', 'P 過去', '2026-04-06', false, false, 'f1000000-0000-0000-0000-000000000051'),
+  ('f1000000-0000-0000-0000-0000000000f2', 'P 未來', '2099-09-07', false, false, 'f1000000-0000-0000-0000-000000000051');
 
 select is(
   (select times_presented from public.meeting_presenter_roster

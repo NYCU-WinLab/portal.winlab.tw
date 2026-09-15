@@ -986,13 +986,13 @@ on conflict (id) do update
 -- B3's presenter is R6, which is what makes R6's denominator differ from
 -- everyone else's.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f0000000-0000-0000-0000-0000000000a0', 2020, 'F 過去',   '2020-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b0', 2099, 'F 凍結週', '2099-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b1', 2099, 'F 第1週',  '2099-03-09', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b2', 2099, 'F 第2週',  '2099-03-16', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000b3', 2099, 'F 第3週',  '2099-03-23', false, false, 'f0000000-0000-0000-0000-000000000006');
+  ('f0000000-0000-0000-0000-0000000000a0', 'F 過去',   '2020-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b0', 'F 凍結週', '2099-03-02', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b1', 'F 第1週',  '2099-03-09', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b2', 'F 第2週',  '2099-03-16', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000b3', 'F 第3週',  '2099-03-23', false, false, 'f0000000-0000-0000-0000-000000000006');
 
 -- History: R1/R2/R3 questioned the 2020 week. Far enough back that it feeds
 -- times_asked without reaching the 56-day co-pairing window of anything below.
@@ -1196,11 +1196,11 @@ select ok(
 -- C1 is seven days before C2; C3 is over four months before it. R1 sits on C2,
 -- so a candidate is scored on whether they recently sat WITH R1.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f0000000-0000-0000-0000-0000000000c3', 2098, 'CP 很久以前', '2098-01-05', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000c1', 2098, 'CP 上週',     '2098-05-04', false, false, 'f0000000-0000-0000-0000-000000000090'),
-  ('f0000000-0000-0000-0000-0000000000c2', 2098, 'CP 本週',     '2098-05-11', false, false, 'f0000000-0000-0000-0000-000000000090');
+  ('f0000000-0000-0000-0000-0000000000c3', 'CP 很久以前', '2098-01-05', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c1', 'CP 上週',     '2098-05-04', false, false, 'f0000000-0000-0000-0000-000000000090'),
+  ('f0000000-0000-0000-0000-0000000000c2', 'CP 本週',     '2098-05-11', false, false, 'f0000000-0000-0000-0000-000000000090');
 
 insert into public.meeting_questioners (meeting_id, user_id, source) values
   ('f0000000-0000-0000-0000-0000000000c1', 'f0000000-0000-0000-0000-000000000001', 'manual'),
@@ -1269,12 +1269,12 @@ on conflict (id) do update
 -- GS is the nearest upcoming meeting but is a SPEAKER week, so it has no
 -- presenter and no roster. GF is the first week that actually has one.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f3000000-0000-0000-0000-0000000000a1', 2097, 'G 演講週', '2097-03-01', false, true,  null),
-  ('f3000000-0000-0000-0000-0000000000b0', 2097, 'G 最近一場', '2097-03-08', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
-  ('f3000000-0000-0000-0000-0000000000b1', 2097, 'G 第1週', '2097-03-15', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
-  ('f3000000-0000-0000-0000-0000000000b2', 2097, 'G 第2週', '2097-03-22', false, false, 'f2000000-0000-0000-0000-0000000000f0');
+  ('f3000000-0000-0000-0000-0000000000a1', 'G 演講週', '2097-03-01', false, true,  null),
+  ('f3000000-0000-0000-0000-0000000000b0', 'G 最近一場', '2097-03-08', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
+  ('f3000000-0000-0000-0000-0000000000b1', 'G 第1週', '2097-03-15', false, false, 'f2000000-0000-0000-0000-0000000000f0'),
+  ('f3000000-0000-0000-0000-0000000000b2', 'G 第2週', '2097-03-22', false, false, 'f2000000-0000-0000-0000-0000000000f0');
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('f2000000-0000-0000-0000-00000000000a', '2019-01-01 00:00:01+00'),
@@ -1430,13 +1430,13 @@ on conflict (id) do update
 --      `at time zone 'Asia/Taipei'`.
 -- HM2  the Taipei date itself. `<=` admits it, so HC becomes eligible.
 insert into public.meetings
-  (id, year, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
+  (id, week_label, scheduled_date, is_holiday, is_speaker, presenter_user_id)
 values
-  ('f5000000-0000-0000-0000-0000000000a0', 2018, 'H 制度上路前',   '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a3', 2098, 'H 只有兩人入池', '2098-01-02', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a1', 2098, 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a4', 2098, 'H 時區邊界前一天', '2098-05-31', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
-  ('f5000000-0000-0000-0000-0000000000a2', 2098, 'H HC 入池當天',  '2098-06-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
+  ('f5000000-0000-0000-0000-0000000000a0', 'H 制度上路前',   '2018-01-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a3', 'H 只有兩人入池', '2098-01-02', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a1', 'H 早於 HC 入池', '2098-03-01', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a4', 'H 時區邊界前一天', '2098-05-31', false, false, 'f4000000-0000-0000-0000-0000000000f0'),
+  ('f5000000-0000-0000-0000-0000000000a2', 'H HC 入池當天',  '2098-06-01', false, false, 'f4000000-0000-0000-0000-0000000000f0');
 
 insert into public.meeting_question_pool (user_id, created_at) values
   ('f4000000-0000-0000-0000-00000000000a', '2098-01-01 00:00:01+00'),
