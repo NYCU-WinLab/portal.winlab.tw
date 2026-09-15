@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { IconTrash } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -25,7 +25,7 @@ import {
   useGroupEpics,
   useLabUsers,
 } from "@/hooks/rooms/use-lab-users"
-import type { GitLabEpic } from "@/lib/gitlab/epics"
+import { agendaAfterEpicSelection, type GitLabEpic } from "@/lib/gitlab/epics"
 import {
   useCreateRecurring,
   useDeleteRecurring,
@@ -101,7 +101,7 @@ export function RecurringTab() {
   const [titleSuffix, setTitleSuffix] = useState(DEFAULT_TOPIC_SUFFIX)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [agenda, setAgenda] = useState("")
-  // The epic every occurrence of this series reports into, if any.
+  // A group series may reuse a Sync container; no selection stays ad-hoc.
   const [epic, setEpic] = useState<GitLabEpic | null>(null)
   const [weekday, setWeekday] = useState(1)
   const [startTime, setStartTime] = useState("09:00")
@@ -113,13 +113,19 @@ export function RecurringTab() {
   const epicsQuery = useGroupEpics(groupName)
   const deliverablesQuery = useEpicDeliverables(groupName, epic?.iid ?? null)
 
-  // An epic belongs to one group; switching groups invalidates the pick.
-  useEffect(() => setEpic(null), [groupName])
+  function handleGroupChange(next: string | null) {
+    if (next !== groupName) {
+      setAgenda((current) => agendaAfterEpicSelection(current, null, epic))
+      setEpic(null)
+    }
+    setGroupName(next)
+  }
 
   function handleEpicChange(next: GitLabEpic | null) {
     setEpic(next)
-    if (next?.description && !agenda.trim()) setAgenda(next.description)
+    setAgenda((current) => agendaAfterEpicSelection(current, next, epic))
   }
+  const invalidRecurringEpic = epic !== null && epic.classification !== "sync"
 
   // Mirrors what the server derives; the server recomputes rather than
   // trusting this.
@@ -197,7 +203,7 @@ export function RecurringTab() {
             onChange={setAttendees}
             advisorIncluded={includeAdvisor}
             onAdvisorIncludedChange={setIncludeAdvisor}
-            onGroupPicked={(group) => setGroupName(group.name)}
+            onGroupPicked={(group) => handleGroupChange(group.name)}
           />
         </div>
 
@@ -206,12 +212,13 @@ export function RecurringTab() {
           epics={epicsQuery.data}
           value={epic?.iid ?? null}
           onChange={handleEpicChange}
+          mode="recurring"
         />
 
         <DeliverablesField
           result={deliverablesQuery.data}
           loading={deliverablesQuery.isFetching}
-          hasEpic={!!epic}
+          epic={epic}
         />
 
         <div className="flex flex-col gap-1.5">
@@ -312,7 +319,7 @@ export function RecurringTab() {
         <Button
           size="sm"
           className="h-7 self-end"
-          disabled={create.isPending}
+          disabled={create.isPending || invalidRecurringEpic}
           onClick={handleCreate}
         >
           {create.isPending ? "建立中…" : "建立"}
