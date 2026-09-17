@@ -15,19 +15,33 @@ grant execute on all functions in schema public to authenticated;
 select plan(12);
 
 -- ── ACL ─────────────────────────────────────────────────────────────────────
--- anon must NOT hold EXECUTE: this project's `alter default privileges` grants
--- it on every new function in public, so the migration's explicit per-role
--- revoke is the only thing that removes it, and an untested revoke here is
--- silently reversible (#1104). The blanket grant above only ever adds
--- `authenticated`, so it cannot mask anon's absence.
-select ok(
-  not exists (
-    select 1
-    from aclexplode((select proacl from pg_proc
-                     where oid = 'public.copy_bento_order_from_user(text, uuid)'::regprocedure)) a
-    where a.privilege_type = 'EXECUTE' and a.grantee::regrole::text = 'anon'
-  ),
-  'anon holds no EXECUTE on copy_bento_order_from_user'
+-- anon must NOT be able to reach this function. Two grants can give it that,
+-- and the first version of this assertion only checked one of them:
+--
+--   * a DIRECT grant to anon — this project's `alter default privileges` hands
+--     it out on every new function in public, so an explicit per-role revoke is
+--     the only thing that removes it, and an untested revoke is silently
+--     reversible (#1104);
+--   * a grant to PUBLIC — PostgreSQL's own default on CREATE FUNCTION, which
+--     anon inherits as a member of PUBLIC. aclexplode reports it as grantee 0,
+--     printing as '-' through ::regrole::text, so a check written against the
+--     literal string 'anon' walks straight past it.
+--
+-- Checking only the first is what let 20260917115311 ship with anon still
+-- holding EXECUTE through PUBLIC while this file reported green. Assert the
+-- whole grantee set instead of probing for one name — a new grantee appearing
+-- should fail loudly rather than slip through an allow-list of one.
+--
+-- The blanket `grant execute on all functions ... to authenticated` above adds
+-- only `authenticated`, which is expected here anyway, so it cannot mask either
+-- hole.
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+     from aclexplode((select proacl from pg_proc
+                      where oid = 'public.copy_bento_order_from_user(text, uuid)'::regprocedure)) a
+    where a.privilege_type = 'EXECUTE'),
+  array['authenticated', 'postgres', 'service_role'],
+  'copy_bento_order_from_user is executable by authenticated + service_role only — not anon, not PUBLIC'
 );
 
 -- ── seed (as superuser — bypasses RLS) ──────────────────────────────────────
