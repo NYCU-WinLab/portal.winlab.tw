@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { IconCopy } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -155,12 +156,19 @@ export function OrderItemsList({
                   {canCopy(group) && (
                     <ConfirmDialog
                       trigger={
+                        // Icon + label, not icon alone: IconCopy reads as "make
+                        // another one", but this replaces. The icon carries
+                        // "copy", the words carry what is being copied — 這份,
+                        // the card this button sits on. No pronoun, so nothing
+                        // here guesses at anyone's gender, and the name beside
+                        // it already says whose order it is.
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-6 px-2 py-0 text-xs"
+                          className="h-6 gap-1 px-2 py-0 text-xs"
                         >
-                          跟他一樣
+                          <IconCopy className="size-3" />
+                          照這份點
                         </Button>
                       }
                       title={`訂餐改成和 ${group.userName || "對方"} 一樣？`}
@@ -169,7 +177,7 @@ export function OrderItemsList({
                         group.items.length,
                         myItemCount
                       )}
-                      confirmText="跟他一樣"
+                      confirmText="照這份點"
                       variant={myItemCount > 0 ? "destructive" : "default"}
                       onConfirm={() => handleCopy(group)}
                     />
