@@ -144,7 +144,7 @@ export function useAddOrderItemWithOptions() {
   })
 }
 
-// "跟他一樣" — replaces the caller's items in an order with a copy of another
+// "照這份點" — replaces the caller's items in an order with a copy of another
 // member's. Server-side in one transaction (copy_bento_order_from_user): the
 // delete and the inserts must not be separable, or a failure halfway through
 // leaves the caller with no order at all. It is also the only way to carry a

@@ -92,7 +92,7 @@ export function groupByPerson(
 }
 
 // Counts the items a given person already has in the order. Used to word the
-// "跟他一樣" confirmation, which is destructive only when this is non-zero.
+// "照這份點" confirmation, which is destructive only when this is non-zero.
 export function countItemsByUser(
   items: ViewOrderItem[],
   userId: string | undefined
@@ -101,9 +101,9 @@ export function countItemsByUser(
   return items.filter((item) => item.user_id === userId).length
 }
 
-// Wording for the "跟他一樣" confirmation. The copy overwrites, so the dialog has
+// Wording for the "照這份點" confirmation. The copy overwrites, so the dialog has
 // to name what is about to be thrown away — a member with four lines already in
-// the order should not read "確認要跟他一樣嗎" and discover the loss afterwards.
+// the order should not read "確認要照這份點嗎" and discover the loss afterwards.
 // With nothing to lose the same action is a plain add, and saying "會刪除 0 筆"
 // would be noise, so the two cases get different sentences.
 export function describeCopyPlan(
