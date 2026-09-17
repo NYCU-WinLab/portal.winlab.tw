@@ -7,12 +7,18 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useDeleteOrderItem } from "@/hooks/bento/use-order-items"
 import {
+  useCopyOrderFromUser,
+  useDeleteOrderItem,
+} from "@/hooks/bento/use-order-items"
+import {
+  countItemsByUser,
+  describeCopyPlan,
   formatItemDateTime,
   groupByPerson,
   itemPersonName,
   sortByTime,
+  type PersonGroup,
   type ViewOrderItem,
 } from "@/lib/bento/order-items-view"
 
@@ -22,6 +28,7 @@ type SortMode = "time" | "person"
 
 interface OrderItemsListProps {
   items: ViewOrderItem[]
+  orderId: string
   isActive: boolean
   currentUserId?: string
   isAdmin?: boolean
@@ -30,13 +37,16 @@ interface OrderItemsListProps {
 
 export function OrderItemsList({
   items,
+  orderId,
   isActive,
   currentUserId,
   isAdmin,
   restaurantAdditional,
 }: OrderItemsListProps) {
   const deleteItem = useDeleteOrderItem()
+  const copyOrder = useCopyOrderFromUser()
   const [sortMode, setSortMode] = useState<SortMode>("person")
+  const myItemCount = countItemsByUser(items, currentUserId)
 
   const handleDelete = async (id: string) => {
     try {
@@ -48,6 +58,31 @@ export function OrderItemsList({
       toast.error(`刪除失敗：${err.message}`)
     }
   }
+
+  const handleCopy = async (group: PersonGroup) => {
+    if (!group.userId) return
+    try {
+      const copied = await copyOrder.mutateAsync({
+        order_id: orderId,
+        source_user_id: group.userId,
+      })
+      toast.success(
+        `已改成和 ${group.userName || "對方"} 一樣的 ${copied} 筆訂餐`
+      )
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error("Failed to copy")
+      console.error("Error copying order:", err)
+      toast.error(`複製失敗：${err.message}`)
+    }
+  }
+
+  // Anonymous (guest) entries are keyed by a free-text name rather than a user
+  // id, so there is nothing stable to copy from — the RPC only takes a user id.
+  const canCopy = (group: PersonGroup) =>
+    isActive &&
+    Boolean(currentUserId) &&
+    Boolean(group.userId) &&
+    group.userId !== currentUserId
 
   const canDelete = (item: ViewOrderItem) =>
     isActive && (currentUserId === item.user_id || Boolean(isAdmin))
@@ -110,12 +145,34 @@ export function OrderItemsList({
               className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-4"
             >
               <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="text-sm font-medium">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
                   {group.userName || "未知"}
                   {group.contact && (
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    <span className="text-xs font-normal text-muted-foreground">
                       ({group.contact})
                     </span>
+                  )}
+                  {canCopy(group) && (
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 py-0 text-xs"
+                        >
+                          跟他一樣
+                        </Button>
+                      }
+                      title={`訂餐改成和 ${group.userName || "對方"} 一樣？`}
+                      description={describeCopyPlan(
+                        group.userName || "對方",
+                        group.items.length,
+                        myItemCount
+                      )}
+                      confirmText="跟他一樣"
+                      variant={myItemCount > 0 ? "destructive" : "default"}
+                      onConfirm={() => handleCopy(group)}
+                    />
                   )}
                 </div>
                 <div className="flex flex-col gap-1 text-sm text-muted-foreground">

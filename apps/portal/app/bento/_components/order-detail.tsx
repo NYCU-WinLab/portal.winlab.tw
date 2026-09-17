@@ -135,6 +135,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
         <h2 className="text-sm font-medium">訂單項目</h2>
         <OrderItemsList
           items={order.order_items}
+          orderId={orderId}
           isActive={isActive}
           currentUserId={user?.id}
           isAdmin={isAdmin}

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+  countItemsByUser,
+  describeCopyPlan,
   formatItemDateTime,
   groupByPerson,
   itemPrice,
@@ -139,5 +141,39 @@ describe("formatItemDateTime", () => {
 
   it("returns an empty string for an invalid date", () => {
     expect(formatItemDateTime("not-a-date")).toBe("")
+  })
+})
+
+describe("countItemsByUser", () => {
+  it("counts only that user's items", () => {
+    const items = [
+      item({ id: "a", user_id: "u1" }),
+      item({ id: "b", user_id: "u2" }),
+      item({ id: "c", user_id: "u1" }),
+    ]
+    expect(countItemsByUser(items, "u1")).toBe(2)
+  })
+
+  it("returns 0 when there is no current user", () => {
+    expect(countItemsByUser([item({ user_id: "u1" })], undefined)).toBe(0)
+  })
+
+  it("does not match anonymous items, whose user_id is null", () => {
+    const items = [item({ id: "a", user_id: null, anonymous_name: "訪客" })]
+    expect(countItemsByUser(items, "u1")).toBe(0)
+  })
+})
+
+describe("describeCopyPlan", () => {
+  it("names what will be deleted when the caller already ordered", () => {
+    expect(describeCopyPlan("王小明", 2, 3)).toBe(
+      "你目前的 3 筆訂餐會被刪除，改成和 王小明 一樣的 2 筆訂餐。"
+    )
+  })
+
+  it("reads as a plain add when the caller has nothing to lose", () => {
+    expect(describeCopyPlan("王小明", 2, 0)).toBe(
+      "會幫你加入和 王小明 一樣的 2 筆訂餐。"
+    )
   })
 })
