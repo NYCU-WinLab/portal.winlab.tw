@@ -2841,6 +2841,10 @@ export type Database = {
         Returns: undefined
       }
       bento_profile_stats: { Args: { p_user_id: string }; Returns: Json }
+      copy_bento_order_from_user: {
+        Args: { p_order_id: string; p_source_user_id: string }
+        Returns: number
+      }
       create_bento_order: {
         Args: {
           p_auto_close_at?: string

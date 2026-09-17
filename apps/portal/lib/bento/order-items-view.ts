@@ -91,6 +91,32 @@ export function groupByPerson(
   })
 }
 
+// Counts the items a given person already has in the order. Used to word the
+// "跟他一樣" confirmation, which is destructive only when this is non-zero.
+export function countItemsByUser(
+  items: ViewOrderItem[],
+  userId: string | undefined
+): number {
+  if (!userId) return 0
+  return items.filter((item) => item.user_id === userId).length
+}
+
+// Wording for the "跟他一樣" confirmation. The copy overwrites, so the dialog has
+// to name what is about to be thrown away — a member with four lines already in
+// the order should not read "確認要跟他一樣嗎" and discover the loss afterwards.
+// With nothing to lose the same action is a plain add, and saying "會刪除 0 筆"
+// would be noise, so the two cases get different sentences.
+export function describeCopyPlan(
+  sourceName: string,
+  sourceItemCount: number,
+  myItemCount: number
+): string {
+  const target = `和 ${sourceName} 一樣的 ${sourceItemCount} 筆訂餐`
+  return myItemCount > 0
+    ? `你目前的 ${myItemCount} 筆訂餐會被刪除，改成${target}。`
+    : `會幫你加入${target}。`
+}
+
 // Flattens all items into a single chronological list.
 export function sortByTime(
   items: ViewOrderItem[],

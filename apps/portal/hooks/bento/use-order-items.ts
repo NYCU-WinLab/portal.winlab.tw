@@ -144,6 +144,36 @@ export function useAddOrderItemWithOptions() {
   })
 }
 
+// "跟他一樣" — replaces the caller's items in an order with a copy of another
+// member's. Server-side in one transaction (copy_bento_order_from_user): the
+// delete and the inserts must not be separable, or a failure halfway through
+// leaves the caller with no order at all. It is also the only way to carry a
+// drink's 甜度/冰量 across, since bento_order_item_options has no INSERT policy.
+export function useCopyOrderFromUser() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      order_id: string
+      source_user_id: string
+    }) => {
+      const { data, error } = await supabase.rpc("copy_bento_order_from_user", {
+        p_order_id: params.order_id,
+        p_source_user_id: params.source_user_id,
+      })
+
+      if (error) throw error
+      // The RPC returns how many lines it copied; the rows themselves arrive
+      // through the invalidation below.
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
 export function useDeleteOrderItem() {
   const supabase = createClient()
   const queryClient = useQueryClient()
