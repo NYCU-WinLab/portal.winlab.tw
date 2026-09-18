@@ -51,7 +51,7 @@ select plan(15);
 -- ═══ the questioner reconcile: owner and service_role ONLY ══════════════════
 -- meetings_reconcile_questioners carries NO permission check of its own — the
 -- admin gate lives in the rebalance wrapper, and the COMMIT-time trigger
--- deliberately runs it for every writer (20260918090000). That makes this
+-- deliberately runs it for every writer (20260918104130). That makes this
 -- revoke the only thing standing between a signed-in non-admin and a call
 -- that rewrites every future questioner roster.
 select is(

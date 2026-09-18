@@ -376,7 +376,9 @@ grant select on public.meeting_question_pool_members to authenticated, service_r
 --
 -- So an edit that leaves the roster within one seat of fair changes nothing,
 -- and one that does not is fixed by the fewest seat moves, preferring the
--- latest weeks.
+-- latest weeks. Each repair lowers Σd², so it terminates. Picking the target
+-- counts from a fresh greedy instead (the first draft of this) moved people
+-- needlessly whenever members were tied, which in prod most of them are.
 --
 -- The one trade: the freeze week's seats — including ones this run places —
 -- never move. Occasionally the only move that would close a gap runs through
@@ -384,9 +386,7 @@ grant select on public.meeting_question_pool_members to authenticated, service_r
 -- its seats become history, which the next run's shares absorb. Letting this
 -- run move a seat it just placed there would make the next run, which sees
 -- that seat as fixed, disagree with it — exactly the drift the pinning
--- exists to prevent. Each repair lowers Σd², so it terminates. Picking the target
--- counts from a fresh greedy instead (the first draft of this) moved people
--- needlessly whenever members were tied, which in prod most of them are.
+-- exists to prevent.
 
 create or replace function public.meetings_reconcile_questioners(
   p_full boolean, p_dry_run boolean
@@ -1176,8 +1176,9 @@ begin
 end;
 $$;
 
--- The admin 「完整重排」: phase 1 alone. Signature unchanged; the result keeps
--- dryRun/assigned for the deployed panel and adds added/removed.
+-- The admin 「完整重排」: the same reconcile, started from the pinned seats
+-- alone. Signature unchanged; the result keeps dryRun/assigned for the
+-- deployed panel and adds added/removed.
 create or replace function public.meetings_rebalance_questioners(p_dry_run boolean default true)
 returns jsonb
 language plpgsql

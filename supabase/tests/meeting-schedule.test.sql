@@ -42,7 +42,7 @@ grant execute on all functions in schema public to authenticated;
 select plan(75);
 
 -- The questioner reconcile runs from a deferred constraint trigger at COMMIT
--- (20260918090000), and this file rolls back. settle() fires it where a
+-- (20260918104130), and this file rolls back. settle() fires it where a
 -- commit would have — see questioner-roster.test.sql's header.
 create function pg_temp.settle() returns void language plpgsql as $$
 begin

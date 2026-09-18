@@ -212,7 +212,7 @@ export function useAdminUpdateMeeting() {
       if (error) throw new Error(paperErrorMessage(error))
       // No follow-up sync call: a change to the date, the week kind or the
       // presenter reconciles every future roster at this UPDATE's own commit
-      // (20260918090000), so there is no second request to fail half-way.
+      // (20260918104130), so there is no second request to fail half-way.
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
