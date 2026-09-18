@@ -1450,14 +1450,17 @@ export type Database = {
       meeting_question_pool: {
         Row: {
           created_at: string
+          joined_on: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          joined_on?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          joined_on?: string
           user_id?: string
         }
         Relationships: [
@@ -1465,6 +1468,89 @@ export type Database = {
             foreignKeyName: "meeting_question_pool_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_question_pool_pauses: {
+        Row: {
+          created_at: string
+          paused_on: string
+          resumed_on: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          paused_on: string
+          resumed_on?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          paused_on?: string
+          resumed_on?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_question_pool"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_question_pool_members"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_question_rotation"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_questioner_stats"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      meeting_questioner_exclusions: {
+        Row: {
+          created_at: string
+          meeting_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          meeting_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          meeting_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_questioner_exclusions_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_questioner_exclusions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
@@ -1617,6 +1703,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meetings_reconcile_pending: {
+        Row: {
+          txid: number
+        }
+        Insert: {
+          txid: number
+        }
+        Update: {
+          txid?: number
+        }
+        Relationships: []
       }
       members: {
         Row: {
@@ -2753,6 +2851,10 @@ export type Database = {
         Row: {
           email: string | null
           is_active: boolean | null
+          is_enabled: boolean | null
+          is_presenter: boolean | null
+          joined_on: string | null
+          lab_status: string | null
           last_asked_date: string | null
           name: string | null
           opportunities: number | null
@@ -2762,19 +2864,35 @@ export type Database = {
           times_asked_scheduled: number | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meeting_question_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meeting_questioner_stats: {
         Row: {
+          joined_on: string | null
           last_asked_date: string | null
           opportunities: number | null
-          pool_added_at: string | null
           rate: number | null
           times_asked: number | null
           times_asked_scheduled: number | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meeting_question_pool_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -3101,17 +3219,39 @@ export type Database = {
         Args: { p_admission_year: number; p_user: string }
         Returns: undefined
       }
+      meetings_question_pool_add: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_question_pool_remove: {
+        Args: { p_user: string }
+        Returns: undefined
+      }
+      meetings_question_pool_set_enabled: {
+        Args: { p_enabled: boolean; p_user: string }
+        Returns: undefined
+      }
+      meetings_questioner_can_serve: {
+        Args: {
+          p_date: string
+          p_meeting_id: string
+          p_new_pick: boolean
+          p_presenter: string
+          p_user: string
+        }
+        Returns: boolean
+      }
       meetings_rebalance_questioners: {
         Args: { p_dry_run?: boolean }
-        Returns: Json
-      }
-      meetings_rebalance_questioners_exec: {
-        Args: { p_dry_run: boolean }
         Returns: Json
       }
       meetings_recent_copair_count: {
         Args: { p_meeting_id: string; p_user: string }
         Returns: number
+      }
+      meetings_reconcile_questioners: {
+        Args: { p_dry_run: boolean; p_full: boolean }
+        Returns: Json
       }
       meetings_remove_from_pool: {
         Args: { p_user: string }
@@ -3129,12 +3269,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      meetings_request_reconcile: { Args: never; Returns: undefined }
       meetings_swap: { Args: { p_a: string; p_b: string }; Returns: undefined }
       meetings_sync_questioners: {
         Args: { p_meeting_id: string }
         Returns: undefined
       }
       meetings_tier_rank: { Args: { p_status: string }; Returns: number }
+      meetings_week_takes_questioners: {
+        Args: {
+          p_is_holiday: boolean
+          p_is_speaker: boolean
+          p_presenter: string
+        }
+        Returns: boolean
+      }
       portal_admin_get_users: {
         Args: never
         Returns: {

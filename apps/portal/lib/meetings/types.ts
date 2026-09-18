@@ -44,17 +44,21 @@ export interface QuestionPoolMember {
   userId: string
   name: string | null
   email: string | null
-  poolAddedAt: string
+  /** 公平統計的起點（台北日期）。在這天之前的週次不算機會，也不會被排入。 */
+  joinedOn: string
   /** 只算已發生的場次；已排定但尚未到的在 timesAskedScheduled。 */
   lastAskedDate: string | null
   timesAsked: number
   timesAskedScheduled: number
+  /** 加入後、未停用期間、非自己報告的週數。停用的週不算他錯過的機會。 */
   opportunities: number
-  /**
-   * (已提問 + 已排定) / 加入後的機會數。輪替就是照這個值由小到大挑人，
-   * 所以面板的排序必須跟它一致，否則畫面上的「下一位」會跟實際排出來的人不同。
-   */
+  /** (已提問 + 已排定) / 機會數 —— 公平分配要拉平的就是這個值。 */
   rate: number
+  /** 在報告順位名單裡 = 預設提問人；否則是額外提問成員。 */
+  isPresenter: boolean
+  /** 管理員沒有停用他的提問。停用與恢復都是明天起生效。 */
+  isEnabled: boolean
+  labStatus: LabStatus | null
 }
 
 export interface PresenterPoolMember {
@@ -120,12 +124,15 @@ export interface DbQuestionPoolMember {
   user_id: string
   name: string | null
   email: string | null
-  pool_added_at: string
+  joined_on: string
   last_asked_date: string | null
   times_asked: number
   times_asked_scheduled: number
   opportunities: number
   rate: number
+  is_presenter: boolean
+  is_enabled: boolean
+  lab_status: string | null
 }
 
 export interface DbPresenterPoolMember {
@@ -223,12 +230,15 @@ export function toQuestionPoolMember(
     userId: row.user_id,
     name: row.name,
     email: row.email,
-    poolAddedAt: row.pool_added_at,
+    joinedOn: row.joined_on,
     lastAskedDate: row.last_asked_date,
     timesAsked: row.times_asked,
     timesAskedScheduled: row.times_asked_scheduled,
     opportunities: row.opportunities,
     rate: row.rate,
+    isPresenter: row.is_presenter,
+    isEnabled: row.is_enabled,
+    labStatus: parseLabStatus(row.lab_status),
   }
 }
 
@@ -240,9 +250,17 @@ export interface RebalanceWeek {
 
 export interface RebalanceResult {
   dryRun: boolean
-  /** 被保留不動的那一場（最近一次尚未發生的會議）。沒有未來會議時為 null。 */
+  /**
+   * 被保留不動的那一場：明天以後第一個要排提問人的週次（今天與更早的週次本來
+   * 就不會被改）。沒有未來會議時為 null。
+   */
   frozenDate: string | null
+  /** frozenDate 之後的週數，也就是 roster 的長度。 */
   weeks: number
+  /** 那些週次合計的提問名額。 */
   assigned: number
+  /** 這次會新增 / 移除的提問列數。 */
+  added: number
+  removed: number
   roster: RebalanceWeek[]
 }

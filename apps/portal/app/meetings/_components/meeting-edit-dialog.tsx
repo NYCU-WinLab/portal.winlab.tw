@@ -414,6 +414,8 @@ export function MeetingEditDialog({
                 <QuestionersField
                   meetingId={meeting.id}
                   year={Number(folderYear)}
+                  scheduledDate={meeting.scheduledDate}
+                  presenterUserId={meeting.presenterUserId}
                 />
               )}
             </>

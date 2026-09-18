@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 
-import { IconArrowsExchange, IconRefresh } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
+import { IconArrowsExchange } from "@tabler/icons-react"
 import { Label } from "@workspace/ui/components/label"
 import {
   Popover,
@@ -14,14 +13,16 @@ import {
 import {
   useQuestionersByYear,
   useReplaceQuestioner,
-  useSyncQuestioners,
 } from "@/hooks/meetings/use-questioners"
 import { useQuestionPool } from "@/hooks/meetings/use-question-pool"
+import { replacementCandidates } from "@/lib/meetings/questioner-roster"
 import type { QuestionPoolMember } from "@/lib/meetings/types"
 
 interface Props {
   meetingId: string
   year: number
+  scheduledDate: string
+  presenterUserId: string | null
 }
 
 function SwapMenu({
@@ -91,14 +92,22 @@ function SwapMenu({
   )
 }
 
-export function QuestionersField({ meetingId, year }: Props) {
+export function QuestionersField({
+  meetingId,
+  year,
+  scheduledDate,
+  presenterUserId,
+}: Props) {
   const { data: questionersByMeeting } = useQuestionersByYear(year)
   const { data: pool = [] } = useQuestionPool()
-  const syncQuestioners = useSyncQuestioners()
 
   const questioners = questionersByMeeting?.get(meetingId) ?? []
-  const questionerIds = new Set(questioners.map((q) => q.userId))
-  const eligible = pool.filter((c) => !questionerIds.has(c.userId))
+  // Same rules the RPC enforces, so the menu only offers people it accepts.
+  const eligible = replacementCandidates(pool, {
+    presenterUserId,
+    scheduledDate,
+    questionerIds: new Set(questioners.map((q) => q.userId)),
+  })
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -126,22 +135,9 @@ export function QuestionersField({ meetingId, year }: Props) {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          提問人由系統依公平輪替自動排定
-        </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-          disabled={syncQuestioners.isPending}
-          onClick={() => syncQuestioners.mutate(meetingId)}
-        >
-          <IconRefresh className="h-3 w-3" />
-          重新同步
-        </Button>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        提問人由系統依公平輪替自動排定；手動換下的人不會再被自動排回這一週
+      </p>
     </div>
   )
 }

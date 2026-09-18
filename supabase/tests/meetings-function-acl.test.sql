@@ -46,29 +46,60 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(13);
+select plan(15);
 
--- ═══ the rebalance engine: owner ONLY ══════════════════════════════════════
--- meetings_rebalance_questioners_exec carries NO permission check of its own —
--- the admin gate lives in the wrapper, and the pool trigger deliberately skips
--- it (20260914083707's header). That makes this revoke the only thing standing
--- between a signed-in non-admin and a call that rewrites every future
--- questioner roster. Not even service_role: nothing reaches it except the two
--- SECURITY DEFINER callers, which run as the owner.
+-- ═══ the questioner reconcile: owner and service_role ONLY ══════════════════
+-- meetings_reconcile_questioners carries NO permission check of its own — the
+-- admin gate lives in the rebalance wrapper, and the COMMIT-time trigger
+-- deliberately runs it for every writer (20260918090000). That makes this
+-- revoke the only thing standing between a signed-in non-admin and a call
+-- that rewrites every future questioner roster.
 select is(
   (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
    from aclexplode((select proacl from pg_proc
-                    where oid = 'public.meetings_rebalance_questioners_exec(boolean)'::regprocedure)) a),
-  array['postgres'],
-  'the rebalance engine is callable by nobody but its owner'
+                    where oid = 'public.meetings_reconcile_questioners(boolean, boolean)'::regprocedure)) a),
+  array['postgres', 'service_role'],
+  'the reconcile engine is callable by nobody but its owner and service_role'
+);
+
+-- The trigger functions and the queue helper are not part of the callable
+-- surface at all — not even service_role's.
+select is(
+  (select count(*)::int
+     from unnest(array['public.meetings_request_reconcile()',
+                       'public.meetings_arm_reconcile()',
+                       'public.meetings_arm_reconcile_for_member()',
+                       'public.meetings_fire_reconcile()',
+                       'public.meetings_take_questioner_lock()',
+                       'public.meetings_presenter_pool_to_roster()',
+                       'public.meetings_drop_presenter_questioner()']) f(sig)
+    where (select array_agg(a.grantee::regrole::text)
+             from aclexplode((select proacl from pg_proc
+                              where oid = f.sig::regprocedure)) a) = array['postgres']),
+  7,
+  'every reconcile trigger function is owner-only'
 );
 
 select is(
   (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
    from aclexplode((select proacl from pg_proc
-                    where oid = 'public.meetings_pool_changed()'::regprocedure)) a),
-  array['postgres'],
-  'the pool trigger function is not part of the callable surface'
+                    where oid = 'public.meetings_questioner_can_serve(uuid, uuid, date, uuid, boolean)'::regprocedure)) a),
+  array['postgres', 'service_role'],
+  'the eligibility rule is internal: owner and service_role only'
+);
+
+-- The roster RPCs are admin-checked inside; anon and PUBLIC never reach them.
+select is(
+  (select count(*)::int
+     from unnest(array['public.meetings_question_pool_add(uuid)',
+                       'public.meetings_question_pool_remove(uuid)',
+                       'public.meetings_question_pool_set_enabled(uuid, boolean)']) f(sig)
+    where (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+             from aclexplode((select proacl from pg_proc
+                              where oid = f.sig::regprocedure)) a)
+          = array['authenticated', 'postgres', 'service_role']),
+  3,
+  'the roster RPCs are callable by authenticated + service_role, never anon or PUBLIC'
 );
 
 select is(

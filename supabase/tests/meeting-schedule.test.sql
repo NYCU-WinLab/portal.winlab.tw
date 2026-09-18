@@ -1,6 +1,6 @@
 -- meetings_swap / meetings_insert_week / meetings_remove_week /
 -- meetings_append_week regression suite —
--- runs via `supabase test db`. Mirrors questioner-rotation.test.sql conventions:
+-- runs via `supabase test db`. Mirrors questioner-roster.test.sql conventions:
 -- seed as superuser (bypasses RLS), impersonate by switching to the
 -- `authenticated` role + setting request.jwt.claims (what auth.uid()/is_meetings_admin
 -- read), assert with pgTAP as superuser (reset role) for direct-table verification.
@@ -39,7 +39,17 @@ begin;
 create extension if not exists pgtap with schema public;
 grant execute on all functions in schema public to authenticated;
 
-select plan(73);
+select plan(75);
+
+-- The questioner reconcile runs from a deferred constraint trigger at COMMIT
+-- (20260918090000), and this file rolls back. settle() fires it where a
+-- commit would have — see questioner-roster.test.sql's header.
+create function pg_temp.settle() returns void language plpgsql as $$
+begin
+  set constraints public.meetings_reconcile_fire immediate;
+  set constraints public.meetings_reconcile_fire deferred;
+end;
+$$;
 
 -- ── actors ──────────────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -100,24 +110,25 @@ insert into public.meetings (id, week_label, scheduled_date, is_holiday, present
   ('dddddddd-0000-0000-0000-000000000003', '春假', '2031-03-19', true,  null, null),                                     -- IH (holiday)
   ('dddddddd-0000-0000-0000-000000000004', '第3週', '2031-03-26', false, 'PC', 'aaaaaaaa-0000-0000-0000-000000000023'); -- I3
 
--- pool for swap questioner checks
-insert into public.meeting_question_pool (user_id, created_at) values
-  ('aaaaaaaa-0000-0000-0000-000000000011', '2020-01-01 00:00:01+00'),
-  ('aaaaaaaa-0000-0000-0000-000000000012', '2020-01-01 00:00:02+00'),
-  ('aaaaaaaa-0000-0000-0000-000000000013', '2020-01-01 00:00:03+00'),
-  ('aaaaaaaa-0000-0000-0000-000000000014', '2020-01-01 00:00:04+00');
+-- The questioner roster. P4 and QX are on it too: the reconcile drops any
+-- seat whose holder is not, and the scenarios below need their manual seats
+-- to be valid ones that survive a reconcile on their own merits.
+insert into public.meeting_question_pool (user_id, joined_on) values
+  ('aaaaaaaa-0000-0000-0000-000000000011', '2020-01-01'),
+  ('aaaaaaaa-0000-0000-0000-000000000012', '2020-01-01'),
+  ('aaaaaaaa-0000-0000-0000-000000000013', '2020-01-01'),
+  ('aaaaaaaa-0000-0000-0000-000000000014', '2020-01-01'),
+  ('aaaaaaaa-0000-0000-0000-000000000005', '2020-01-01'),
+  ('aaaaaaaa-0000-0000-0000-000000000031', '2020-01-01');
 
--- MA/MB questioners via the real rotation (MA -> Q1,Q2,Q3)
-select public.meetings_sync_questioners('cccccccc-0000-0000-0000-000000000001');
-select public.meetings_sync_questioners('cccccccc-0000-0000-0000-000000000002');
+-- Every future presentation week gets its roster from the real reconcile.
+select pg_temp.settle();
 
 -- MX questioners incl. P4 (manual) so the swap-in presenter collides -> eviction
 --
--- Cleared first: since 20260914083733 an insert into either pool table
--- rebalances every future week, so the rows seeded at line 77 already gave MX
--- and I3 an automatic roster. These scenarios need a SPECIFIC roster, not
--- whatever the rotation picked, so the generated one is discarded rather than
--- appended to.
+-- Cleared first: the settle() above already gave MX and I3 an automatic
+-- roster. These scenarios need a SPECIFIC roster, not whatever the rotation
+-- picked, so the generated one is discarded rather than appended to.
 delete from public.meeting_questioners
 where meeting_id in ('cccccccc-0000-0000-0000-000000000005',
                      'dddddddd-0000-0000-0000-000000000004');
@@ -208,6 +219,7 @@ select ok(
     where meeting_id = 'cccccccc-0000-0000-0000-000000000005'
       and user_id = 'aaaaaaaa-0000-0000-0000-000000000005'),
   'a questioner who becomes the presenter via swap is evicted from that date''s list');
+select pg_temp.settle();
 select is(
   (select count(*)::int from public.meeting_questioners where meeting_id = 'cccccccc-0000-0000-0000-000000000005'),
   3,
@@ -252,12 +264,19 @@ select is(
    where scheduled_date = '2031-03-05' and presenter_user_id is null and not is_holiday),
   1,
   'a blank week is inserted at the freed earliest slot');
+select pg_temp.settle();
 select ok(
   exists (
     select 1 from public.meeting_questioners
     where meeting_id = 'dddddddd-0000-0000-0000-000000000004'
       and user_id = 'aaaaaaaa-0000-0000-0000-000000000031'),
   'the presenter''s questioner (QX on I3) travels with them to the new date');
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id = (select id from public.meetings
+                        where scheduled_date = '2031-03-05' and presenter_user_id is null)),
+  0,
+  'the blank week insert_week opens carries no questioners, even after the reconcile');
 
 -- ═══ meetings_remove_week (inverse of insert) ═══════════════════════════════
 -- non-admin cannot remove
@@ -296,12 +315,20 @@ select is(
    where scheduled_date between '2031-01-01' and '2031-12-31'),
   4,
   'insert then remove leaves the original row count (blank + trailing week gone)');
+select pg_temp.settle();
 select ok(
   exists (
     select 1 from public.meeting_questioners
     where meeting_id = 'dddddddd-0000-0000-0000-000000000004'
       and user_id = 'aaaaaaaa-0000-0000-0000-000000000031'),
   'QX still rides with I3 after the pull-up');
+select is(
+  (select count(*)::int from public.meeting_questioners
+   where meeting_id in ('dddddddd-0000-0000-0000-000000000001',
+                        'dddddddd-0000-0000-0000-000000000002',
+                        'dddddddd-0000-0000-0000-000000000004')),
+  9,
+  'after insert and remove the three presentation weeks are fully staffed again');
 
 -- ═══ speaker weeks (外部講者演講) ════════════════════════════════════════════
 -- A speaker week (is_speaker=true) is an anchored calendar event with no
@@ -454,11 +481,11 @@ select throws_ok(
 -- a speaker week is never assigned questioners
 insert into public.meetings (id, week_label, scheduled_date, is_holiday, is_speaker, presenter, presenter_user_id) values
   ('88888888-0000-0000-0000-000000000001', '演講', '2038-02-01', false, true, '講者A', null);
-select public.meetings_sync_questioners('88888888-0000-0000-0000-000000000001');
+select pg_temp.settle();
 select is(
   (select count(*)::int from public.meeting_questioners where meeting_id = '88888888-0000-0000-0000-000000000001'),
   0,
-  'meetings_sync_questioners never assigns questioners to a speaker week');
+  'the reconcile never assigns questioners to a speaker week');
 
 -- trailing-slot mint excludes a speaker sitting AFTER the last presentation
 -- (mirror of the holiday regression): year 2037, speaker on 6/25.
