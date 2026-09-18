@@ -172,8 +172,9 @@ export function isRotationMember(labStatus: string | null): boolean {
  *   morning after renaming themselves in Keycloak. Not given new slots, but
  *   keeps the ones they hold, and an admin may still assign them by hand.
  * - `"alumni"` / `"not-graduate"` — Keycloak has positively placed them outside
- *   the rotation. Not given new slots, evicted from future weeks on the next
- *   resync, and rejected for manual assignment.
+ *   the rotation. Not given new slots, evicted from future weeks by the
+ *   reconcile that runs when their lab_status changes (20260918104130), and
+ *   rejected for manual assignment.
  */
 export function rotationExclusionReason(
   labStatus: string | null

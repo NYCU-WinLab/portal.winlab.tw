@@ -110,16 +110,9 @@ export function useUpdateOwnMeeting() {
         })
         .eq("id", id)
       if (error) throw new Error(paperErrorMessage(error))
-
-      const { error: syncError } = await supabase.rpc(
-        "meetings_sync_questioners",
-        { p_meeting_id: id }
-      )
-      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已儲存")
     },
@@ -140,7 +133,8 @@ export function useClaimMeeting() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已認領")
     },
@@ -216,16 +210,14 @@ export function useAdminUpdateMeeting() {
         })
         .eq("id", id)
       if (error) throw new Error(paperErrorMessage(error))
-
-      const { error: syncError } = await supabase.rpc(
-        "meetings_sync_questioners",
-        { p_meeting_id: id }
-      )
-      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
+      // No follow-up sync call: a change to the date, the week kind or the
+      // presenter reconciles every future roster at this UPDATE's own commit
+      // (20260918104130), so there is no second request to fail half-way.
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已儲存")
     },
@@ -272,22 +264,13 @@ export function useAddMeeting() {
           : {}),
       }
 
-      const { data, error } = await supabase
-        .from(TABLE)
-        .insert(payload)
-        .select("id")
-        .single()
+      const { error } = await supabase.from(TABLE).insert(payload)
       if (error) throw new Error(addMeetingErrorMessage(error))
-
-      const { error: syncError } = await supabase.rpc(
-        "meetings_sync_questioners",
-        { p_meeting_id: data.id }
-      )
-      if (syncError) throw new Error(syncError.message || "同步提問人失敗")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("週次已新增")
     },
@@ -306,6 +289,9 @@ export function useDeleteMeeting() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
+      // The deleted week's questioners are paid back elsewhere at commit.
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("已刪除")
     },
@@ -327,7 +313,8 @@ export function useSwapMeetings() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
     },
     onError: (e: Error) => toast.error(e.message),
@@ -348,7 +335,8 @@ export function useInsertMeetingWeek() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
     },
     onError: (e: Error) => toast.error(e.message),
@@ -377,7 +365,8 @@ export function useAppendMeetingWeek() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       toast.success("週次已新增")
     },
@@ -398,7 +387,8 @@ export function useRemoveMeetingWeek() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
     },
     onError: (e: Error) => toast.error(e.message),
@@ -455,7 +445,8 @@ export function useGenerateSemester() {
     },
     onSuccess: ({ inserted, skippedDate, skippedLabel }) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
+      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       qc.invalidateQueries({ queryKey: queryKeys.paperAssignments.all })
       // The two skip reasons mean opposite things and used to share one
       // sentence. "略過 16 週已存在" on a semester whose NUMBERS were taken (not

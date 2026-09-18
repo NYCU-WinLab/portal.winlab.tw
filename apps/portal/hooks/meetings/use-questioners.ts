@@ -77,29 +77,11 @@ export function useReplaceQuestioner() {
       if (error) throw new Error(error.message || "更換提問人失敗")
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
+      // The swap shifts one seat between two members; the reconcile at commit
+      // evens that out in later weeks, so every roster may have moved.
+      qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       toast.success("已更換提問人")
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-}
-
-export function useSyncQuestioners() {
-  const supabase = createClient()
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (meetingId: string) => {
-      const { error } = await supabase.rpc("meetings_sync_questioners", {
-        p_meeting_id: meetingId,
-      })
-      if (error) throw new Error(error.message || "同步提問人失敗")
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["meetings", "questioners"] })
-      qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
-      toast.success("已重新同步提問人")
     },
     onError: (e: Error) => toast.error(e.message),
   })

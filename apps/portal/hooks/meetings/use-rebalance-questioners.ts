@@ -9,11 +9,14 @@ import type { RebalanceResult } from "@/lib/meetings/types"
 import { queryKeys } from "./query-keys"
 
 /**
- * 重新平衡未來場次的提問人。
+ * 完整重排未來場次的提問人 —— 忽略現有安排，只保留最近一場與手動指定。
+ *
+ * 平常用不到：排班或名冊有任何變動時，資料庫會在 commit 時自動做最小調整。
+ * 這是給「想從頭排一次」用的逃生口。
  *
  * 兩個 mutation 打同一支 RPC，差別只在 p_dry_run —— 預覽先跑一次拿結果給人看，
  * 確認後再跑一次真的寫入。RPC 是冪等的，所以第二次跑出來的分配與預覽一致，
- * 除非中間有人改了排程或成員池。
+ * 除非中間有人改了排程或名冊。
  *
  * 預覽刻意不吐 toast：它是使用者主動要的資訊，不是背景事件，畫面上會直接
  * 列出每一週的名單。
@@ -27,7 +30,7 @@ export function useRebalanceQuestioners() {
       "meetings_rebalance_questioners",
       { p_dry_run: dryRun }
     )
-    if (error) throw new Error(error.message || "重新平衡提問人失敗")
+    if (error) throw new Error(error.message || "完整重排提問人失敗")
     return data as unknown as RebalanceResult
   }
 
@@ -41,9 +44,10 @@ export function useRebalanceQuestioners() {
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
-      qc.invalidateQueries({ queryKey: queryKeys.questionPool.members })
       toast.success(
-        `已重新平衡 ${result.weeks} 週、${result.assigned} 個提問名額`
+        result.added + result.removed > 0
+          ? `已完整重排 ${result.weeks} 週：新增 ${result.added}、移除 ${result.removed} 個提問名額`
+          : "已完整重排，名單沒有變動"
       )
     },
     onError: (e: Error) => toast.error(e.message),

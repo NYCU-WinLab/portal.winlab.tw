@@ -82,10 +82,16 @@ export async function GET(request: NextRequest) {
       .not("presenter", "is", null)
       .order("scheduled_date", { ascending: true })
       .limit(12),
+    // Everyone currently in the rotation: on the roster, not switched off, and
+    // a grad student. meeting_question_pool alone would also list paused
+    // members and graduates the automation no longer schedules.
     supabase
-      .from("meeting_question_pool")
-      .select("user_profiles(name)")
-      .order("created_at"),
+      .from("meeting_question_rotation")
+      .select("name")
+      .eq("is_enabled", true)
+      .eq("is_active", true)
+      .order("joined_on")
+      .order("user_id"),
   ])
 
   if (error || !meetingData) {
@@ -159,11 +165,7 @@ export async function GET(request: NextRequest) {
 
   // Backward-compatible array-of-arrays shape: a single element wrapping the
   // full question pool (fixed groups no longer exist).
-  const poolNames = (
-    (poolData ?? []) as unknown as Array<{
-      user_profiles: { name: string | null } | null
-    }>
-  ).map((row) => row.user_profiles?.name ?? "")
+  const poolNames = (poolData ?? []).map((row) => row.name ?? "")
   const questionGroups = [poolNames]
 
   return NextResponse.json(
