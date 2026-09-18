@@ -45,7 +45,7 @@ function QuestionerRow({
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{member.name ?? "—"}</span>
         <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {member.isPresenter ? "報告人" : "額外"}
+          {member.isPresenter ? "報告人" : "額外成員"}
         </span>
         <NotScheduledBadge labStatus={member.labStatus} />
         {!member.isEnabled && (
@@ -150,8 +150,8 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
               {!shown.frozenDate
                 ? "目前沒有可重排的未來週次"
                 : applied
-                  ? `已套用：${shown.frozenDate} 當週（含）以前維持不動，其後 ${shown.weeks} 週更動了 ${shown.added} 個名額`
-                  : `預覽：${shown.frozenDate} 當週（含）以前維持不動，其後 ${shown.weeks} 週會更動 ${shown.added} 個名額`}
+                  ? `已套用：${shown.frozenDate} 當週（含）以前維持不動，其後 ${shown.weeks} 週新增 ${shown.added}、移除 ${shown.removed} 個名額`
+                  : `預覽：${shown.frozenDate} 當週（含）以前維持不動，其後 ${shown.weeks} 週會新增 ${shown.added}、移除 ${shown.removed} 個名額`}
             </p>
             {shown.roster.length > 0 && (
               <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
@@ -207,7 +207,10 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
                 key={m.userId}
                 member={m}
                 isAdmin={isAdmin}
-                pending={setEnabled.isPending}
+                pending={
+                  setEnabled.isPending &&
+                  setEnabled.variables?.userId === m.userId
+                }
                 onToggle={(enabled) =>
                   setEnabled.mutate({ userId: m.userId, enabled })
                 }
@@ -220,7 +223,7 @@ export function QuestionPoolPanel({ isAdmin }: { isAdmin: boolean }) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            額外提問成員（不可為報告人）
+            額外提問成員（不可為報告人，在此新增或移除）
           </p>
           {isAdmin && (
             <Button

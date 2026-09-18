@@ -15,8 +15,9 @@
 --
 -- 2. The fairness clock, pool_added_at, was min(created_at) across the two
 --    tables: a derived value that moved whenever a row was deleted from either
---    one (removing 詹詠翔's question-pool row would have moved him from
---    2026-06-15 to 2026-08-08 and changed his rate).
+--    one (removing the question-pool row of a member who sat in both would
+--    have moved their clock from 2026-06-15 to 2026-08-08 and changed their
+--    rate).
 --
 -- 3. Fairness was maintained only when a week GAINED a roster (sync's greedy
 --    fill) or when a pool changed (full rebalance). Every operation that TAKES
@@ -146,18 +147,28 @@ alter table public.meeting_question_pool_pauses enable row level security;
 alter table public.meeting_questioner_exclusions enable row level security;
 alter table public.meetings_reconcile_pending enable row level security;
 
--- Invoker views read the pauses, so authenticated must see them; nobody but
--- the SECURITY DEFINER RPCs writes any of the three.
+-- Invoker views read the pauses, so authenticated must see them. Nobody but
+-- the SECURITY DEFINER functions writes any of the three — service_role
+-- included, which Supabase's default privileges would otherwise hand full DML.
 create policy "authenticated read meeting_question_pool_pauses"
   on public.meeting_question_pool_pauses for select to authenticated using (true);
 create policy "authenticated read meeting_questioner_exclusions"
   on public.meeting_questioner_exclusions for select to authenticated using (true);
 
-revoke all on public.meeting_question_pool_pauses from public, anon, authenticated;
-revoke all on public.meeting_questioner_exclusions from public, anon, authenticated;
-revoke all on public.meetings_reconcile_pending from public, anon, authenticated;
+revoke all on public.meeting_question_pool_pauses from public, anon, authenticated, service_role;
+revoke all on public.meeting_questioner_exclusions from public, anon, authenticated, service_role;
+revoke all on public.meetings_reconcile_pending from public, anon, authenticated, service_role;
 grant select on public.meeting_question_pool_pauses to authenticated, service_role;
 grant select on public.meeting_questioner_exclusions to authenticated, service_role;
+
+-- meeting_questioners is written only by SECURITY DEFINER functions from here
+-- on. A direct write would skip the reconcile — there is deliberately no arm
+-- trigger on this table, since the reconcile's own writes land here — so a
+-- deleted seat would simply never be paid back. The deployed frontend only
+-- ever reads it, so this does not wait for the contract migration.
+drop policy if exists "meetings admin write meeting_questioners" on public.meeting_questioners;
+revoke insert, update, delete, truncate on public.meeting_questioners
+  from public, anon, authenticated;
 
 -- ── 4. the single eligibility rule ─────────────────────────────────────────
 
@@ -348,8 +359,11 @@ grant select on public.meeting_question_pool_members to authenticated, service_r
 --           the seats there are to hand out. It is fractional; deviation
 --           d_i = held_i − ideal_i says how far a member is from their share.
 --   fill    Vacant seats go, week by week, to the eligible member with the
---           lowest d, then the #1140 order (rate, co-pairing, longest since
---           last asked, joined_on, user_id).
+--           lowest d, the #1140 order (rate, co-pairing, longest since last
+--           asked, joined_on, user_id) breaking ties. The freeze week is
+--           filled first and its new seats pinned like the rest of it, after
+--           which the ideal is taken again with them as floors — the state a
+--           second run starts from — so that run changes nothing.
 --   repair  While some member j is MORE THAN ONE seat further above their
 --           share than another member i is (d_j − d_i > 1), pass one seat
 --           from j to i. Directly if j holds a seat on a week i can take;
@@ -373,6 +387,9 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
+-- `drop table if exists pg_temp.…` NOTICEs on a session's first run, and this
+-- runs inside other people's COMMITs; keep that off their wire.
+set client_min_messages = warning
 as $$
 declare
   v_today    date := (now() at time zone 'Asia/Taipei')::date;
@@ -385,6 +402,7 @@ declare
   v_depth    int;
   v_repaired boolean;
   v_pick     uuid;
+  v_pass     int;
   v_seats    numeric;
   v_lo       numeric;
   v_hi       numeric;
@@ -518,6 +536,7 @@ begin
       where mq.user_id = q.user_id
         and m.scheduled_date <= v_today
         and m.scheduled_date >= q.joined_on
+        and not m.is_holiday
     ) as last_asked_date,
     (select count(*)::int from rq_assign a
       where a.user_id = q.user_id and a.pinned) as pinned,
@@ -532,104 +551,117 @@ begin
   from public.meeting_question_pool q
   join public.user_profiles up on up.id = q.user_id;
 
-  -- Seats the rotation members will share: each week ends with three seats,
-  -- or fewer if fewer can serve, or more if more are pinned — minus the
-  -- pinned seats of members outside the rotation (a NULL lab_status keeps
-  -- what it holds but takes no share).
-  select coalesce(sum(greatest(held_w, least(3, held_w + open_w))), 0)
-  into v_seats
-  from (
-    select
-      (select count(*) from rq_assign a where a.meeting_id = w.id) as held_w,
-      (select count(*) from rq_elig e
-        where e.meeting_id = w.id
-          and not exists (select 1 from rq_assign a
-                           where a.meeting_id = w.id and a.user_id = e.user_id)
-      ) as open_w
-    from rq_weeks w
-  ) t;
+  -- Fill, in two passes, each taking the ideal first. Pass 1 fills the
+  -- freeze week alone and PINS what it places, raising those members'
+  -- floors; pass 2 takes the ideal again with those floors and fills every
+  -- other week. The floors are what the next run will see, so without the
+  -- second ideal that run would reach a different one and move a seat after
+  -- an edit that changed nothing.
+  for v_pass in 1 .. 2 loop
+    -- Seats the rotation members will share: each week ends with three
+    -- seats, or fewer if fewer can serve, or more if more are pinned —
+    -- minus the pinned seats of members outside the rotation (a NULL
+    -- lab_status keeps what it holds but takes no share).
+    select coalesce(sum(greatest(held_w, least(3, held_w + open_w))), 0)
+    into v_seats
+    from (
+      select
+        (select count(*) from rq_assign a where a.meeting_id = w.id) as held_w,
+        (select count(*) from rq_elig e
+          where e.meeting_id = w.id
+            and not exists (select 1 from rq_assign a
+                             where a.meeting_id = w.id and a.user_id = e.user_id)
+        ) as open_w
+      from rq_weeks w
+    ) t;
 
-  v_seats := v_seats - (
-    select count(*) from rq_assign a
-    join rq_state st on st.user_id = a.user_id
-    where not st.in_rotation
-  );
+    v_seats := v_seats - (
+      select count(*) from rq_assign a
+      join rq_state st on st.user_id = a.user_id
+      where not st.in_rotation
+    );
 
-  -- Water-filling by bisection on L. Σ clamp(L·den − base, pinned, capacity)
-  -- is non-decreasing in L; sixty halvings are far below a thousandth of a
-  -- seat. A member with den = 0 sits at their pinned count whatever L is.
-  v_lo := 0;
-  select coalesce(max((capacity + base)::numeric / den), 0) + 1
-  into v_hi
-  from rq_state where in_rotation and den > 0;
+    -- Water-filling by bisection on L. Σ clamp(L·den − base, pinned,
+    -- capacity) is non-decreasing in L; sixty halvings are far below a
+    -- thousandth of a seat. A member with den = 0 sits at their pinned
+    -- count whatever L is.
+    v_lo := 0;
+    select coalesce(max((capacity + base)::numeric / den), 0) + 1
+    into v_hi
+    from rq_state where in_rotation and den > 0;
 
-  for k in 1 .. 60 loop
-    v_mid := (v_lo + v_hi) / 2;
-    select coalesce(sum(least(capacity, greatest(pinned, v_mid * den - base))), 0)
-    into v_sum
-    from rq_state where in_rotation;
-    if v_sum < v_seats then
-      v_lo := v_mid;
-    else
-      v_hi := v_mid;
-    end if;
-  end loop;
+    for k in 1 .. 60 loop
+      v_mid := (v_lo + v_hi) / 2;
+      select coalesce(sum(least(capacity, greatest(pinned, v_mid * den - base))), 0)
+      into v_sum
+      from rq_state where in_rotation;
+      if v_sum < v_seats then
+        v_lo := v_mid;
+      else
+        v_hi := v_mid;
+      end if;
+    end loop;
 
-  update rq_state
-  set ideal = least(capacity, greatest(pinned, v_hi * den - base))
-  where in_rotation;
+    update rq_state
+    set ideal = least(capacity, greatest(pinned, v_hi * den - base))
+    where in_rotation;
 
-  -- Fill: every vacancy, earliest week first.
-  for v_week in
-    select id, scheduled_date from rq_weeks order by scheduled_date, id
-  loop
+    for v_week in
+      select id, scheduled_date from rq_weeks
+      where (v_pass = 1) = (scheduled_date = v_freeze)
+      order by scheduled_date, id
     loop
-      exit when (select count(*) from rq_assign where meeting_id = v_week.id) >= 3;
+      loop
+        exit when (select count(*) from rq_assign where meeting_id = v_week.id) >= 3;
 
-      with roster as (
-        select mq.user_id, m.scheduled_date
-        from public.meeting_questioners mq
-        join public.meetings m on m.id = mq.meeting_id
-        where m.scheduled_date <= v_today
-          and m.scheduled_date >= v_week.scheduled_date - 56
-        union all
-        select a.user_id, a.scheduled_date
-        from rq_assign a
-        where a.scheduled_date < v_week.scheduled_date
-          and a.scheduled_date >= v_week.scheduled_date - 56
-      ),
-      paired as (
-        select r1.user_id as a, r2.user_id as b
-        from roster r1
-        join roster r2
-          on r2.scheduled_date = r1.scheduled_date and r2.user_id <> r1.user_id
-        where r1.scheduled_date < v_week.scheduled_date
-      )
-      select st.user_id into v_pick
-      from rq_state st
-      join rq_elig e on e.meeting_id = v_week.id and e.user_id = st.user_id
-      where not exists (
-        select 1 from rq_assign a
-        where a.meeting_id = v_week.id and a.user_id = st.user_id
-      )
-      order by
-        st.held - st.ideal asc,
-        case when st.den = 0 then 0::numeric
-             else round((st.base + st.held)::numeric / st.den, 6) end asc,
-        (select count(distinct a.user_id)
-           from rq_assign a
-           join paired pr on pr.a = st.user_id and pr.b = a.user_id
-          where a.meeting_id = v_week.id) asc,
-        st.last_asked_date asc nulls first,
-        st.joined_on asc,
-        st.user_id asc
-      limit 1;
+        with roster as (
+          select mq.user_id, m.scheduled_date
+          from public.meeting_questioners mq
+          join public.meetings m on m.id = mq.meeting_id
+          where m.scheduled_date <= v_today
+            and m.scheduled_date >= v_week.scheduled_date - 56
+          union all
+          select a.user_id, a.scheduled_date
+          from rq_assign a
+          where a.scheduled_date < v_week.scheduled_date
+            and a.scheduled_date >= v_week.scheduled_date - 56
+        ),
+        paired as (
+          select r1.user_id as a, r2.user_id as b
+          from roster r1
+          join roster r2
+            on r2.scheduled_date = r1.scheduled_date and r2.user_id <> r1.user_id
+          where r1.scheduled_date < v_week.scheduled_date
+        )
+        select st.user_id into v_pick
+        from rq_state st
+        join rq_elig e on e.meeting_id = v_week.id and e.user_id = st.user_id
+        where not exists (
+          select 1 from rq_assign a
+          where a.meeting_id = v_week.id and a.user_id = st.user_id
+        )
+        order by
+          st.held - st.ideal asc,
+          case when st.den = 0 then 0::numeric
+               else round((st.base + st.held)::numeric / st.den, 6) end asc,
+          (select count(distinct a.user_id)
+             from rq_assign a
+             join paired pr on pr.a = st.user_id and pr.b = a.user_id
+            where a.meeting_id = v_week.id) asc,
+          st.last_asked_date asc nulls first,
+          st.joined_on asc,
+          st.user_id asc
+        limit 1;
 
-      exit when v_pick is null;
+        exit when v_pick is null;
 
-      insert into rq_assign (meeting_id, user_id, scheduled_date, pinned, assigned_at)
-      values (v_week.id, v_pick, v_week.scheduled_date, false, null);
-      update rq_state set held = held + 1 where user_id = v_pick;
+        insert into rq_assign (meeting_id, user_id, scheduled_date, pinned, assigned_at)
+        values (v_week.id, v_pick, v_week.scheduled_date, v_pass = 1, null);
+        update rq_state
+        set held = held + 1,
+            pinned = pinned + case when v_pass = 1 then 1 else 0 end
+        where user_id = v_pick;
+      end loop;
     end loop;
   end loop;
 
@@ -1332,6 +1364,13 @@ begin
 
   if v_meeting.is_thesis then
     raise exception '碩論週由管理員指定，無法認領' using errcode = 'P0001';
+  end if;
+
+  -- A past week is history, not an open slot. Claiming one also used to be
+  -- a way to erase one's own seat on it: meetings_drop_presenter_questioner
+  -- removes the new presenter from that week's questioners on any date.
+  if v_meeting.scheduled_date < (now() at time zone 'Asia/Taipei')::date then
+    raise exception '已經過去的週次無法認領' using errcode = 'P0001';
   end if;
 
   if v_meeting.presenter_user_id is not null then

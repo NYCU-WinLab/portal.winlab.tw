@@ -30,7 +30,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(80);
+select plan(107);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,12 +60,27 @@ $$;
 -- max(held − ideal) − min(held − ideal) over rotation members, as the
 -- reconcile itself judges it (dry run: reads, writes nothing).
 create function pg_temp.spread() returns numeric language sql as $$
-  select coalesce(max(d) - min(d), 0)
+  select case when count(*) = 0 then null else max(d) - min(d) end
   from (
     select (m->>'held')::numeric - (m->>'ideal')::numeric as d
     from jsonb_array_elements(
            public.meetings_reconcile_questioners(false, true)->'members') m
   ) t
+$$;
+
+-- Future weeks left short of three while an eligible member sits idle.
+create function pg_temp.understaffed() returns int language sql stable as $$
+  select count(*)::int
+  from public.meetings m
+  where m.scheduled_date > pg_temp.today()
+    and public.meetings_week_takes_questioners(m.is_holiday, m.is_speaker, m.presenter_user_id)
+    and (select count(*) from public.meeting_questioners q where q.meeting_id = m.id) < 3
+    and exists (
+      select 1 from public.meeting_question_pool p
+      where public.meetings_questioner_can_serve(
+              p.user_id, m.id, m.scheduled_date, m.presenter_user_id, true)
+        and not exists (select 1 from public.meeting_questioners q
+                         where q.meeting_id = m.id and q.user_id = p.user_id))
 $$;
 
 create function pg_temp.pending() returns int language sql stable as $$
@@ -295,6 +310,42 @@ select is(
   'and takes the pause history with it'
 );
 
+-- Expand-phase shims: the deployed frontend still calls these by name.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_remove_from_pool('e3000000-0000-0000-0000-000000000002') $$,
+  '42501', NULL, 'the old remove RPC is still admin-only');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_add('e3000000-0000-0000-0000-000000000002');
+select lives_ok(
+  $$ select public.meetings_remove_from_pool('e3000000-0000-0000-0000-000000000002') $$,
+  'the old remove RPC forwards to the new one');
+select lives_ok(
+  $$ select public.meetings_sync_questioners(gen_random_uuid()) $$,
+  'the old sync RPC is accepted and does nothing');
+reset role;
+
+select is(
+  (select count(*)::int from public.meeting_question_pool
+    where user_id = 'e3000000-0000-0000-0000-000000000002'),
+  0,
+  'and the forwarded remove took the extra member off'
+);
+select has_column('public', 'meeting_question_rotation', 'pool_added_at',
+  'the rotation keeps pool_added_at for the deployed panel''s ordering');
+select bag_eq(
+  $$ select column_name::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'meeting_question_pool_members' $$,
+  $$ values ('user_id'), ('name'), ('email'), ('pool_added_at'), ('last_asked_date'),
+            ('times_asked'), ('is_active'), ('times_asked_scheduled'),
+            ('opportunities'), ('rate') $$,
+  'the extras view keeps exactly the columns the deployed panel reads'
+);
+
 -- ═══ B. the reconcile ══════════════════════════════════════════════════════
 -- Six members who joined long ago; five future weeks presented by people
 -- outside the roster; one past and one same-day week that must never be
@@ -315,6 +366,12 @@ insert into public.meetings (id, week_label, scheduled_date, presenter, presente
   ('f0000000-0000-0000-0000-000000000005', 'W5', pg_temp.w(5), 'X5', 'e2000000-0000-0000-0000-000000000005'),
   ('f0000000-0000-0000-0000-00000000000a', 'PAST', pg_temp.today() - 14, 'X6', 'e2000000-0000-0000-0000-000000000006'),
   ('f0000000-0000-0000-0000-00000000000b', 'TODAY', pg_temp.today(), 'X6', 'e2000000-0000-0000-0000-000000000006');
+
+-- Two weeks nearer than W1 that carry no roster: the freeze line must skip them.
+insert into public.meetings (id, week_label, scheduled_date, is_speaker, presenter) values
+  ('f1000000-0000-0000-0000-000000000001', 'TALK', pg_temp.today() + 3, true, 'Guest');
+insert into public.meetings (id, week_label, scheduled_date) values
+  ('f1000000-0000-0000-0000-000000000002', 'OPEN', pg_temp.today() + 4);
 
 select cmp_ok(pg_temp.pending(), '=', 1, 'any number of edits in one transaction queue one reconcile');
 select pg_temp.settle();
@@ -344,6 +401,19 @@ select ok(
   'fifteen seats among six members: everyone holds two or three'
 );
 select cmp_ok(pg_temp.spread(), '<=', 1.000001, 'nobody is more than one seat apart from anyone else');
+select is(pg_temp.understaffed(), 0, 'no week is left short while someone could take the seat');
+select is(
+  (public.meetings_reconcile_questioners(false, true)->>'frozenDate')::date,
+  pg_temp.w(1),
+  'the freeze line skips a speaker week and a week without a presenter'
+);
+select is(
+  (select count(*)::int from public.meeting_questioners
+    where meeting_id in ('f1000000-0000-0000-0000-000000000001',
+                         'f1000000-0000-0000-0000-000000000002')),
+  0,
+  'and neither of those weeks is staffed'
+);
 select ok(
   not exists (
     select 1 from public.meeting_questioners mq
@@ -377,6 +447,8 @@ delete from public.meetings where id = 'f0000000-0000-0000-0000-000000000003';
 reset role;
 select set_config('request.jwt.claims', '', true);
 
+create temp table b1_plan as
+  select public.meetings_reconcile_questioners(false, true) as r;
 select pg_temp.settle();
 
 select ok(
@@ -385,19 +457,26 @@ select ok(
   'twelve seats among six: the three who lost a seat are paid back, everyone holds two'
 );
 
--- Exactly the members who held three seats and did not sit on W3 must give
--- one up; nobody else moves.
+-- Every seat that changed hands outside W3 is one the repair reports moving,
+-- and it had to move at least one per member left holding three (more only
+-- when a transfer needs a chain through a third member).
 select is(
   (select count(*)::int from b1_before b
     where b.meeting_id <> 'f0000000-0000-0000-0000-000000000003'
       and not exists (select 1 from public.meeting_questioners q
                        where q.meeting_id = b.meeting_id and q.user_id = b.user_id)),
+  (select (r->>'moves')::int from b1_plan),
+  'nothing moves except what the repair reports'
+);
+select cmp_ok(
+  (select (r->>'moves')::int from b1_plan),
+  '>=',
   (select count(*)::int from b1_counts c
     where c.n = 3
       and not exists (select 1 from b1_before b
                        where b.meeting_id = 'f0000000-0000-0000-0000-000000000003'
                          and b.user_id = c.user_id)),
-  'the fewest seats move: one per over-served member, none otherwise'
+  'and at least one seat per member left over-served'
 );
 select results_eq(
   $$ select user_id, assigned_at from public.meeting_questioners
@@ -486,6 +565,24 @@ select results_eq(
   'an unclassified member keeps exactly the seats they held — no eviction, no new ones'
 );
 select cmp_ok(pg_temp.spread(), '<=', 1.000001, 'still within one seat after a graduation');
+select is(
+  public.meetings_questioner_can_serve('e1000000-0000-0000-0000-000000000003',
+    'f0000000-0000-0000-0000-000000000001', pg_temp.w(1),
+    'e2000000-0000-0000-0000-000000000001', true),
+  false,
+  'an unclassified member is never newly placed'
+);
+select is(
+  public.meetings_questioner_can_serve('e1000000-0000-0000-0000-000000000003',
+    'f0000000-0000-0000-0000-000000000001', pg_temp.w(1),
+    'e2000000-0000-0000-0000-000000000001', false),
+  true,
+  'but may keep a seat, or be placed by hand'
+);
+
+update public.user_profiles set lab_status = 'alumni'
+where id = 'e2000000-0000-0000-0000-000000000006';
+select is(pg_temp.pending(), 0, 'a lab_status change of someone off the roster queues nothing');
 
 update public.user_profiles set lab_status = 'master'
 where id = 'e1000000-0000-0000-0000-000000000003';
@@ -512,12 +609,11 @@ select is(
   3,
   'and the nearest week is refilled rather than left short'
 );
-select cmp_ok(
-  (select opportunities from public.meeting_question_rotation
-    where user_id = 'e1000000-0000-0000-0000-000000000004'),
-  '<',
-  (select opportunities from b5_opp),
-  'the paused weeks stop counting as opportunities they missed'
+select ok(
+  (select opportunities from b5_opp) > 0
+  and (select opportunities from public.meeting_question_rotation
+        where user_id = 'e1000000-0000-0000-0000-000000000004') = 0,
+  'every paused week stops counting as an opportunity they missed'
 );
 select cmp_ok(pg_temp.spread(), '<=', 1.000001, 'still within one seat while someone is paused');
 
@@ -594,6 +690,15 @@ select ok(
            where meeting_id = 'f0000000-0000-0000-0000-000000000005'
              and user_id = (select x from b6)),
   'the removal is recorded as an exclusion'
+);
+select ok(
+  not public.meetings_questioner_can_serve((select x from b6),
+        'f0000000-0000-0000-0000-000000000005', pg_temp.w(5),
+        'e2000000-0000-0000-0000-000000000005', true)
+  and public.meetings_questioner_can_serve((select x from b6),
+        'f0000000-0000-0000-0000-000000000005', pg_temp.w(5),
+        'e2000000-0000-0000-0000-000000000005', false),
+  'the exclusion binds the automation, not an admin'
 );
 
 set local role authenticated;
@@ -695,18 +800,22 @@ select cmp_ok(pg_temp.spread(), '<=', 1.000001, 'still within one seat after ins
 
 -- ── B9. an ordinary member claims a week ──────────────────────────────────
 
-insert into public.meetings (id, week_label, scheduled_date)
-values ('f0000000-0000-0000-0000-00000000000c', 'CLAIM', pg_temp.w(9));
+insert into public.meetings (id, week_label, scheduled_date) values
+  ('f0000000-0000-0000-0000-00000000000c', 'CLAIM', pg_temp.w(9)),
+  ('f0000000-0000-0000-0000-00000000000e', 'GONE', pg_temp.today() - 21);
 select pg_temp.settle();
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"e2000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.meetings_claim('f0000000-0000-0000-0000-00000000000e') $$,
+  'P0001', '已經過去的週次無法認領', 'a week that has passed cannot be claimed');
 select lives_ok(
   $$ select public.meetings_claim('f0000000-0000-0000-0000-00000000000c') $$,
   'a member claims an open week');
+select pg_temp.settle();
 reset role;
 select set_config('request.jwt.claims', '', true);
-select pg_temp.settle();
 
 select is(
   (select count(*)::int from public.meeting_questioners
@@ -729,7 +838,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 select ok(
   (select r ? 'dryRun' and r ? 'assigned' and r ? 'weeks' and r ? 'frozenDate'
-          and r ? 'added' and r ? 'removed'
+          and r ? 'added' and r ? 'removed' and (r->>'full')::boolean
      from (select public.meetings_rebalance_questioners(true) as r) t),
   'the dry run still answers in the shape the deployed panel reads'
 );
@@ -776,6 +885,138 @@ select results_eq(
   'but the week drops out of both sides of the rate at once'
 );
 
+-- ═══ D. boundaries ═════════════════════════════════════════════════════════
+
+-- D1. A pause starts tomorrow. R4 holds a hand-placed seat today and one
+-- tomorrow; switching R4 off takes the second, never the first.
+insert into public.meetings (id, week_label, scheduled_date, presenter, presenter_user_id) values
+  ('f0000000-0000-0000-0000-00000000000d', 'TMRW', pg_temp.today() + 1, 'X5', 'e2000000-0000-0000-0000-000000000005');
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f0000000-0000-0000-0000-00000000000b', 'e1000000-0000-0000-0000-000000000004', 'manual'),
+  ('f0000000-0000-0000-0000-00000000000d', 'e1000000-0000-0000-0000-000000000004', 'manual');
+select pg_temp.settle();
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000004', false);
+reset role;
+select set_config('request.jwt.claims', '', true);
+select pg_temp.settle();
+
+select results_eq(
+  $$ select meeting_id from public.meeting_questioners
+     where user_id = 'e1000000-0000-0000-0000-000000000004'
+       and meeting_id in ('f0000000-0000-0000-0000-00000000000b',
+                          'f0000000-0000-0000-0000-00000000000d') $$,
+  $$ values ('f0000000-0000-0000-0000-00000000000b'::uuid) $$,
+  'a pause switched on today takes tomorrow''s seat and leaves today''s'
+);
+select is(
+  (select count(*)::int from public.meeting_questioners
+    where meeting_id = 'f0000000-0000-0000-0000-00000000000d'),
+  3,
+  'tomorrow''s week — now the freeze week — is refilled'
+);
+select results_eq(
+  $$ select times_asked::int, opportunities from public.meeting_question_rotation
+     where user_id = 'e1000000-0000-0000-0000-000000000004' $$,
+  $$ values (1, 1) $$,
+  'today''s seat still counts, on both sides of the rate'
+);
+
+-- The resumed_on end of the interval, read straight off the rule.
+update public.meeting_question_pool_pauses set paused_on = pg_temp.today() - 7
+where user_id = 'e1000000-0000-0000-0000-000000000004';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000004', true);
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select ok(
+  not public.meetings_questioner_can_serve('e1000000-0000-0000-0000-000000000004',
+        'f0000000-0000-0000-0000-00000000000b', pg_temp.today(),
+        'e2000000-0000-0000-0000-000000000006', false)
+  and public.meetings_questioner_can_serve('e1000000-0000-0000-0000-000000000004',
+        'f0000000-0000-0000-0000-00000000000d', pg_temp.today() + 1,
+        'e2000000-0000-0000-0000-000000000005', true),
+  'resuming today reopens tomorrow: still paused on resumed_on − 1, eligible on it'
+);
+select pg_temp.settle();
+
+-- D2. A seat held by someone who is not on the roster at all goes, even on
+-- the freeze week. (Nothing but the functions writes meeting_questioners, and
+-- a write there queues nothing by design, so the queue entry is made by hand.)
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f0000000-0000-0000-0000-00000000000d', 'e2000000-0000-0000-0000-000000000002', 'manual');
+select public.meetings_request_reconcile();
+select pg_temp.settle();
+select ok(
+  not exists (select 1 from public.meeting_questioners
+               where meeting_id = 'f0000000-0000-0000-0000-00000000000d'
+                 and user_id = 'e2000000-0000-0000-0000-000000000002'),
+  'a seat whose holder is not on the roster is removed, freeze week or not'
+);
+select is(
+  (select (r->>'added')::int + (r->>'removed')::int
+     from (select public.meetings_reconcile_questioners(false, true) as r) t),
+  0,
+  'a reconcile right after one that refilled the freeze week changes nothing'
+);
+
+-- D3. Fewer people than seats: switch four members off and nothing errors,
+-- weeks simply run short, and none is short while someone could fill it.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000001', false);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000003', false);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000005', false);
+select public.meetings_question_pool_set_enabled('e1000000-0000-0000-0000-000000000006', false);
+reset role;
+select set_config('request.jwt.claims', '', true);
+select lives_ok($$ select pg_temp.settle() $$, 'a roster too small for three seats a week does not error');
+select ok(
+  exists (
+    select 1 from public.meetings m
+    where m.scheduled_date > pg_temp.today()
+      and m.presenter_user_id is not null and not m.is_holiday
+      and (select count(*) from public.meeting_questioners q where q.meeting_id = m.id) < 3),
+  'weeks run short when there is nobody left to take the seat'
+);
+select is(pg_temp.understaffed(), 0, 'but never while someone could take it');
+
+-- D4. The co-pairing tie-break, measured directly. Far in the past, so no
+-- reconcile below ever sees these weeks.
+insert into public.meetings (id, week_label, scheduled_date) values
+  ('f2000000-0000-0000-0000-000000000001', 'CP1', pg_temp.today() - 400),
+  ('f2000000-0000-0000-0000-000000000002', 'CP2', pg_temp.today() - 393),
+  ('f2000000-0000-0000-0000-000000000003', 'CP3', pg_temp.today() - 330);
+insert into public.meeting_questioners (meeting_id, user_id, source) values
+  ('f2000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000005', 'manual'),
+  ('f2000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000006', 'manual'),
+  ('f2000000-0000-0000-0000-000000000002', 'e1000000-0000-0000-0000-000000000006', 'manual'),
+  ('f2000000-0000-0000-0000-000000000003', 'e1000000-0000-0000-0000-000000000006', 'manual');
+
+select is(
+  public.meetings_recent_copair_count('e1000000-0000-0000-0000-000000000005',
+                                      'f2000000-0000-0000-0000-000000000002'),
+  1,
+  'a candidate who sat with this week''s roster a week ago scores one'
+);
+select is(
+  public.meetings_recent_copair_count('e1000000-0000-0000-0000-000000000005',
+                                      'f2000000-0000-0000-0000-000000000003'),
+  0,
+  'a pairing older than 56 days has stopped counting'
+);
+select is(
+  public.meetings_recent_copair_count('e1000000-0000-0000-0000-000000000001',
+                                      'f2000000-0000-0000-0000-000000000002'),
+  0,
+  'a candidate who has never sat with them scores zero'
+);
+
 -- ═══ C. structure ══════════════════════════════════════════════════════════
 
 -- Every table whose writes can change who should ask takes the rebalance key
@@ -813,7 +1054,9 @@ select is(
                        'public.meetings_question_pool_add(uuid)',
                        'public.meetings_question_pool_remove(uuid)',
                        'public.meetings_question_pool_set_enabled(uuid,boolean)']) f(sig)
-    cross join lateral (select pg_get_functiondef(f.sig::regprocedure) as d) x
+    cross join lateral (
+      select regexp_replace(pg_get_functiondef(f.sig::regprocedure), '--[^\n]*', '', 'g') as d
+    ) x
     where x.d ~ '(^|\n)\s*perform pg_advisory_xact_lock\(hashtext\(''meetings_rebalance_questioners''\)\);'
       and position('pg_advisory_xact_lock' in x.d) < least(
             coalesce(nullif(position('select * into v_' in x.d), 0), 2147483647),
@@ -828,8 +1071,12 @@ select ok(
   and not has_table_privilege('anon', 'public.meeting_questioner_exclusions', 'insert')
   and not has_table_privilege('authenticated', 'public.meeting_question_pool_pauses', 'insert')
   and not has_table_privilege('authenticated', 'public.meeting_questioner_exclusions', 'delete')
-  and not has_table_privilege('authenticated', 'public.meetings_reconcile_pending', 'select'),
-  'the new tables are written only through the RPCs'
+  and not has_table_privilege('authenticated', 'public.meetings_reconcile_pending', 'select')
+  and not has_table_privilege('service_role', 'public.meeting_question_pool_pauses', 'insert')
+  and not has_table_privilege('service_role', 'public.meetings_reconcile_pending', 'insert')
+  and not has_table_privilege('authenticated', 'public.meeting_questioners', 'insert')
+  and not has_table_privilege('authenticated', 'public.meeting_questioners', 'delete'),
+  'the new tables and meeting_questioners are written only through the functions'
 );
 select ok(
   not has_table_privilege('anon', 'public.meeting_questioner_stats', 'select')

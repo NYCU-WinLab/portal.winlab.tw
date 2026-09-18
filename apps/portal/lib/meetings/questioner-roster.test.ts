@@ -78,6 +78,18 @@ describe("replacementCandidates", () => {
     expect(replacementCandidates(pool, week)).toHaveLength(1)
   })
 
+  it("rejects a member Keycloak places outside the rotation, not only alumni", () => {
+    const pool = [member({ userId: "undergrad", labStatus: "undergrad" })]
+    expect(replacementCandidates(pool, week)).toHaveLength(0)
+  })
+
+  it("works for a week that has no presenter recorded", () => {
+    const pool = [member({ userId: "ok" })]
+    expect(
+      replacementCandidates(pool, { ...week, presenterUserId: null })
+    ).toHaveLength(1)
+  })
+
   it("accepts a member on the very day they joined", () => {
     const pool = [member({ userId: "sameDay", joinedOn: "2026-10-05" })]
     expect(replacementCandidates(pool, week)).toHaveLength(1)

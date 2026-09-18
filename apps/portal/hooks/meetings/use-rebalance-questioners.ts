@@ -30,7 +30,7 @@ export function useRebalanceQuestioners() {
       "meetings_rebalance_questioners",
       { p_dry_run: dryRun }
     )
-    if (error) throw new Error(error.message || "重新平衡提問人失敗")
+    if (error) throw new Error(error.message || "完整重排提問人失敗")
     return data as unknown as RebalanceResult
   }
 
@@ -45,8 +45,8 @@ export function useRebalanceQuestioners() {
       qc.invalidateQueries({ queryKey: queryKeys.questioners.all })
       qc.invalidateQueries({ queryKey: queryKeys.questionPool.all })
       toast.success(
-        result.added > 0
-          ? `已完整重排 ${result.weeks} 週，更動 ${result.added} 個提問名額`
+        result.added + result.removed > 0
+          ? `已完整重排 ${result.weeks} 週：新增 ${result.added}、移除 ${result.removed} 個提問名額`
           : "已完整重排，名單沒有變動"
       )
     },

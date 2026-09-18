@@ -31,7 +31,8 @@ export function extraCandidates<T extends { id: string }>(
  * （p_new_pick = false，也就是管理員手動指定）同一套規則的前端版本，用來
  * 過濾選單；真正的把關仍在 RPC：
  *
- * - 沒有被停用
+ * - 沒有被停用（比 RPC 嚴格：RPC 看的是當週日期是否落在停用區間，停用明天
+ *   才生效，所以今天剛停用的人 RPC 其實還收；選單直接不列，免得混淆）
  * - lab_status 是碩博士，或尚未同步（尚未同步的人管理員仍可手動指定）
  * - 不是當週報告人、還不在當週名單裡
  * - 當週日期不早於他加入名冊的日期
@@ -55,9 +56,8 @@ export function replacementCandidates(
 }
 
 /**
- * "2026-10-05" → "10/5". A YYYY-MM-DD value is a calendar date, not an
- * instant: split it rather than hand it to Date, which reads it as UTC midnight
- * and lands on the previous day anywhere west of Greenwich.
+ * "2026-10-05" → "10/5"。YYYY-MM-DD 是日曆日期不是時間點：直接拆字串，
+ * 不交給 Date —— Date 會把它當成 UTC 午夜，在格林威治以西的時區會變成前一天。
  */
 export function formatMonthDay(date: string): string {
   const [, month, day] = date.split("-").map(Number)

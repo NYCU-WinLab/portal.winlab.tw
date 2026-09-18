@@ -92,7 +92,8 @@ export function useRemovePoolMember() {
   })
 }
 
-/** 停用 / 恢復某人的提問。兩者都是明天起生效，今天的會議不受影響。 */
+/** Switches a member's questioning off or back on — both from tomorrow, so
+ * today's meeting is never affected. */
 export function useSetQuestionerEnabled() {
   const supabase = createClient()
   const invalidate = useInvalidateRoster()
