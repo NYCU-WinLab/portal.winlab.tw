@@ -30,7 +30,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(107);
+select plan(108);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -1064,6 +1064,29 @@ select is(
             coalesce(nullif(position('from public.meetings' in x.d), 0), 2147483647))),
   10,
   'every writer takes the same key, as a live statement, before touching meetings'
+);
+
+-- PostgREST sessions preload safeupdate, which rejects a DELETE or UPDATE
+-- with no WHERE clause even inside a function. This suite runs as postgres,
+-- which does not load it, so a bare `delete from rq_bfs;` passed every test
+-- here and failed every repairing COMMIT made through the API. Checked by
+-- reading the bodies instead.
+select is(
+  (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+     cross join lateral (
+       select regexp_replace(pg_get_functiondef(p.oid), '--[^\n]*', '', 'g') as d
+     ) x
+    where n.nspname = 'public'
+      and p.proname like 'meetings\_%'
+      and p.prokind = 'f'
+      and exists (
+        select 1 from regexp_split_to_table(x.d, ';') stmt
+        where stmt ~* '^\s*(delete\s+from|update)\s'
+          and stmt !~* '\mwhere\M')),
+  '{}'::text[],
+  'no meetings function issues a DELETE or UPDATE that safeupdate would reject'
 );
 
 select ok(

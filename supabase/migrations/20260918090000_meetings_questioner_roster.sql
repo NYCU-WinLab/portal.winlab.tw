@@ -706,7 +706,10 @@ begin
       );
 
       v_target := null;
-      delete from rq_bfs;
+      -- `where true`, not a bare delete: PostgREST sessions preload Supabase's
+      -- safeupdate, which rejects any DELETE/UPDATE without a WHERE clause —
+      -- inside functions too, and this runs inside their COMMITs.
+      delete from rq_bfs where true;
       insert into rq_bfs (user_id, depth) values (v_donor.user_id, 0);
 
       for v_depth in 1 .. 4 loop
