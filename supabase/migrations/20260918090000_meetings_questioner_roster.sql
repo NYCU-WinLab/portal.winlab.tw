@@ -168,7 +168,7 @@ grant select on public.meeting_questioner_exclusions to authenticated, service_r
 -- ever reads it, so this does not wait for the contract migration.
 drop policy if exists "meetings admin write meeting_questioners" on public.meeting_questioners;
 revoke insert, update, delete, truncate on public.meeting_questioners
-  from public, anon, authenticated;
+  from public, anon, authenticated, service_role;
 
 -- ── 4. the single eligibility rule ─────────────────────────────────────────
 
@@ -376,7 +376,15 @@ grant select on public.meeting_question_pool_members to authenticated, service_r
 --
 -- So an edit that leaves the roster within one seat of fair changes nothing,
 -- and one that does not is fixed by the fewest seat moves, preferring the
--- latest weeks. Each repair lowers Σd², so it terminates. Picking the target
+-- latest weeks.
+--
+-- The one trade: the freeze week's seats — including ones this run places —
+-- never move. Occasionally the only move that would close a gap runs through
+-- that week, and the gap stays (≤ about one seat) until the week passes and
+-- its seats become history, which the next run's shares absorb. Letting this
+-- run move a seat it just placed there would make the next run, which sees
+-- that seat as fixed, disagree with it — exactly the drift the pinning
+-- exists to prevent. Each repair lowers Σd², so it terminates. Picking the target
 -- counts from a fresh greedy instead (the first draft of this) moved people
 -- needlessly whenever members were tied, which in prod most of them are.
 

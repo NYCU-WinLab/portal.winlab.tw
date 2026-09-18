@@ -1075,7 +1075,8 @@ select ok(
   and not has_table_privilege('service_role', 'public.meeting_question_pool_pauses', 'insert')
   and not has_table_privilege('service_role', 'public.meetings_reconcile_pending', 'insert')
   and not has_table_privilege('authenticated', 'public.meeting_questioners', 'insert')
-  and not has_table_privilege('authenticated', 'public.meeting_questioners', 'delete'),
+  and not has_table_privilege('authenticated', 'public.meeting_questioners', 'delete')
+  and not has_table_privilege('service_role', 'public.meeting_questioners', 'insert'),
   'the new tables and meeting_questioners are written only through the functions'
 );
 select ok(
