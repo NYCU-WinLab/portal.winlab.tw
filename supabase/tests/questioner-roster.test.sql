@@ -30,7 +30,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(108);
+select plan(112);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -264,6 +264,12 @@ select results_eq(
   $$ values (pg_temp.today() - 7, pg_temp.today() + 1) $$,
   'resuming closes the pause from tomorrow and keeps its history'
 );
+select is(
+  (select is_enabled from public.meeting_question_rotation
+    where user_id = 'e3000000-0000-0000-0000-000000000001'),
+  true,
+  'a pause that resumes tomorrow already reads as switched on'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
@@ -276,6 +282,44 @@ select results_eq(
   $$ values (pg_temp.today() - 7, null::date) $$,
   'switching off again the same day reopens that pause instead of leaving a one-day gap'
 );
+
+-- #1176: a pause that starts next month is not in force yet, so the member
+-- reads as switched on; switching off brings the pause forward to tomorrow.
+delete from public.meeting_question_pool_pauses
+where user_id = 'e3000000-0000-0000-0000-000000000001';
+insert into public.meeting_question_pool_pauses (user_id, paused_on)
+values ('e3000000-0000-0000-0000-000000000001', pg_temp.today() + 30);
+
+select is(
+  (select is_enabled from public.meeting_question_rotation
+    where user_id = 'e3000000-0000-0000-0000-000000000001'),
+  true,
+  'a pause that has not started yet reads as switched on'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_set_enabled('e3000000-0000-0000-0000-000000000001', false);
+reset role;
+
+select results_eq(
+  $$ select paused_on, resumed_on from public.meeting_question_pool_pauses
+     where user_id = 'e3000000-0000-0000-0000-000000000001' $$,
+  $$ values (pg_temp.today() + 1, null::date) $$,
+  'switching off a member whose pause starts later brings it forward to tomorrow'
+);
+select is(
+  (select is_enabled from public.meeting_question_rotation
+    where user_id = 'e3000000-0000-0000-0000-000000000001'),
+  false,
+  'and the member now reads as switched off'
+);
+
+-- Put back the state the following tests expect.
+delete from public.meeting_question_pool_pauses
+where user_id = 'e3000000-0000-0000-0000-000000000001';
+insert into public.meeting_question_pool_pauses (user_id, paused_on)
+values ('e3000000-0000-0000-0000-000000000001', pg_temp.today() - 7);
 
 -- promotion and departure
 update public.meeting_question_pool set joined_on = pg_temp.today() - 30
