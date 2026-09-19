@@ -177,9 +177,8 @@ async function placeOccurrence(
       groupName: schedule.group_name,
       agenda: schedule.agenda,
       deliverables: schedule.deliverables ?? [],
-      // Carried to every occurrence: a standing series belongs to the same
-      // epic each week, and a week that arrived without it would file itself
-      // as a parentless one-off.
+      // Carried to every occurrence: the helper creates/reuses a distinct
+      // child under this Sync container for each booking request.
       issueRefs: schedule.issue_refs ?? [],
     })
     result.booked++

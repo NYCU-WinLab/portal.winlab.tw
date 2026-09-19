@@ -158,7 +158,11 @@ export async function getEpicDeliverables(
   if (!groupPath) {
     return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
   }
-  return fetchEpicDeliverables(groupPath, iid)
+  const epic = await fetchEpic(groupPath, iid)
+  if (!epic) {
+    return { status: "error", detail: `讀不到 Epic &${iid}` }
+  }
+  return fetchEpicDeliverables(groupPath, epic)
 }
 
 /**
@@ -167,45 +171,57 @@ export async function getEpicDeliverables(
  *
  * Both halves are resolved from GitLab rather than taken from the form. The
  * references are pinned to the group being booked under — a reference to
- * anything else is dropped rather than forwarded, since it would put a marker
- * comment on some other project's epic. The deliverables then come from the
- * issues linked under those epics, because the epic is the meeting and owes
- * nothing itself. An ad-hoc meeting has no epic and therefore none.
+ * anything else fails explicitly rather than targeting another project.
+ * Sync containers intentionally contribute no agenda or deliverables;
+ * tracked meetings and Reports derive their issue scope from GitLab.
  *
- * Never throws. A GitLab outage costs the booking its epic link, not the
- * room — the pipeline's fallback for a booking with no ISSUE_REFS is to open
- * a standalone epic, which is recoverable by hand.
+ * A selected epic is never silently downgraded to ad-hoc. In particular, a
+ * Report with an invalid iteration must be fixed before booking, and a
+ * recurring series may only reuse a Sync container.
  */
 async function resolveEpicLink(
   groupName: string | null | undefined,
-  requested: readonly string[]
+  requested: readonly string[],
+  recurring = false
 ): Promise<{ issueRefs: string[]; deliverables: string[] }> {
   const empty = { issueRefs: [], deliverables: [] }
   if (requested.length === 0) return empty
 
   const groupPath = await gitlabPathForGroup(groupName)
-  if (!groupPath) return empty
+  if (!groupPath) {
+    throw new Error("所選群組沒有設定 gitlab_path，無法確認 Epic")
+  }
 
   const refs = requested
     .map((raw) => parseEpicRef(raw, groupPath))
     .filter((ref) => ref !== null)
     .filter((ref) => ref.groupPath === groupPath)
 
-  if (refs.length === 0) return empty
+  if (refs.length !== requested.length || refs.length === 0) {
+    throw new Error("Epic reference 無效或不屬於所選群組")
+  }
 
-  // Confirms each epic exists and is readable before it's stored. An epic
-  // that comes back null is dropped rather than failing the booking — the
-  // marker is worth losing, the room isn't.
-  const epics = (
-    await Promise.all(refs.map((ref) => fetchEpic(groupPath, ref.iid)))
-  ).filter((epic) => epic !== null)
-
-  // A failed read leaves the booking's deliverables empty rather than
-  // stopping it. The epic link is the part that matters and it survives; the
-  // labels are a summary that GitLab can restate later.
-  const deliverables = await Promise.all(
-    epics.map((epic) => fetchEpicDeliverables(groupPath, epic.iid))
+  const resolved = await Promise.all(
+    refs.map((ref) => fetchEpic(groupPath, ref.iid))
   )
+  if (resolved.some((epic) => epic === null)) {
+    throw new Error("所選 Epic 已不存在或目前無法讀取")
+  }
+  const epics = resolved.filter((epic) => epic !== null)
+
+  if (recurring && epics.some((epic) => epic.classification !== "sync")) {
+    throw new Error(
+      "固定群組會議只能選 Sync container；Report 與單場 Meeting 不能重複使用"
+    )
+  }
+
+  const deliverables = await Promise.all(
+    epics.map((epic) => fetchEpicDeliverables(groupPath, epic))
+  )
+  const failed = deliverables.find((result) => result.status === "error")
+  if (failed?.status === "error") {
+    throw new Error(`無法確認所選 Epic:${failed.detail}`)
+  }
 
   return {
     issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
@@ -417,10 +433,12 @@ export async function confirmBooking(
   })
   const title = composeTopic(prefix, input.titleSuffix)
 
-  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
-
-  const supabase = await createClient()
   try {
+    const epicLink = await resolveEpicLink(
+      input.groupName,
+      input.issueRefs ?? []
+    )
+    const supabase = await createClient()
     const outcome = await placeBooking(supabase, requireServiceAccount(), {
       date: input.date,
       room: input.room,
@@ -462,31 +480,57 @@ export async function confirmBooking(
  * something is genuinely left behind, since it will still start and still
  * record.
  */
-async function cancelTeamsMeeting(
-  bookingId: string,
-  date: string,
+async function cancelTeamsMeeting(booking: {
+  id: string
+  date: string
   startTime: string
-): Promise<void> {
+  title: string
+  groupName: string | null
+  issueRefs: string[]
+}): Promise<void> {
   if (!meetingPipelineConfigured()) return
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("rooms_meeting_requests")
+    .select("request_id, cancel_id, message_id")
+    .eq("booking_id", booking.id)
+    .eq("kind", "create")
+    .not("cancel_id", "is", null)
+    .not("message_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error(
+      "[rooms] could not resolve original meeting request for cancellation",
+      error
+    )
+    return
+  }
+  if (!data) {
+    console.warn(
+      "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
+    )
+    return
+  }
+  if (!data.cancel_id || !data.message_id) {
+    console.warn(
+      "[rooms] original create request has no completed Teams cancellation identity"
+    )
+    return
+  }
+
   try {
-    const admin = createAdminClient()
-    const { data } = await admin
-      .from("rooms_meeting_requests")
-      .select("cancel_id, message_id")
-      .eq("booking_id", bookingId)
-      .eq("kind", "create")
-      .eq("status", "success")
-      .maybeSingle()
-
-    // No successful creation means there's no meeting to take down — the
-    // request failed, or never happened.
-    if (!data?.cancel_id || !data.message_id) return
-
     await triggerMeetingCancel(admin, {
-      bookingId,
+      bookingId: booking.id,
+      bookingRequestId: data.request_id,
+      title: booking.title,
+      groupName: booking.groupName,
+      issueRefs: booking.issueRefs,
       cancelId: data.cancel_id,
       messageId: data.message_id,
-      start: taipeiIso(date, startTime),
+      start: taipeiIso(booking.date, booking.startTime),
       reason: "此會議已取消(教室預約已取消)",
     })
   } catch (err) {
@@ -545,7 +589,14 @@ export async function cancelBooking(bookingId: string): Promise<BookingResult> {
     }
   }
 
-  await cancelTeamsMeeting(booking.id, booking.date, booking.start_time)
+  await cancelTeamsMeeting({
+    id: booking.id,
+    date: booking.date,
+    startTime: booking.start_time,
+    title: booking.title ?? `${booking.room ?? "線上"} 會議`,
+    groupName: booking.group_name,
+    issueRefs: booking.issue_refs ?? [],
+  })
 
   revalidatePath("/rooms")
 
@@ -682,8 +733,8 @@ export interface CreateRecurringInput {
   /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
   agenda?: string | null
   /**
-   * Epics every occurrence of this series belongs to. Deliverables follow
-   * from them, as with a one-off booking.
+   * Optional Sync container reused by every occurrence. A selected Report or
+   * single Meeting is rejected server-side.
    */
   issueRefs?: string[]
 }
@@ -722,7 +773,11 @@ export async function createRecurringMeeting(
   // Frozen at creation for the same reason the prefix is: the epic a standing
   // series reports into shouldn't change under it because someone relabelled
   // something in GitLab midway through a term.
-  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+  const epicLink = await resolveEpicLink(
+    input.groupName,
+    input.issueRefs ?? [],
+    true
+  )
 
   const supabase = await createClient()
   const { data: created, error } = await supabase
