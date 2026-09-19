@@ -4,6 +4,8 @@
 -- meetings_questioner_can_serve (which checks paused_on) kept seating the
 -- member until then.
 
+-- pool_added_at survives the expand phase only: the deployed frontend orders
+-- by it. The contract migration drops it.
 create or replace view public.meeting_question_rotation
 with (security_invoker = true) as
 select
@@ -18,7 +20,12 @@ select
   st.times_asked_scheduled,
   st.opportunities,
   st.rate,
+  -- The reason behind is_active, for the panel's 「未排程」 hint — the same
+  -- column meeting_presenter_roster already exposes.
   up.lab_status,
+  -- Off iff a pause covers tomorrow, as the half-open [paused_on, resumed_on)
+  -- that meetings_questioner_can_serve uses — tomorrow being the day
+  -- set_enabled's changes take effect.
   not exists (
     select 1 from public.meeting_question_pool_pauses z
     where z.user_id = st.user_id

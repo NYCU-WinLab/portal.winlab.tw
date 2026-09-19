@@ -30,7 +30,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(111);
+select plan(112);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -263,6 +263,12 @@ select results_eq(
      where user_id = 'e3000000-0000-0000-0000-000000000001' $$,
   $$ values (pg_temp.today() - 7, pg_temp.today() + 1) $$,
   'resuming closes the pause from tomorrow and keeps its history'
+);
+select is(
+  (select is_enabled from public.meeting_question_rotation
+    where user_id = 'e3000000-0000-0000-0000-000000000001'),
+  true,
+  'a pause that resumes tomorrow already reads as switched on'
 );
 
 set local role authenticated;
