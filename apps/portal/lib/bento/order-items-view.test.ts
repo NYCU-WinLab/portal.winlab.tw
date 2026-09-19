@@ -5,8 +5,10 @@ import {
   describeCopyPlan,
   formatItemDateTime,
   groupByPerson,
+  isOverBudget,
   itemPrice,
   sortByTime,
+  type PersonGroup,
   type ViewOrderItem,
 } from "./order-items-view"
 
@@ -161,6 +163,40 @@ describe("countItemsByUser", () => {
   it("does not match anonymous items, whose user_id is null", () => {
     const items = [item({ id: "a", user_id: null, anonymous_name: "訪客" })]
     expect(countItemsByUser(items, "u1")).toBe(0)
+  })
+})
+
+describe("isOverBudget", () => {
+  function group(overrides: Partial<PersonGroup>): PersonGroup {
+    return {
+      key: "u1",
+      userId: "u1",
+      userName: "王小明",
+      contact: null,
+      items: [],
+      total: 0,
+      ...overrides,
+    }
+  }
+
+  it("flags a total above 140", () => {
+    expect(isOverBudget(group({ total: 141 }))).toBe(true)
+  })
+
+  it("does not flag exactly 140 — the limit itself is allowed", () => {
+    expect(isOverBudget(group({ total: 140 }))).toBe(false)
+  })
+
+  it("does not flag a total below 140", () => {
+    expect(isOverBudget(group({ total: 139 }))).toBe(false)
+  })
+
+  it("never flags 曾建超, however much he orders", () => {
+    expect(isOverBudget(group({ userName: "曾建超", total: 180 }))).toBe(false)
+  })
+
+  it("flags a nameless group over the limit", () => {
+    expect(isOverBudget(group({ userName: null, total: 165 }))).toBe(true)
   })
 })
 
