@@ -17,6 +17,7 @@ import {
   describeCopyPlan,
   formatItemDateTime,
   groupByPerson,
+  isOverBudget,
   itemPersonName,
   sortByTime,
   type PersonGroup,
@@ -140,76 +141,88 @@ export function OrderItemsList({
               {deleteButton(item)}
             </div>
           ))
-        : groupByPerson(items, currentUserId).map((group) => (
-            <div
-              key={group.key}
-              className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-4"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                  {group.userName || "未知"}
-                  {group.contact && (
-                    <span className="text-xs font-normal text-muted-foreground">
-                      ({group.contact})
-                    </span>
-                  )}
-                  {canCopy(group) && (
-                    <ConfirmDialog
-                      trigger={
-                        // Icon + label, not icon alone: IconCopy reads as "make
-                        // another one", but this replaces. The icon carries
-                        // "copy", the words carry what is being copied — 這份,
-                        // the card this button sits on. No pronoun, so nothing
-                        // here guesses at anyone's gender, and the name beside
-                        // it already says whose order it is.
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-6 gap-1 px-2 py-0 text-xs"
-                        >
-                          <IconCopy className="size-3" />
-                          照這份點
-                        </Button>
-                      }
-                      title={`訂餐改成和 ${group.userName || "對方"} 一樣？`}
-                      description={describeCopyPlan(
-                        group.userName || "對方",
-                        group.items.length,
-                        myItemCount
-                      )}
-                      confirmText="照這份點"
-                      variant={myItemCount > 0 ? "destructive" : "default"}
-                      onConfirm={() => handleCopy(group)}
-                    />
-                  )}
-                </div>
-                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  {group.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">
-                        {formatItemDateTime(item.created_at)}
+        : groupByPerson(items, currentUserId).map((group) => {
+            const overBudget = isOverBudget(group)
+            return (
+              <div
+                key={group.key}
+                className={cn(
+                  "flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-4",
+                  overBudget &&
+                    "border-red-200 bg-red-50 dark:border-red-400/25 dark:bg-red-400/10"
+                )}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                    {group.userName || "未知"}
+                    {group.contact && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        ({group.contact})
                       </span>
-                      <span>{item.menu_items?.name}</span>
-                      <ItemOptionBadges
-                        item={item}
-                        restaurantAdditional={restaurantAdditional}
+                    )}
+                    {canCopy(group) && (
+                      <ConfirmDialog
+                        trigger={
+                          // Icon + label, not icon alone: IconCopy reads as "make
+                          // another one", but this replaces. The icon carries
+                          // "copy", the words carry what is being copied — 這份,
+                          // the card this button sits on. No pronoun, so nothing
+                          // here guesses at anyone's gender, and the name beside
+                          // it already says whose order it is.
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 gap-1 px-2 py-0 text-xs"
+                          >
+                            <IconCopy className="size-3" />
+                            照這份點
+                          </Button>
+                        }
+                        title={`訂餐改成和 ${group.userName || "對方"} 一樣？`}
+                        description={describeCopyPlan(
+                          group.userName || "對方",
+                          group.items.length,
+                          myItemCount
+                        )}
+                        confirmText="照這份點"
+                        variant={myItemCount > 0 ? "destructive" : "default"}
+                        onConfirm={() => handleCopy(group)}
                       />
-                      {deleteButton(item)}
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-wrap items-center gap-2"
+                      >
+                        <span className="shrink-0 text-xs text-muted-foreground/70 tabular-nums">
+                          {formatItemDateTime(item.created_at)}
+                        </span>
+                        <span>{item.menu_items?.name}</span>
+                        <ItemOptionBadges
+                          item={item}
+                          restaurantAdditional={restaurantAdditional}
+                        />
+                        {deleteButton(item)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-xs text-muted-foreground">總計</div>
+                  <div
+                    className={cn(
+                      "text-sm font-medium",
+                      overBudget && "text-red-800 dark:text-red-300"
+                    )}
+                  >
+                    NT$ {group.total.toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <div className="shrink-0 text-right">
-                <div className="text-xs text-muted-foreground">總計</div>
-                <div className="text-sm font-medium">
-                  NT$ {group.total.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
     </div>
   )
 }
