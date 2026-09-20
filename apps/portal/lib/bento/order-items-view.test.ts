@@ -191,8 +191,29 @@ describe("isOverBudget", () => {
     expect(isOverBudget(group({ total: 139 }))).toBe(false)
   })
 
-  it("never flags 曾建超, however much he orders", () => {
-    expect(isOverBudget(group({ userName: "曾建超", total: 180 }))).toBe(false)
+  it("never flags 曾建超老師, however much he orders", () => {
+    expect(
+      isOverBudget(
+        group({
+          userId: "7b14c1a8-f142-4681-a738-b723f88803a0",
+          userName: "曾建超",
+          total: 180,
+        })
+      )
+    ).toBe(false)
+  })
+
+  it("still flags a guest who types the same name 曾建超", () => {
+    expect(
+      isOverBudget(
+        group({
+          key: "anon:曾建超",
+          userId: null,
+          userName: "曾建超",
+          total: 180,
+        })
+      )
+    ).toBe(true)
   })
 
   it("flags a nameless group over the limit", () => {
