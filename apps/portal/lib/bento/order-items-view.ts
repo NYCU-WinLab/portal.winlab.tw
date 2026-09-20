@@ -91,6 +91,16 @@ export function groupByPerson(
   })
 }
 
+// Lab rule: one person's lunch stays at or under NT$ 140. The card tints red
+// only once the total is strictly above it — exactly 140 is still allowed.
+// The exempt user is matched by id, not display name, so a guest who types the
+// same name can't borrow the exemption (guest groups carry userId = null).
+export function isOverBudget(group: PersonGroup): boolean {
+  const BUDGET_LIMIT = 140
+  const BUDGET_EXEMPT_USER_ID = "7b14c1a8-f142-4681-a738-b723f88803a0" // 曾建超老師
+  return group.total > BUDGET_LIMIT && group.userId !== BUDGET_EXEMPT_USER_ID
+}
+
 // Counts the items a given person already has in the order. Used to word the
 // "照這份點" confirmation, which is destructive only when this is non-zero.
 export function countItemsByUser(
