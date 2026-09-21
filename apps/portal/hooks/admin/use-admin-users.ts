@@ -2,28 +2,19 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { fetchAdminUsers } from "@/lib/admin/fetch"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
 
-export interface AdminUser {
-  id: string
-  name: string | null
-  email: string
-  is_admin: boolean
-  roles: Record<string, string[]>
-}
+export type { AdminUser } from "@/lib/admin/fetch"
 
 export function useAdminUsers() {
   const supabase = createClient()
 
   return useQuery({
     queryKey: queryKeys.users,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("portal_admin_get_users")
-      if (error) throw error
-      return (data ?? []) as AdminUser[]
-    },
+    queryFn: () => fetchAdminUsers(supabase),
   })
 }
 

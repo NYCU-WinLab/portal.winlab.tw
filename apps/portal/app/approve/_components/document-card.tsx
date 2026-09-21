@@ -5,14 +5,8 @@ import type { ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 
-import type { ApproveDocument, DocumentStatus } from "@/lib/approve/types"
-
-const STATUS_LABEL: Record<DocumentStatus, string> = {
-  draft: "草稿",
-  pending: "送簽中",
-  completed: "已完成",
-  cancelled: "已取消",
-}
+import { DOCUMENT_STATUS_LABEL } from "@/lib/approve/labels"
+import type { ApproveDocument } from "@/lib/approve/types"
 
 export function DocumentCard({
   href,
@@ -34,7 +28,7 @@ export function DocumentCard({
           <span className="truncate text-sm font-medium">{title}</span>
           {status && (
             <Badge variant="outline" className="text-xs">
-              {STATUS_LABEL[status]}
+              {DOCUMENT_STATUS_LABEL[status]}
             </Badge>
           )}
         </div>

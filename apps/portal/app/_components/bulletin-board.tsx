@@ -4,20 +4,20 @@ import { Pin } from "lucide-react"
 import { Badge } from "@workspace/ui/components/badge"
 
 import { createClient } from "@/lib/supabase/server"
-import { toAnnouncement, type DbAnnouncement } from "@/lib/bulletin/types"
+import { fetchAnnouncements } from "@/lib/bulletin/fetch"
+import { toAnnouncement } from "@/lib/bulletin/types"
 
 import { BulletinAdminBar } from "./bulletin-admin-bar"
 
-async function fetchAnnouncements() {
+async function loadAnnouncements() {
   const supabase = await createClient()
-  const { data } = await supabase
-    .from("announcements")
-    .select("*")
-    .eq("is_published", true)
-    .order("pinned", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(10)
-  return (data ?? []).map((r) => toAnnouncement(r as DbAnnouncement))
+  try {
+    return (await fetchAnnouncements(supabase)).map(toAnnouncement)
+  } catch {
+    // The board is one strip of the portal home page; a bulletin outage
+    // leaves it empty instead of taking the whole page down.
+    return []
+  }
 }
 
 async function checkIsAdmin() {
@@ -28,7 +28,7 @@ async function checkIsAdmin() {
 
 export async function BulletinBoard() {
   const [announcements, isAdmin] = await Promise.all([
-    fetchAnnouncements(),
+    loadAnnouncements(),
     checkIsAdmin(),
   ])
 

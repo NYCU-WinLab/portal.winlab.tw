@@ -6,7 +6,8 @@ import { Badge } from "@workspace/ui/components/badge"
 
 import { PortalShell } from "@/components/portal-shell"
 import { createClient } from "@/lib/supabase/server"
-import { toAnnouncement, type DbAnnouncement } from "@/lib/bulletin/types"
+import { fetchAnnouncement } from "@/lib/bulletin/fetch"
+import { toAnnouncement } from "@/lib/bulletin/types"
 
 import { AnnouncementActions } from "./_components/announcement-actions"
 
@@ -18,19 +19,16 @@ export default async function BulletinDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data }, { data: isAdminData }] = await Promise.all([
-    supabase
-      .from("announcements")
-      .select("*")
-      .eq("id", id)
-      .eq("is_published", true)
-      .maybeSingle(),
+  const [row, { data: isAdminData }] = await Promise.all([
+    // A read that fails is indistinguishable from an id nobody published, and
+    // both should land on the 404 this page already shows.
+    fetchAnnouncement(supabase, id).catch(() => null),
     supabase.rpc("is_portal_admin"),
   ])
 
-  if (!data) notFound()
+  if (!row) notFound()
 
-  const a = toAnnouncement(data as DbAnnouncement)
+  const a = toAnnouncement(row)
   const isAdmin = isAdminData === true
 
   return (

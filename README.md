@@ -38,7 +38,7 @@ The portal exposes a remote MCP server at `https://portal.winlab.tw/api/mcp` (St
 claude mcp add --transport http portal https://portal.winlab.tw/api/mcp
 ```
 
-Tools today: `whoami`, `list_receipts`, `upload_receipt`, `list_trips`, `list_trip_files`. Add more in `apps/portal/lib/mcp/server.ts`, and name the new tool in `apps/portal/lib/mcp/instructions.ts` (the initialize `instructions` an agent reads before calling anything; the test enforces the pairing).
+Every app has tools (28 today): reads for all of them, plus the low-risk writes a member can already do for themselves (`upload_receipt`, bento `add_bento_order_item` / `remove_bento_order_item`, `create_leave` / `delete_leave`, `post_bulletin_message`). Unlocking the door, booking rooms, signing, bookkeeping and role changes deliberately have no tool. Tools live one module per app in `apps/portal/lib/mcp/tools/`; name every new tool in `apps/portal/lib/mcp/instructions.ts` (the initialize `instructions` an agent reads before calling anything; the test enforces the pairing).
 
 One app lives on its own subdomain because its design system diverges from portal:
 

@@ -5,12 +5,12 @@ import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { UserCard } from "@/components/user-card"
 import { accountConsoleUrl } from "@/lib/keycloak/admin"
+import { fetchProfileStats } from "@/lib/profile/fetch"
 import type { ProfileFieldsResult } from "@/lib/profile/keycloak"
 import {
   getProfileFields,
   keycloakSubFromIdentities,
 } from "@/lib/profile/keycloak"
-import type { ProfileStats } from "@/lib/profile/stats"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
@@ -21,11 +21,7 @@ import { Section } from "./_components/profile-ui"
 export default async function ProfilePage() {
   const user = (await getCurrentUser())!
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc("get_profile_stats", {
-    p_user_id: user.id,
-  })
-  if (error) throw error
-  const stats = data as ProfileStats | null
+  const stats = await fetchProfileStats(supabase, user.id)
 
   // Account fields come from Keycloak, not Supabase, and are read-only here —
   // the link at the bottom of the section is where they get changed. Hidden

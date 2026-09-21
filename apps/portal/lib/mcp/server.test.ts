@@ -90,13 +90,38 @@ describe("portal MCP handler", () => {
       result: { tools: { name: string; description?: string }[] }
     }
     const names = body.result.tools.map((t) => t.name).sort()
-    expect(names).toEqual([
-      "list_receipts",
-      "list_trip_files",
-      "list_trips",
-      "upload_receipt",
-      "whoami",
-    ])
+    expect(names).toEqual(
+      [
+        "add_bento_order_item",
+        "create_leave",
+        "delete_leave",
+        "get_announcement",
+        "get_approve_document",
+        "get_bento_order",
+        "get_next_meeting",
+        "get_profile",
+        "get_reimburse_balance",
+        "list_announcements",
+        "list_approve_documents",
+        "list_bento_orders",
+        "list_bulletin_messages",
+        "list_door_events",
+        "list_leaderboard",
+        "list_leaves",
+        "list_meetings",
+        "list_portal_users",
+        "list_receipts",
+        "list_reimburse_entries",
+        "list_room_availability",
+        "list_room_bookings",
+        "list_trip_files",
+        "list_trips",
+        "post_bulletin_message",
+        "remove_bento_order_item",
+        "upload_receipt",
+        "whoami",
+      ].sort()
+    )
     // Every tool the server offers must be named in the instructions, so an
     // agent reading only the prompt knows which apps are covered.
     for (const name of names) expect(MCP_INSTRUCTIONS).toContain(name)

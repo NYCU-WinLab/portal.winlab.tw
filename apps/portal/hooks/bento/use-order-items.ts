@@ -2,6 +2,11 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
+import {
+  addOrderItemWithOptions,
+  deleteOrderItem,
+  type AddOrderItemWithOptionsParams,
+} from "@/lib/bento/order-items"
 import { createClient } from "@/lib/supabase/client"
 
 import { useAuth } from "@/hooks/use-auth"
@@ -106,16 +111,6 @@ export function useAddAnonymousItem() {
   })
 }
 
-interface AddWithOptionsParams {
-  order_id: string
-  menu_item_id: string
-  option_value_ids: string[]
-  no_sauce?: boolean
-  user_id?: string | null
-  anonymous_name?: string | null
-  anonymous_contact?: string | null
-}
-
 // Adds an order item together with its selected options (e.g. 甜度/冰量) in one
 // atomic RPC. The RPC enforces that every required option group is satisfied, so
 // mandatory ice/sugar cannot be bypassed. Used for drink shops.
@@ -124,20 +119,8 @@ export function useAddOrderItemWithOptions() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: AddWithOptionsParams) => {
-      const { data, error } = await supabase.rpc("add_bento_order_item", {
-        p_order_id: params.order_id,
-        p_menu_item_id: params.menu_item_id,
-        p_option_value_ids: params.option_value_ids,
-        p_no_sauce: params.no_sauce ?? false,
-        p_user_id: params.user_id ?? undefined,
-        p_anonymous_name: params.anonymous_name ?? undefined,
-        p_anonymous_contact: params.anonymous_contact ?? undefined,
-      })
-
-      if (error) throw error
-      return data
-    },
+    mutationFn: (params: AddOrderItemWithOptionsParams) =>
+      addOrderItemWithOptions(supabase, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
     },
@@ -180,11 +163,7 @@ export function useDeleteOrderItem() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("bento_order_items")
-        .delete()
-        .eq("id", id)
-      if (error) throw error
+      await deleteOrderItem(supabase, id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
