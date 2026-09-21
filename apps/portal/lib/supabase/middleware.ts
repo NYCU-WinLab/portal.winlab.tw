@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+import { loginUrlFor } from "@/lib/auth/safe-next"
+
 import type { Database } from "./database.types"
 
 // Ghost cookies from the old portal (domain=.winlab.tw) are sent by the
@@ -68,9 +70,10 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {
-    // no user, potentially respond by redirecting the user to the login page
-    const url = request.nextUrl.clone()
-    url.pathname = "/auth/login"
+    // no user: send them to login, remembering where they were headed so
+    // flows that arrive with state in the URL (OAuth consent) survive it
+    const { pathname, search } = request.nextUrl
+    const url = new URL(loginUrlFor(`${pathname}${search}`), request.nextUrl)
     return NextResponse.redirect(url)
   }
 

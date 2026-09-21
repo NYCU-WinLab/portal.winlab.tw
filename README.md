@@ -28,6 +28,17 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 | `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
 | `/rooms`     | CS dept. meeting room availability query                        |
 | `/trip`      | Travel-document uploads with admin folder export                |
+| `/api/mcp`   | Remote MCP server for AI agents (OAuth 2.1 via Supabase Auth)   |
+
+### Connecting an AI agent (MCP)
+
+The portal exposes a remote MCP server at `https://portal.winlab.tw/api/mcp` (Streamable HTTP). Auth is standard MCP OAuth 2.1: the client discovers Supabase Auth through `/.well-known/oauth-protected-resource`, registers itself dynamically, and the member signs in with the usual Keycloak SSO, then approves the client on `/oauth/consent`. Tools run under that member's own permissions (RLS), the same as the web app.
+
+```bash
+claude mcp add --transport http portal https://portal.winlab.tw/api/mcp
+```
+
+Tools today: `whoami`, `list_receipts`, `upload_receipt`. Add more in `apps/portal/lib/mcp/server.ts`.
 
 One app lives on its own subdomain because its design system diverges from portal:
 

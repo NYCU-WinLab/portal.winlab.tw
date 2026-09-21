@@ -6,7 +6,7 @@ import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
 
-export function SignInButton() {
+export function SignInButton({ next = "/" }: { next?: string }) {
   const [pending, startTransition] = useTransition()
 
   function onClick() {
@@ -16,7 +16,10 @@ export function SignInButton() {
         provider: "keycloak",
         options: {
           scopes: "openid",
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo:
+            next === "/"
+              ? `${window.location.origin}/auth/callback`
+              : `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         },
       })
     })
