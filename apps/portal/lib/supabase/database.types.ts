@@ -703,6 +703,45 @@ export type Database = {
           },
         ]
       }
+      door_events: {
+        Row: {
+          client_address: string | null
+          created_at: string
+          error: string | null
+          geo_city: string | null
+          id: string
+          latency_ms: number | null
+          ok: boolean
+          user_email: string | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          client_address?: string | null
+          created_at?: string
+          error?: string | null
+          geo_city?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok: boolean
+          user_email?: string | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          client_address?: string | null
+          created_at?: string
+          error?: string | null
+          geo_city?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok?: boolean
+          user_email?: string | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       gallery_activity_notifications: {
         Row: {
           actor_user_id: string
