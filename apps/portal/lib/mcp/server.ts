@@ -73,7 +73,7 @@ export function registerTools(
           .select("name, is_admin, roles")
           .eq("id", caller.userId)
           .maybeSingle()
-        if (error) throw error
+        if (error) throw new Error(error.message)
         return json({
           id: caller.userId,
           email: caller.email,

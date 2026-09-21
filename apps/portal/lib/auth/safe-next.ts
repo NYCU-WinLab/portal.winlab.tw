@@ -9,6 +9,10 @@ export function safeNextPath(
   if (!candidate.startsWith("/")) return fallback
   if (candidate.startsWith("//")) return fallback
   if (candidate.includes("\\")) return fallback
+  // Browsers strip tab / newline before parsing, so "/\t/evil.example" would
+  // resolve to https://evil.example/ once it lands in a Location header.
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(candidate)) return fallback
   return candidate
 }
 

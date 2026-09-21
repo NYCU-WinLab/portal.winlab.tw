@@ -17,6 +17,12 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/\\evil.example")).toBe("/")
   })
 
+  test("falls back when control characters could smuggle a host", () => {
+    expect(safeNextPath("/\t/evil.example")).toBe("/")
+    expect(safeNextPath("/\r\n/evil.example")).toBe("/")
+    expect(safeNextPath("/receipts\u0000")).toBe("/")
+  })
+
   test("honours a custom fallback", () => {
     expect(safeNextPath("javascript:alert(1)", "/receipts")).toBe("/receipts")
   })
