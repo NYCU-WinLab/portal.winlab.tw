@@ -17,6 +17,7 @@ import { uidToCardNumber } from "@/lib/door/cards"
 import type { DoorCardView } from "@/lib/door/cards"
 import {
   connectCardReader,
+  preloadCardReader,
   type CardReaderConnection,
 } from "@/lib/door/chameleon"
 
@@ -76,6 +77,8 @@ export function CardReader({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Guards against a second scan starting before the previous one resolves.
   const scanningRef = useRef(false)
+  // A scan can resolve after the component is gone; this stops it writing state.
+  const mountedRef = useRef(true)
 
   const handleTag = useCallback((uid: Uint8Array) => {
     const result = uidToCardNumber(uid)
@@ -120,6 +123,7 @@ export function CardReader({
     scanningRef.current = true
     try {
       const tags = await connection.scan()
+      if (!mountedRef.current) return
       for (const tag of tags) handleTag(tag.uid)
     } catch {
       // Empty field or a transient read error, both expected while polling.
@@ -153,8 +157,15 @@ export function CardReader({
     }
   }, [poll])
 
+  // Warm the CDN modules the moment the panel opens, so the click that calls
+  // connect reaches requestPort() from cache and stays inside its user gesture.
+  useEffect(() => {
+    if (supported === true && open) preloadCardReader()
+  }, [supported, open])
+
   useEffect(() => {
     return () => {
+      mountedRef.current = false
       stopPolling()
       const connection = connectionRef.current
       connectionRef.current = null

@@ -1,9 +1,9 @@
 // The only place chameleon-ultra.js is touched. The library ships no types and
 // must never enter the app bundle: it is a browser-only Web Serial driver we
-// load from a CDN at runtime, lazily, the first time an admin clicks connect.
-// Both bundlers are told to leave the URLs alone so the import stays a native
-// runtime import. Its shape is asserted here once, at the import boundary, and
-// nowhere else in the app sees an untyped value.
+// load from a CDN at runtime, lazily. Both bundlers are told to leave the URLs
+// alone so the import stays a native runtime import. Its shape is asserted only
+// at the two import boundaries below (loadCore and loadAdapter), and nowhere
+// else in the app sees an untyped value.
 
 const CHAMELEON_CORE_ESM =
   "https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm"
@@ -52,6 +52,17 @@ async function loadAdapter(): Promise<WebserialAdapterModule> {
   return (await import(
     /* webpackIgnore: true */ /* turbopackIgnore: true */ CHAMELEON_ADAPTER_ESM
   )) as unknown as WebserialAdapterModule
+}
+
+// Warm the module cache before the user clicks connect. requestPort() only
+// runs during a live user gesture (~5s of transient activation), so a cold CDN
+// fetch inside the click handler could blow that window and throw. Firing the
+// imports ahead of time makes connectCardReader() resolve them from cache and
+// reach requestPort() while the gesture is still active. Fire-and-forget: the
+// dynamic imports memoize, so a failure here is retried by connectCardReader().
+export function preloadCardReader(): void {
+  void loadCore().catch(() => {})
+  void loadAdapter().catch(() => {})
 }
 
 // Must run inside a user gesture: the WebserialAdapter triggers

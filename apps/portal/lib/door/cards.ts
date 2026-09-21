@@ -31,7 +31,7 @@ export const CARD_ID_PATTERN = /^[0-9]{10}$/
 // A ChameleonUltra in reader mode hands back a card's ISO14443A UID, and the
 // controller's card number is that same UID read little-endian: reader UID
 // 75 B3 8D 5E reverses to 5E 8D B3 75 = 0x5E8DB375 = 1586344821, a real
-// enrolled card. Only 4-byte UIDs map to a number here — 7-byte UIDs and the
+// enrolled card. Only 4-byte UIDs map to a number here; 7-byte UIDs and the
 // like are out of scope. A UID whose first byte is 0x08 is a random one the
 // card re-rolls on every tap (phones, privacy cards), so it can never be
 // enrolled. A 4-byte value tops out at 4294967295, well under 2^53, so a plain
