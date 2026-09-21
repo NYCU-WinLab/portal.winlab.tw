@@ -38,7 +38,7 @@ The portal exposes a remote MCP server at `https://portal.winlab.tw/api/mcp` (St
 claude mcp add --transport http portal https://portal.winlab.tw/api/mcp
 ```
 
-Tools today: `whoami`, `list_receipts`, `upload_receipt`. Add more in `apps/portal/lib/mcp/server.ts`.
+Tools today: `whoami`, `list_receipts`, `upload_receipt`, `list_trips`, `list_trip_files`. Add more in `apps/portal/lib/mcp/server.ts`, and name the new tool in `apps/portal/lib/mcp/instructions.ts` (the initialize `instructions` an agent reads before calling anything; the test enforces the pairing).
 
 One app lives on its own subdomain because its design system diverges from portal:
 

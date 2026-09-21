@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
 import { after } from "next/server"
 
+import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
 import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
 import { createUserClient, verifySupabaseToken } from "@/lib/mcp/supabase"
 import { drainOutboxBatch } from "@/lib/receipts/email-drain"
@@ -31,8 +32,7 @@ const handler = withMcpAuth(
       }),
     {
       serverInfo: MCP_SERVER_INFO,
-      instructions:
-        "WinLab portal. Tools act as the signed-in member; receipts admins see everyone's receipts, others see their own.",
+      instructions: MCP_INSTRUCTIONS,
     }
   ),
   (_req, bearer) => verifySupabaseToken(bearer),
