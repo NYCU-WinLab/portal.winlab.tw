@@ -44,7 +44,7 @@ export function buildDoorEvent(
     user_email: user.email,
     user_name: user.name,
     ok: outcome.ok,
-    error: outcome.ok ? null : outcome.error,
+    error: outcome.ok ? null : outcome.error || "Door API request failed",
     latency_ms: Math.round(outcome.latencyMs),
     client_address: str(attribution["client.address"]),
     geo_city: str(attribution["geo.city"]),
@@ -76,25 +76,25 @@ export async function recordDoorEvent(
   outcome: DoorOutcome,
   headers: Headers
 ): Promise<void> {
-  const event = buildDoorEvent(
-    user,
-    outcome,
-    getClientAttributionAttributes(headers)
-  )
-
-  emitLog({
-    severity: event.ok ? "INFO" : "WARN",
-    body: event.ok ? "door opened" : "door open failed",
-    attributes: doorEventAttributes(event),
-  })
-
   try {
+    const event = buildDoorEvent(
+      user,
+      outcome,
+      getClientAttributionAttributes(headers)
+    )
+
+    emitLog({
+      severity: event.ok ? "INFO" : "WARN",
+      body: event.ok ? "door opened" : "door open failed",
+      attributes: doorEventAttributes(event),
+    })
+
     const { error } = await createAdminClient()
       .from("door_events")
       .insert(event)
     if (error) console.error("[door] audit insert failed", error.message)
   } catch (err) {
-    console.error("[door] audit insert failed", err)
+    console.error("[door] audit record failed", err)
   }
 }
 

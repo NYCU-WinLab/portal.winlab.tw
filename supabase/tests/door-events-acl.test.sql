@@ -8,7 +8,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(5);
+select plan(6);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.door_events'::regclass),
@@ -29,6 +29,14 @@ select is(
   'the one door_events policy is a SELECT — nothing lets authenticated write'
 );
 
+-- The policy being a SELECT is not enough: `using (true)` is also a SELECT.
+-- Pin the predicate itself, since that is what keeps non-admins out.
+select ok(
+  (select qual from pg_policies
+    where schemaname = 'public' and tablename = 'door_events') like '%is_portal_admin()%',
+  'the door_events SELECT policy is gated on is_portal_admin()'
+);
+
 -- anon must hold nothing at all; authenticated only SELECT.
 select is(
   (select count(*)::int
@@ -45,10 +53,6 @@ select is(
   array['SELECT'],
   'authenticated holds SELECT and nothing else on door_events'
 );
-
--- Suite-wide convention: every pgTAP file in this repo ends up granting this so
--- the rest of the suite stays runnable after dropping to `authenticated`.
-grant execute on all functions in schema public to authenticated;
 
 select * from finish();
 rollback;

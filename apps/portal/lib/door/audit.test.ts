@@ -55,3 +55,10 @@ describe("doorEventAttributes", () => {
     })
   })
 })
+
+describe("buildDoorEvent with an empty error message", () => {
+  test("still stores a reason so the row passes the ok/error check", () => {
+    const row = buildDoorEvent(user, { ok: false, latencyMs: 1, error: "" }, {})
+    expect(row.error).toBe("Door API request failed")
+  })
+})
