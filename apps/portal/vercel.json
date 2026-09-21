@@ -17,6 +17,10 @@
     {
       "path": "/api/cron/kc-lab-status",
       "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cron/door-reconcile",
+      "schedule": "0 21 * * *"
     }
   ]
 }
