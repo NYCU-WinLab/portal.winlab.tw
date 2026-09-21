@@ -7,21 +7,11 @@
 // someone had the page open would miss exactly the overnight corruption this
 // whole feature exists to catch.
 
-import {
-  diffControllerCards,
-  isValidCardId,
-  maskCardId,
-} from "@/lib/door/cards"
+import { maskCardId, planImport, planReconcile } from "@/lib/door/cards"
 import { recordDoorCardChange, type DoorCardActor } from "@/lib/door/card-audit"
 import { listDoorCardRows } from "@/lib/door/card-store"
 import { fetchControllerCardList } from "@/lib/door/hams"
 import { createAdminClient } from "@/lib/supabase/admin"
-
-// The controller holds a few dozen cards. A count anywhere near this is the
-// signature of the corruption that motivated #1192 — the device claimed 10,240
-// cards while only 10 were readable — so it gets flagged even when nothing
-// else drifted.
-export const CARD_COUNT_ALARM = 200
 
 export type ReconcileResult = {
   synced: number
@@ -52,42 +42,34 @@ export async function reconcileControllerCards(
   try {
     const list = await fetchControllerCardList()
     const rows = await listDoorCardRows(admin)
-    const diff = diffControllerCards(rows, list.cards)
     const seenAt = new Date().toISOString()
 
-    const tableSuspect = list.count > CARD_COUNT_ALARM
-    const drifted =
-      tableSuspect ||
-      diff.missingOnController.length > 0 ||
-      diff.unknownOnController.length > 0
+    // Decided before anything is written: see planReconcile.
+    const plan = planReconcile(rows, list.cards, list.count)
 
     const result: ReconcileResult = {
-      synced: diff.synced.length,
-      missing_on_controller: diff.missingOnController.length,
-      unknown_on_controller: diff.unknownOnController.length,
-      controller_card_count: list.count,
-      drifted,
-      table_suspect: tableSuspect,
+      synced: plan.synced.length,
+      missing_on_controller: plan.missingOnController.length,
+      unknown_on_controller: plan.unknownOnController.length,
+      controller_card_count: plan.controllerCardCount,
+      drifted: plan.drifted,
+      table_suspect: plan.tableSuspect,
     }
 
-    // A card table this size is not a list, it is damage, and what it reports
-    // as present or absent means nothing. Writing sync_state from it would
-    // mark every real card missing on the strength of a corrupt read, so the
-    // comparison is recorded and nothing is written.
-    if (!tableSuspect) {
-      if (diff.synced.length > 0) {
+    if (plan.writeSyncState) {
+      if (plan.synced.length > 0) {
         const { error } = await admin
           .from("door_cards")
           .update({ sync_state: "synced", last_seen_at: seenAt })
-          .in("card_id", diff.synced)
+          .in("card_id", plan.synced)
         if (error) throw new Error(error.message)
       }
 
-      if (diff.missingOnController.length > 0) {
+      if (plan.missingOnController.length > 0) {
         const { error } = await admin
           .from("door_cards")
           .update({ sync_state: "missing_on_controller" })
-          .in("card_id", diff.missingOnController)
+          .in("card_id", plan.missingOnController)
         if (error) throw new Error(error.message)
       }
     }
@@ -97,21 +79,21 @@ export async function reconcileControllerCards(
       action: "reconcile",
       cardId: null,
       headers,
-      severity: drifted ? "ERROR" : "INFO",
-      body: tableSuspect
+      severity: plan.drifted ? "ERROR" : "INFO",
+      body: plan.tableSuspect
         ? "door card table looks corrupted"
-        : drifted
+        : plan.drifted
           ? "door card list drifted"
           : "door card list reconciled",
       outcome: {
-        ok: !drifted,
-        error: drifted ? describeDrift(result) : null,
+        ok: !plan.drifted,
+        error: plan.drifted ? describeDrift(result) : null,
         latencyMs: performance.now() - started,
         detail: {
           ...result,
-          sync_state_written: !tableSuspect,
-          missing_ids: diff.missingOnController.map(maskCardId),
-          unknown_ids: diff.unknownOnController.map(maskCardId),
+          sync_state_written: plan.writeSyncState,
+          missing_ids: plan.missingOnController.map(maskCardId),
+          unknown_ids: plan.unknownOnController.map(maskCardId),
         },
       },
     })
@@ -163,24 +145,20 @@ export async function importControllerCards(
   try {
     const list = await fetchControllerCardList()
     const rows = await listDoorCardRows(admin)
-    const known = new Set(rows.map((r) => r.card_id))
     const seenAt = new Date().toISOString()
 
-    // A card id the check constraint would reject fails the whole insert, and
-    // one unreadable entry in a corrupted table must not stop the other
-    // fifteen real cards from being adopted. Skip it and name it in the audit.
-    const invalid = list.cards.filter((card) => !isValidCardId(card.card_id))
+    const plan = planImport(
+      list.cards,
+      rows.map((r) => r.card_id)
+    )
 
-    const toInsert = list.cards
-      .filter((card) => isValidCardId(card.card_id))
-      .filter((card) => !known.has(card.card_id))
-      .map((card) => ({
-        card_id: card.card_id,
-        holder_name: card.name,
-        sync_state: "synced",
-        last_seen_at: seenAt,
-        created_by: actor?.id ?? null,
-      }))
+    const toInsert = plan.adopt.map((card) => ({
+      card_id: card.card_id,
+      holder_name: card.name,
+      sync_state: "synced",
+      last_seen_at: seenAt,
+      created_by: actor?.id ?? null,
+    }))
 
     if (toInsert.length > 0) {
       const { error } = await admin.from("door_cards").insert(toInsert)
@@ -189,8 +167,8 @@ export async function importControllerCards(
 
     const result: ImportResult = {
       imported: toInsert.length,
-      skipped: list.cards.length - toInsert.length - invalid.length,
-      invalid: invalid.length,
+      skipped: plan.alreadyKnown,
+      invalid: plan.invalid.length,
       controller_card_count: list.count,
     }
 
@@ -199,7 +177,7 @@ export async function importControllerCards(
       action: "import",
       cardId: null,
       headers,
-      severity: invalid.length > 0 ? "WARN" : "INFO",
+      severity: plan.invalid.length > 0 ? "WARN" : "INFO",
       body: "door cards imported from controller",
       outcome: {
         ok: true,
@@ -207,7 +185,7 @@ export async function importControllerCards(
         detail: {
           ...result,
           imported_ids: toInsert.map((c) => maskCardId(c.card_id)),
-          invalid_ids: invalid.map((c) => maskCardId(c.card_id)),
+          invalid_ids: plan.invalid.map((c) => maskCardId(c.card_id)),
         },
       },
     })

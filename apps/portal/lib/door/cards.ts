@@ -127,6 +127,67 @@ export function diffControllerCards(
   }
 }
 
+// The controller holds a few dozen cards. A count anywhere near this is the
+// signature of the corruption that motivated #1192 — the device claimed 10,240
+// cards while only 10 were readable.
+export const CARD_COUNT_ALARM = 200
+
+export type ReconcilePlan = {
+  synced: string[]
+  missingOnController: string[]
+  unknownOnController: string[]
+  controllerCardCount: number
+  tableSuspect: boolean
+  drifted: boolean
+  writeSyncState: boolean
+}
+
+// Everything reconcile decides, decided before anything is written. A card
+// table this size is not a list, it is damage, and what it reports as present
+// or absent means nothing — so `writeSyncState` goes false and the comparison
+// is recorded without marking every real card missing on the strength of a
+// corrupt read.
+export function planReconcile(
+  rows: Pick<DoorCardRow, "card_id">[],
+  controller: Pick<ControllerCard, "card_id">[],
+  controllerCardCount: number
+): ReconcilePlan {
+  const diff = diffControllerCards(rows, controller)
+  const tableSuspect = controllerCardCount > CARD_COUNT_ALARM
+
+  return {
+    ...diff,
+    controllerCardCount,
+    tableSuspect,
+    drifted:
+      tableSuspect ||
+      diff.missingOnController.length > 0 ||
+      diff.unknownOnController.length > 0,
+    writeSyncState: !tableSuspect,
+  }
+}
+
+export type ImportPlan<T> = {
+  adopt: T[]
+  invalid: T[]
+  alreadyKnown: number
+}
+
+// Which controller cards the import should adopt. A card id the check
+// constraint would reject fails the whole insert, so one unreadable entry in a
+// damaged table must not stop the other fifteen real cards from coming across.
+export function planImport<T extends Pick<ControllerCard, "card_id">>(
+  controller: T[],
+  knownCardIds: Iterable<string>
+): ImportPlan<T> {
+  const known = new Set(knownCardIds)
+  const invalid = controller.filter((card) => !isValidCardId(card.card_id))
+  const valid = controller.filter((card) => isValidCardId(card.card_id))
+  const adopt = valid.filter((card) => !known.has(card.card_id))
+
+  return { adopt, invalid, alreadyKnown: valid.length - adopt.length }
+}
+
 export function syncStateFor(
   cardId: string,
   controller: Pick<ControllerCard, "card_id">[]

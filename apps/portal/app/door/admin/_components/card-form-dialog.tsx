@@ -104,11 +104,15 @@ function CardForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{mode === "add" ? "新增卡片" : "編輯卡片"}</DialogTitle>
+        <DialogTitle>
+          {mode === "edit" ? "編輯卡片" : card ? "重新加入卡機" : "新增卡片"}
+        </DialogTitle>
         <DialogDescription>
-          {mode === "add"
-            ? "先寫進卡機，成功了才會記到名單上。"
-            : "改姓名會同步到卡機；持有人和備註只存在 Portal。"}
+          {mode === "edit"
+            ? "改姓名會同步到卡機；持有人和備註只存在 Portal。"
+            : card
+              ? "把這張卡再寫回卡機一次。持有人和備註會留著，不用重打。"
+              : "先寫進卡機，成功了才會記到名單上。"}
         </DialogDescription>
       </DialogHeader>
 
@@ -193,7 +197,13 @@ function CardForm({
           onClick={handleSubmit}
           disabled={pending || !!cardIdError || !!nameError}
         >
-          {pending ? "處理中…" : mode === "add" ? "新增" : "儲存"}
+          {pending
+            ? "處理中…"
+            : mode === "edit"
+              ? "儲存"
+              : card
+                ? "重新加入"
+                : "新增"}
         </Button>
       </DialogFooter>
     </>

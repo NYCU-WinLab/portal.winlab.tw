@@ -5,6 +5,7 @@
 
 import type { Attributes } from "@opentelemetry/api"
 
+import { maskCardId } from "@/lib/door/cards"
 import { getClientAttributionAttributes } from "@/lib/otel/attribution"
 import { emitLog } from "@/lib/otel/log"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -81,7 +82,9 @@ export function doorCardChangeAttributes(
     "door.card.ok": change.ok,
     "user.name": change.user_name,
   }
-  if (change.card_id) attrs["door.card.id"] = change.card_id
+  // Telemetry leaves the lab and is read by more people than the card list is.
+  // The full number is a physical key, and it stays in the row.
+  if (change.card_id) attrs["door.card.id"] = maskCardId(change.card_id)
   if (change.user_id) attrs["user.id"] = change.user_id
   if (change.user_email) attrs["user.email"] = change.user_email
   if (change.error) attrs["error.message"] = change.error

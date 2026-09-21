@@ -51,6 +51,18 @@ describe("buildDoorCardChange", () => {
 })
 
 describe("doorCardChangeAttributes", () => {
+  test("masks the card number, which the row still keeps in full", () => {
+    const change = buildDoorCardChange(
+      user,
+      "add",
+      "0001234567",
+      { ok: true },
+      {}
+    )
+    expect(doorCardChangeAttributes(change)["door.card.id"]).toBe("******4567")
+    expect(change.card_id).toBe("0001234567")
+  })
+
   test("flattens numeric detail onto door.card.* and keeps secrets out", () => {
     const attrs = doorCardChangeAttributes(
       buildDoorCardChange(

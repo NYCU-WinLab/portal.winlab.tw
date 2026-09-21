@@ -7,6 +7,8 @@ import {
   isValidCardId,
   maskCardId,
   mergeDoorCards,
+  planImport,
+  planReconcile,
   validateCardId,
   validateHolderName,
   type DoorCardRow,
@@ -26,7 +28,7 @@ function row(card_id: string, extra: Partial<DoorCardRow> = {}): DoorCardRow {
 }
 
 function card(card_id: string, name = "某人"): ControllerCard {
-  return { card_id, name, time_index: 1, status: "active" }
+  return { card_id, name, time_index: 1, status: 14 }
 }
 
 describe("validateCardId", () => {
@@ -162,5 +164,72 @@ describe("mergeDoorCards", () => {
       "0000000002",
       "0000000003",
     ])
+  })
+})
+
+describe("planReconcile", () => {
+  test("a clean comparison writes sync_state and reports no drift", () => {
+    const plan = planReconcile(
+      [row("0000000001"), row("0000000002")],
+      [card("0000000001"), card("0000000002")],
+      2
+    )
+    expect(plan.drifted).toBe(false)
+    expect(plan.tableSuspect).toBe(false)
+    expect(plan.writeSyncState).toBe(true)
+    expect(plan.synced).toEqual(["0000000001", "0000000002"])
+  })
+
+  test("drift on either side is drift", () => {
+    expect(
+      planReconcile([row("0000000001")], [], 0).drifted
+    ).toBe(true)
+    expect(
+      planReconcile([], [card("0000000009")], 1).drifted
+    ).toBe(true)
+  })
+
+  test("an absurd card count blocks the sync_state write", () => {
+    const plan = planReconcile(
+      [row("0000000001")],
+      [card("0000000001")],
+      10240
+    )
+    expect(plan.tableSuspect).toBe(true)
+    expect(plan.drifted).toBe(true)
+    // The whole point: the cards read back fine, and we still refuse to
+    // believe a table claiming ten thousand entries.
+    expect(plan.writeSyncState).toBe(false)
+    expect(plan.synced).toEqual(["0000000001"])
+  })
+
+  test("exactly at the alarm count is still trusted", () => {
+    expect(planReconcile([], [], 200).tableSuspect).toBe(false)
+    expect(planReconcile([], [], 201).tableSuspect).toBe(true)
+  })
+})
+
+describe("planImport", () => {
+  test("adopts what the controller has and we do not", () => {
+    const plan = planImport(
+      [card("0000000001"), card("0000000002")],
+      ["0000000001"]
+    )
+    expect(plan.adopt.map((c) => c.card_id)).toEqual(["0000000002"])
+    expect(plan.alreadyKnown).toBe(1)
+    expect(plan.invalid).toEqual([])
+  })
+
+  test("sets aside a malformed id instead of failing the whole batch", () => {
+    const plan = planImport([card("0000000001"), card("garbage")], [])
+    expect(plan.adopt.map((c) => c.card_id)).toEqual(["0000000001"])
+    expect(plan.invalid.map((c) => c.card_id)).toEqual(["garbage"])
+  })
+
+  test("a malformed id never counts as already known", () => {
+    const plan = planImport([card("123")], ["123"])
+    expect(plan.alreadyKnown).toBe(0)
+    expect(plan.adopt).toEqual([])
+    expect(plan.invalid).toHaveLength(1)
   })
 })

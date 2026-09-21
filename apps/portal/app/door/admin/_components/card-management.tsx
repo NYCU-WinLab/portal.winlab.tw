@@ -70,7 +70,11 @@ export function CardManagement({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [adding, setAdding] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  // Non-null when the add form is reopening a row the controller lost: the
+  // card number, name, holder and note are all still here, and retyping them
+  // is how they get lost for real.
+  const [addSeed, setAddSeed] = useState<DoorCardView | null>(null)
   const [editing, setEditing] = useState<DoorCardView | null>(null)
   const [deleting, setDeleting] = useState<DoorCardView | null>(null)
 
@@ -111,7 +115,14 @@ export function CardManagement({
       />
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => setAdding(true)} disabled={pending}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setAddSeed(null)
+            setAddOpen(true)
+          }}
+          disabled={pending}
+        >
           新增卡片
         </Button>
       </div>
@@ -126,7 +137,7 @@ export function CardManagement({
               <TableHead>備註</TableHead>
               <TableHead className="w-28">卡機</TableHead>
               <TableHead className="w-28">最後同步</TableHead>
-              <TableHead className="w-28 text-right">操作</TableHead>
+              <TableHead className="w-44 text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -168,6 +179,19 @@ export function CardManagement({
                   <TableCell className="text-right">
                     {card.in_database ? (
                       <div className="flex justify-end gap-1">
+                        {card.sync_state === "missing_on_controller" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => {
+                              setAddSeed(card)
+                              setAddOpen(true)
+                            }}
+                          >
+                            重新加入卡機
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -201,14 +225,15 @@ export function CardManagement({
 
       <CardFormDialog
         mode="add"
+        card={addSeed}
         members={members}
-        open={adding}
+        open={addOpen}
         pending={pending}
-        onOpenChange={setAdding}
+        onOpenChange={setAddOpen}
         onSubmit={(values: CardFormValues) =>
           run(
             () => addDoorCard(values),
-            () => setAdding(false)
+            () => setAddOpen(false)
           )
         }
       />

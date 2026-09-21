@@ -64,7 +64,7 @@ export type ControllerCard = {
   card_id: string
   name: string
   time_index: number
-  status: string
+  status: number
 }
 
 export type ControllerCardList = { count: number; cards: ControllerCard[] }

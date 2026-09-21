@@ -208,6 +208,14 @@ export async function addDoorCard(
   let counts: ControllerCounts | null = null
 
   try {
+    const admin = createAdminClient()
+    // A card that went missing from the controller keeps its row here, and
+    // re-adding it is exactly what the rename_lost_card message tells the
+    // admin to do. That row carries the holder link and the note, which the
+    // controller never knew about and the add form cannot be expected to
+    // retype, so they survive unless this call supplies something.
+    const existing = await getDoorCardRow(admin, cardId)
+
     const result = await createControllerCard(cardId, holderName)
     controllerChanged = true
     counts = {
@@ -215,25 +223,23 @@ export async function addDoorCard(
       count_after: result.count_after,
     }
 
-    // Upsert, not insert: a card that went missing from the controller still
-    // has its row here, and re-adding it is the normal way to fix that. The
-    // row is being re-created, so created_by moves to whoever did it;
-    // door_card_changes keeps the longer history.
-    const { error } = await createAdminClient()
-      .from("door_cards")
-      .upsert(
-        {
-          card_id: cardId,
-          holder_name: holderName,
-          holder_user_id: input.holder_user_id || null,
-          note: input.note?.trim() || null,
-          sync_state: "synced",
-          last_seen_at: new Date().toISOString(),
-          created_by: user.id,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "card_id" }
-      )
+    const now = new Date().toISOString()
+    const { error } = await admin.from("door_cards").upsert(
+      {
+        card_id: cardId,
+        holder_name: holderName,
+        holder_user_id:
+          input.holder_user_id?.trim() || existing?.holder_user_id || null,
+        note: input.note?.trim() || existing?.note || null,
+        sync_state: "synced",
+        last_seen_at: now,
+        updated_at: now,
+        // Only on a genuine insert: re-adding a card does not make the person
+        // who re-added it its creator.
+        ...(existing ? {} : { created_by: user.id }),
+      },
+      { onConflict: "card_id" }
+    )
     if (error) throw new Error(error.message)
 
     const latencyMs = performance.now() - started
@@ -246,11 +252,28 @@ export async function addDoorCard(
         outcome: {
           ok: true,
           latencyMs,
-          detail: { holder_name: holderName, ...counts },
+          detail: {
+            holder_name: holderName,
+            readded: existing !== null,
+            previous: existing
+              ? {
+                  holder_name: existing.holder_name,
+                  holder_user_id: existing.holder_user_id,
+                  note: existing.note,
+                  sync_state: existing.sync_state,
+                }
+              : null,
+            ...counts,
+          },
         },
       })
     )
-    return { ok: true, message: `已新增 ${holderName} 的卡片。` }
+    return {
+      ok: true,
+      message: existing
+        ? `已把 ${holderName} 的卡片重新寫回卡機。`
+        : `已新增 ${holderName} 的卡片。`,
+    }
   } catch (err) {
     auditFailure(
       user,
@@ -317,13 +340,16 @@ export async function updateDoorCard(
           // The device renames by deleting and re-adding. The delete landed
           // and the add did not, so the card no longer opens the door: say so
           // and mark the row, rather than leaving a row that claims "synced".
-          await admin
+          const { error: markError } = await admin
             .from("door_cards")
             .update({
               sync_state: "missing_on_controller",
               updated_at: new Date().toISOString(),
             })
             .eq("card_id", cardId)
+          if (markError)
+            console.error("[door] marking lost card failed", markError.message)
+
           after(() =>
             recordDoorCardChange({
               actor: user,
@@ -340,11 +366,20 @@ export async function updateDoorCard(
                   controller_changed: true,
                   code: err.code,
                   observed: err.body?.observed ?? null,
+                  // A failure here means the row still claims to be synced
+                  // while the card no longer opens the door — the one state
+                  // this page exists to make impossible.
+                  mark_error: markError?.message ?? null,
                 },
               },
             })
           )
-          return { ok: false, error: hamsErrorMessage(err.code, GENERIC_ERROR) }
+          return {
+            ok: false,
+            error:
+              hamsErrorMessage(err.code, GENERIC_ERROR) +
+              (markError ? "（Portal 這邊也沒能更新狀態，請按「與卡機比對」）" : ""),
+          }
         }
         throw err
       }
