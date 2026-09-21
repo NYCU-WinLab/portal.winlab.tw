@@ -2,15 +2,13 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { clearStaleSupabaseCookiesOnResponse } from "@/lib/auth/clear-stale-cookies"
+import { safeNextPath } from "@/lib/auth/safe-next"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
-  let next = searchParams.get("next") ?? "/"
-  if (!next.startsWith("/")) {
-    next = "/"
-  }
+  const next = safeNextPath(searchParams.get("next"))
 
   if (code) {
     const supabase = await createClient()

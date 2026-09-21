@@ -24,6 +24,7 @@ A business app is `apps/portal/app/<name>/` — a route segment, **not** a separ
 - **Keycloak** as Supabase's OIDC provider (configured in dashboards, never in code)
 - **TanStack Query** v5 for client-side data fetching where it's needed
 - **pdf-lib** for receipt-archive PDF generation in the browser
+- **mcp-handler** + `@modelcontextprotocol/server` for the remote MCP endpoint at `/api/mcp`
 
 ## Commands
 
@@ -125,7 +126,15 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 > Fluid-compute caveat (also commented in `server.ts` / `middleware.ts`): never store the Supabase client in a global variable. Build a fresh one per request.
 
-**Route-level auth gating is on** — `apps/portal/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`) calls `updateSession()` and redirects unauthenticated requests to `/auth/login`. The allow-list is pathname-prefix based: `/login` and `/auth/*` (login, callback, auth-code-error) skip the gate.
+### MCP server (`/api/mcp`)
+
+`apps/portal/app/api/mcp/route.ts` mounts a remote MCP server with `mcp-handler`. It is a **second client of the same Supabase project**, not an API layer: tools in `apps/portal/lib/mcp/server.ts` receive the caller's Supabase JWT and build a per-request client with it (`lib/mcp/supabase.ts` → `createUserClient`), so RLS applies exactly as in the browser. Reuse `lib/<app>/*` query builders (e.g. `fetchReceipts`, `uploadReceiptPdf`) instead of duplicating queries; if a tool needs logic that only exists inside a hook, move it into `lib/` first.
+
+Auth is MCP-spec OAuth 2.1 with **Supabase Auth as the authorization server** (Dashboard → Authentication → OAuth Server). Keycloak stays upstream: the client is sent to `/oauth/consent`, the proxy bounces an anonymous visitor through `/auth/login?next=…`, Keycloak signs them in, and the consent page approves the client via `supabase.auth.oauth.*`. `/.well-known/oauth-protected-resource` (excluded from the proxy) tells clients where the authorization server is. Tokens are verified by asking Supabase (`auth.getUser(jwt)`) because the project signs with HS256; do not swap that for a local signature check. OAuth scopes (`openid` / `email` / `profile`) only shape the ID token: an approved client acts with the member's **full** RLS permissions, admin roles included, so the consent page says so and tools must never widen what the web app lets that member do.
+
+`lib/mcp/server.test.ts` boots the real handler in `bun test` (401 challenge, bad token, `tools/list`), so a tool that fails to register or a broken auth wrapper fails CI before it reaches Vercel.
+
+**Route-level auth gating is on** — `apps/portal/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`) calls `updateSession()` and redirects unauthenticated requests to `/auth/login`. The allow-list is pathname-prefix based: `/login` and `/auth/*` (login, callback, auth-code-error) skip the gate; `/api/*` and `/.well-known/*` are excluded by the matcher. An anonymous visitor is redirected to `/auth/login?next=<path>` and lands back on that path after sign-in (`lib/auth/safe-next.ts` keeps `next` same-origin).
 
 ```ts
 // apps/portal/proxy.ts
@@ -138,7 +147,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
 ```

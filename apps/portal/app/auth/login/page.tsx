@@ -3,17 +3,19 @@ import { redirect } from "next/navigation"
 import { AuthStateReset } from "@/components/auth-state-reset"
 import { PortalShell } from "@/components/portal-shell"
 import { SignInButton } from "@/components/sign-in-button"
+import { safeNextPath } from "@/lib/auth/safe-next"
 import { getCurrentUser } from "@/lib/user"
 
 type LoginPageProps = {
-  searchParams: Promise<{ stale?: string }>
+  searchParams: Promise<{ stale?: string; next?: string }>
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const user = await getCurrentUser()
-  if (user) redirect("/")
+  const { stale, next: rawNext } = await searchParams
+  const next = safeNextPath(rawNext)
 
-  const { stale } = await searchParams
+  const user = await getCurrentUser()
+  if (user) redirect(next)
 
   return (
     <PortalShell appName="Sign in">
@@ -31,7 +33,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           ) : null}
         </div>
-        <SignInButton />
+        <SignInButton next={next} />
       </div>
     </PortalShell>
   )

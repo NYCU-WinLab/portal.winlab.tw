@@ -5,11 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { triggerReceiptEmailDrain } from "@/app/receipts/actions"
 import { fetchReceipts } from "@/lib/receipts/fetch"
 import { createClient } from "@/lib/supabase/client"
-import {
-  RECEIPT_FILE_EXT,
-  RECEIPT_MIME_PDF,
-  fileToReceiptPdf,
-} from "@/lib/receipts/file"
+import { fileToReceiptPdf } from "@/lib/receipts/file"
 import {
   RECEIPTS_BUCKET,
   toReceipt,
@@ -17,6 +13,7 @@ import {
   type DepositAccount,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
+import { uploadReceiptPdf } from "@/lib/receipts/upload"
 
 import { queryKeys } from "./query-keys"
 
@@ -63,33 +60,12 @@ export function useUploadReceipt() {
       file: File
       depositAccount: DepositAccount
     }) => {
-      const id = crypto.randomUUID()
-      const path = `${id}/${id}.${RECEIPT_FILE_EXT}`
-      const pdfBlob = await fileToReceiptPdf(file)
-
-      const { error: uploadError } = await supabase.storage
-        .from(RECEIPTS_BUCKET)
-        .upload(path, pdfBlob, {
-          contentType: RECEIPT_MIME_PDF,
-          upsert: false,
-        })
-      if (uploadError) throw uploadError
-
-      const { data, error } = await supabase
-        .from(TABLE)
-        .insert({
-          id,
-          name,
-          image_path: path,
-          deposit_account: depositAccount,
-        })
-        .select()
-        .single()
-      if (error) {
-        // best-effort cleanup; orphan object beats half a row
-        await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
-        throw error
-      }
+      const pdf = await fileToReceiptPdf(file)
+      const receipt = await uploadReceiptPdf(supabase, {
+        name,
+        depositAccount,
+        pdf,
+      })
 
       // Fire-and-forget — the server action defers the actual drain to
       // `after()` so this await only costs one round-trip to kick it off.
@@ -103,7 +79,7 @@ export function useUploadReceipt() {
         )
       }
 
-      return toReceipt(data as unknown as DatabaseReceiptWithTags)
+      return receipt
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })

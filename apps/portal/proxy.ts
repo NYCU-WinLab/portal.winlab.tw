@@ -11,6 +11,6 @@ export const config = {
     // API routes handle their own auth (cron endpoints use CRON_SECRET, not
     // Supabase cookies), so exclude /api to keep the proxy off the hot path
     // for machine-to-machine requests.
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
