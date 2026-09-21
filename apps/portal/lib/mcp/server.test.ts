@@ -105,6 +105,7 @@ describe("portal MCP handler", () => {
         "list_approve_documents",
         "list_bento_orders",
         "list_bulletin_messages",
+        "list_door_cards",
         "list_door_events",
         "list_leaderboard",
         "list_leaves",

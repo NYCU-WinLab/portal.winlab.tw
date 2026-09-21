@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import type { DoorEvent } from "@/lib/door/audit"
-import { doorEventRows } from "@/lib/mcp/tools/door"
+import type { DoorCardRow } from "@/lib/door/cards"
+import { doorCardRows, doorEventRows } from "@/lib/mcp/tools/door"
 
 const event: DoorEvent = {
   id: "11111111-2222-3333-4444-555555555555",
@@ -47,5 +48,50 @@ describe("doorEventRows", () => {
 
   test("maps an empty log to an empty list", () => {
     expect(doorEventRows([])).toEqual([])
+  })
+})
+
+const cardRow: DoorCardRow = {
+  card_id: "0001234567",
+  holder_name: "詹詠翔",
+  holder_user_id: "99999999-8888-7777-6666-555555555555",
+  note: "研究生",
+  sync_state: "synced",
+  last_seen_at: "2026-09-21T02:00:00.000Z",
+}
+
+describe("doorCardRows", () => {
+  test("carries the card through and adds the label the page shows", () => {
+    expect(doorCardRows([cardRow])).toEqual([
+      {
+        card_id: "0001234567",
+        holder_name: "詹詠翔",
+        holder_user_id: "99999999-8888-7777-6666-555555555555",
+        note: "研究生",
+        sync_state: "synced",
+        sync_state_label: "已同步",
+        last_seen_at: "2026-09-21T02:00:00.000Z",
+      },
+    ])
+  })
+
+  test("labels a card the controller does not have", () => {
+    const [row] = doorCardRows([
+      { ...cardRow, sync_state: "missing_on_controller", last_seen_at: null },
+    ])
+    expect(row?.sync_state_label).toBe("卡機沒有")
+    expect(row?.last_seen_at).toBeNull()
+  })
+
+  test("keeps a guest card with no portal account", () => {
+    const [row] = doorCardRows([
+      { ...cardRow, holder_user_id: null, note: null },
+    ])
+    expect(row?.holder_user_id).toBeNull()
+    expect(row?.note).toBeNull()
+  })
+
+  test("maps an empty list to an empty list", () => {
+    expect(doorCardRows([])).toEqual([])
   })
 })

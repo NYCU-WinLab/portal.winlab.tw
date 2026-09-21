@@ -13,15 +13,16 @@ export const metadata: Metadata = {
   description: "實驗室門禁開關。",
 }
 
-// The top-right corner links to the audit log, and only for portal admins:
-// /door/log 404s for everyone else, so showing the link would be a dead end.
+// The top-right corner links to card management and the audit log, and only
+// for door admins: both pages 404 for everyone else, so showing the links
+// would be a dead end. Portal super admins satisfy is_door_admin() too.
 export default async function DoorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: isAdmin } = await supabase.rpc("is_portal_admin")
+  const { data: isAdmin } = await supabase.rpc("is_door_admin")
 
   return (
     <>
@@ -31,12 +32,20 @@ export default async function DoorLayout({
         containerClassName="p-0"
         topRight={
           isAdmin ? (
-            <Link
-              href="/door/log"
-              className="transition-colors hover:text-foreground"
-            >
-              Log
-            </Link>
+            <span className="flex gap-4">
+              <Link
+                href="/door/admin"
+                className="transition-colors hover:text-foreground"
+              >
+                Admin
+              </Link>
+              <Link
+                href="/door/log"
+                className="transition-colors hover:text-foreground"
+              >
+                Log
+              </Link>
+            </span>
           ) : undefined
         }
       >
