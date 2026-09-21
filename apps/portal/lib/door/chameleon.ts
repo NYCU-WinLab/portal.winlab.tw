@@ -24,7 +24,13 @@ export interface CardReaderConnection {
 type DeviceModeEnum = { READER: number; TAG: number }
 
 interface UltraDevice {
-  use(adapter: unknown): void
+  // use() installs the adapter's connect/disconnect hooks and is async, so it
+  // must be awaited before connect().
+  use(adapter: unknown): Promise<void>
+  // connect() is what runs navigator.serial.requestPort() and opens the port;
+  // there is no auto-connect, so it must be called before any command, and it
+  // must stay inside the click gesture.
+  connect(): Promise<void>
   cmdChangeDeviceMode(mode: number): Promise<void>
   cmdHf14aScan(): Promise<Iso14443aTag[] | Iso14443aTag>
   disconnect?(): Promise<void>
@@ -73,7 +79,12 @@ export async function connectCardReader(): Promise<CardReaderConnection> {
   const { default: WebserialAdapter } = await loadAdapter()
 
   const ultra = new ChameleonUltra()
-  ultra.use(new WebserialAdapter())
+  // Await the adapter install, then connect() to acquire and open the port
+  // (this is the call that prompts for the serial device). Only after the port
+  // is open can a command run; skipping connect() leaves this.port undefined
+  // and the library throws "Did you remember to use adapter plugin?".
+  await ultra.use(new WebserialAdapter())
+  await ultra.connect()
   await ultra.cmdChangeDeviceMode(DeviceMode.READER)
 
   return {
