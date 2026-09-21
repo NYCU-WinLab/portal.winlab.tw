@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { createClient } from "@/lib/supabase/client"
+import { fetchLeaderboard } from "@/lib/games/fetch"
 import type { GameScore, GameType } from "@/lib/games/types"
 import { queryKeys } from "./query-keys"
 
@@ -15,14 +16,8 @@ export function useLeaderboard(
 
   return useQuery({
     queryKey: queryKeys.leaderboard.byGame(gameType, level),
-    queryFn: async (): Promise<GameScore[]> => {
-      const { data, error } = await supabase.rpc("get_game_leaderboard", {
-        p_game_type: gameType,
-        p_level: level ?? undefined,
-      })
-      if (error) throw error
-      return (data ?? []) as GameScore[]
-    },
+    queryFn: async (): Promise<GameScore[]> =>
+      fetchLeaderboard(supabase, gameType, level),
   })
 }
 

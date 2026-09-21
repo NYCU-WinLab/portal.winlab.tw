@@ -14,6 +14,6 @@ export default async function DoorLogPage() {
   const { data: isAdmin } = await supabase.rpc("is_portal_admin")
   if (!isAdmin) notFound()
 
-  const events = await listDoorEvents()
+  const events = await listDoorEvents(supabase)
   return <DoorLog events={events} />
 }

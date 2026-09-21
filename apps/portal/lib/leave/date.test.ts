@@ -3,8 +3,11 @@ import { describe, expect, test } from "bun:test"
 import {
   formatLeaveDate,
   getNextMondays,
+  isMondayIsoDate,
   parseLocalDate,
+  taipeiToday,
   toIsoDate,
+  upcomingLeaveMondays,
 } from "@/lib/leave/date"
 
 describe("parseLocalDate", () => {
@@ -72,5 +75,50 @@ describe("getNextMondays", () => {
     expect(list[0]?.getDate()).toBe(29)
     expect(list[1]?.getMonth()).toBe(1)
     expect(list[1]?.getDate()).toBe(5)
+  })
+})
+
+describe("taipeiToday", () => {
+  test("reads the Taipei calendar date, not the server's", () => {
+    expect(taipeiToday(new Date("2026-09-21T03:00:00.000Z"))).toBe("2026-09-21")
+  })
+
+  test("late UTC evening is already tomorrow in Taipei", () => {
+    expect(taipeiToday(new Date("2026-09-21T16:30:00.000Z"))).toBe("2026-09-22")
+  })
+
+  test("just before midnight Taipei is still the same day", () => {
+    expect(taipeiToday(new Date("2026-09-21T15:59:59.000Z"))).toBe("2026-09-21")
+  })
+})
+
+describe("isMondayIsoDate", () => {
+  test("accepts a Monday", () => {
+    expect(isMondayIsoDate("2026-09-21")).toBe(true)
+  })
+
+  test("rejects every other weekday", () => {
+    expect(isMondayIsoDate("2026-09-20")).toBe(false)
+    expect(isMondayIsoDate("2026-09-22")).toBe(false)
+    expect(isMondayIsoDate("2026-09-27")).toBe(false)
+  })
+
+  test("rejects a date that is not a date", () => {
+    expect(isMondayIsoDate("2026-13-45")).toBe(false)
+    expect(isMondayIsoDate("nope")).toBe(false)
+  })
+})
+
+describe("upcomingLeaveMondays", () => {
+  test("starts on today when today is a Monday", () => {
+    const mondays = upcomingLeaveMondays("2026-09-21")
+    expect(mondays).toHaveLength(8)
+    expect(mondays[0]).toBe("2026-09-21")
+    expect(mondays[7]).toBe("2026-11-09")
+  })
+
+  test("starts on the next Monday from any other day", () => {
+    expect(upcomingLeaveMondays("2026-09-22")[0]).toBe("2026-09-28")
+    expect(upcomingLeaveMondays("2026-09-27")[0]).toBe("2026-09-28")
   })
 })

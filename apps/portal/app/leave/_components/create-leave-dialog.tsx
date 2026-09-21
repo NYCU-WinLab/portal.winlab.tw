@@ -25,13 +25,16 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { useCreateLeave } from "@/hooks/leave/use-leaves"
 import { useAuth } from "@/hooks/use-auth"
-import { formatLeaveDate, getNextMondays, toIsoDate } from "@/lib/leave/date"
-
-const MONDAY_OPTIONS = 8
+import {
+  formatLeaveDate,
+  getNextMondays,
+  LEAVE_MONDAY_OPTIONS,
+  toIsoDate,
+} from "@/lib/leave/date"
 
 export function CreateLeaveDialog() {
   const [open, setOpen] = useState(false)
-  const mondays = getNextMondays(MONDAY_OPTIONS)
+  const mondays = getNextMondays(LEAVE_MONDAY_OPTIONS)
   const [date, setDate] = useState(toIsoDate(mondays[0]!))
   const [reason, setReason] = useState("")
   const { user } = useAuth()

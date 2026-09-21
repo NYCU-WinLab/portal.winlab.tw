@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/lib/supabase/server"
-import { parseMentions } from "@/lib/bulletin/types"
+import { insertBulletinMessage } from "@/lib/bulletin/fetch"
+import { parseMentions, type DbBulletinMessage } from "@/lib/bulletin/types"
 
 function createServiceClient() {
   return createServiceRoleClient(
@@ -38,21 +39,18 @@ export async function POST(request: NextRequest) {
   }
 
   // RLS will reject is_broadcast=true unless caller is admin; let it speak.
-  const { data: inserted, error: insertError } = await supabase
-    .from("bulletin_messages")
-    .insert({
+  let inserted: DbBulletinMessage
+  try {
+    inserted = await insertBulletinMessage(supabase, {
       content,
-      author_id: user.id,
-      is_broadcast: isBroadcast,
+      authorId: user.id,
+      isBroadcast,
     })
-    .select(
-      "id, content, author_id, is_broadcast, broadcast_notified_at, created_at"
-    )
-    .single()
-
-  if (insertError || !inserted) {
+  } catch (err) {
     return NextResponse.json(
-      { error: insertError?.message ?? "Failed to insert message" },
+      {
+        error: err instanceof Error ? err.message : "Failed to insert message",
+      },
       { status: 400 }
     )
   }

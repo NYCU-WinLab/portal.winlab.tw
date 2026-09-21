@@ -8,6 +8,7 @@ import {
   type Icon,
 } from "@tabler/icons-react"
 
+import { FIELD_CATEGORY_LABEL } from "./labels"
 import type { FieldCategory, PredefinedCategory } from "./types"
 
 export type CategoryDef = {
@@ -21,42 +22,42 @@ export type CategoryDef = {
 export const FIELD_CATEGORIES: readonly CategoryDef[] = [
   {
     id: "signature",
-    label: "簽名",
+    label: FIELD_CATEGORY_LABEL.signature,
     icon: IconSignature,
     predefined: true,
     defaultSize: { width: 0.2, height: 0.08 },
   },
   {
     id: "contact_address",
-    label: "聯絡地址",
+    label: FIELD_CATEGORY_LABEL.contact_address,
     icon: IconMapPin,
     predefined: true,
     defaultSize: { width: 0.3, height: 0.05 },
   },
   {
     id: "household_address",
-    label: "戶籍地址",
+    label: FIELD_CATEGORY_LABEL.household_address,
     icon: IconHome,
     predefined: true,
     defaultSize: { width: 0.3, height: 0.05 },
   },
   {
     id: "id_number",
-    label: "身分證",
+    label: FIELD_CATEGORY_LABEL.id_number,
     icon: IconId,
     predefined: true,
     defaultSize: { width: 0.2, height: 0.05 },
   },
   {
     id: "phone",
-    label: "手機",
+    label: FIELD_CATEGORY_LABEL.phone,
     icon: IconPhone,
     predefined: true,
     defaultSize: { width: 0.2, height: 0.05 },
   },
   {
     id: "other",
-    label: "其他",
+    label: FIELD_CATEGORY_LABEL.other,
     icon: IconTextSize,
     predefined: false,
     defaultSize: { width: 0.3, height: 0.05 },
