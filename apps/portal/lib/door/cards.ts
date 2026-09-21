@@ -28,6 +28,33 @@ export type DoorCardView = DoorCardRow & {
 export const CARD_ID_LENGTH = 10
 export const CARD_ID_PATTERN = /^[0-9]{10}$/
 
+// A ChameleonUltra in reader mode hands back a card's ISO14443A UID, and the
+// controller's card number is that same UID read little-endian: reader UID
+// 75 B3 8D 5E reverses to 5E 8D B3 75 = 0x5E8DB375 = 1586344821, a real
+// enrolled card. Only 4-byte UIDs map to a number here; 7-byte UIDs and the
+// like are out of scope. A UID whose first byte is 0x08 is a random one the
+// card re-rolls on every tap (phones, privacy cards), so it can never be
+// enrolled. A 4-byte value tops out at 4294967295, well under 2^53, so a plain
+// JS number is exact.
+export type UidCardNumber =
+  | { ok: true; cardNumber: string }
+  | { ok: false; reason: "unsupported_length" | "random_uid" }
+
+const RANDOM_UID_PREFIX = 0x08
+
+export function uidToCardNumber(
+  uid: Uint8Array | readonly number[]
+): UidCardNumber {
+  if (uid.length !== 4) return { ok: false, reason: "unsupported_length" }
+  if (uid[0] === RANDOM_UID_PREFIX) return { ok: false, reason: "random_uid" }
+
+  let value = 0
+  for (let i = uid.length - 1; i >= 0; i--) {
+    value = value * 256 + (uid[i] ?? 0)
+  }
+  return { ok: true, cardNumber: String(value).padStart(CARD_ID_LENGTH, "0") }
+}
+
 // Big5 is what the controller stores names in: two bytes per Chinese
 // character, one per ASCII character, 16 bytes of room. This is the client-side
 // approximation so the admin sees the problem while typing; the bridge does the

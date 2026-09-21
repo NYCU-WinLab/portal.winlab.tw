@@ -47,6 +47,10 @@ const NO_HOLDER = "__none__"
 type CardFormProps = {
   mode: "add" | "edit"
   card?: DoorCardView | null
+  // A card number captured from the reader: it prefills the add form for a
+  // brand-new card, unlike `card`, which reopens an existing row.
+  prefillCardId?: string
+  autoFocusName?: boolean
   members: Member[]
   open: boolean
   pending: boolean
@@ -66,7 +70,10 @@ export function CardFormDialog(props: CardFormProps) {
       }}
     >
       <DialogContent className="max-w-md">
-        <CardForm key={props.card?.card_id ?? "new"} {...props} />
+        <CardForm
+          key={props.card?.card_id ?? props.prefillCardId ?? "new"}
+          {...props}
+        />
       </DialogContent>
     </Dialog>
   )
@@ -75,12 +82,14 @@ export function CardFormDialog(props: CardFormProps) {
 function CardForm({
   mode,
   card,
+  prefillCardId,
+  autoFocusName,
   members,
   pending,
   onOpenChange,
   onSubmit,
 }: CardFormProps) {
-  const [cardId, setCardId] = useState(card?.card_id ?? "")
+  const [cardId, setCardId] = useState(card?.card_id ?? prefillCardId ?? "")
   const [holderName, setHolderName] = useState(card?.holder_name ?? "")
   const [holderUserId, setHolderUserId] = useState(
     card?.holder_user_id ?? NO_HOLDER
@@ -144,6 +153,7 @@ function CardForm({
             id="holder-name"
             value={holderName}
             autoComplete="off"
+            autoFocus={autoFocusName}
             onChange={(e) => setHolderName(e.target.value)}
             placeholder="卡機上顯示的名字"
           />

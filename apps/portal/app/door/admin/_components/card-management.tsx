@@ -36,6 +36,7 @@ import {
   updateDoorCard,
   type DoorCardMutation,
 } from "../actions"
+import { CardReader } from "./card-reader"
 import {
   CardFormDialog,
   type CardFormValues,
@@ -75,6 +76,9 @@ export function CardManagement({
   // card number, name, holder and note are all still here, and retyping them
   // is how they get lost for real.
   const [addSeed, setAddSeed] = useState<DoorCardView | null>(null)
+  // A card number tapped on the reader, used to prefill a fresh add form. Kept
+  // apart from addSeed so the form still reads "新增卡片", not "重新加入卡機".
+  const [addPrefillCardId, setAddPrefillCardId] = useState<string | null>(null)
   const [editing, setEditing] = useState<DoorCardView | null>(null)
   const [deleting, setDeleting] = useState<DoorCardView | null>(null)
 
@@ -114,18 +118,27 @@ export function CardManagement({
         onReconcile={() => run(reconcileDoorCards)}
       />
 
-      <div className="flex justify-end">
+      <CardReader
+        cards={cards}
+        disabled={pending}
+        onEnrol={(cardNumber) => {
+          setAddSeed(null)
+          setAddPrefillCardId(cardNumber)
+          setAddOpen(true)
+        }}
+      >
         <Button
           size="sm"
           onClick={() => {
             setAddSeed(null)
+            setAddPrefillCardId(null)
             setAddOpen(true)
           }}
           disabled={pending}
         >
           新增卡片
         </Button>
-      </div>
+      </CardReader>
 
       <div className="rounded-xl border border-border">
         <Table>
@@ -226,14 +239,22 @@ export function CardManagement({
       <CardFormDialog
         mode="add"
         card={addSeed}
+        prefillCardId={addPrefillCardId ?? undefined}
+        autoFocusName={addPrefillCardId !== null}
         members={members}
         open={addOpen}
         pending={pending}
-        onOpenChange={setAddOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open)
+          if (!open) setAddPrefillCardId(null)
+        }}
         onSubmit={(values: CardFormValues) =>
           run(
             () => addDoorCard(values),
-            () => setAddOpen(false)
+            () => {
+              setAddOpen(false)
+              setAddPrefillCardId(null)
+            }
           )
         }
       />

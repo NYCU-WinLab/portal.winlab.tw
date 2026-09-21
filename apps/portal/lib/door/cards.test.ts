@@ -9,6 +9,7 @@ import {
   mergeDoorCards,
   planImport,
   planReconcile,
+  uidToCardNumber,
   validateCardId,
   validateHolderName,
   type DoorCardRow,
@@ -231,5 +232,49 @@ describe("planImport", () => {
     expect(plan.alreadyKnown).toBe(0)
     expect(plan.adopt).toEqual([])
     expect(plan.invalid).toHaveLength(1)
+  })
+})
+
+describe("uidToCardNumber", () => {
+  test("reverses a 4-byte UID into the controller's card number", () => {
+    // The known card: reader UID 75 B3 8D 5E -> 5E8DB375 -> 1586344821.
+    const result = uidToCardNumber(Uint8Array.from([0x75, 0xb3, 0x8d, 0x5e]))
+    expect(result).toEqual({ ok: true, cardNumber: "1586344821" })
+  })
+
+  test("zero-pads a small number to ten digits", () => {
+    const result = uidToCardNumber(Uint8Array.from([0x01, 0x00, 0x00, 0x00]))
+    expect(result).toEqual({ ok: true, cardNumber: "0000000001" })
+  })
+
+  test("maps the maximum 4-byte UID without losing precision", () => {
+    const result = uidToCardNumber(Uint8Array.from([0xff, 0xff, 0xff, 0xff]))
+    expect(result).toEqual({ ok: true, cardNumber: "4294967295" })
+  })
+
+  test("accepts a plain number array, not just a typed array", () => {
+    expect(uidToCardNumber([0x75, 0xb3, 0x8d, 0x5e])).toEqual({
+      ok: true,
+      cardNumber: "1586344821",
+    })
+  })
+
+  test("rejects a UID that is not four bytes", () => {
+    expect(uidToCardNumber(Uint8Array.from([0x04, 0x8d, 0x5e]))).toEqual({
+      ok: false,
+      reason: "unsupported_length",
+    })
+    expect(
+      uidToCardNumber(
+        Uint8Array.from([0x04, 0x8d, 0x5e, 0x12, 0x34, 0x56, 0x78])
+      )
+    ).toEqual({ ok: false, reason: "unsupported_length" })
+  })
+
+  test("rejects a random UID that starts with 0x08", () => {
+    expect(uidToCardNumber(Uint8Array.from([0x08, 0x11, 0x22, 0x33]))).toEqual({
+      ok: false,
+      reason: "random_uid",
+    })
   })
 })
