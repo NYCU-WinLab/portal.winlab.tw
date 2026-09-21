@@ -17,15 +17,33 @@ import {
  * Callers are responsible for keeping `attributes` free of secrets
  * (passwords, session tokens, auth headers/cookies).
  */
+export function emitLog(input: {
+  severity: "INFO" | "WARN" | "ERROR"
+  body: string
+  attributes?: LogAttributes
+}): void {
+  const logger = logs.getLogger("portal")
+  logger.emit({
+    severityNumber: SEVERITY[input.severity],
+    severityText: input.severity,
+    body: input.body,
+    attributes: input.attributes,
+  })
+}
+
+const SEVERITY = {
+  INFO: SeverityNumber.INFO,
+  WARN: SeverityNumber.WARN,
+  ERROR: SeverityNumber.ERROR,
+} as const
+
 export function emitErrorLog(input: {
   message: string
   digest?: string
   attributes?: LogAttributes
 }): void {
-  const logger = logs.getLogger("portal")
-  logger.emit({
-    severityNumber: SeverityNumber.ERROR,
-    severityText: "ERROR",
+  emitLog({
+    severity: "ERROR",
     body: input.message,
     attributes: {
       ...(input.digest ? { "error.digest": input.digest } : {}),

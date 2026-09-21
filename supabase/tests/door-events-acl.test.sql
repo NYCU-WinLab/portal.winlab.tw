@@ -1,0 +1,54 @@
+-- door_events ACL regression suite — runs via `supabase test db`.
+--
+-- 20260921090000 made door_events an admin-read, service-role-write audit
+-- table. Two things keep that true and both are single lines a later migration
+-- can undo without noticing: the grant set on the table, and the fact that the
+-- only policy is a SELECT gated on is_portal_admin(). Pin both.
+
+begin;
+create extension if not exists pgtap with schema public;
+
+select plan(5);
+
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.door_events'::regclass),
+  'door_events has RLS enabled'
+);
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and tablename = 'door_events'),
+  1,
+  'door_events carries exactly one policy'
+);
+
+select is(
+  (select cmd from pg_policies
+    where schemaname = 'public' and tablename = 'door_events'),
+  'SELECT',
+  'the one door_events policy is a SELECT — nothing lets authenticated write'
+);
+
+-- anon must hold nothing at all; authenticated only SELECT.
+select is(
+  (select count(*)::int
+     from aclexplode((select relacl from pg_class where oid = 'public.door_events'::regclass)) a
+    where a.grantee = 'anon'::regrole),
+  0,
+  'anon holds no privilege on door_events'
+);
+
+select is(
+  (select array_agg(a.privilege_type order by a.privilege_type)
+     from aclexplode((select relacl from pg_class where oid = 'public.door_events'::regclass)) a
+    where a.grantee = 'authenticated'::regrole),
+  array['SELECT'],
+  'authenticated holds SELECT and nothing else on door_events'
+);
+
+-- Suite-wide convention: every pgTAP file in this repo ends up granting this so
+-- the rest of the suite stays runnable after dropping to `authenticated`.
+grant execute on all functions in schema public to authenticated;
+
+select * from finish();
+rollback;
