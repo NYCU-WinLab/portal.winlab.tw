@@ -22,10 +22,14 @@ import { useUpdateUserRoles } from "@/hooks/admin/use-admin-users"
 import { useAuth } from "@/hooks/use-auth"
 
 const APP_LABELS: Record<string, string> = {
-  bento: "訂餐 (Bento)",
-  trip: "出差 (Trip)",
   approve: "簽核 (Approve)",
+  bento: "訂餐 (Bento)",
+  door: "門禁 (Door)",
   leave: "請假 (Leave)",
+  meetings: "實驗室會議 (Meetings)",
+  receipts: "核銷單據 (Receipts)",
+  reimburse: "帳務 (Reimburse)",
+  trip: "出差 (Trip)",
 }
 
 function appLabel(app: string) {

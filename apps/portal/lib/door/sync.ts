@@ -7,7 +7,11 @@
 // someone had the page open would miss exactly the overnight corruption this
 // whole feature exists to catch.
 
-import { diffControllerCards } from "@/lib/door/cards"
+import {
+  diffControllerCards,
+  isValidCardId,
+  maskCardId,
+} from "@/lib/door/cards"
 import { recordDoorCardChange, type DoorCardActor } from "@/lib/door/card-audit"
 import { listDoorCardRows } from "@/lib/door/card-store"
 import { fetchControllerCardList } from "@/lib/door/hams"
@@ -25,11 +29,13 @@ export type ReconcileResult = {
   unknown_on_controller: number
   controller_card_count: number
   drifted: boolean
+  table_suspect: boolean
 }
 
 export type ImportResult = {
   imported: number
   skipped: number
+  invalid: number
   controller_card_count: number
 }
 
@@ -49,26 +55,11 @@ export async function reconcileControllerCards(
     const diff = diffControllerCards(rows, list.cards)
     const seenAt = new Date().toISOString()
 
-    if (diff.synced.length > 0) {
-      const { error } = await admin
-        .from("door_cards")
-        .update({ sync_state: "synced", last_seen_at: seenAt })
-        .in("card_id", diff.synced)
-      if (error) throw new Error(error.message)
-    }
-
-    if (diff.missingOnController.length > 0) {
-      const { error } = await admin
-        .from("door_cards")
-        .update({ sync_state: "missing_on_controller" })
-        .in("card_id", diff.missingOnController)
-      if (error) throw new Error(error.message)
-    }
-
+    const tableSuspect = list.count > CARD_COUNT_ALARM
     const drifted =
+      tableSuspect ||
       diff.missingOnController.length > 0 ||
-      diff.unknownOnController.length > 0 ||
-      list.count > CARD_COUNT_ALARM
+      diff.unknownOnController.length > 0
 
     const result: ReconcileResult = {
       synced: diff.synced.length,
@@ -76,6 +67,29 @@ export async function reconcileControllerCards(
       unknown_on_controller: diff.unknownOnController.length,
       controller_card_count: list.count,
       drifted,
+      table_suspect: tableSuspect,
+    }
+
+    // A card table this size is not a list, it is damage, and what it reports
+    // as present or absent means nothing. Writing sync_state from it would
+    // mark every real card missing on the strength of a corrupt read, so the
+    // comparison is recorded and nothing is written.
+    if (!tableSuspect) {
+      if (diff.synced.length > 0) {
+        const { error } = await admin
+          .from("door_cards")
+          .update({ sync_state: "synced", last_seen_at: seenAt })
+          .in("card_id", diff.synced)
+        if (error) throw new Error(error.message)
+      }
+
+      if (diff.missingOnController.length > 0) {
+        const { error } = await admin
+          .from("door_cards")
+          .update({ sync_state: "missing_on_controller" })
+          .in("card_id", diff.missingOnController)
+        if (error) throw new Error(error.message)
+      }
     }
 
     await recordDoorCardChange({
@@ -84,15 +98,20 @@ export async function reconcileControllerCards(
       cardId: null,
       headers,
       severity: drifted ? "ERROR" : "INFO",
-      body: drifted ? "door card list drifted" : "door card list reconciled",
+      body: tableSuspect
+        ? "door card table looks corrupted"
+        : drifted
+          ? "door card list drifted"
+          : "door card list reconciled",
       outcome: {
         ok: !drifted,
         error: drifted ? describeDrift(result) : null,
         latencyMs: performance.now() - started,
         detail: {
           ...result,
-          missing_ids: diff.missingOnController,
-          unknown_ids: diff.unknownOnController,
+          sync_state_written: !tableSuspect,
+          missing_ids: diff.missingOnController.map(maskCardId),
+          unknown_ids: diff.unknownOnController.map(maskCardId),
         },
       },
     })
@@ -118,12 +137,14 @@ export async function reconcileControllerCards(
 
 function describeDrift(result: ReconcileResult): string {
   const parts: string[] = []
+  if (result.table_suspect)
+    parts.push(
+      `controller reports ${result.controller_card_count} cards, card table suspect`
+    )
   if (result.missing_on_controller > 0)
     parts.push(`${result.missing_on_controller} missing on controller`)
   if (result.unknown_on_controller > 0)
     parts.push(`${result.unknown_on_controller} unknown on controller`)
-  if (result.controller_card_count > CARD_COUNT_ALARM)
-    parts.push(`controller reports ${result.controller_card_count} cards`)
   return parts.join(", ")
 }
 
@@ -145,7 +166,13 @@ export async function importControllerCards(
     const known = new Set(rows.map((r) => r.card_id))
     const seenAt = new Date().toISOString()
 
+    // A card id the check constraint would reject fails the whole insert, and
+    // one unreadable entry in a corrupted table must not stop the other
+    // fifteen real cards from being adopted. Skip it and name it in the audit.
+    const invalid = list.cards.filter((card) => !isValidCardId(card.card_id))
+
     const toInsert = list.cards
+      .filter((card) => isValidCardId(card.card_id))
       .filter((card) => !known.has(card.card_id))
       .map((card) => ({
         card_id: card.card_id,
@@ -162,7 +189,8 @@ export async function importControllerCards(
 
     const result: ImportResult = {
       imported: toInsert.length,
-      skipped: list.cards.length - toInsert.length,
+      skipped: list.cards.length - toInsert.length - invalid.length,
+      invalid: invalid.length,
       controller_card_count: list.count,
     }
 
@@ -171,11 +199,16 @@ export async function importControllerCards(
       action: "import",
       cardId: null,
       headers,
+      severity: invalid.length > 0 ? "WARN" : "INFO",
       body: "door cards imported from controller",
       outcome: {
         ok: true,
         latencyMs: performance.now() - started,
-        detail: { ...result, imported_ids: toInsert.map((c) => c.card_id) },
+        detail: {
+          ...result,
+          imported_ids: toInsert.map((c) => maskCardId(c.card_id)),
+          invalid_ids: invalid.map((c) => maskCardId(c.card_id)),
+        },
       },
     })
 

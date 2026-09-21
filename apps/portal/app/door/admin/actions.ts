@@ -64,6 +64,20 @@ export type DoorCardPatch = {
   note?: string | null
 }
 
+// Thrown when the reason is something the admin can act on. Everything else
+// reaches the browser as GENERIC_ERROR: a Postgres message names columns and
+// constraints the admin cannot do anything with, and it does not belong in a
+// toast.
+class DoorAdminError extends Error {}
+
+const GENERIC_ERROR = "操作失敗了，請再試一次，若一直失敗請找管理員看 log。"
+
+// Said when the controller took the change but the portal failed to write it
+// down. The device is the thing that opens the door, so the change is real and
+// the list on screen is the copy that is now wrong.
+const CONTROLLER_AHEAD =
+  "卡機已經改好了，但 Portal 沒記下來。請按「與卡機比對」把兩邊對回來。"
+
 // Every action starts here. RLS already hides the rows, but the bridge calls
 // have no RLS at all, so the role check is the gate that keeps a member from
 // rewriting the controller through a hand-made request.
@@ -71,17 +85,22 @@ async function requireDoorAdmin(): Promise<NormalizedUser> {
   const supabase = await createClient()
   const { data: isAdmin, error } = await supabase.rpc("is_door_admin")
   if (error) throw new Error(error.message)
-  if (!isAdmin) throw new Error("Forbidden")
+  if (!isAdmin) throw new DoorAdminError("你沒有門禁卡管理權限。")
   const user = await getCurrentUser()
-  if (!user) throw new Error("Unauthorized")
+  if (!user) throw new DoorAdminError("登入狀態過期了，請重新整理。")
   return user
 }
 
 function describe(err: unknown): string {
-  if (err instanceof HamsError)
-    return hamsErrorMessage(err.code, err.message || "卡機橋接服務沒有回應。")
-  if (err instanceof Error) return err.message
-  return "未知錯誤"
+  if (err instanceof HamsError) return hamsErrorMessage(err.code, GENERIC_ERROR)
+  if (err instanceof DoorAdminError) return err.message
+  console.error("[door] card action failed", err)
+  return GENERIC_ERROR
+}
+
+type FailureDetail = {
+  controllerChanged: boolean
+  counts?: ControllerCounts | null
 }
 
 function auditFailure(
@@ -90,7 +109,8 @@ function auditFailure(
   cardId: string | null,
   err: unknown,
   latencyMs: number,
-  requestHeaders: Headers
+  requestHeaders: Headers,
+  failure: FailureDetail
 ) {
   after(() =>
     recordDoorCardChange({
@@ -104,11 +124,22 @@ function auditFailure(
         ok: false,
         error: err instanceof Error ? err.message : String(err),
         latencyMs,
-        detail: err instanceof HamsError ? { code: err.code } : null,
+        detail: {
+          // Without this a half-applied change reads exactly like a no-op, and
+          // the two need very different follow-up: one needs a retry, the
+          // other needs someone to go look at the controller.
+          controller_changed: failure.controllerChanged,
+          ...(failure.counts ?? {}),
+          ...(err instanceof HamsError
+            ? { code: err.code, status: err.status }
+            : {}),
+        },
       },
     })
   )
 }
+
+type ControllerCounts = { count_before: number; count_after: number }
 
 export async function listDoorCards(): Promise<DoorCardsResult> {
   try {
@@ -173,20 +204,36 @@ export async function addDoorCard(
   const invalid = validateCardId(cardId) ?? validateHolderName(holderName)
   if (invalid) return { ok: false, error: invalid }
 
+  let controllerChanged = false
+  let counts: ControllerCounts | null = null
+
   try {
     const result = await createControllerCard(cardId, holderName)
+    controllerChanged = true
+    counts = {
+      count_before: result.count_before,
+      count_after: result.count_after,
+    }
 
+    // Upsert, not insert: a card that went missing from the controller still
+    // has its row here, and re-adding it is the normal way to fix that. The
+    // row is being re-created, so created_by moves to whoever did it;
+    // door_card_changes keeps the longer history.
     const { error } = await createAdminClient()
       .from("door_cards")
-      .insert({
-        card_id: cardId,
-        holder_name: holderName,
-        holder_user_id: input.holder_user_id || null,
-        note: input.note?.trim() || null,
-        sync_state: "synced",
-        last_seen_at: new Date().toISOString(),
-        created_by: user.id,
-      })
+      .upsert(
+        {
+          card_id: cardId,
+          holder_name: holderName,
+          holder_user_id: input.holder_user_id || null,
+          note: input.note?.trim() || null,
+          sync_state: "synced",
+          last_seen_at: new Date().toISOString(),
+          created_by: user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "card_id" }
+      )
     if (error) throw new Error(error.message)
 
     const latencyMs = performance.now() - started
@@ -199,11 +246,7 @@ export async function addDoorCard(
         outcome: {
           ok: true,
           latencyMs,
-          detail: {
-            holder_name: holderName,
-            count_before: result.count_before,
-            count_after: result.count_after,
-          },
+          detail: { holder_name: holderName, ...counts },
         },
       })
     )
@@ -215,9 +258,13 @@ export async function addDoorCard(
       cardId,
       err,
       performance.now() - started,
-      requestHeaders
+      requestHeaders,
+      { controllerChanged, counts }
     )
-    return { ok: false, error: describe(err) }
+    return {
+      ok: false,
+      error: controllerChanged ? CONTROLLER_AHEAD : describe(err),
+    }
   }
 }
 
@@ -234,22 +281,74 @@ export async function updateDoorCard(
     return { ok: false, error: describe(err) }
   }
 
+  const invalidId = validateCardId(cardId)
+  if (invalidId) return { ok: false, error: invalidId }
+
   const holderName = patch.holder_name?.trim()
   if (holderName !== undefined) {
     const invalid = validateHolderName(holderName)
     if (invalid) return { ok: false, error: invalid }
   }
 
+  let controllerChanged = false
+  let counts: ControllerCounts | null = null
+
   try {
     const admin = createAdminClient()
     const existing = await getDoorCardRow(admin, cardId)
-    if (!existing) throw new Error("這張卡不在名單裡，請先匯入卡機清單。")
+    if (!existing)
+      throw new DoorAdminError("這張卡不在名單裡，請先匯入卡機清單。")
 
     // The controller only stores the name, so a note or holder change is a
     // portal-side edit and must not touch the device.
     const renamed =
       holderName !== undefined && holderName !== existing.holder_name
-    if (renamed) await renameControllerCard(cardId, holderName!)
+
+    if (renamed) {
+      try {
+        const result = await renameControllerCard(cardId, holderName!)
+        controllerChanged = true
+        counts = {
+          count_before: result.count_before,
+          count_after: result.count_after,
+        }
+      } catch (err) {
+        if (err instanceof HamsError && err.code === "rename_lost_card") {
+          // The device renames by deleting and re-adding. The delete landed
+          // and the add did not, so the card no longer opens the door: say so
+          // and mark the row, rather than leaving a row that claims "synced".
+          await admin
+            .from("door_cards")
+            .update({
+              sync_state: "missing_on_controller",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("card_id", cardId)
+          after(() =>
+            recordDoorCardChange({
+              actor: user,
+              action: "update",
+              cardId,
+              headers: requestHeaders,
+              severity: "ERROR",
+              body: "door card rename lost the card",
+              outcome: {
+                ok: false,
+                error: err.message,
+                latencyMs: performance.now() - started,
+                detail: {
+                  controller_changed: true,
+                  code: err.code,
+                  observed: err.body?.observed ?? null,
+                },
+              },
+            })
+          )
+          return { ok: false, error: hamsErrorMessage(err.code, GENERIC_ERROR) }
+        }
+        throw err
+      }
+    }
 
     const { error } = await admin
       .from("door_cards")
@@ -280,6 +379,7 @@ export async function updateDoorCard(
             renamed_on_controller: renamed,
             holder_name_before: existing.holder_name,
             holder_name_after: holderName ?? existing.holder_name,
+            ...counts,
           },
         },
       })
@@ -292,9 +392,13 @@ export async function updateDoorCard(
       cardId,
       err,
       performance.now() - started,
-      requestHeaders
+      requestHeaders,
+      { controllerChanged, counts }
     )
-    return { ok: false, error: describe(err) }
+    return {
+      ok: false,
+      error: controllerChanged ? CONTROLLER_AHEAD : describe(err),
+    }
   }
 }
 
@@ -310,13 +414,24 @@ export async function deleteDoorCard(
     return { ok: false, error: describe(err) }
   }
 
+  const invalidId = validateCardId(cardId)
+  if (invalidId) return { ok: false, error: invalidId }
+
+  let controllerChanged = false
+  let counts: ControllerCounts | null = null
+
   try {
     // not_found means the device no longer has this card, which is the state
     // the delete was asking for. Dropping the row anyway is what clears a
     // card that was already removed by hand in HAMS.
     let alreadyGone = false
     try {
-      await deleteControllerCard(cardId)
+      const result = await deleteControllerCard(cardId)
+      controllerChanged = true
+      counts = {
+        count_before: result.count_before,
+        count_after: result.count_after,
+      }
     } catch (err) {
       if (err instanceof HamsError && err.code === "not_found")
         alreadyGone = true
@@ -339,7 +454,7 @@ export async function deleteDoorCard(
         outcome: {
           ok: true,
           latencyMs,
-          detail: { already_gone_on_controller: alreadyGone },
+          detail: { already_gone_on_controller: alreadyGone, ...counts },
         },
       })
     )
@@ -356,9 +471,13 @@ export async function deleteDoorCard(
       cardId,
       err,
       performance.now() - started,
-      requestHeaders
+      requestHeaders,
+      { controllerChanged, counts }
     )
-    return { ok: false, error: describe(err) }
+    return {
+      ok: false,
+      error: controllerChanged ? CONTROLLER_AHEAD : describe(err),
+    }
   }
 }
 
@@ -369,7 +488,9 @@ export async function importFromController(): Promise<DoorCardMutation> {
     const result = await importControllerCards(user, requestHeaders)
     return {
       ok: true,
-      message: `匯入 ${result.imported} 張卡，${result.skipped} 張已在名單裡。`,
+      message:
+        `匯入 ${result.imported} 張卡，${result.skipped} 張已在名單裡。` +
+        (result.invalid > 0 ? `${result.invalid} 張卡號不合格式，跳過。` : ""),
     }
   } catch (err) {
     return { ok: false, error: describe(err) }
@@ -381,6 +502,11 @@ export async function reconcileDoorCards(): Promise<DoorCardMutation> {
     const user = await requireDoorAdmin()
     const requestHeaders = await headers()
     const result = await reconcileControllerCards(user, requestHeaders)
+    if (result.table_suspect)
+      return {
+        ok: false,
+        error: `卡機回報 ${result.controller_card_count} 張卡，卡表疑似損毀，請先用 HAMS 重新上傳。名單沒有被改動。`,
+      }
     if (!result.drifted)
       return {
         ok: true,

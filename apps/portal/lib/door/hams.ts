@@ -1,3 +1,5 @@
+import "server-only"
+
 // Server-only client for hams-bridge, the small HTTP service on lab infra that
 // wraps the Hundure RAC-960PME access controller. The controller speaks a
 // binary TCP protocol and only answers on the lab network, so Vercel talks to
@@ -9,7 +11,9 @@
 //   GET    /health       -> device version, clock skew, card count
 // Every write re-reads the card table on the device before answering, which is
 // why a failure here is worth surfacing verbatim: the bridge already knows
-// whether the change landed. Both env vars are server-only.
+// whether the change landed. The one case where it landed halfway is a rename,
+// which the device only does as delete-then-add: the bridge reports that as
+// 502 rename_lost_card and the card is gone. Both env vars are server-only.
 
 export type HamsErrorCode =
   | "unauthorized"
@@ -20,17 +24,28 @@ export type HamsErrorCode =
   | "controller_busy"
   | "table_suspect"
   | "verify_failed"
+  | "rename_lost_card"
   | "unknown"
 
 export class HamsError extends Error {
   readonly code: HamsErrorCode
   readonly status: number
+  // The raw failure body. rename_lost_card carries `deleted` and `observed`
+  // counts that say how far the half-applied rename got, and the audit row is
+  // the only place that ever gets to see them.
+  readonly body: Record<string, unknown> | null
 
-  constructor(message: string, code: HamsErrorCode, status: number) {
+  constructor(
+    message: string,
+    code: HamsErrorCode,
+    status: number,
+    body: Record<string, unknown> | null = null
+  ) {
     super(message)
     this.name = "HamsError"
     this.code = code
     this.status = status
+    this.body = body
   }
 }
 
@@ -76,6 +91,7 @@ const KNOWN_CODES: readonly HamsErrorCode[] = [
   "controller_busy",
   "table_suspect",
   "verify_failed",
+  "rename_lost_card",
 ]
 
 export function hamsConfigured(): boolean {
@@ -95,8 +111,15 @@ function toError(status: number, body: unknown): HamsError {
   const message =
     typeof shape.error === "string" && shape.error.length > 0
       ? shape.error
-      : `hams-bridge responded ${status}`
-  return new HamsError(message, code, status)
+      : `hams-bridge responded ${status} (${code})`
+  return new HamsError(
+    message,
+    code,
+    status,
+    typeof body === "object" && body !== null
+      ? (body as Record<string, unknown>)
+      : null
+  )
 }
 
 async function request<T>(

@@ -78,6 +78,8 @@ export const HAMS_ERROR_MESSAGES: Record<HamsErrorCode, string> = {
   controller_busy: "卡機正在忙，等一下再試一次。",
   table_suspect: "卡機卡表疑似損毀，請先用 HAMS 重新上傳",
   verify_failed: "卡機沒有確認這次變更，請按「與卡機比對」",
+  rename_lost_card:
+    "改名時卡機已刪除舊資料但新增失敗，這張卡目前無法開門，請重新新增",
   unknown: "卡機橋接服務回了沒看過的錯誤。",
 }
 
@@ -87,6 +89,14 @@ export function hamsErrorMessage(
 ): string {
   if (!code) return fallback
   return HAMS_ERROR_MESSAGES[code] ?? fallback
+}
+
+// Card numbers identify a physical key. A log line or an error toast is read
+// by more people than the card list is, so anything that leaves this feature
+// carries only the last four digits.
+export function maskCardId(cardId: string): string {
+  if (cardId.length <= 4) return cardId
+  return `${"*".repeat(cardId.length - 4)}${cardId.slice(-4)}`
 }
 
 export type ControllerDiff = {

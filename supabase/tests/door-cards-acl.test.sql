@@ -10,7 +10,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(13);
+select plan(15);
 
 select ok(
   (select exists (
@@ -18,6 +18,26 @@ select ok(
        join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.proname = 'is_door_admin')),
   'is_door_admin() exists — every policy below names it'
+);
+
+-- is_door_admin() is the only thing standing between a member and the card
+-- list, and it reads user_profiles, which that member cannot read for anyone
+-- but themselves. Without SECURITY DEFINER it silently answers false for
+-- everyone; without a pinned search_path it is resolvable through a schema the
+-- caller controls.
+select ok(
+  (select prosecdef from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'is_door_admin'),
+  'is_door_admin() is SECURITY DEFINER'
+);
+
+select ok(
+  (select proconfig from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'is_door_admin')
+    @> array['search_path=public'],
+  'is_door_admin() pins search_path to public'
 );
 
 select ok(

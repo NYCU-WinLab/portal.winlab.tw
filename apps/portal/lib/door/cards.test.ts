@@ -5,6 +5,7 @@ import {
   diffControllerCards,
   hamsErrorMessage,
   isValidCardId,
+  maskCardId,
   mergeDoorCards,
   validateCardId,
   validateHolderName,
@@ -83,8 +84,23 @@ describe("hamsErrorMessage", () => {
     )
   })
 
+  test("explains a rename that deleted the card and never re-added it", () => {
+    expect(hamsErrorMessage("rename_lost_card", "boom")).toContain("重新新增")
+  })
+
   test("falls back to the raw message when there is no code", () => {
     expect(hamsErrorMessage(undefined, "boom")).toBe("boom")
+  })
+})
+
+describe("maskCardId", () => {
+  test("keeps only the last four digits", () => {
+    expect(maskCardId("0001234567")).toBe("******4567")
+  })
+
+  test("leaves a too-short id alone rather than inventing padding", () => {
+    expect(maskCardId("4567")).toBe("4567")
+    expect(maskCardId("")).toBe("")
   })
 })
 
