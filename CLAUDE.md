@@ -402,6 +402,29 @@ Icons live in `apps/portal/public/icons/` (192, 512, and the 180 that iOS
 actually uses). They are upscaled from `app/apple-icon.png`; replace them from
 a larger source if one ever shows up.
 
+**Changing `start_url` does not reach anyone who already installed the app** —
+iOS caches the manifest when the icon is added, so a change means everyone
+deletes and re-adds their icon. Treat it as a migration, not an edit.
+
+### `/door/go` opens the door by itself
+
+The door manifest's `start_url` is `/door/go`, not `/door`, so one tap on the
+home-screen icon is one unlock. `/door` stays the page you press yourself and
+is what a browser visit gets: a link someone follows, or an old tab restoring,
+must never open the lab door.
+
+`/door/go` renders the same `<DoorPanel>` with `autoOpen`, and the guard is
+`lib/door/auto-open.ts` — it opens only when `PerformanceNavigationTiming.type`
+is `navigate`. A reload, a back/forward restore, or a browser reporting nothing
+is the page coming back on its own, and none of them are consent. That check is
+an allow-list of exactly one value on purpose, so a browser inventing a new
+navigation type can never be read as a request to unlock.
+
+The accepted cost is that an accidental tap on the icon opens the door. The
+audit trail from #1184 is what makes that survivable — every open, deliberate
+or not, records who and when. If that trade ever stops being worth it, point
+`start_url` back at `/door` (and tell everyone to re-add the icon).
+
 ## Style conventions
 
 - **Prettier** — no semicolons, double quotes, 2-space indent, `printWidth: 80`, `trailingComma: "es5"`. `prettier-plugin-tailwindcss` sorts classes; `cn` and `cva` are registered as Tailwind functions.

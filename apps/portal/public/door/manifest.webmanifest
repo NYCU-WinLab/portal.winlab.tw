@@ -6,7 +6,7 @@
   "lang": "zh-Hant",
   "dir": "ltr",
   "categories": ["utilities", "productivity"],
-  "start_url": "/door",
+  "start_url": "/door/go",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
