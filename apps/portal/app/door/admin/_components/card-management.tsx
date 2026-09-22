@@ -168,7 +168,7 @@ export function CardManagement({
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {holder.note ?? "—"}
+                    {holder.note ?? ""}
                   </TableCell>
                   <TableCell>
                     <SyncBadge state={holder.syncState} />
