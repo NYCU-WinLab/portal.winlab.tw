@@ -69,7 +69,7 @@ export function validateCardId(value: string): string | null {
   if (value.length === 0) return "請輸入卡號。"
   if (!/^[0-9]*$/.test(value)) return "卡號只能是數字。"
   if (value.length !== CARD_ID_LENGTH)
-    return `卡號是 ${CARD_ID_LENGTH} 位數字，開頭的 0 要一起輸入。`
+    return `卡號需為 ${CARD_ID_LENGTH} 位數字`
   return null
 }
 

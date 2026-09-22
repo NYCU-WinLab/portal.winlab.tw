@@ -238,9 +238,6 @@ function HolderForm({
           {hasDuplicate && (
             <p className="text-xs text-destructive">卡號不能重複。</p>
           )}
-          <p className="text-xs text-muted-foreground">
-            每張卡是 {CARD_ID_LENGTH} 位數字，開頭的 0 要一起輸入。
-          </p>
 
           <CardReader
             cards={allCards}

@@ -219,16 +219,7 @@ export function CardReader({
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-muted-foreground">
-              剛剛感應到
-            </p>
-            {taps.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {status === "connected"
-                  ? "把卡片靠上讀卡機，卡號就會出現在這裡。"
-                  : "先連線讀卡機，再感應卡片。"}
-              </p>
-            ) : (
+            {taps.length > 0 && (
               <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                 {taps.map((tap) => (
                   <TapRow
