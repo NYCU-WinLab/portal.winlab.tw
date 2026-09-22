@@ -372,6 +372,36 @@ Central content container: `mx-auto w-full max-w-4xl px-6 py-20`. Width is 4xl (
 
 **Each route picks its own `appName`** (Portal, Profile, Bento, …). Don't set it once in the root `layout.tsx` — that would freeze every app to the same name. Multi-route apps wrap `<PortalShell>` in their own `layout.tsx`.
 
+### Installing one app to a phone home screen (PWA)
+
+Portal as a whole is not a PWA. An individual app opts in by declaring a
+manifest on its own segment — today only `/door`, because its whole UI is one
+big button and opening a browser to reach it is most of the work. `apps/gallery`
+is a PWA too, but as a whole workspace on its own domain (`app/manifest.ts`,
+plus a service worker and install prompt); portal apps get the smaller version.
+
+The recipe is a static `public/<app>/manifest.webmanifest` plus `manifest:`,
+`appleWebApp:` and a `themeColor` viewport in that app's `layout.tsx`. Next.js's
+`manifest.ts` file convention only works at the app root, which portal keeps
+free, so the manifest is a plain file under `public/`.
+
+Two things are load-bearing and look wrong out of context:
+
+- **`scope` is `/`, not `/<app>`.** An installed web app on iOS gets its own
+  cookie jar, so its first launch always lands on `/auth/login` — outside
+  `/<app>`. iOS opens an out-of-scope navigation in Safari, which writes the
+  session cookie to Safari's jar and leaves the installed app logged out
+  forever. Narrowing `scope` to the app is a sign-in loop with no way out.
+- **`.webmanifest` is excluded from `proxy.ts`'s matcher.** A browser refetches
+  the manifest when it judges installability and when it launches an installed
+  app, both of which happen with an empty cookie jar. Gated, those fetches get
+  a redirect to HTML and the app silently loses its standalone launch. The
+  manifest holds no secrets — name, icons, `start_url`.
+
+Icons live in `apps/portal/public/icons/` (192, 512, and the 180 that iOS
+actually uses). They are upscaled from `app/apple-icon.png`; replace them from
+a larger source if one ever shows up.
+
 ## Style conventions
 
 - **Prettier** — no semicolons, double quotes, 2-space indent, `printWidth: 80`, `trailingComma: "es5"`. `prettier-plugin-tailwindcss` sorts classes; `cn` and `cva` are registered as Tailwind functions.
