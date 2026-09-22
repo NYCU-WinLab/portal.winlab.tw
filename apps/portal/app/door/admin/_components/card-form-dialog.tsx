@@ -13,23 +13,20 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import {
   big5ByteLength,
   CARD_ID_LENGTH,
+  deriveHolder,
   HOLDER_NAME_MAX_BYTES,
   validateCardId,
   validateHolderName,
   type DoorCardView,
+  type HolderChoice,
 } from "@/lib/door/cards"
+
+import { MemberSelect, NO_HOLDER } from "./member-select"
 
 export type Member = { id: string; name: string | null; email: string | null }
 
@@ -40,17 +37,13 @@ export type CardFormValues = {
   note: string | null
 }
 
-// Radix Select has no empty-string value, so "no portal account" needs a
-// sentinel. Guest and spare cards are the reason the column is nullable.
-const NO_HOLDER = "__none__"
-
 type CardFormProps = {
   mode: "add" | "edit"
   card?: DoorCardView | null
   // A card number captured from the reader: it prefills the add form for a
   // brand-new card, unlike `card`, which reopens an existing row.
   prefillCardId?: string
-  autoFocusName?: boolean
+  autoFocusHolder?: boolean
   members: Member[]
   open: boolean
   pending: boolean
@@ -83,29 +76,58 @@ function CardForm({
   mode,
   card,
   prefillCardId,
-  autoFocusName,
+  autoFocusHolder,
   members,
   pending,
   onOpenChange,
   onSubmit,
 }: CardFormProps) {
   const [cardId, setCardId] = useState(card?.card_id ?? prefillCardId ?? "")
-  const [holderName, setHolderName] = useState(card?.holder_name ?? "")
   const [holderUserId, setHolderUserId] = useState(
     card?.holder_user_id ?? NO_HOLDER
   )
+  // Only used for a guest card. In edit mode a card with no member keeps its
+  // stored label so switching fields doesn't wipe it.
+  const [guestLabel, setGuestLabel] = useState(
+    card && !card.holder_user_id ? (card.holder_name ?? "") : ""
+  )
   const [note, setNote] = useState(card?.note ?? "")
 
+  const isGuest = holderUserId === NO_HOLDER
+  const selectedMember = isGuest
+    ? null
+    : (members.find((m) => m.id === holderUserId) ?? null)
+
+  const choice: HolderChoice = isGuest
+    ? { kind: "guest", label: guestLabel }
+    : {
+        kind: "member",
+        member: {
+          id: holderUserId,
+          name: selectedMember?.name ?? card?.holder_name ?? null,
+        },
+      }
+  const derived = deriveHolder(choice)
+
   const cardIdError = mode === "add" ? validateCardId(cardId) : null
-  const nameError = validateHolderName(holderName)
-  const nameBytes = big5ByteLength(holderName.trim())
+  const nameError = validateHolderName(derived.holder_name)
+  const guestBytes = big5ByteLength(guestLabel.trim())
+
+  // A member with no readable name can't be written to the controller, which
+  // needs a label. Surface that instead of a blank "請輸入姓名".
+  const memberNameError =
+    !isGuest && nameError
+      ? "這位成員的姓名無法寫進卡機，請改用「無成員（訪客）」自訂標籤。"
+      : null
+
+  const blocked = !!cardIdError || !!nameError
 
   function handleSubmit() {
-    if (cardIdError || nameError) return
+    if (blocked) return
     onSubmit({
       card_id: cardId.trim(),
-      holder_name: holderName.trim(),
-      holder_user_id: holderUserId === NO_HOLDER ? null : holderUserId,
+      holder_name: derived.holder_name,
+      holder_user_id: derived.holder_user_id,
       note: note.trim() || null,
     })
   }
@@ -118,10 +140,10 @@ function CardForm({
         </DialogTitle>
         <DialogDescription>
           {mode === "edit"
-            ? "改姓名會同步到卡機；持有人和備註只存在 Portal。"
+            ? "改動只存 Portal，改名才會同步到卡機。"
             : card
-              ? "把這張卡再寫回卡機一次。持有人和備註會留著，不用重打。"
-              : "先寫進卡機，成功了才會記到名單上。"}
+              ? "把這張卡再寫回卡機一次。"
+              : "卡片會先寫進卡機，成功才會記到名單。"}
         </DialogDescription>
       </DialogHeader>
 
@@ -140,7 +162,7 @@ function CardForm({
             placeholder="0001234567"
           />
           <p className="text-xs text-muted-foreground">
-            卡片上印的 {CARD_ID_LENGTH} 位數字，開頭的 0 要一起輸入。
+            {CARD_ID_LENGTH} 位數字，開頭的 0 要一起輸入。
           </p>
           {cardId.length > 0 && cardIdError && (
             <p className="text-xs text-destructive">{cardIdError}</p>
@@ -148,40 +170,38 @@ function CardForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="holder-name">姓名</Label>
-          <Input
-            id="holder-name"
-            value={holderName}
-            autoComplete="off"
-            autoFocus={autoFocusName}
-            onChange={(e) => setHolderName(e.target.value)}
-            placeholder="卡機上顯示的名字"
+          <Label htmlFor="holder-user">持有人</Label>
+          <MemberSelect
+            id="holder-user"
+            members={members}
+            value={holderUserId}
+            autoFocus={autoFocusHolder}
+            onSelect={setHolderUserId}
           />
-          <p className="text-xs text-muted-foreground">
-            卡機只存這個名字，最多 {HOLDER_NAME_MAX_BYTES} 個位元組（中文算
-            2、英數算 1），目前 {nameBytes}。
-          </p>
-          {holderName.length > 0 && nameError && (
-            <p className="text-xs text-destructive">{nameError}</p>
+          {memberNameError && (
+            <p className="text-xs text-destructive">{memberNameError}</p>
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="holder-user">持有人</Label>
-          <Select value={holderUserId} onValueChange={setHolderUserId}>
-            <SelectTrigger id="holder-user" className="w-full">
-              <SelectValue placeholder="選一位成員" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_HOLDER}>不對應 Portal 帳號</SelectItem>
-              {members.map((member) => (
-                <SelectItem key={member.id} value={member.id}>
-                  {member.name ?? member.email ?? member.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isGuest && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="guest-label">姓名 / 標籤</Label>
+            <Input
+              id="guest-label"
+              value={guestLabel}
+              autoComplete="off"
+              onChange={(e) => setGuestLabel(e.target.value)}
+              placeholder="卡機上顯示的名字"
+            />
+            <p className="text-xs text-muted-foreground">
+              最多 {HOLDER_NAME_MAX_BYTES} 位元組（中文 2、英數 1），目前{" "}
+              {guestBytes}。
+            </p>
+            {guestLabel.length > 0 && nameError && (
+              <p className="text-xs text-destructive">{nameError}</p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="card-note">備註</Label>
@@ -190,7 +210,7 @@ function CardForm({
             value={note}
             rows={2}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="訪客卡、備用卡、借給誰…"
+            placeholder="備用卡、借給誰…"
           />
         </div>
       </div>
@@ -203,10 +223,7 @@ function CardForm({
         >
           取消
         </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={pending || !!cardIdError || !!nameError}
-        >
+        <Button onClick={handleSubmit} disabled={pending || blocked}>
           {pending
             ? "處理中…"
             : mode === "edit"

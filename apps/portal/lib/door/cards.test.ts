@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   big5ByteLength,
+  deriveHolder,
   diffControllerCards,
   hamsErrorMessage,
   isValidCardId,
@@ -275,6 +276,39 @@ describe("uidToCardNumber", () => {
     expect(uidToCardNumber(Uint8Array.from([0x08, 0x11, 0x22, 0x33]))).toEqual({
       ok: false,
       reason: "random_uid",
+    })
+  })
+})
+
+describe("deriveHolder", () => {
+  test("member selection carries the member id and the member's own name", () => {
+    expect(
+      deriveHolder({
+        kind: "member",
+        member: { id: "u-1", name: "蔣汶儒" },
+      })
+    ).toEqual({ holder_name: "蔣汶儒", holder_user_id: "u-1" })
+  })
+
+  test("member name is trimmed so the controller label has no stray spaces", () => {
+    expect(
+      deriveHolder({
+        kind: "member",
+        member: { id: "u-2", name: "  Kai Kuo  " },
+      })
+    ).toEqual({ holder_name: "Kai Kuo", holder_user_id: "u-2" })
+  })
+
+  test("a member with no name resolves to an empty label the form must reject", () => {
+    expect(
+      deriveHolder({ kind: "member", member: { id: "u-3", name: null } })
+    ).toEqual({ holder_name: "", holder_user_id: "u-3" })
+  })
+
+  test("guest selection has no member id and uses the typed label", () => {
+    expect(deriveHolder({ kind: "guest", label: "  訪客卡  " })).toEqual({
+      holder_name: "訪客卡",
+      holder_user_id: null,
     })
   })
 })

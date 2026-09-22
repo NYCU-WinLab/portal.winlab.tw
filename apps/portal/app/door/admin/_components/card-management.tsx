@@ -240,7 +240,7 @@ export function CardManagement({
         mode="add"
         card={addSeed}
         prefillCardId={addPrefillCardId ?? undefined}
-        autoFocusName={addPrefillCardId !== null}
+        autoFocusHolder={addPrefillCardId !== null}
         members={members}
         open={addOpen}
         pending={pending}
