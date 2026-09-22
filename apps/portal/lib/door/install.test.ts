@@ -25,7 +25,12 @@ describe("door home-screen install", () => {
   // round trip inside the installed app.
   test("scope covers the auth routes, not just /door", () => {
     expect(manifest.scope).toBe("/")
-    expect(manifest.start_url).toBe("/door")
+  })
+
+  // The icon launches the route that opens the door by itself. /door stays the
+  // press-it-yourself page, so a link someone follows never opens anything.
+  test("the icon launches /door/go, not /door", () => {
+    expect(manifest.start_url).toBe("/door/go")
   })
 
   // A browser refetches the manifest when it judges installability and when it
@@ -43,6 +48,12 @@ describe("door home-screen install", () => {
     expect(gated("/door")).toBe(true)
     expect(gated("/door/admin")).toBe(true)
     expect(gated("/door/log")).toBe(true)
+  })
+
+  // The one route that opens the door without being pressed is the one that
+  // least tolerates an anonymous visitor reaching it.
+  test("the auto-opening route is gated too", () => {
+    expect(gated(manifest.start_url)).toBe(true)
   })
 
   // Chrome refuses to offer an install without a 192px icon; iOS uses the 180.
