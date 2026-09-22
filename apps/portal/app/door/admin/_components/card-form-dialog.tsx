@@ -1,12 +1,12 @@
 "use client"
 
+import { IconPlus, IconX } from "@tabler/icons-react"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -18,43 +18,42 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import {
   big5ByteLength,
   CARD_ID_LENGTH,
-  deriveHolder,
   HOLDER_NAME_MAX_BYTES,
   validateCardId,
   validateHolderName,
   type DoorCardView,
-  type HolderChoice,
+  type HolderGroup,
 } from "@/lib/door/cards"
 
+import { CardReader } from "./card-reader"
 import { MemberSelect, NO_HOLDER } from "./member-select"
 
 export type Member = { id: string; name: string | null; email: string | null }
 
-export type CardFormValues = {
-  card_id: string
-  holder_name: string
-  holder_user_id: string | null
+export type HolderFormValues = {
+  holderUserId: string | null
+  holderName: string
   note: string | null
+  cardIds: string[]
 }
 
-type CardFormProps = {
+type HolderFormProps = {
   mode: "add" | "edit"
-  card?: DoorCardView | null
-  // A card number captured from the reader: it prefills the add form for a
-  // brand-new card, unlike `card`, which reopens an existing row.
-  prefillCardId?: string
-  autoFocusHolder?: boolean
+  group?: HolderGroup | null
   members: Member[]
+  // Every enrolled card, so the reader can flag a tap that is already on the
+  // list rather than offering to add it twice.
+  allCards: DoorCardView[]
   open: boolean
   pending: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (values: CardFormValues) => void
+  onSubmit: (values: HolderFormValues) => void
 }
 
 // The fields live one level down so the dialog content can be keyed on the
-// card: Radix unmounts it when closed, which is what resets the form between
-// two different cards without an effect copying props into state.
-export function CardFormDialog(props: CardFormProps) {
+// holder: Radix unmounts it when closed, which resets the form between two
+// different holders without an effect copying props into state.
+export function HolderFormDialog(props: HolderFormProps) {
   return (
     <Dialog
       open={props.open}
@@ -62,73 +61,97 @@ export function CardFormDialog(props: CardFormProps) {
         if (!props.pending) props.onOpenChange(next)
       }}
     >
-      <DialogContent className="max-w-md">
-        <CardForm
-          key={props.card?.card_id ?? props.prefillCardId ?? "new"}
-          {...props}
-        />
+      <DialogContent className="max-w-md" aria-describedby={undefined}>
+        <HolderForm key={props.group?.key ?? "new"} {...props} />
       </DialogContent>
     </Dialog>
   )
 }
 
-function CardForm({
+function HolderForm({
   mode,
-  card,
-  prefillCardId,
-  autoFocusHolder,
+  group,
   members,
+  allCards,
   pending,
   onOpenChange,
   onSubmit,
-}: CardFormProps) {
-  const [cardId, setCardId] = useState(card?.card_id ?? prefillCardId ?? "")
+}: HolderFormProps) {
   const [holderUserId, setHolderUserId] = useState(
-    card?.holder_user_id ?? NO_HOLDER
+    group?.holderUserId ?? NO_HOLDER
   )
-  // Only used for a guest card. In edit mode a card with no member keeps its
-  // stored label so switching fields doesn't wipe it.
-  const [guestLabel, setGuestLabel] = useState(
-    card && !card.holder_user_id ? (card.holder_name ?? "") : ""
+  // One 備註 field: for a member it is the optional note, for a guest it is the
+  // required label that becomes both holder_name and note. A guest row stores
+  // the label in note too, so fall back to the label when reopening one.
+  const [noteText, setNoteText] = useState(
+    group ? (group.note ?? (group.holderUserId ? "" : group.holderName)) : ""
   )
-  const [note, setNote] = useState(card?.note ?? "")
+  const [cardIds, setCardIds] = useState<string[]>(
+    group && group.cardIds.length > 0 ? group.cardIds : [""]
+  )
 
   const isGuest = holderUserId === NO_HOLDER
   const selectedMember = isGuest
     ? null
     : (members.find((m) => m.id === holderUserId) ?? null)
 
-  const choice: HolderChoice = isGuest
-    ? { kind: "guest", label: guestLabel }
-    : {
-        kind: "member",
-        member: {
-          id: holderUserId,
-          name: selectedMember?.name ?? card?.holder_name ?? null,
-        },
-      }
-  const derived = deriveHolder(choice)
+  const holderName = isGuest
+    ? noteText.trim()
+    : (selectedMember?.name ?? group?.holderName ?? "").trim()
 
-  const cardIdError = mode === "add" ? validateCardId(cardId) : null
-  const nameError = validateHolderName(derived.holder_name)
-  const guestBytes = big5ByteLength(guestLabel.trim())
-
+  const nameError = validateHolderName(holderName)
   // A member with no readable name can't be written to the controller, which
   // needs a label. Surface that instead of a blank "請輸入姓名".
   const memberNameError =
     !isGuest && nameError
       ? "這位成員的姓名無法寫進卡機，請改用「無成員（訪客）」自訂標籤。"
       : null
+  const guestBytes = big5ByteLength(noteText.trim())
 
-  const blocked = !!cardIdError || !!nameError
+  const trimmedCards = cardIds.map((c) => c.trim()).filter((c) => c.length > 0)
+  const uniqueCards = [...new Set(trimmedCards)]
+  const hasDuplicate = uniqueCards.length !== trimmedCards.length
+  const cardErrors = cardIds.map((c) =>
+    c.trim().length > 0 ? validateCardId(c.trim()) : null
+  )
+  const anyCardError = cardErrors.some((e) => e !== null)
+  const noCards = uniqueCards.length === 0
+
+  const blocked = !!nameError || anyCardError || hasDuplicate || noCards
+
+  function setCardAt(index: number, next: string) {
+    setCardIds((prev) => prev.map((c, i) => (i === index ? next : c)))
+  }
+
+  function removeCardAt(index: number) {
+    setCardIds((prev) =>
+      prev.length === 1 ? prev : prev.filter((_, i) => i !== index)
+    )
+  }
+
+  function addCardRow() {
+    setCardIds((prev) => [...prev, ""])
+  }
+
+  // A scanned number fills the first empty row, or appends one. Duplicates are
+  // dropped so tapping the same card twice doesn't add a second row.
+  function appendScanned(cardNumber: string) {
+    setCardIds((prev) => {
+      if (prev.some((c) => c.trim() === cardNumber)) return prev
+      const emptyIndex = prev.findIndex((c) => c.trim().length === 0)
+      if (emptyIndex >= 0)
+        return prev.map((c, i) => (i === emptyIndex ? cardNumber : c))
+      return [...prev, cardNumber]
+    })
+  }
 
   function handleSubmit() {
     if (blocked) return
     onSubmit({
-      card_id: cardId.trim(),
-      holder_name: derived.holder_name,
-      holder_user_id: derived.holder_user_id,
-      note: note.trim() || null,
+      holderUserId: isGuest ? null : holderUserId,
+      holderName,
+      note: noteText.trim() || null,
+      cardIds: uniqueCards,
     })
   }
 
@@ -136,43 +159,17 @@ function CardForm({
     <>
       <DialogHeader>
         <DialogTitle>
-          {mode === "edit" ? "編輯卡片" : card ? "重新加入卡機" : "新增卡片"}
+          {mode === "edit" ? "編輯持有人" : "新增持有人"}
         </DialogTitle>
-        <DialogDescription>
-          {mode === "edit"
-            ? "改動只存 Portal，改名才會同步到卡機。"
-            : card
-              ? "把這張卡再寫回卡機一次。"
-              : "卡片會先寫進卡機，成功才會記到名單。"}
-        </DialogDescription>
       </DialogHeader>
 
       <div className="flex flex-col gap-4 py-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="card-id">卡號</Label>
-          <Input
-            id="card-id"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={CARD_ID_LENGTH}
-            value={cardId}
-            disabled={mode === "edit"}
-            onChange={(e) => setCardId(e.target.value.replace(/[^0-9]/g, ""))}
-            className="font-mono tabular-nums"
-            placeholder="0001234567"
-          />
-          {cardId.length > 0 && cardIdError && (
-            <p className="text-xs text-destructive">{cardIdError}</p>
-          )}
-        </div>
-
         <div className="flex flex-col gap-2">
           <Label htmlFor="holder-user">持有人</Label>
           <MemberSelect
             id="holder-user"
             members={members}
             value={holderUserId}
-            autoFocus={autoFocusHolder}
             onSelect={setHolderUserId}
           />
           {memberNameError && (
@@ -180,35 +177,84 @@ function CardForm({
           )}
         </div>
 
-        {isGuest && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="guest-label">姓名 / 標籤</Label>
-            <Input
-              id="guest-label"
-              value={guestLabel}
-              autoComplete="off"
-              onChange={(e) => setGuestLabel(e.target.value)}
-              placeholder="卡機上顯示的名字"
-            />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="holder-note">備註</Label>
+          <Textarea
+            id="holder-note"
+            value={noteText}
+            rows={2}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder={isGuest ? "卡機上顯示的名字" : "備用卡、借給誰…"}
+          />
+          {isGuest ? (
             <p className="text-xs text-muted-foreground">
-              最多 {HOLDER_NAME_MAX_BYTES} 位元組（中文 2、英數 1），目前{" "}
-              {guestBytes}。
+              訪客請填卡機上顯示的名字，最多 {HOLDER_NAME_MAX_BYTES}{" "}
+              位元組（中文 2、英數 1），目前 {guestBytes}。
             </p>
-            {guestLabel.length > 0 && nameError && (
-              <p className="text-xs text-destructive">{nameError}</p>
-            )}
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-muted-foreground">選填。</p>
+          )}
+          {isGuest && noteText.trim().length > 0 && nameError && (
+            <p className="text-xs text-destructive">{nameError}</p>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="card-note">備註</Label>
-          <Textarea
-            id="card-note"
-            value={note}
-            rows={2}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="備用卡、借給誰…"
-          />
+          <Label>卡號</Label>
+          <div className="flex flex-col gap-2">
+            {cardIds.map((value, index) => (
+              <div key={index} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={CARD_ID_LENGTH}
+                    value={value}
+                    onChange={(e) =>
+                      setCardAt(index, e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    className="font-mono tabular-nums"
+                    placeholder="0001234567"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={cardIds.length === 1}
+                    onClick={() => removeCardAt(index)}
+                    aria-label="移除這一列卡號"
+                  >
+                    <IconX className="size-4" />
+                  </Button>
+                </div>
+                {value.trim().length > 0 && cardErrors[index] && (
+                  <p className="text-xs text-destructive">
+                    {cardErrors[index]}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          {hasDuplicate && (
+            <p className="text-xs text-destructive">卡號不能重複。</p>
+          )}
+
+          <CardReader
+            cards={allCards}
+            disabled={pending}
+            onEnrol={appendScanned}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addCardRow}
+              disabled={pending}
+            >
+              <IconPlus className="size-4" />
+              新增卡號
+            </Button>
+          </CardReader>
         </div>
       </div>
 
@@ -221,13 +267,7 @@ function CardForm({
           取消
         </Button>
         <Button onClick={handleSubmit} disabled={pending || blocked}>
-          {pending
-            ? "處理中…"
-            : mode === "edit"
-              ? "儲存"
-              : card
-                ? "重新加入"
-                : "新增"}
+          {pending ? "處理中…" : "儲存"}
         </Button>
       </DialogFooter>
     </>

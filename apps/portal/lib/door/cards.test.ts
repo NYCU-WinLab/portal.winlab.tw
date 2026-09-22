@@ -4,16 +4,19 @@ import {
   big5ByteLength,
   deriveHolder,
   diffControllerCards,
+  groupCardsByHolder,
   hamsErrorMessage,
   isValidCardId,
   maskCardId,
   mergeDoorCards,
+  planHolderCardWrites,
   planImport,
   planReconcile,
   uidToCardNumber,
   validateCardId,
   validateHolderName,
   type DoorCardRow,
+  type DoorCardView,
 } from "@/lib/door/cards"
 import type { ControllerCard } from "@/lib/door/hams"
 
@@ -183,20 +186,12 @@ describe("planReconcile", () => {
   })
 
   test("drift on either side is drift", () => {
-    expect(
-      planReconcile([row("0000000001")], [], 0).drifted
-    ).toBe(true)
-    expect(
-      planReconcile([], [card("0000000009")], 1).drifted
-    ).toBe(true)
+    expect(planReconcile([row("0000000001")], [], 0).drifted).toBe(true)
+    expect(planReconcile([], [card("0000000009")], 1).drifted).toBe(true)
   })
 
   test("an absurd card count blocks the sync_state write", () => {
-    const plan = planReconcile(
-      [row("0000000001")],
-      [card("0000000001")],
-      10240
-    )
+    const plan = planReconcile([row("0000000001")], [card("0000000001")], 10240)
     expect(plan.tableSuspect).toBe(true)
     expect(plan.drifted).toBe(true)
     // The whole point: the cards read back fine, and we still refuse to
@@ -310,5 +305,242 @@ describe("deriveHolder", () => {
       holder_name: "訪客卡",
       holder_user_id: null,
     })
+  })
+})
+
+function view(
+  card_id: string,
+  extra: Partial<DoorCardView> = {}
+): DoorCardView {
+  return {
+    card_id,
+    holder_name: "某人",
+    holder_user_id: null,
+    note: null,
+    sync_state: "synced",
+    last_seen_at: null,
+    controller_name: null,
+    in_database: true,
+    ...extra,
+  }
+}
+
+describe("groupCardsByHolder", () => {
+  const members = [
+    { id: "u-1", name: "蔣汶儒", email: "wr@example.com" },
+    { id: "u-2", name: null, email: "kai@example.com" },
+  ]
+
+  test("a member's several cards fold into one holder row", () => {
+    const groups = groupCardsByHolder(
+      [
+        view("0000000001", { holder_user_id: "u-1", holder_name: "蔣汶儒" }),
+        view("0000000002", { holder_user_id: "u-1", holder_name: "蔣汶儒" }),
+      ],
+      members
+    )
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.holderUserId).toBe("u-1")
+    expect(groups[0]!.displayName).toBe("蔣汶儒")
+    expect(groups[0]!.cardIds).toEqual(["0000000001", "0000000002"])
+  })
+
+  test("two distinct guest labels are two holders", () => {
+    const groups = groupCardsByHolder(
+      [
+        view("0000000010", { holder_name: "訪客A" }),
+        view("0000000011", { holder_name: "訪客B" }),
+      ],
+      members
+    )
+    expect(groups).toHaveLength(2)
+    expect(groups.map((g) => g.holderName).sort()).toEqual(["訪客A", "訪客B"])
+    expect(groups.every((g) => g.holderUserId === null)).toBe(true)
+  })
+
+  test("a member with no name falls back to email for the label", () => {
+    const groups = groupCardsByHolder(
+      [view("0000000020", { holder_user_id: "u-2", holder_name: "Kai" })],
+      members
+    )
+    expect(groups[0]!.displayName).toBe("kai@example.com")
+  })
+
+  test("aggregate sync is synced only when every card is", () => {
+    const [group] = groupCardsByHolder(
+      [
+        view("0000000030", { holder_user_id: "u-1", sync_state: "synced" }),
+        view("0000000031", {
+          holder_user_id: "u-1",
+          sync_state: "missing_on_controller",
+        }),
+      ],
+      members
+    )
+    expect(group!.syncState).toBe("missing_on_controller")
+  })
+
+  test("aggregate surfaces a missing card over an unknown one", () => {
+    const [group] = groupCardsByHolder(
+      [
+        view("0000000040", {
+          holder_name: "訪客",
+          sync_state: "unknown_on_controller",
+          in_database: false,
+        }),
+        view("0000000041", {
+          holder_name: "訪客",
+          sync_state: "missing_on_controller",
+        }),
+      ],
+      members
+    )
+    expect(group!.syncState).toBe("missing_on_controller")
+    expect(group!.inDatabase).toBe(true)
+  })
+
+  test("a holder made only of controller-only cards is not in the database", () => {
+    const [group] = groupCardsByHolder(
+      [
+        view("0000000050", {
+          holder_name: "陌生卡",
+          sync_state: "unknown_on_controller",
+          in_database: false,
+        }),
+      ],
+      members
+    )
+    expect(group!.inDatabase).toBe(false)
+    expect(group!.syncState).toBe("unknown_on_controller")
+  })
+
+  test("all synced cards report a synced holder", () => {
+    const [group] = groupCardsByHolder(
+      [
+        view("0000000060", { holder_user_id: "u-1", sync_state: "synced" }),
+        view("0000000061", { holder_user_id: "u-1", sync_state: "synced" }),
+      ],
+      members
+    )
+    expect(group!.syncState).toBe("synced")
+  })
+})
+
+describe("planHolderCardWrites", () => {
+  function existing(
+    card_id: string,
+    extra: Partial<
+      Pick<DoorCardRow, "holder_name" | "holder_user_id" | "note">
+    > = {}
+  ) {
+    return {
+      card_id,
+      holder_name: "蔣汶儒",
+      holder_user_id: "u-1" as string | null,
+      note: null as string | null,
+      ...extra,
+    }
+  }
+
+  test("a new card number is an add", () => {
+    const plan = planHolderCardWrites([existing("0000000001")], {
+      cardIds: ["0000000001", "0000000002"],
+      holderName: "蔣汶儒",
+      holderUserId: "u-1",
+      note: null,
+    })
+    expect(plan.add).toEqual(["0000000002"])
+    expect(plan.remove).toEqual([])
+    expect(plan.rename).toEqual([])
+    expect(plan.updateMeta).toEqual([])
+  })
+
+  test("a dropped card number is a remove", () => {
+    const plan = planHolderCardWrites(
+      [existing("0000000001"), existing("0000000002")],
+      {
+        cardIds: ["0000000001"],
+        holderName: "蔣汶儒",
+        holderUserId: "u-1",
+        note: null,
+      }
+    )
+    expect(plan.remove).toEqual(["0000000002"])
+    expect(plan.add).toEqual([])
+  })
+
+  test("a kept card whose label changed is a rename", () => {
+    const plan = planHolderCardWrites([existing("0000000001")], {
+      cardIds: ["0000000001"],
+      holderName: "Kai Kuo",
+      holderUserId: "u-2",
+      note: null,
+    })
+    expect(plan.rename).toEqual(["0000000001"])
+    expect(plan.updateMeta).toEqual([])
+  })
+
+  test("a kept card with the same label but a new note is a portal-only update", () => {
+    const plan = planHolderCardWrites([existing("0000000001")], {
+      cardIds: ["0000000001"],
+      holderName: "蔣汶儒",
+      holderUserId: "u-1",
+      note: "備用卡",
+    })
+    expect(plan.rename).toEqual([])
+    expect(plan.updateMeta).toEqual(["0000000001"])
+  })
+
+  test("a kept card that changed nothing is in no list", () => {
+    const plan = planHolderCardWrites(
+      [existing("0000000001", { note: "備用卡" })],
+      {
+        cardIds: ["0000000001"],
+        holderName: "蔣汶儒",
+        holderUserId: "u-1",
+        note: "備用卡",
+      }
+    )
+    expect(plan.add).toEqual([])
+    expect(plan.remove).toEqual([])
+    expect(plan.rename).toEqual([])
+    expect(plan.updateMeta).toEqual([])
+  })
+
+  test("empty and whitespace notes compare equal, not a spurious update", () => {
+    const plan = planHolderCardWrites(
+      [existing("0000000001", { note: null })],
+      {
+        cardIds: ["0000000001"],
+        holderName: "蔣汶儒",
+        holderUserId: "u-1",
+        note: "   ",
+      }
+    )
+    expect(plan.updateMeta).toEqual([])
+  })
+
+  test("duplicate submitted numbers collapse to one add", () => {
+    const plan = planHolderCardWrites([], {
+      cardIds: ["0000000005", "0000000005"],
+      holderName: "訪客",
+      holderUserId: null,
+      note: "訪客",
+    })
+    expect(plan.add).toEqual(["0000000005"])
+  })
+
+  test("switching a guest to a member renames and drops the note diff into the rename", () => {
+    const plan = planHolderCardWrites(
+      [existing("0000000001", { holder_name: "訪客", holder_user_id: null })],
+      {
+        cardIds: ["0000000001"],
+        holderName: "蔣汶儒",
+        holderUserId: "u-1",
+        note: null,
+      }
+    )
+    expect(plan.rename).toEqual(["0000000001"])
+    expect(plan.updateMeta).toEqual([])
   })
 })

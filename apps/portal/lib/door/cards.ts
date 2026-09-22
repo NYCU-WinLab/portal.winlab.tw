@@ -292,3 +292,155 @@ export function mergeDoorCards(
 function byCardId(a: { card_id: string }, b: { card_id: string }) {
   return a.card_id.localeCompare(b.card_id)
 }
+
+// ---- Holder grouping and card-set diffing (one row per holder) ----
+
+export type HolderMember = {
+  id: string
+  name: string | null
+  email: string | null
+}
+
+// One row on /door/admin. A holder is a member (their several cards fold into
+// one row) or a guest (each distinct label is its own holder). The label is
+// what gets written to the controller.
+export type HolderGroup = {
+  key: string
+  holderUserId: string | null
+  holderName: string
+  displayName: string
+  note: string | null
+  cardIds: string[]
+  cards: DoorCardView[]
+  syncState: DoorCardSyncState
+  inDatabase: boolean
+}
+
+// One badge for the whole holder: synced only when every card is, otherwise the
+// worst problem the row carries. A card the controller lost matters more than
+// one it holds that the portal doesn't know about.
+function aggregateSyncState(cards: DoorCardView[]): DoorCardSyncState {
+  if (cards.every((c) => c.sync_state === "synced")) return "synced"
+  if (cards.some((c) => c.sync_state === "missing_on_controller"))
+    return "missing_on_controller"
+  if (cards.some((c) => c.sync_state === "unknown_on_controller"))
+    return "unknown_on_controller"
+  return "unknown"
+}
+
+export function groupCardsByHolder(
+  cards: DoorCardView[],
+  members: HolderMember[]
+): HolderGroup[] {
+  const memberById = new Map(members.map((m) => [m.id, m]))
+  const order: string[] = []
+  const buckets = new Map<string, DoorCardView[]>()
+
+  for (const card of cards) {
+    const key = card.holder_user_id
+      ? `member:${card.holder_user_id}`
+      : `guest:${card.holder_name}`
+    const bucket = buckets.get(key)
+    if (bucket) {
+      bucket.push(card)
+    } else {
+      buckets.set(key, [card])
+      order.push(key)
+    }
+  }
+
+  const groups: HolderGroup[] = order.map((key) => {
+    const groupCards = buckets.get(key)!
+    const first = groupCards[0]!
+    const holderUserId = first.holder_user_id
+    const member = holderUserId ? memberById.get(holderUserId) : undefined
+    const holderName = first.holder_name
+    const displayName = member
+      ? (member.name ?? member.email ?? holderName ?? member.id)
+      : holderName
+    return {
+      key,
+      holderUserId,
+      holderName,
+      displayName,
+      note: groupCards.find((c) => c.note)?.note ?? null,
+      cardIds: groupCards
+        .map((c) => c.card_id)
+        .sort((a, b) => a.localeCompare(b)),
+      cards: groupCards,
+      syncState: aggregateSyncState(groupCards),
+      inDatabase: groupCards.some((c) => c.in_database),
+    }
+  })
+
+  return groups.sort(
+    (a, b) =>
+      a.displayName.localeCompare(b.displayName) || a.key.localeCompare(b.key)
+  )
+}
+
+export type HolderCardSubmission = {
+  cardIds: string[]
+  holderName: string
+  holderUserId: string | null
+  note: string | null
+}
+
+export type HolderCardWritePlan = {
+  add: string[]
+  remove: string[]
+  rename: string[]
+  updateMeta: string[]
+}
+
+// Turns a saved holder form into the exact set of controller / portal writes to
+// run. Pure so the mapping that drives real door writes is unit-tested:
+//   add        — a card number the holder gained (new controller card)
+//   remove     — a card number the holder dropped (controller delete)
+//   rename     — a kept card whose stored label differs from the new one
+//                (controller delete-then-add via the PUT path)
+//   updateMeta — a kept card whose label is unchanged but whose member link or
+//                note moved (portal-only, no controller write)
+// A kept card that changed nothing appears in none of the lists.
+export function planHolderCardWrites(
+  existing: Pick<
+    DoorCardRow,
+    "card_id" | "holder_name" | "holder_user_id" | "note"
+  >[],
+  submission: HolderCardSubmission
+): HolderCardWritePlan {
+  const norm = (v: string | null) =>
+    v && v.trim().length > 0 ? v.trim() : null
+  const submitted = [...new Set(submission.cardIds)]
+  const submittedSet = new Set(submitted)
+  const existingById = new Map(existing.map((e) => [e.card_id, e]))
+  const targetName = submission.holderName.trim()
+  const targetUser = submission.holderUserId ?? null
+  const targetNote = norm(submission.note)
+
+  const add: string[] = []
+  const rename: string[] = []
+  const updateMeta: string[] = []
+
+  for (const cardId of submitted) {
+    const prev = existingById.get(cardId)
+    if (!prev) {
+      add.push(cardId)
+      continue
+    }
+    if (prev.holder_name !== targetName) {
+      rename.push(cardId)
+    } else if (
+      (prev.holder_user_id ?? null) !== targetUser ||
+      norm(prev.note) !== targetNote
+    ) {
+      updateMeta.push(cardId)
+    }
+  }
+
+  const remove = existing
+    .filter((e) => !submittedSet.has(e.card_id))
+    .map((e) => e.card_id)
+
+  return { add, remove, rename, updateMeta }
+}
