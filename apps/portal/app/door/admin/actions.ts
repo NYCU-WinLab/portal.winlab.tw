@@ -17,8 +17,10 @@ import { getDoorCardRow, listDoorCardRows } from "@/lib/door/card-store"
 import {
   hamsErrorMessage,
   mergeDoorCards,
+  planHolderCardWrites,
   validateCardId,
   validateHolderName,
+  type DoorCardRow,
   type DoorCardView,
 } from "@/lib/door/cards"
 import {
@@ -378,7 +380,9 @@ export async function updateDoorCard(
             ok: false,
             error:
               hamsErrorMessage(err.code, GENERIC_ERROR) +
-              (markError ? "（Portal 這邊也沒能更新狀態，請按「與卡機比對」）" : ""),
+              (markError
+                ? "（Portal 這邊也沒能更新狀態，請按「與卡機比對」）"
+                : ""),
           }
         }
         throw err
@@ -554,4 +558,160 @@ export async function reconcileDoorCards(): Promise<DoorCardMutation> {
   } catch (err) {
     return { ok: false, error: describe(err) }
   }
+}
+
+// ---- Holder-centric card editing ----
+//
+// The holder form saves a whole holder at once: a member (or guest) and the set
+// of card numbers they hold. These actions diff the submitted set against the
+// stored one and wrap the existing single-card actions in that loop, so the
+// bridge / DB / audit logic stays in one place. Each card is written on its own
+// and its outcome collected, so a partial failure keeps the writes that landed.
+
+export type HolderCardOp = "add" | "remove" | "rename" | "update"
+
+export type HolderCardOutcome = {
+  cardId: string
+  op: HolderCardOp
+  ok: boolean
+  message: string | null
+  error: string | null
+}
+
+export type HolderCardsResult =
+  | { ok: false; error: string }
+  | { ok: true; results: HolderCardOutcome[] }
+
+export type SaveHolderCardsInput = {
+  holderUserId: string | null
+  holderName: string
+  note: string | null
+  cardIds: string[]
+  existingCardIds: string[]
+}
+
+function toOutcome(
+  cardId: string,
+  op: HolderCardOp,
+  mutation: DoorCardMutation
+): HolderCardOutcome {
+  return mutation.ok
+    ? { cardId, op, ok: true, message: mutation.message, error: null }
+    : { cardId, op, ok: false, message: null, error: mutation.error }
+}
+
+export async function saveHolderCards(
+  input: SaveHolderCardsInput
+): Promise<HolderCardsResult> {
+  try {
+    await requireDoorAdmin()
+  } catch (err) {
+    return { ok: false, error: describe(err) }
+  }
+
+  const holderName = input.holderName.trim()
+  const nameError = validateHolderName(holderName)
+  if (nameError) return { ok: false, error: nameError }
+
+  const submitted = [...new Set(input.cardIds.map((c) => c.trim()))].filter(
+    (c) => c.length > 0
+  )
+  if (submitted.length === 0)
+    return {
+      ok: false,
+      error: "至少要留一張卡片，否則請用「刪除」移除持有人。",
+    }
+  for (const cardId of submitted) {
+    const invalid = validateCardId(cardId)
+    if (invalid) return { ok: false, error: `卡號 ${cardId}：${invalid}` }
+  }
+
+  const holderUserId = input.holderUserId?.trim() || null
+  const note = input.note?.trim() || null
+
+  const admin = createAdminClient()
+  const existing: DoorCardRow[] = []
+  for (const cardId of [...new Set(input.existingCardIds)]) {
+    const row = await getDoorCardRow(admin, cardId)
+    if (row) existing.push(row)
+  }
+
+  const plan = planHolderCardWrites(existing, {
+    cardIds: submitted,
+    holderName,
+    holderUserId,
+    note,
+  })
+
+  const results: HolderCardOutcome[] = []
+
+  // Drop cards first to free controller space, then rename (a device
+  // delete-then-add), then add the newcomers; portal-only meta writes can go
+  // whenever.
+  for (const cardId of plan.remove) {
+    results.push(toOutcome(cardId, "remove", await deleteDoorCard(cardId)))
+  }
+  for (const cardId of plan.rename) {
+    results.push(
+      toOutcome(
+        cardId,
+        "rename",
+        await updateDoorCard(cardId, {
+          holder_name: holderName,
+          holder_user_id: holderUserId,
+          note,
+        })
+      )
+    )
+  }
+  for (const cardId of plan.updateMeta) {
+    results.push(
+      toOutcome(
+        cardId,
+        "update",
+        await updateDoorCard(cardId, {
+          holder_name: holderName,
+          holder_user_id: holderUserId,
+          note,
+        })
+      )
+    )
+  }
+  for (const cardId of plan.add) {
+    results.push(
+      toOutcome(
+        cardId,
+        "add",
+        await addDoorCard({
+          card_id: cardId,
+          holder_name: holderName,
+          holder_user_id: holderUserId,
+          note,
+        })
+      )
+    )
+  }
+
+  return { ok: true, results }
+}
+
+export async function deleteHolderCards(
+  cardIds: string[]
+): Promise<HolderCardsResult> {
+  try {
+    await requireDoorAdmin()
+  } catch (err) {
+    return { ok: false, error: describe(err) }
+  }
+
+  const targets = [...new Set(cardIds.map((c) => c.trim()))].filter(
+    (c) => c.length > 0
+  )
+  if (targets.length === 0) return { ok: false, error: "沒有要刪除的卡片。" }
+
+  const results: HolderCardOutcome[] = []
+  for (const cardId of targets) {
+    results.push(toOutcome(cardId, "remove", await deleteDoorCard(cardId)))
+  }
+  return { ok: true, results }
 }
