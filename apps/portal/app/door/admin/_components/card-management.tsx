@@ -145,7 +145,7 @@ export function CardManagement({
                   colSpan={4}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
-                  名單還是空的，先按「匯入卡機清單」把卡機上的卡收進來。
+                  尚無卡片
                 </TableCell>
               </TableRow>
             ) : (

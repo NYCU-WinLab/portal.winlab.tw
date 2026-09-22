@@ -176,11 +176,6 @@ export function CardReader({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {supported === false && (
-          <p className="mr-auto text-xs text-muted-foreground">
-            感應讀卡需要 Chrome 或 Edge 瀏覽器。
-          </p>
-        )}
         {supported === true && (
           <Button
             variant="outline"
@@ -254,7 +249,7 @@ function ConnectionState({
     )
   const label =
     status === "connected"
-      ? "已連線，請感應卡片"
+      ? "已連線"
       : status === "connecting"
         ? "連線中…"
         : "未連線"
@@ -275,14 +270,12 @@ function TapRow({
   if (tap.kind === "random")
     return (
       <li className="px-3 py-2 text-sm text-destructive">
-        這張卡每次感應號碼都會變（隨機 UID），無法登錄。
+        卡號不固定，無法登錄。
       </li>
     )
   if (tap.kind === "unsupported")
     return (
-      <li className="px-3 py-2 text-sm text-destructive">
-        此卡不是 4-byte UID，無法對應門禁卡號。
-      </li>
+      <li className="px-3 py-2 text-sm text-destructive">不支援此卡片。</li>
     )
 
   const enrolled = cards.find((card) => card.card_id === tap.cardNumber)
