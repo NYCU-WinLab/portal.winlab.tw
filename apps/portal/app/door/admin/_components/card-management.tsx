@@ -52,10 +52,6 @@ const timestamp = new Intl.DateTimeFormat("zh-TW", {
   hour12: false,
 })
 
-// Anything past a couple of minutes and the controller's own event timestamps
-// stop lining up with the portal's, which is what makes a log unreadable.
-const CLOCK_SKEW_WARN_S = 120
-
 export function CardManagement({
   cards,
   controllerError,
@@ -354,9 +350,6 @@ function StatusStrip({
   onImport: () => void
   onReconcile: () => void
 }) {
-  const skewed =
-    health !== null && Math.abs(health.clock_skew_s) > CLOCK_SKEW_WARN_S
-
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
@@ -364,11 +357,6 @@ function StatusStrip({
           <>
             <Field label="卡機韌體" value={health.device_version} />
             <Field label="卡機卡數" value={String(health.card_count)} />
-            <Field
-              label="時間差"
-              value={`${Math.round(health.clock_skew_s)} 秒`}
-              tone={skewed ? "warn" : "normal"}
-            />
           </>
         ) : (
           <span className="text-sm text-destructive">
