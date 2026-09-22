@@ -89,6 +89,28 @@ export function validateHolderName(value: string): string | null {
   return null
 }
 
+// What the holder picker resolves to before it hits the server. A card always
+// needs a label for the controller: for a member that label is the member's own
+// name (kept in step with the member record instead of retyped), for a guest it
+// is the free-text label the admin types.
+export type HolderChoice =
+  | { kind: "guest"; label: string }
+  | { kind: "member"; member: { id: string; name: string | null } }
+
+export type DerivedHolder = {
+  holder_name: string
+  holder_user_id: string | null
+}
+
+export function deriveHolder(choice: HolderChoice): DerivedHolder {
+  if (choice.kind === "guest")
+    return { holder_name: choice.label.trim(), holder_user_id: null }
+  return {
+    holder_name: (choice.member.name ?? "").trim(),
+    holder_user_id: choice.member.id,
+  }
+}
+
 export const SYNC_STATE_LABELS: Record<DoorCardSyncState, string> = {
   synced: "已同步",
   missing_on_controller: "卡機沒有",
