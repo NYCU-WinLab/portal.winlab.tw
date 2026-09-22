@@ -16,9 +16,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import {
-  big5ByteLength,
   CARD_ID_LENGTH,
-  HOLDER_NAME_MAX_BYTES,
   validateCardId,
   validateHolderName,
   type DoorCardView,
@@ -104,9 +102,8 @@ function HolderForm({
   // needs a label. Surface that instead of a blank "請輸入姓名".
   const memberNameError =
     !isGuest && nameError
-      ? "這位成員的姓名無法寫進卡機，請改用「無成員（訪客）」自訂標籤。"
+      ? "成員姓名無法使用，請改選「無成員（訪客）」。"
       : null
-  const guestBytes = big5ByteLength(noteText.trim())
 
   const trimmedCards = cardIds.map((c) => c.trim()).filter((c) => c.length > 0)
   const uniqueCards = [...new Set(trimmedCards)]
@@ -186,14 +183,6 @@ function HolderForm({
             onChange={(e) => setNoteText(e.target.value)}
             placeholder={isGuest ? "卡機上顯示的名字" : "備用卡、借給誰…"}
           />
-          {isGuest ? (
-            <p className="text-xs text-muted-foreground">
-              訪客請填卡機上顯示的名字，最多 {HOLDER_NAME_MAX_BYTES}{" "}
-              位元組（中文 2、英數 1），目前 {guestBytes}。
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">選填。</p>
-          )}
           {isGuest && noteText.trim().length > 0 && nameError && (
             <p className="text-xs text-destructive">{nameError}</p>
           )}

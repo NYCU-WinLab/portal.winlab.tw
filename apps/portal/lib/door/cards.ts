@@ -85,7 +85,7 @@ export function validateHolderName(value: string): string | null {
   const trimmed = value.trim()
   if (trimmed.length === 0) return "請輸入姓名。"
   if (big5ByteLength(trimmed) > HOLDER_NAME_MAX_BYTES)
-    return `姓名最多 ${HOLDER_NAME_MAX_BYTES} 個位元組（中文算 2、英數算 1）。`
+    return "姓名過長，請縮短。"
   return null
 }
 
