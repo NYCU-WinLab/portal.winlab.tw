@@ -413,12 +413,26 @@ home-screen icon is one unlock. `/door` stays the page you press yourself and
 is what a browser visit gets: a link someone follows, or an old tab restoring,
 must never open the lab door.
 
-`/door/go` renders the same `<DoorPanel>` with `autoOpen`, and the guard is
-`lib/door/auto-open.ts` — it opens only when `PerformanceNavigationTiming.type`
-is `navigate`. A reload, a back/forward restore, or a browser reporting nothing
-is the page coming back on its own, and none of them are consent. That check is
-an allow-list of exactly one value on purpose, so a browser inventing a new
-navigation type can never be read as a request to unlock.
+`/door/go` renders the same `<DoorPanel>` with `autoOpen`, and the guards live
+in `lib/door/auto-open.ts`. There are **two**, because a home-screen icon has
+two ways of getting you back to a page:
+
+- **`shouldAutoOpen`** — the cold launch. Opens only when
+  `PerformanceNavigationTiming.type` is `navigate`. A reload, a back/forward
+  restore, or a browser reporting nothing is the page coming back on its own,
+  and none of them are consent. It is an allow-list of exactly one value on
+  purpose, so a browser inventing a new navigation type can never be read as a
+  request to unlock.
+- **`shouldOpenOnResume`** — the warm one. Tapping the icon of an app iOS still
+  holds in memory does not navigate anywhere; it brings the page to the front.
+  Nothing mounts, no navigation entry appears, so the first guard never gets a
+  second chance. Handling only the cold launch is what #1210 was: the icon
+  opened the door once and behaved like a plain bookmark every time after.
+
+So the rule is **the app coming to the front is the request**, and `idle` keeps
+it to one open at a time. The cost of saying it that way is that _any_ return
+to the foreground opens the door, including arriving through the app switcher
+— that is the honest shape of "the icon is the door button", not an oversight.
 
 The accepted cost is that an accidental tap on the icon opens the door. The
 audit trail from #1184 is what makes that survivable — every open, deliberate

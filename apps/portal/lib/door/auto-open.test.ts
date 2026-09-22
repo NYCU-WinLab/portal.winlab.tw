@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   readLaunchKind,
   shouldAutoOpen,
+  shouldOpenOnResume,
   type DoorLaunchKind,
 } from "@/lib/door/auto-open"
 
@@ -34,6 +35,25 @@ describe("shouldAutoOpen", () => {
   test("a launch kind nobody has heard of does not open the door", () => {
     expect(shouldAutoOpen("prerender" as DoorLaunchKind)).toBe(false)
     expect(shouldAutoOpen("something-new" as DoorLaunchKind)).toBe(false)
+  })
+})
+
+describe("shouldOpenOnResume", () => {
+  // The case that made this exist: tap the icon, swipe home, tap it again.
+  // iOS resumes the page instead of relaunching it, so nothing mounts and the
+  // launch-kind check never runs again.
+  test("coming back to the front opens the door", () => {
+    expect(shouldOpenOnResume("visible", true)).toBe(true)
+  })
+
+  test("going to the background does not", () => {
+    expect(shouldOpenOnResume("hidden", true)).toBe(false)
+  })
+
+  // An open already running, or still showing that it worked, is not someone
+  // asking for another one.
+  test("an open already in flight is not a new request", () => {
+    expect(shouldOpenOnResume("visible", false)).toBe(false)
   })
 })
 

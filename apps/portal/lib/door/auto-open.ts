@@ -23,3 +23,22 @@ export function readLaunchKind(
   ) as PerformanceNavigationTiming[]
   return entry?.type
 }
+
+// Tapping the icon of an app iOS still has in memory does not navigate
+// anywhere — it just brings the page back to the front. Nothing mounts, no
+// navigation entry appears, so shouldAutoOpen above never gets a second
+// chance. Without this the icon opens the door the first time and behaves
+// like a plain bookmark every time after, which is worse than never
+// promising one tap at all.
+//
+// The cost is that any return to the foreground opens the door, including
+// arriving here through the app switcher. That is the honest shape of "the
+// icon is the door button": the app coming to the front IS the request.
+// `idle` is what keeps it to one open at a time — an open already running or
+// still showing its result is not a new request.
+export function shouldOpenOnResume(
+  visibility: DocumentVisibilityState,
+  idle: boolean
+): boolean {
+  return visibility === "visible" && idle
+}
