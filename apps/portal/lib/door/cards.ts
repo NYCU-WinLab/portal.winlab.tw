@@ -119,17 +119,17 @@ export const SYNC_STATE_LABELS: Record<DoorCardSyncState, string> = {
 }
 
 export const HAMS_ERROR_MESSAGES: Record<HamsErrorCode, string> = {
-  unauthorized: "卡機橋接服務拒絕了這次請求，請檢查 HAMS_API_SECRET。",
+  unauthorized: "門禁服務驗證失敗。",
   validation: "卡號或姓名不符合卡機規格。",
-  exists: "這張卡已經在卡機裡了。",
+  exists: "卡片已存在。",
   not_found: "卡機上找不到這張卡。",
-  controller_unreachable: "連不上卡機，請確認卡機和橋接服務都還活著。",
-  controller_busy: "卡機正在忙，等一下再試一次。",
+  controller_unreachable: "無法連線至卡機。",
+  controller_busy: "卡機忙碌中，請稍後重試。",
   table_suspect: "卡機卡表疑似損毀，請先用 HAMS 重新上傳",
   verify_failed: "卡機沒有確認這次變更，請按「與卡機比對」",
   rename_lost_card:
     "改名時卡機已刪除舊資料但新增失敗，這張卡目前無法開門，請重新新增",
-  unknown: "卡機橋接服務回了沒看過的錯誤。",
+  unknown: "門禁服務發生錯誤。",
 }
 
 export function hamsErrorMessage(

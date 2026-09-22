@@ -9,7 +9,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -97,12 +96,12 @@ export function CardManagement({
       const failed = result.results.filter((r) => !r.ok)
       const ok = result.results.filter((r) => r.ok)
       if (result.results.length === 0) {
-        toast.success("沒有需要變更的卡片。")
+        toast.success("未變更")
       } else if (failed.length === 0) {
         toast.success(`已更新 ${ok.length} 張卡片。`)
       } else {
         for (const r of failed) toast.error(`卡號 ${r.cardId}：${r.error}`)
-        if (ok.length > 0) toast.success(`其中 ${ok.length} 張卡片已更新。`)
+        if (ok.length > 0) toast.success(`已更新 ${ok.length} 張卡片。`)
       }
       onDone?.()
       router.refresh()
@@ -262,14 +261,13 @@ export function CardManagement({
           if (!open && !pending) setDeleting(null)
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby={undefined}>
           <AlertDialogHeader>
-            <AlertDialogTitle>刪除這位持有人的卡片？</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle>
               {deleting
-                ? `${deleting.displayName} 的 ${deleting.cardIds.length} 張卡片會從卡機上移除，之後這些卡刷不開門。`
-                : ""}
-            </AlertDialogDescription>
+                ? `刪除 ${deleting.displayName} 的 ${deleting.cardIds.length} 張卡片？`
+                : "刪除卡片？"}
+            </AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>取消</AlertDialogCancel>
@@ -337,14 +335,14 @@ function StatusStrip({
           </>
         ) : (
           <span className="text-sm text-destructive">
-            卡機狀態讀不到：{healthError ?? "未知錯誤"}
+            無法取得卡機狀態：{healthError ?? "未知錯誤"}
           </span>
         )}
       </div>
 
       {controllerError && (
         <p className="text-xs text-destructive">
-          卡機清單讀不到，下面是 Portal 存的名單：{controllerError}
+          目前顯示已儲存名單：{controllerError}
         </p>
       )}
 
