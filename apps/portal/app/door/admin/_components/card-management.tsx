@@ -25,32 +25,24 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 
-import { SYNC_STATE_LABELS, type DoorCardView } from "@/lib/door/cards"
+import {
+  groupCardsByHolder,
+  SYNC_STATE_LABELS,
+  type DoorCardSyncState,
+  type DoorCardView,
+  type HolderGroup,
+} from "@/lib/door/cards"
 import type { ControllerHealth } from "@/lib/door/hams"
 
 import {
-  addDoorCard,
-  deleteDoorCard,
+  deleteHolderCards,
   importFromController,
   reconcileDoorCards,
-  updateDoorCard,
+  saveHolderCards,
   type DoorCardMutation,
+  type HolderCardsResult,
 } from "../actions"
-import { CardReader } from "./card-reader"
-import {
-  CardFormDialog,
-  type CardFormValues,
-  type Member,
-} from "./card-form-dialog"
-
-const timestamp = new Intl.DateTimeFormat("zh-TW", {
-  timeZone: "Asia/Taipei",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-})
+import { HolderFormDialog, type Member } from "./card-form-dialog"
 
 export function CardManagement({
   cards,
@@ -68,19 +60,12 @@ export function CardManagement({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [addOpen, setAddOpen] = useState(false)
-  // Non-null when the add form is reopening a row the controller lost: the
-  // card number, name, holder and note are all still here, and retyping them
-  // is how they get lost for real.
-  const [addSeed, setAddSeed] = useState<DoorCardView | null>(null)
-  // A card number tapped on the reader, used to prefill a fresh add form. Kept
-  // apart from addSeed so the form still reads "新增卡片", not "重新加入卡機".
-  const [addPrefillCardId, setAddPrefillCardId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<DoorCardView | null>(null)
-  const [deleting, setDeleting] = useState<DoorCardView | null>(null)
+  const [editing, setEditing] = useState<HolderGroup | null>(null)
+  const [deleting, setDeleting] = useState<HolderGroup | null>(null)
 
-  const memberNames = useMemo(
-    () => new Map(members.map((m) => [m.id, m.name ?? m.email ?? m.id])),
-    [members]
+  const holders = useMemo(
+    () => groupCardsByHolder(cards, members),
+    [cards, members]
   )
 
   function run(action: () => Promise<DoorCardMutation>, onDone?: () => void) {
@@ -96,14 +81,37 @@ export function CardManagement({
     })
   }
 
+  // A holder save / delete touches one card per write, so the result is a list.
+  // Report each card that failed on its own and never call it a clean success
+  // when some of the set did not land.
+  function runHolder(
+    action: () => Promise<HolderCardsResult>,
+    onDone?: () => void
+  ) {
+    startTransition(async () => {
+      const result = await action()
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      const failed = result.results.filter((r) => !r.ok)
+      const ok = result.results.filter((r) => r.ok)
+      if (result.results.length === 0) {
+        toast.success("沒有需要變更的卡片。")
+      } else if (failed.length === 0) {
+        toast.success(`已更新 ${ok.length} 張卡片。`)
+      } else {
+        for (const r of failed) toast.error(`卡號 ${r.cardId}：${r.error}`)
+        if (ok.length > 0) toast.success(`其中 ${ok.length} 張卡片已更新。`)
+      }
+      onDone?.()
+      router.refresh()
+    })
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">門禁卡管理</h1>
-        <p className="text-sm text-muted-foreground">
-          這裡是門禁卡機的卡片名單，新增、改名、刪除都會直接寫進卡機。
-        </p>
-      </div>
+      <h1 className="text-lg font-semibold">門禁卡管理</h1>
 
       <StatusStrip
         health={health}
@@ -114,98 +122,65 @@ export function CardManagement({
         onReconcile={() => run(reconcileDoorCards)}
       />
 
-      <CardReader
-        cards={cards}
-        disabled={pending}
-        onEnrol={(cardNumber) => {
-          setAddSeed(null)
-          setAddPrefillCardId(cardNumber)
-          setAddOpen(true)
-        }}
-      >
-        <Button
-          size="sm"
-          onClick={() => {
-            setAddSeed(null)
-            setAddPrefillCardId(null)
-            setAddOpen(true)
-          }}
-          disabled={pending}
-        >
-          新增卡片
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setAddOpen(true)} disabled={pending}>
+          新增持有人
         </Button>
-      </CardReader>
+      </div>
 
       <div className="rounded-xl border border-border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-32">卡號</TableHead>
-              <TableHead>姓名</TableHead>
               <TableHead>持有人</TableHead>
               <TableHead>備註</TableHead>
               <TableHead className="w-28">卡機</TableHead>
-              <TableHead className="w-28">最後同步</TableHead>
-              <TableHead className="w-44 text-right">操作</TableHead>
+              <TableHead className="w-28 text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cards.length === 0 ? (
+            {holders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={4}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   名單還是空的，先按「匯入卡機清單」把卡機上的卡收進來。
                 </TableCell>
               </TableRow>
             ) : (
-              cards.map((card) => (
-                <TableRow key={card.card_id}>
-                  <TableCell className="font-mono text-xs tabular-nums">
-                    {card.card_id}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {card.holder_name}
+              holders.map((holder) => (
+                <TableRow key={holder.key}>
+                  <TableCell>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="font-medium">{holder.displayName}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {holder.cardIds.map((id) => (
+                          <Badge
+                            key={id}
+                            variant="outline"
+                            className="font-mono text-xs tabular-nums"
+                          >
+                            {id}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {card.holder_user_id
-                      ? (memberNames.get(card.holder_user_id) ??
-                        card.holder_user_id)
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {card.note ?? "—"}
+                    {holder.note ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <SyncBadge card={card} />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground tabular-nums">
-                    {card.last_seen_at
-                      ? timestamp.format(new Date(card.last_seen_at))
-                      : "—"}
+                    <SyncBadge state={holder.syncState} />
                   </TableCell>
                   <TableCell className="text-right">
-                    {card.in_database ? (
+                    {holder.inDatabase ? (
                       <div className="flex justify-end gap-1">
-                        {card.sync_state === "missing_on_controller" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={pending}
-                            onClick={() => {
-                              setAddSeed(card)
-                              setAddOpen(true)
-                            }}
-                          >
-                            重新加入卡機
-                          </Button>
-                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           disabled={pending}
-                          onClick={() => setEditing(card)}
+                          onClick={() => setEditing(holder)}
                         >
                           編輯
                         </Button>
@@ -213,7 +188,7 @@ export function CardManagement({
                           variant="ghost"
                           size="sm"
                           disabled={pending}
-                          onClick={() => setDeleting(card)}
+                          onClick={() => setDeleting(holder)}
                           className="text-destructive"
                         >
                           刪除
@@ -232,47 +207,49 @@ export function CardManagement({
         </Table>
       </div>
 
-      <CardFormDialog
+      <HolderFormDialog
         mode="add"
-        card={addSeed}
-        prefillCardId={addPrefillCardId ?? undefined}
-        autoFocusHolder={addPrefillCardId !== null}
         members={members}
+        allCards={cards}
         open={addOpen}
         pending={pending}
-        onOpenChange={(open) => {
-          setAddOpen(open)
-          if (!open) setAddPrefillCardId(null)
-        }}
-        onSubmit={(values: CardFormValues) =>
-          run(
-            () => addDoorCard(values),
-            () => {
-              setAddOpen(false)
-              setAddPrefillCardId(null)
-            }
+        onOpenChange={setAddOpen}
+        onSubmit={(values) =>
+          runHolder(
+            () =>
+              saveHolderCards({
+                holderUserId: values.holderUserId,
+                holderName: values.holderName,
+                note: values.note,
+                cardIds: values.cardIds,
+                existingCardIds: [],
+              }),
+            () => setAddOpen(false)
           )
         }
       />
 
-      <CardFormDialog
+      <HolderFormDialog
         mode="edit"
-        card={editing}
+        group={editing}
         members={members}
+        allCards={cards}
         open={!!editing}
         pending={pending}
         onOpenChange={(open) => {
           if (!open) setEditing(null)
         }}
-        onSubmit={(values: CardFormValues) => {
+        onSubmit={(values) => {
           const target = editing
           if (!target) return
-          run(
+          runHolder(
             () =>
-              updateDoorCard(target.card_id, {
-                holder_name: values.holder_name,
-                holder_user_id: values.holder_user_id,
+              saveHolderCards({
+                holderUserId: values.holderUserId,
+                holderName: values.holderName,
                 note: values.note,
+                cardIds: values.cardIds,
+                existingCardIds: target.cardIds,
               }),
             () => setEditing(null)
           )
@@ -287,10 +264,10 @@ export function CardManagement({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>刪除這張卡？</AlertDialogTitle>
+            <AlertDialogTitle>刪除這位持有人的卡片？</AlertDialogTitle>
             <AlertDialogDescription>
               {deleting
-                ? `${deleting.holder_name}（${deleting.card_id}）會從卡機上移除，之後這張卡刷不開門。`
+                ? `${deleting.displayName} 的 ${deleting.cardIds.length} 張卡片會從卡機上移除，之後這些卡刷不開門。`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -303,8 +280,8 @@ export function CardManagement({
                 e.preventDefault()
                 const target = deleting
                 if (!target) return
-                run(
-                  () => deleteDoorCard(target.card_id),
+                runHolder(
+                  () => deleteHolderCards(target.cardIds),
                   () => setDeleting(null)
                 )
               }}
@@ -318,15 +295,15 @@ export function CardManagement({
   )
 }
 
-function SyncBadge({ card }: { card: DoorCardView }) {
-  const label = SYNC_STATE_LABELS[card.sync_state]
-  if (card.sync_state === "synced")
+function SyncBadge({ state }: { state: DoorCardSyncState }) {
+  const label = SYNC_STATE_LABELS[state]
+  if (state === "synced")
     return (
       <Badge variant="secondary" className="text-xs">
         {label}
       </Badge>
     )
-  if (card.sync_state === "unknown")
+  if (state === "unknown")
     return <span className="text-xs text-muted-foreground">{label}</span>
   return (
     <Badge variant="destructive" className="text-xs">
@@ -393,27 +370,11 @@ function StatusStrip({
   )
 }
 
-function Field({
-  label,
-  value,
-  tone = "normal",
-}: {
-  label: string
-  value: string
-  tone?: "normal" | "warn"
-}) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-2">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span
-        className={
-          tone === "warn"
-            ? "font-medium text-destructive tabular-nums"
-            : "font-medium tabular-nums"
-        }
-      >
-        {value}
-      </span>
+      <span className="font-medium tabular-nums">{value}</span>
     </span>
   )
 }
