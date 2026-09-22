@@ -6,7 +6,11 @@ import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
 
-import { readLaunchKind, shouldAutoOpen } from "@/lib/door/auto-open"
+import {
+  readLaunchKind,
+  shouldAutoOpen,
+  shouldOpenOnResume,
+} from "@/lib/door/auto-open"
 
 import { getDoorState, openDoor } from "../actions"
 import { LockParticles } from "./lock-particles"
@@ -114,6 +118,27 @@ export function DoorPanel({
     autoFired.current = true
     const id = setTimeout(runOpen, 0)
     return () => clearTimeout(id)
+  }, [autoOpen, configured, runOpen])
+
+  // The effect above only fires when something mounts. Tapping the icon of an
+  // app iOS still holds in memory mounts nothing — it just brings this page
+  // back to the front — so that is the other half of "the icon is the door
+  // button". A ref carries the idle check because the listener outlives the
+  // render that registered it.
+  const idle = phase === "idle" && !pending
+  const idleRef = useRef(idle)
+  useEffect(() => {
+    idleRef.current = idle
+  }, [idle])
+
+  useEffect(() => {
+    if (!autoOpen || !configured) return
+    const onVisibility = () => {
+      if (!shouldOpenOnResume(document.visibilityState, idleRef.current)) return
+      runOpen()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
   }, [autoOpen, configured, runOpen])
 
   const emoji = !configured
