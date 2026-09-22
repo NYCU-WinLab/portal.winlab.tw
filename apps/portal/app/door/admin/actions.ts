@@ -72,13 +72,12 @@ export type DoorCardPatch = {
 // toast.
 class DoorAdminError extends Error {}
 
-const GENERIC_ERROR = "操作失敗了，請再試一次，若一直失敗請找管理員看 log。"
+const GENERIC_ERROR = "操作失敗，請重試。"
 
 // Said when the controller took the change but the portal failed to write it
 // down. The device is the thing that opens the door, so the change is real and
 // the list on screen is the copy that is now wrong.
-const CONTROLLER_AHEAD =
-  "卡機已經改好了，但 Portal 沒記下來。請按「與卡機比對」把兩邊對回來。"
+const CONTROLLER_AHEAD = "卡機已更新，名單儲存失敗。請與卡機比對。"
 
 // Every action starts here. RLS already hides the rows, but the bridge calls
 // have no RLS at all, so the role check is the gate that keeps a member from
@@ -153,7 +152,7 @@ export async function listDoorCards(): Promise<DoorCardsResult> {
       return {
         ok: true,
         cards: mergeDoorCards(rows, null),
-        controllerError: "卡機橋接服務尚未設定（HAMS_API_URL）。",
+        controllerError: "門禁服務尚未設定。",
       }
     }
 
@@ -181,8 +180,7 @@ export async function listDoorCards(): Promise<DoorCardsResult> {
 export async function getControllerHealth(): Promise<ControllerHealthResult> {
   try {
     await requireDoorAdmin()
-    if (!hamsConfigured())
-      return { ok: false, error: "卡機橋接服務尚未設定（HAMS_API_URL）。" }
+    if (!hamsConfigured()) return { ok: false, error: "門禁服務尚未設定。" }
     return { ok: true, health: await fetchControllerHealth() }
   } catch (err) {
     return { ok: false, error: describe(err) }
@@ -273,7 +271,7 @@ export async function addDoorCard(
     return {
       ok: true,
       message: existing
-        ? `已把 ${holderName} 的卡片重新寫回卡機。`
+        ? `已恢復 ${holderName} 的卡片。`
         : `已新增 ${holderName} 的卡片。`,
     }
   } catch (err) {
@@ -499,9 +497,7 @@ export async function deleteDoorCard(
     )
     return {
       ok: true,
-      message: alreadyGone
-        ? "卡機上早就沒有這張卡，已從名單移除。"
-        : "已刪除卡片。",
+      message: alreadyGone ? "已從名單移除。" : "已刪除卡片。",
     }
   } catch (err) {
     auditFailure(
@@ -549,11 +545,11 @@ export async function reconcileDoorCards(): Promise<DoorCardMutation> {
     if (!result.drifted)
       return {
         ok: true,
-        message: `卡機和名單一致，共 ${result.synced} 張卡。`,
+        message: `${result.synced} 張卡皆已同步。`,
       }
     return {
       ok: true,
-      message: `對完了：卡機缺 ${result.missing_on_controller} 張、多 ${result.unknown_on_controller} 張，卡機回報 ${result.controller_card_count} 張。`,
+      message: `卡機缺 ${result.missing_on_controller} 張、多 ${result.unknown_on_controller} 張，卡機回報 ${result.controller_card_count} 張。`,
     }
   } catch (err) {
     return { ok: false, error: describe(err) }

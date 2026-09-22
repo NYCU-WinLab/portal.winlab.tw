@@ -181,7 +181,7 @@ function HolderForm({
             value={noteText}
             rows={2}
             onChange={(e) => setNoteText(e.target.value)}
-            placeholder={isGuest ? "卡機上顯示的名字" : "備用卡、借給誰…"}
+            placeholder={isGuest ? "訪客姓名" : undefined}
           />
           {isGuest && noteText.trim().length > 0 && nameError && (
             <p className="text-xs text-destructive">{nameError}</p>
