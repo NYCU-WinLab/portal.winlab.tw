@@ -161,9 +161,6 @@ function CardForm({
             className="font-mono tabular-nums"
             placeholder="0001234567"
           />
-          <p className="text-xs text-muted-foreground">
-            {CARD_ID_LENGTH} 位數字，開頭的 0 要一起輸入。
-          </p>
           {cardId.length > 0 && cardIdError && (
             <p className="text-xs text-destructive">{cardIdError}</p>
           )}
