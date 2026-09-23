@@ -311,6 +311,8 @@ function BookingSuggestion({
   }
 
   function handleCustomClick() {
+    // Already typing: re-seeding would wipe what's in the box.
+    if (customMode) return
     setCustomMode(true)
     // Seed with the preset already picked so switching modes keeps the
     // choice instead of silently dropping it.
@@ -396,6 +398,9 @@ function BookingSuggestion({
                 : "outline"
             }
             className="h-7"
+            // Past the end of the day's grid suggestRoom finds nothing and
+            // the UI would blame the rooms instead of the clock.
+            disabled={opt.minutes > maxMinutes}
             onClick={() => handlePresetClick(opt.minutes)}
           >
             {opt.label}
@@ -415,11 +420,11 @@ function BookingSuggestion({
           <div className="flex items-center gap-2">
             <Input
               id="custom-duration"
-              type="number"
+              // text, not number: Firefox turns "abc" in a number box into
+              // "" with no error. parseCustomDuration rejects non-digits.
+              type="text"
               inputMode="numeric"
-              min={SLOT_MINUTES}
-              max={maxMinutes}
-              step={SLOT_MINUTES}
+              aria-label="自訂時長（分鐘）"
               placeholder={`${SLOT_MINUTES} 的倍數`}
               value={customInput}
               onChange={(e) => handleCustomInput(e.target.value)}
@@ -437,6 +442,7 @@ function BookingSuggestion({
           </div>
           <p
             id="custom-duration-hint"
+            aria-live="polite"
             className={cn(
               "text-xs",
               customError ? "text-destructive" : "text-muted-foreground"
