@@ -91,6 +91,7 @@ export default async function ProfilePage() {
           <DoorGreetingForm
             name={normalizeGreetingName(greeting.name?.trim() || user.name)}
             suffix={greeting.suffix}
+            color={greeting.color}
           />
         ) : null}
 
