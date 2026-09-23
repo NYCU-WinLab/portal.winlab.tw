@@ -234,7 +234,7 @@ describe("buildGreetingSoundMap", () => {
       door_greeting_suffix: null,
       door_greeting_color: null,
       door_sound_path: "a/20260923120000-11111111.mp3",
-      door_sound_mode: "sound_then_voice",
+      door_sound_mode: "sound_only",
     },
     {
       id: B,
@@ -251,6 +251,14 @@ describe("buildGreetingSoundMap", () => {
       door_greeting_color: null,
       door_sound_path: "c/20260923120000-33333333.wav",
       door_sound_mode: "voice_only",
+    },
+    {
+      id: "c2",
+      name: "Retired Mode",
+      door_greeting_suffix: null,
+      door_greeting_color: null,
+      door_sound_path: "c2/20260923120000-44444444.mp3",
+      door_sound_mode: "sound_then_voice",
     },
     {
       id: "d",
@@ -285,7 +293,7 @@ describe("buildGreetingSoundMap", () => {
     )
     const a = {
       url: url("a/20260923120000-11111111.mp3"),
-      mode: "sound_then_voice" as const,
+      mode: "sound_only" as const,
       version: "a/20260923120000-11111111.mp3",
     }
     const b = {

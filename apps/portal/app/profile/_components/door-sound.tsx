@@ -85,7 +85,7 @@ export function DoorSoundForm({
     setFile(next)
     setPickedUrl(objectUrl)
     // A first upload with the voice-only mode would play nothing new.
-    if (modeValue === "voice_only") setModeValue("sound_then_voice")
+    if (modeValue === "voice_only") setModeValue("sound_only")
   }
 
   async function submit() {
@@ -209,7 +209,7 @@ export function DoorSoundForm({
           })}
           {!hasFile ? (
             <p className="text-xs text-muted-foreground">
-              上傳音效後才能選前兩項。
+              上傳音效後才能選「只播音效」。
             </p>
           ) : null}
         </fieldset>

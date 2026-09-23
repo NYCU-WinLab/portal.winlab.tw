@@ -1,10 +1,11 @@
--- Door sound regression suite (20260923140000), runs via `supabase test db`.
+-- Door sound regression suite (20260923140000, modes narrowed to two in
+-- 20260923150000), runs via `supabase test db`.
 --
 -- Pins: the private door-sounds bucket and its limits; a member uploads only
 -- into their own folder and reads nothing back (only the service role reads
 -- the bucket); user_profiles.door_sound_path can only point into the row's
--- own folder; the mode is one of three values and needs a file unless it is
--- voice_only; and another member's row does not change.
+-- own folder; the mode is sound_only or voice_only (sound_then_voice was
+-- dropped) and sound_only needs a file; and another member's row does not change.
 
 begin;
 create extension if not exists pgtap with schema public;
@@ -96,20 +97,22 @@ select lives_ok(
   $$ update public.user_profiles
       set door_sound_path =
             '71111111-1111-1111-1111-111111111111/20260923120000-abcd1234.mp3',
-          door_sound_mode = 'sound_then_voice'
+          door_sound_mode = 'sound_only'
       where id = '71111111-1111-1111-1111-111111111111' $$,
   'a member can point their own row at their own file'
 );
 select is(
   (select door_sound_mode from public.user_profiles
     where id = '71111111-1111-1111-1111-111111111111'),
-  'sound_then_voice',
+  'sound_only',
   'the own-row write is stored'
 );
-select lives_ok(
-  $$ update public.user_profiles set door_sound_mode = 'sound_only'
+select throws_ok(
+  $$ update public.user_profiles set door_sound_mode = 'sound_then_voice'
       where id = '71111111-1111-1111-1111-111111111111' $$,
-  'sound_only is a valid mode'
+  '23514',
+  null,
+  'sound_then_voice is no longer a valid mode'
 );
 select throws_ok(
   $$ update public.user_profiles

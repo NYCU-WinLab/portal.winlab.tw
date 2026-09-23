@@ -131,16 +131,16 @@ describe("updateDoorSound", () => {
   test("checks the new upload, then points the member's row at it", async () => {
     const result = await updateDoorSound(deps(), {
       path: NEW,
-      mode: "sound_then_voice",
+      mode: "sound_only",
     })
     expect(result).toEqual({
       ok: true,
       path: NEW,
-      mode: "sound_then_voice",
+      mode: "sound_only",
       previous: OLD,
     })
     expect(patches()).toEqual([
-      { door_sound_path: NEW, door_sound_mode: "sound_then_voice" },
+      { door_sound_path: NEW, door_sound_mode: "sound_only" },
     ])
     const infoCall = calls.find((c) => c.url.includes("/object/info/"))
     expect(infoCall?.apikey).toBe("service-key")
@@ -151,10 +151,10 @@ describe("updateDoorSound", () => {
   })
 
   test("changing only the mode keeps the current file and skips storage", async () => {
-    const result = await updateDoorSound(deps(), { mode: "sound_then_voice" })
-    expect(result).toMatchObject({ ok: true, path: OLD })
+    const result = await updateDoorSound(deps(), { mode: "voice_only" })
+    expect(result).toMatchObject({ ok: true, path: OLD, mode: "voice_only" })
     expect(patches()).toEqual([
-      { door_sound_path: OLD, door_sound_mode: "sound_then_voice" },
+      { door_sound_path: OLD, door_sound_mode: "voice_only" },
     ])
     expect(calls.some((c) => c.url.includes("/storage/"))).toBe(false)
   })
@@ -173,6 +173,9 @@ describe("updateDoorSound", () => {
       ok: false,
       error: SOUND_MODE_INVALID,
     })
+    expect(
+      await updateDoorSound(deps(), { path: NEW, mode: "sound_then_voice" })
+    ).toEqual({ ok: false, error: SOUND_MODE_INVALID })
     expect(
       await updateDoorSound(deps(), {
         path: `${OTHER}/20260923120000-bbbbbbbb.m4a`,

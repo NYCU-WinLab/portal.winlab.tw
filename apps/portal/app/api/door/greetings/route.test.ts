@@ -26,7 +26,7 @@ const PROFILES = [
     door_greeting_suffix: "好帥",
     door_greeting_color: "#ff4040",
     door_sound_path: "u1/20260923120000-abcd1234.mp3",
-    door_sound_mode: "sound_then_voice",
+    door_sound_mode: "sound_only",
   },
   {
     id: "u2",
@@ -186,12 +186,12 @@ test("200 maps profile names and linked card holder names, normalised", async ()
     sound: {
       詹詠翔: {
         url: "https://database.example/storage/v1/object/sign/door-sounds/u1/20260923120000-abcd1234.mp3?token=t-u1",
-        mode: "sound_then_voice",
+        mode: "sound_only",
         version: "u1/20260923120000-abcd1234.mp3",
       },
       "Loki Zhan": {
         url: "https://database.example/storage/v1/object/sign/door-sounds/u1/20260923120000-abcd1234.mp3?token=t-u1",
-        mode: "sound_then_voice",
+        mode: "sound_only",
         version: "u1/20260923120000-abcd1234.mp3",
       },
       Carol: {

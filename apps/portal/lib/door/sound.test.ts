@@ -142,10 +142,11 @@ describe("paths", () => {
 })
 
 describe("modes", () => {
-  test("knows the three modes and which play a file", () => {
+  test("knows the two modes and which plays a file", () => {
     expect(isDoorSoundMode("sound_only")).toBe(true)
-    expect(isDoorSoundMode("sound_then_voice")).toBe(true)
     expect(isDoorSoundMode("voice_only")).toBe(true)
+    expect(isDoorSoundMode("sound_then_voice")).toBe(false)
+    expect(isDoorSoundPlayMode("sound_then_voice")).toBe(false)
     expect(isDoorSoundMode("loud")).toBe(false)
     expect(isDoorSoundPlayMode("voice_only")).toBe(false)
     expect(isDoorSoundPlayMode("sound_only")).toBe(true)

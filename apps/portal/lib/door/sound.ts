@@ -26,22 +26,17 @@ export const DOOR_SOUND_ACCEPT = [
   ...new Set(Object.values(DOOR_SOUND_TYPES)),
 ].join(",")
 
-export const DOOR_SOUND_MODES = [
-  "sound_only",
-  "sound_then_voice",
-  "voice_only",
-] as const
+export const DOOR_SOUND_MODES = ["sound_only", "voice_only"] as const
 
 export type DoorSoundMode = (typeof DOOR_SOUND_MODES)[number]
 
-// The modes the panel needs a file for; voice_only is the spoken greeting the
+// The mode the panel needs a file for; voice_only is the spoken greeting the
 // panel already does for everyone.
 export type DoorSoundPlayMode = Exclude<DoorSoundMode, "voice_only">
 
 export const DOOR_SOUND_MODE_LABELS: Record<DoorSoundMode, string> = {
   sound_only: "只播音效",
-  sound_then_voice: "先播音效，再念「歡迎，名字」",
-  voice_only: "只念語音（不用音效）",
+  voice_only: "只念語音",
 }
 
 export function isDoorSoundMode(value: unknown): value is DoorSoundMode {
