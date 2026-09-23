@@ -14,12 +14,29 @@ let profilesFail = false
 const restorers: (() => void)[] = []
 
 const PROFILES = [
-  { id: "u1", name: "詠翔 詹", door_greeting_suffix: "好帥" },
-  { id: "u2", name: "  Simon  ", door_greeting_suffix: "hi!" },
+  {
+    id: "u1",
+    name: "詠翔 詹",
+    door_greeting_suffix: "好帥",
+    door_greeting_color: "#ff4040",
+  },
+  {
+    id: "u2",
+    name: "  Simon  ",
+    door_greeting_suffix: "hi!",
+    door_greeting_color: null,
+  },
+  {
+    id: "u3",
+    name: "Carol",
+    door_greeting_suffix: null,
+    door_greeting_color: "#33e6ff",
+  },
 ]
 const CARDS = [
   { holder_name: "Loki  Zhan", holder_user_id: "u1" },
   { holder_name: "詹詠翔", holder_user_id: "u1" },
+  { holder_name: "Carol  Wu", holder_user_id: "u3" },
 ]
 
 beforeEach(() => {
@@ -101,15 +118,26 @@ test("200 maps profile names and linked card holder names, normalised", async ()
       "Loki Zhan": "好帥",
       Simon: "hi!",
     },
+    color: {
+      詹詠翔: "#ff4040",
+      "Loki Zhan": "#ff4040",
+      Carol: "#33e6ff",
+      "Carol Wu": "#33e6ff",
+    },
   })
   const profileRead = calls.find((call) => call.url.includes("/user_profiles"))
   expect(profileRead?.method).toBe("GET")
-  expect(profileRead?.url).toContain("door_greeting_suffix=not.is.null")
+  expect(decodeURIComponent(profileRead?.url ?? "")).toContain(
+    "or=(door_greeting_suffix.not.is.null,door_greeting_color.not.is.null)"
+  )
+  expect(decodeURIComponent(profileRead?.url ?? "")).toContain(
+    "select=id,name,door_greeting_suffix,door_greeting_color"
+  )
   expect(profileRead?.apikey).toBe("test-server-only-key")
   const cardRead = calls.find((call) => call.url.includes("/door_cards"))
   expect(cardRead?.method).toBe("GET")
   expect(decodeURIComponent(cardRead?.url ?? "")).toContain(
-    "holder_user_id=in.(u1,u2)"
+    "holder_user_id=in.(u1,u2,u3)"
   )
   expect(calls.every((call) => call.method === "GET")).toBe(true)
 })
@@ -118,5 +146,7 @@ test("a database failure is a 503, not an empty map", async () => {
   profilesFail = true
   const response = await GET(request())
   expect(response.status).toBe(503)
-  expect(await response.json()).not.toHaveProperty("suffix")
+  const body = await response.json()
+  expect(body).not.toHaveProperty("suffix")
+  expect(body).not.toHaveProperty("color")
 })

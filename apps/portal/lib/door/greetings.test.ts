@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  buildGreetingColorMap,
   buildGreetingSuffixMap,
   greetingsAuthorized,
   normalizeGreetingName,
@@ -29,8 +30,18 @@ describe("buildGreetingSuffixMap", () => {
   test("keys each member by profile name and every linked card holder name", () => {
     const map = buildGreetingSuffixMap(
       [
-        { id: "a", name: "詠翔 詹", door_greeting_suffix: "好帥" },
-        { id: "b", name: "Simon", door_greeting_suffix: "hi!" },
+        {
+          id: "a",
+          name: "詠翔 詹",
+          door_greeting_suffix: "好帥",
+          door_greeting_color: null,
+        },
+        {
+          id: "b",
+          name: "Simon",
+          door_greeting_suffix: "hi!",
+          door_greeting_color: null,
+        },
       ],
       [
         { holder_name: "詹詠翔", holder_user_id: "a" },
@@ -49,9 +60,24 @@ describe("buildGreetingSuffixMap", () => {
   test("skips members without a suffix and blank names", () => {
     const map = buildGreetingSuffixMap(
       [
-        { id: "a", name: "Alice", door_greeting_suffix: null },
-        { id: "b", name: "   ", door_greeting_suffix: "好" },
-        { id: "c", name: null, door_greeting_suffix: "讚" },
+        {
+          id: "a",
+          name: "Alice",
+          door_greeting_suffix: null,
+          door_greeting_color: null,
+        },
+        {
+          id: "b",
+          name: "   ",
+          door_greeting_suffix: "好",
+          door_greeting_color: null,
+        },
+        {
+          id: "c",
+          name: null,
+          door_greeting_suffix: "讚",
+          door_greeting_color: null,
+        },
       ],
       [
         { holder_name: "Alice", holder_user_id: "a" },
@@ -64,13 +90,112 @@ describe("buildGreetingSuffixMap", () => {
 
   test("a collision resolves the same way regardless of row order", () => {
     const profiles = [
-      { id: "b", name: "Sam", door_greeting_suffix: "B" },
-      { id: "a", name: "Sam", door_greeting_suffix: "A" },
+      {
+        id: "b",
+        name: "Sam",
+        door_greeting_suffix: "B",
+        door_greeting_color: null,
+      },
+      {
+        id: "a",
+        name: "Sam",
+        door_greeting_suffix: "A",
+        door_greeting_color: null,
+      },
     ]
     const cards = [{ holder_name: "Sam", holder_user_id: "b" }]
     expect(buildGreetingSuffixMap(profiles, cards)).toEqual({ Sam: "A" })
     expect(buildGreetingSuffixMap([...profiles].reverse(), cards)).toEqual({
       Sam: "A",
+    })
+  })
+})
+
+describe("buildGreetingColorMap", () => {
+  const profiles = [
+    {
+      id: "a",
+      name: "詠翔 詹",
+      door_greeting_suffix: null,
+      door_greeting_color: "#ff4040",
+    },
+    {
+      id: "b",
+      name: "Simon",
+      door_greeting_suffix: "hi!",
+      door_greeting_color: null,
+    },
+    {
+      id: "c",
+      name: "Carol",
+      door_greeting_suffix: "讚",
+      door_greeting_color: "#33ff66",
+    },
+  ]
+  const cards = [
+    { holder_name: "Loki  Zhan", holder_user_id: "a" },
+    { holder_name: "Simon Chen", holder_user_id: "b" },
+    { holder_name: "Carol W", holder_user_id: "c" },
+    { holder_name: "Guest", holder_user_id: null },
+  ]
+
+  test("uses the same keys as the suffix map, only for members with a colour", () => {
+    expect(buildGreetingColorMap(profiles, cards)).toEqual({
+      詹詠翔: "#ff4040",
+      "Loki Zhan": "#ff4040",
+      Carol: "#33ff66",
+      "Carol W": "#33ff66",
+    })
+  })
+
+  test("a colour does not add or move keys in the suffix map", () => {
+    expect(buildGreetingSuffixMap(profiles, cards)).toEqual({
+      Simon: "hi!",
+      "Simon Chen": "hi!",
+      Carol: "讚",
+      "Carol W": "讚",
+    })
+  })
+
+  test("drops a stored value the panel could not parse", () => {
+    const map = buildGreetingColorMap(
+      [
+        {
+          id: "a",
+          name: "Dim",
+          door_greeting_suffix: null,
+          door_greeting_color: "#101010",
+        },
+        {
+          id: "b",
+          name: "Upper",
+          door_greeting_suffix: null,
+          door_greeting_color: "#FFFFFF",
+        },
+      ],
+      []
+    )
+    expect(map).toEqual({})
+  })
+
+  test("a collision resolves by lowest id regardless of row order", () => {
+    const rows = [
+      {
+        id: "b",
+        name: "Sam",
+        door_greeting_suffix: null,
+        door_greeting_color: "#6699ff",
+      },
+      {
+        id: "a",
+        name: "Sam",
+        door_greeting_suffix: null,
+        door_greeting_color: "#ff66cc",
+      },
+    ]
+    expect(buildGreetingColorMap(rows, [])).toEqual({ Sam: "#ff66cc" })
+    expect(buildGreetingColorMap([...rows].reverse(), [])).toEqual({
+      Sam: "#ff66cc",
     })
   })
 })

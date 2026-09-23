@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 
 import {
+  buildGreetingColorMap,
   buildGreetingSuffixMap,
   greetingsAuthorized,
-  type SuffixCardHolder,
-  type SuffixProfile,
+  type GreetingCardHolder,
+  type GreetingProfile,
 } from "@/lib/door/greetings"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -15,7 +16,9 @@ const NO_STORE = { "Cache-Control": "no-store" }
 const QUERY_TIMEOUT_MS = 5000
 
 // Read by the door panel service with the DISPLAY_API_SECRET it already
-// shares with Portal. Service role, read only, two columns of two tables.
+// shares with Portal. Service role, read only, a few columns of two tables.
+// Returns {"suffix": {name: suffix}, "color": {name: "#rrggbb"}}, both keyed
+// the same way; a member appears in a map only when they set that value.
 export async function GET(request: Request) {
   const secret = process.env.DISPLAY_API_SECRET
   if (!secret || secret.length < 32) {
@@ -41,8 +44,8 @@ export async function GET(request: Request) {
     const supabase = createAdminClient()
     const profiles = await supabase
       .from("user_profiles")
-      .select("id, name, door_greeting_suffix")
-      .not("door_greeting_suffix", "is", null)
+      .select("id, name, door_greeting_suffix, door_greeting_color")
+      .or("door_greeting_suffix.not.is.null,door_greeting_color.not.is.null")
       .abortSignal(controller.signal)
       .retry(false)
     if (profiles.error) {
@@ -52,9 +55,9 @@ export async function GET(request: Request) {
         { status: 503, headers: NO_STORE }
       )
     }
-    const rows = (profiles.data ?? []) as SuffixProfile[]
+    const rows = (profiles.data ?? []) as GreetingProfile[]
 
-    let cards: SuffixCardHolder[] = []
+    let cards: GreetingCardHolder[] = []
     if (rows.length > 0) {
       const holders = await supabase
         .from("door_cards")
@@ -72,11 +75,14 @@ export async function GET(request: Request) {
           { status: 503, headers: NO_STORE }
         )
       }
-      cards = (holders.data ?? []) as SuffixCardHolder[]
+      cards = (holders.data ?? []) as GreetingCardHolder[]
     }
 
     return NextResponse.json(
-      { suffix: buildGreetingSuffixMap(rows, cards) },
+      {
+        suffix: buildGreetingSuffixMap(rows, cards),
+        color: buildGreetingColorMap(rows, cards),
+      },
       { headers: NO_STORE }
     )
   } catch (err) {
