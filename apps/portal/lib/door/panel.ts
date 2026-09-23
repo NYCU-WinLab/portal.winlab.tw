@@ -2,6 +2,9 @@
 // the lab pve host, driving the 32x32 panel over BLE). It is a separate
 // service from the door relay, with its own URL and token:
 //   POST /api/greet  {"name": string, "seconds": number}  -> 202
+//   POST /api/greetings/reload                              -> 2xx
+// The second one tells the service to re-read GET /api/door/greetings (the
+// per-member suffixes and name colours) instead of waiting for its next poll.
 // The service owns the name rules (family-first Han, Latin first word, length
 // caps) and the font, so Portal sends the raw name. Both env vars are optional
 // and server-only; unset means no panel.
@@ -61,6 +64,33 @@ export async function greetNameOnPanel(
     return "failed"
   } catch (err) {
     console.error("[door] panel request failed", err)
+    return "failed"
+  }
+}
+
+export type ReloadGreetingsResult = "reloaded" | "skipped" | "failed"
+
+// Runs inside after() once a member saves their greeting. Never throws: the
+// greeting is already stored, and the service picks it up on its next read
+// even if this nudge is lost.
+export async function reloadPanelGreetings({
+  timeoutMs = 3000,
+}: { timeoutMs?: number } = {}): Promise<ReloadGreetingsResult> {
+  const base = process.env.DISPLAY_API_URL
+  const secret = process.env.DISPLAY_API_SECRET
+  if (!base || !secret) return "skipped"
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/api/greetings/reload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (res.ok) return "reloaded"
+    console.error(`[door] panel greetings reload responded ${res.status}`)
+    return "failed"
+  } catch (err) {
+    console.error("[door] panel greetings reload failed", err)
     return "failed"
   }
 }
