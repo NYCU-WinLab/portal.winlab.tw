@@ -15,7 +15,9 @@ import {
   type AttendeeContact,
   type PickableGroup,
 } from "@/lib/rooms/attendee-groups"
+import { validateBookingTimes } from "@/lib/rooms/booking-times"
 import {
+  DAY_WINDOW,
   fetchAvailabilityRange,
   fetchPortalBookingsForDate,
   type BookingMeeting,
@@ -320,6 +322,11 @@ export async function confirmBooking(
 ): Promise<BookingResult> {
   const user = await getCurrentUser()
   if (!user) return { error: "請先登入" }
+
+  // The picker only offers valid slots, but this action takes whatever the
+  // request carries. Checked before anything is booked, triggered or written.
+  const times = validateBookingTimes(input.startTime, input.endTime, DAY_WINDOW)
+  if (!times.ok) return { error: times.error }
 
   // Derived server-side from the group and the attendee list, never taken
   // from the client: the prefix decides which project a Teams recording
