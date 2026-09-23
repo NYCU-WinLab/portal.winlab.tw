@@ -23,10 +23,7 @@ const formatter = new Intl.DateTimeFormat("zh-TW", {
 export function DoorLog({ events }: { events: DoorEvent[] }) {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
-      <h1 className="mb-1 text-lg font-semibold">開門紀錄</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        最近 {events.length} 次按下 /door 的紀錄，新的在上面。
-      </p>
+      <h1 className="mb-6 text-lg font-semibold">開門紀錄</h1>
       <Table>
         <TableHeader>
           <TableRow>
@@ -44,7 +41,7 @@ export function DoorLog({ events }: { events: DoorEvent[] }) {
                 colSpan={5}
                 className="py-10 text-center text-sm text-muted-foreground"
               >
-                還沒有人按過。
+                尚無紀錄
               </TableCell>
             </TableRow>
           ) : (

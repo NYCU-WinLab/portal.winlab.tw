@@ -1,6 +1,6 @@
 "use client"
 
-import type { BookingMeeting } from "../actions"
+import type { BookingMeeting } from "@/lib/rooms/fetch"
 
 /**
  * Where the Teams meeting got to.

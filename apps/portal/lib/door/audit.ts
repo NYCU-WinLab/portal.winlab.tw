@@ -2,11 +2,11 @@
 // mirrored as an OTel log record so Sensorium has it too. Server-only.
 
 import type { Attributes } from "@opentelemetry/api"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { getClientAttributionAttributes } from "@/lib/otel/attribution"
 import { emitLog } from "@/lib/otel/log"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 import type { NormalizedUser } from "@/lib/user"
 
 export type DoorOutcome =
@@ -100,9 +100,13 @@ export async function recordDoorEvent(
 
 // Newest first. RLS limits this to portal admins; anyone else gets an empty
 // list, so callers gate the page on `is_portal_admin` themselves rather than
-// reading "no rows" as "no events".
-export async function listDoorEvents(limit = 100): Promise<DoorEvent[]> {
-  const supabase = await createClient()
+// reading "no rows" as "no events". The client is a parameter because the two
+// callers build different ones: the page a cookie client, the MCP tool one
+// carrying the caller's bearer token.
+export async function listDoorEvents(
+  supabase: SupabaseClient,
+  limit = 100
+): Promise<DoorEvent[]> {
   const { data, error } = await supabase
     .from("door_events")
     .select(
@@ -111,5 +115,5 @@ export async function listDoorEvents(limit = 100): Promise<DoorEvent[]> {
     .order("created_at", { ascending: false })
     .limit(limit)
   if (error) throw new Error(error.message)
-  return data
+  return (data ?? []) as DoorEvent[]
 }

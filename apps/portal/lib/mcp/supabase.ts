@@ -1,6 +1,7 @@
 import type { AuthInfo } from "@modelcontextprotocol/server"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
+import { keycloakSubFromIdentities } from "@/lib/profile/keycloak"
 import type { Database } from "@/lib/supabase/database.types"
 
 function env() {
@@ -44,6 +45,9 @@ export async function verifySupabaseToken(
       userId: user.id,
       email: user.email ?? null,
       name: displayName(user.user_metadata),
+      // createUserClient cannot call auth.getUser (accessToken mode), so the
+      // identity a tool may need later is resolved here, once.
+      keycloakSub: keycloakSubFromIdentities(user.identities),
     },
   }
 }

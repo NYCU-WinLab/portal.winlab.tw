@@ -1,10 +1,16 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 
 import { toast } from "sonner"
 
 import { cn } from "@workspace/ui/lib/utils"
+
+import {
+  readLaunchKind,
+  shouldAutoOpen,
+  shouldOpenOnResume,
+} from "@/lib/door/auto-open"
 
 import { getDoorState, openDoor } from "../actions"
 import { LockParticles } from "./lock-particles"
@@ -25,15 +31,21 @@ type Phase = "idle" | "opening" | "opened"
 export function DoorPanel({
   configured,
   initialOnline,
+  autoOpen = false,
 }: {
   configured: boolean
   initialOnline: boolean | null
+  // Set by /door/go, the route the installed home-screen icon launches. The
+  // tap on the icon is the tap that opens the door; the panel still renders so
+  // a failed open leaves a button to press again.
+  autoOpen?: boolean
 }) {
   const [online, setOnline] = useState<boolean | null>(initialOnline)
   const [phase, setPhase] = useState<Phase>("idle")
   const [frame, setFrame] = useState(0)
   const [shake, setShake] = useState(0)
   const [pending, startTransition] = useTransition()
+  const autoFired = useRef(false)
 
   useEffect(() => {
     if (!configured) return
@@ -65,8 +77,10 @@ export function DoorPanel({
 
   const busy = pending || phase === "opening"
 
-  const unlock = () => {
-    if (busy) return
+  // The open sequence itself, with no guard on it. Stable so the auto-open
+  // effect below can depend on it honestly; every setter and startTransition
+  // already is.
+  const runOpen = useCallback(() => {
     playUnlockSound()
     setFrame(0)
     setPhase("opening")
@@ -82,7 +96,50 @@ export function DoorPanel({
         toast.error(result.error)
       }
     })
+  }, [startTransition])
+
+  const unlock = () => {
+    if (busy) return
+    runOpen()
   }
+
+  // One shot, and only for a launch the person actually started — see
+  // lib/door/auto-open.ts for why the navigation type is the thing we trust.
+  // The ref keeps it to once per launch; a door is not something to open twice
+  // because state changed. Scheduled rather than called inline so the first
+  // paint lands before the opening animation starts, and so the effect body
+  // never cascades renders.
+  //
+  // playUnlockSound() stays silent on this path — there is no tap handler for
+  // iOS to start the AudioContext in. The door still opens.
+  useEffect(() => {
+    if (!autoOpen || autoFired.current || !configured) return
+    if (!shouldAutoOpen(readLaunchKind(performance))) return
+    autoFired.current = true
+    const id = setTimeout(runOpen, 0)
+    return () => clearTimeout(id)
+  }, [autoOpen, configured, runOpen])
+
+  // The effect above only fires when something mounts. Tapping the icon of an
+  // app iOS still holds in memory mounts nothing — it just brings this page
+  // back to the front — so that is the other half of "the icon is the door
+  // button". A ref carries the idle check because the listener outlives the
+  // render that registered it.
+  const idle = phase === "idle" && !pending
+  const idleRef = useRef(idle)
+  useEffect(() => {
+    idleRef.current = idle
+  }, [idle])
+
+  useEffect(() => {
+    if (!autoOpen || !configured) return
+    const onVisibility = () => {
+      if (!shouldOpenOnResume(document.visibilityState, idleRef.current)) return
+      runOpen()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
+  }, [autoOpen, configured, runOpen])
 
   const emoji = !configured
     ? "🔧"

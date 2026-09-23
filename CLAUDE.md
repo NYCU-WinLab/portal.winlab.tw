@@ -128,11 +128,15 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### MCP server (`/api/mcp`)
 
-`apps/portal/app/api/mcp/route.ts` mounts a remote MCP server with `mcp-handler`. It is a **second client of the same Supabase project**, not an API layer: tools in `apps/portal/lib/mcp/server.ts` receive the caller's Supabase JWT and build a per-request client with it (`lib/mcp/supabase.ts` → `createUserClient`), so RLS applies exactly as in the browser. Reuse `lib/<app>/*` query builders (e.g. `fetchReceipts`, `uploadReceiptPdf`) instead of duplicating queries; if a tool needs logic that only exists inside a hook, move it into `lib/` first.
+`apps/portal/app/api/mcp/route.ts` mounts a remote MCP server with `mcp-handler`. It is a **second client of the same Supabase project**, not an API layer: tools in `apps/portal/lib/mcp/tools/<app>.ts` (one module per app, wired in `lib/mcp/server.ts`, shared helpers in `lib/mcp/context.ts`) receive the caller's Supabase JWT and build a per-request client with it (`lib/mcp/supabase.ts` → `createUserClient`), so RLS applies exactly as in the browser. Reuse `lib/<app>/*` query builders (e.g. `fetchReceipts`, `uploadReceiptPdf`) instead of duplicating queries; if a tool needs logic that only exists inside a hook, move it into `lib/` first.
 
 Auth is MCP-spec OAuth 2.1 with **Supabase Auth as the authorization server** (Dashboard → Authentication → OAuth Server). Keycloak stays upstream: the client is sent to `/oauth/consent`, the proxy bounces an anonymous visitor through `/auth/login?next=…`, Keycloak signs them in, and the consent page approves the client via `supabase.auth.oauth.*`. `/.well-known/oauth-protected-resource` (excluded from the proxy) tells clients where the authorization server is. Tokens are verified by asking Supabase (`auth.getUser(jwt)`) because the project signs with HS256; do not swap that for a local signature check. OAuth scopes (`openid` / `email` / `profile`) only shape the ID token: an approved client acts with the member's **full** RLS permissions, admin roles included, so the consent page says so and tools must never widen what the web app lets that member do.
 
-`lib/mcp/server.test.ts` boots the real handler in `bun test` (401 challenge, bad token, `tools/list`), so a tool that fails to register or a broken auth wrapper fails CI before it reaches Vercel.
+Write tools exist only for what a member already does for themselves at low risk (receipt upload, own bento lines, own leave, a normal chat message). Physical or shared-credential actions (door unlock, room booking through the shared account), signing, bookkeeping and role grants have **no** tool on purpose; do not add one without the maintainer's say-so. A tool must never use the service-role client.
+
+`lib/mcp/instructions.ts` is the `instructions` string returned on `initialize`. MCP clients paste it into the agent's system prompt, so it is the agent's only map of the portal: what the apps are, which have tools, how RLS shapes results. When you add a tool, name it there; `lib/mcp/server.test.ts` fails if a registered tool is missing from the instructions or has a one-line description.
+
+`lib/mcp/server.test.ts` boots the real handler in `bun test` (401 challenge, bad token, `initialize` instructions, `tools/list`), so a tool that fails to register or a broken auth wrapper fails CI before it reaches Vercel.
 
 **Route-level auth gating is on** — `apps/portal/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`) calls `updateSession()` and redirects unauthenticated requests to `/auth/login`. The allow-list is pathname-prefix based: `/login` and `/auth/*` (login, callback, auth-code-error) skip the gate; `/api/*` and `/.well-known/*` are excluded by the matcher. An anonymous visitor is redirected to `/auth/login?next=<path>` and lands back on that path after sign-in (`lib/auth/safe-next.ts` keeps `next` same-origin).
 
@@ -367,6 +371,73 @@ Corner styling is locked: `fixed z-50 p-6 text-muted-foreground text-xs`. TR / B
 Central content container: `mx-auto w-full max-w-4xl px-6 py-20`. Width is 4xl (56rem / 896px), 5rem of vertical padding so corners never overlap content. For short pages that should feel centred, add `min-h-[60vh] flex-col justify-center` to the content.
 
 **Each route picks its own `appName`** (Portal, Profile, Bento, …). Don't set it once in the root `layout.tsx` — that would freeze every app to the same name. Multi-route apps wrap `<PortalShell>` in their own `layout.tsx`.
+
+### Installing one app to a phone home screen (PWA)
+
+Portal as a whole is not a PWA. An individual app opts in by declaring a
+manifest on its own segment — today only `/door`, because its whole UI is one
+big button and opening a browser to reach it is most of the work. `apps/gallery`
+is a PWA too, but as a whole workspace on its own domain (`app/manifest.ts`,
+plus a service worker and install prompt); portal apps get the smaller version.
+
+The recipe is a static `public/<app>/manifest.webmanifest` plus `manifest:`,
+`appleWebApp:` and a `themeColor` viewport in that app's `layout.tsx`. Next.js's
+`manifest.ts` file convention only works at the app root, which portal keeps
+free, so the manifest is a plain file under `public/`.
+
+Two things are load-bearing and look wrong out of context:
+
+- **`scope` is `/`, not `/<app>`.** An installed web app on iOS gets its own
+  cookie jar, so its first launch always lands on `/auth/login` — outside
+  `/<app>`. iOS opens an out-of-scope navigation in Safari, which writes the
+  session cookie to Safari's jar and leaves the installed app logged out
+  forever. Narrowing `scope` to the app is a sign-in loop with no way out.
+- **`.webmanifest` is excluded from `proxy.ts`'s matcher.** A browser refetches
+  the manifest when it judges installability and when it launches an installed
+  app, both of which happen with an empty cookie jar. Gated, those fetches get
+  a redirect to HTML and the app silently loses its standalone launch. The
+  manifest holds no secrets — name, icons, `start_url`.
+
+Icons live in `apps/portal/public/icons/` (192, 512, and the 180 that iOS
+actually uses). They are upscaled from `app/apple-icon.png`; replace them from
+a larger source if one ever shows up.
+
+**Changing `start_url` does not reach anyone who already installed the app** —
+iOS caches the manifest when the icon is added, so a change means everyone
+deletes and re-adds their icon. Treat it as a migration, not an edit.
+
+### `/door/go` opens the door by itself
+
+The door manifest's `start_url` is `/door/go`, not `/door`, so one tap on the
+home-screen icon is one unlock. `/door` stays the page you press yourself and
+is what a browser visit gets: a link someone follows, or an old tab restoring,
+must never open the lab door.
+
+`/door/go` renders the same `<DoorPanel>` with `autoOpen`, and the guards live
+in `lib/door/auto-open.ts`. There are **two**, because a home-screen icon has
+two ways of getting you back to a page:
+
+- **`shouldAutoOpen`** — the cold launch. Opens only when
+  `PerformanceNavigationTiming.type` is `navigate`. A reload, a back/forward
+  restore, or a browser reporting nothing is the page coming back on its own,
+  and none of them are consent. It is an allow-list of exactly one value on
+  purpose, so a browser inventing a new navigation type can never be read as a
+  request to unlock.
+- **`shouldOpenOnResume`** — the warm one. Tapping the icon of an app iOS still
+  holds in memory does not navigate anywhere; it brings the page to the front.
+  Nothing mounts, no navigation entry appears, so the first guard never gets a
+  second chance. Handling only the cold launch is what #1210 was: the icon
+  opened the door once and behaved like a plain bookmark every time after.
+
+So the rule is **the app coming to the front is the request**, and `idle` keeps
+it to one open at a time. The cost of saying it that way is that _any_ return
+to the foreground opens the door, including arriving through the app switcher
+— that is the honest shape of "the icon is the door button", not an oversight.
+
+The accepted cost is that an accidental tap on the icon opens the door. The
+audit trail from #1184 is what makes that survivable — every open, deliberate
+or not, records who and when. If that trade ever stops being worth it, point
+`start_url` back at `/door` (and tell everyone to re-add the icon).
 
 ## Style conventions
 

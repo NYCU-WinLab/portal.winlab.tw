@@ -1,9 +1,11 @@
 -- door_events ACL regression suite — runs via `supabase test db`.
 --
 -- 20260921090000 made door_events an admin-read, service-role-write audit
--- table. Two things keep that true and both are single lines a later migration
--- can undo without noticing: the grant set on the table, and the fact that the
--- only policy is a SELECT gated on is_portal_admin(). Pin both.
+-- table and 20260921103000 handed the read to door admins (is_door_admin(),
+-- which portal super admins still satisfy). Two things keep that true and both
+-- are single lines a later migration can undo without noticing: the grant set
+-- on the table, and the fact that the only policy is a SELECT gated on
+-- is_door_admin(). Pin both.
 
 begin;
 create extension if not exists pgtap with schema public;
@@ -33,8 +35,8 @@ select is(
 -- Pin the predicate itself, since that is what keeps non-admins out.
 select ok(
   (select qual from pg_policies
-    where schemaname = 'public' and tablename = 'door_events') like '%is_portal_admin()%',
-  'the door_events SELECT policy is gated on is_portal_admin()'
+    where schemaname = 'public' and tablename = 'door_events') like '%is_door_admin()%',
+  'the door_events SELECT policy is gated on is_door_admin()'
 );
 
 -- anon must hold nothing at all; authenticated only SELECT.

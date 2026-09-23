@@ -1,18 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
 
+import { fetchEgress } from "./fetch"
 import type { DatabaseEgress, InsertEgress, UpdateEgress } from "./types"
 
 const TABLE = "reimburse_egress"
 
 export async function getEgressList() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .order("invoice_date", { ascending: false })
-
-  if (error) throw new Error(`Failed to fetch egress: ${error.message}`)
-  return (data ?? []) as DatabaseEgress[]
+  return fetchEgress(await createClient())
 }
 
 export async function getEgressById(id: string) {

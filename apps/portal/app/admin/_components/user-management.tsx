@@ -20,8 +20,19 @@ import { useAdminUsers } from "@/hooks/admin/use-admin-users"
 
 import { RoleEditorDialog } from "./role-editor-dialog"
 
-// Derive the full app list from actual data + known portal apps
-const KNOWN_APPS = ["bento", "trip", "approve", "leave"]
+// Derive the full app list from actual data + known portal apps.
+// Every app with an is_<app>_admin() wrapper in the database has to be listed
+// here, or its role can only be granted by hand-editing user_profiles.roles.
+const KNOWN_APPS = [
+  "approve",
+  "bento",
+  "door",
+  "leave",
+  "meetings",
+  "receipts",
+  "reimburse",
+  "trip",
+]
 
 function deriveApps(users: AdminUser[]): string[] {
   const set = new Set<string>(KNOWN_APPS)

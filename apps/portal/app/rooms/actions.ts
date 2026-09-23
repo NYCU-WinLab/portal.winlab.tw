@@ -16,9 +16,12 @@ import {
   type PickableGroup,
 } from "@/lib/rooms/attendee-groups"
 import {
-  computeDayAvailability,
-  type AvailabilitySlot,
-} from "@/lib/rooms/availability"
+  fetchAvailabilityRange,
+  fetchPortalBookingsForDate,
+  type BookingMeeting,
+  type DayAvailability,
+  type PortalBooking,
+} from "@/lib/rooms/fetch"
 import {
   fetchAttendeeGroups,
   gitlabPathForGroup,
@@ -45,36 +48,15 @@ import {
 } from "@/lib/rooms/meeting-pipeline"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cancelRoomBooking } from "@/lib/rooms/booking-client"
-import { fetchBusySlotsForDates, fetchRooms } from "@/lib/rooms/client"
-import { addDays, taipeiIso, todayInTaipei } from "@/lib/rooms/date"
+import { taipeiIso, todayInTaipei } from "@/lib/rooms/date"
 import { sendBookingInvite } from "@/lib/rooms/invite-mail"
-
-const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
-
-export interface DayAvailability {
-  date: string
-  slots: AvailabilitySlot[]
-}
 
 /** `days` calendar days starting at `startDate`. */
 export async function getRoomAvailabilityRange(
   startDate: string,
   days: number
 ): Promise<DayAvailability[]> {
-  const rooms = await fetchRooms()
-  const activeRoomNames = rooms.filter((r) => r.active).map((r) => r.name)
-  const dates = Array.from({ length: days }, (_, i) => addDays(startDate, i))
-
-  const busyByDate = await fetchBusySlotsForDates(activeRoomNames, dates)
-  return dates.map((date) => ({
-    date,
-    slots: computeDayAvailability(
-      rooms,
-      busyByDate.get(date) ?? [],
-      date,
-      DAY_WINDOW
-    ),
-  }))
+  return fetchAvailabilityRange(startDate, days)
 }
 
 function requireServiceAccount(): string {
@@ -217,80 +199,11 @@ async function resolveEpicLink(
   }
 }
 
-export interface BookingMeeting {
-  status: "pending" | "success" | "failed"
-  joinUrl: string | null
-  errorCode: string | null
-}
-
-export interface PortalBooking {
-  id: string
-  room: string
-  date: string
-  startTime: string
-  endTime: string
-  requestedBy: string
-  title: string | null
-  attendees: AttendeeContact[]
-  /** Null when no Teams meeting was ever requested for this booking. */
-  meeting: BookingMeeting | null
-}
-
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
 export async function getPortalBookingsForDate(
   date: string
 ): Promise<PortalBooking[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("rooms_bookings")
-    .select(
-      "id, room, date, start_time, end_time, requested_by, title, attendees"
-    )
-    .eq("date", date)
-    .eq("status", "booked")
-    // Online-only meetings reserve no room, so they have nothing to match
-    // against the availability grid this feeds.
-    .not("room", "is", null)
-
-  if (error) {
-    throw new Error(`讀取 Portal 預約紀錄失敗:${error.message}`)
-  }
-
-  const bookings = data ?? []
-
-  // Second query rather than a join: the meeting request is optional and its
-  // absence is meaningful ("no Teams meeting was asked for"), which an inner
-  // join would turn into a missing booking.
-  const { data: requests } = await supabase
-    .from("rooms_meeting_requests")
-    .select("booking_id, status, join_url, error_code")
-    .eq("kind", "create")
-    .in(
-      "booking_id",
-      bookings.map((b) => b.id)
-    )
-
-  const byBooking = new Map<string, BookingMeeting>()
-  for (const r of requests ?? []) {
-    if (!r.booking_id) continue
-    byBooking.set(r.booking_id, {
-      status: r.status as BookingMeeting["status"],
-      joinUrl: r.join_url,
-      errorCode: r.error_code,
-    })
-  }
-
-  return bookings.map((row) => ({
-    id: row.id,
-    room: row.room!,
-    date: row.date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    requestedBy: row.requested_by,
-    title: row.title,
-    attendees: (row.attendees ?? []) as unknown as AttendeeContact[],
-    meeting: byBooking.get(row.id) ?? null,
-  }))
+  return fetchPortalBookingsForDate(await createClient(), date)
 }
 
 export interface OnlineBooking {

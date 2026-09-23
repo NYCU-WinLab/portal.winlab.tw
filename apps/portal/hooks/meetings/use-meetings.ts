@@ -5,7 +5,8 @@ import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
 import type { TablesInsert } from "@/lib/supabase/database.types"
-import { toMeeting, type DbMeeting, type Meeting } from "@/lib/meetings/types"
+import { fetchMeetings } from "@/lib/meetings/fetch"
+import type { Meeting } from "@/lib/meetings/types"
 import type { SemesterKey } from "@/lib/meetings/semester"
 
 import { queryKeys } from "./query-keys"
@@ -52,19 +53,7 @@ export function useMeetings(year: number) {
 
   return useQuery({
     queryKey: queryKeys.meetings.byYear(year),
-    queryFn: async (): Promise<Meeting[]> => {
-      // 頁籤是西元年，過濾就用西元年的日期區間。以前這裡讀的是 meetings.year
-      // 欄位——一份在列被搬動時不會跟著更新的狀態，於是跨年搬過去的人會留在
-      // 舊的頁籤上。日期是列上唯一會被編輯的東西，所以用它。
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select("*")
-        .gte("scheduled_date", `${year}-01-01`)
-        .lte("scheduled_date", `${year}-12-31`)
-        .order("scheduled_date", { ascending: true })
-      if (error) throw new Error(error.message || "讀取排班失敗")
-      return (data as DbMeeting[]).map(toMeeting)
-    },
+    queryFn: (): Promise<Meeting[]> => fetchMeetings(supabase, year),
   })
 }
 

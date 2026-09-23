@@ -703,6 +703,98 @@ export type Database = {
           },
         ]
       }
+      door_card_changes: {
+        Row: {
+          action: string
+          card_id: string | null
+          client_address: string | null
+          created_at: string
+          detail: Json | null
+          error: string | null
+          geo_city: string | null
+          id: string
+          latency_ms: number | null
+          ok: boolean
+          user_email: string | null
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          action: string
+          card_id?: string | null
+          client_address?: string | null
+          created_at?: string
+          detail?: Json | null
+          error?: string | null
+          geo_city?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok: boolean
+          user_email?: string | null
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          action?: string
+          card_id?: string | null
+          client_address?: string | null
+          created_at?: string
+          detail?: Json | null
+          error?: string | null
+          geo_city?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok?: boolean
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: []
+      }
+      door_cards: {
+        Row: {
+          card_id: string
+          created_at: string
+          created_by: string | null
+          holder_name: string
+          holder_user_id: string | null
+          last_seen_at: string | null
+          note: string | null
+          sync_state: string
+          updated_at: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          created_by?: string | null
+          holder_name: string
+          holder_user_id?: string | null
+          last_seen_at?: string | null
+          note?: string | null
+          sync_state?: string
+          updated_at?: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          created_by?: string | null
+          holder_name?: string
+          holder_user_id?: string | null
+          last_seen_at?: string | null
+          note?: string | null
+          sync_state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "door_cards_holder_user_id_fkey"
+            columns: ["holder_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       door_events: {
         Row: {
           client_address: string | null
@@ -3196,6 +3288,7 @@ export type Database = {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
       }
+      is_door_admin: { Args: never; Returns: boolean }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }
       is_quiz_host: { Args: { p_session_id: string }; Returns: boolean }
