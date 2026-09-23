@@ -19,7 +19,7 @@ import { profile } from "./profile"
 import { describeError } from "./report"
 import { users } from "./users"
 
-const USAGE = `
+export const USAGE = `
 kc — Keycloak realm tooling for portal.winlab.tw
 
   bun run kc doctor [options]      Diagnose the realm connection end to end
@@ -43,7 +43,7 @@ Credentials are read from, in increasing precedence:
   $WINLAB_KC_ENV, then the process environment.
 `.trim()
 
-type Args = {
+export type Args = {
   command: string
   profile: ProfileName
   attribute?: string
@@ -55,7 +55,7 @@ type Args = {
   configPath: string
 }
 
-function parseArgs(argv: string[]): Args | null {
+export function parseArgs(argv: string[]): Args | null {
   const [command, ...rest] = argv
   if (!command || command === "--help" || command === "-h") return null
 
@@ -174,4 +174,7 @@ async function main(): Promise<number> {
   }
 }
 
-process.exit(await main())
+// Only run as a CLI; importing this module (e.g. from a test) must not.
+if (import.meta.main) {
+  process.exit(await main())
+}

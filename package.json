@@ -11,7 +11,7 @@
     "test": "turbo test",
     "prepare": "husky",
     "kc": "bun scripts/kc/index.ts",
-    "typecheck:scripts": "./node_modules/typescript/bin/tsc -p scripts/tsconfig.json"
+    "typecheck:scripts": "./node_modules/typescript-7/bin/tsc -p scripts/tsconfig.json"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,css}": [
