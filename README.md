@@ -12,23 +12,23 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 
 ## Apps
 
-| Path         | What it is                                                      |
-| ------------ | --------------------------------------------------------------- |
-| `/`          | Home — welcome card + nav to every app                          |
-| `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`) |
-| `/approve`   | Document signing with PDF field placement + email outbox        |
-| `/bento`     | Lunch-ordering for the lab — orders, menus, realtime            |
-| `/bulletin`  | Announcements board                                             |
-| `/door`      | Lab door: one-shot unlock pulse to the relay controller         |
-| `/games`     | Mini-games (2048, snake, …) with global leaderboards            |
-| `/leave`     | Monday-meeting attendance sign-ups                              |
-| `/meetings`  | Lab-meeting weekly schedule + teacher papers                    |
-| `/profile`   | Personal account + bento / leave / approve / trip stats         |
-| `/receipts`  | Admin-only receipt review (PDF archive workflow)                |
-| `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
-| `/rooms`     | CS dept. meeting room availability query                        |
-| `/trip`      | Travel-document uploads with admin folder export                |
-| `/api/mcp`   | Remote MCP server for AI agents (OAuth 2.1 via Supabase Auth)   |
+| Path         | What it is                                                       |
+| ------------ | ---------------------------------------------------------------- |
+| `/`          | Home — welcome card + nav to every app                           |
+| `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`)  |
+| `/approve`   | Document signing with PDF field placement + email outbox         |
+| `/bento`     | Lunch-ordering for the lab — orders, menus, realtime             |
+| `/bulletin`  | Announcements board                                              |
+| `/door`      | Lab door: unlock pulse, card management, and web/card access log |
+| `/games`     | Mini-games (2048, snake, …) with global leaderboards             |
+| `/leave`     | Monday-meeting attendance sign-ups                               |
+| `/meetings`  | Lab-meeting weekly schedule + teacher papers                     |
+| `/profile`   | Personal account + bento / leave / approve / trip stats          |
+| `/receipts`  | Admin-only receipt review (PDF archive workflow)                 |
+| `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                     |
+| `/rooms`     | CS dept. meeting room availability query                         |
+| `/trip`      | Travel-document uploads with admin folder export                 |
+| `/api/mcp`   | Remote MCP server for AI agents (OAuth 2.1 via Supabase Auth)    |
 
 ### Connecting an AI agent (MCP)
 
@@ -39,6 +39,29 @@ claude mcp add --transport http portal https://portal.winlab.tw/api/mcp
 ```
 
 Every app has tools (28 today): reads for all of them, plus the low-risk writes a member can already do for themselves (`upload_receipt`, bento `add_bento_order_item` / `remove_bento_order_item`, `create_leave` / `delete_leave`, `post_bulletin_message`). Unlocking the door, booking rooms, signing, bookkeeping and role changes deliberately have no tool. Tools live one module per app in `apps/portal/lib/mcp/tools/`; name every new tool in `apps/portal/lib/mcp/instructions.ts` (the initialize `instructions` an agent reads before calling anything; the test enforces the pairing).
+
+### Physical card log
+
+`/door/log` distinguishes web unlock requests from physical card presentations.
+Both remain visible only to door admins and portal super admins. A successful
+card event means the controller granted access, not proof that a particular
+person entered; unclassified device codes remain unknown instead of becoming
+false successes or failures.
+
+The lab-side `hams-bridge` posts to `/api/door/events` using a dedicated
+`HAMS_EVENTS_SECRET` (at least 32 characters), configured on both services.
+This endpoint accepts at most 100 events / 64 KiB, uses service-role inserts
+behind that bearer check, and ignores duplicate fingerprints without changing
+existing holder snapshots. It grants no card-management or unlock capability.
+Deploy migration `20260922045402_door_card_events.sql` and the receiver before
+enabling the bridge collector; stop the original HAMS monitor first.
+
+The bridge durably stores each batch before acknowledging the controller and
+retains an outbox across delivery failures. Card timestamps use the uncorrected
+controller clock (`Asia/Taipei`); `received_at` records bridge reception time.
+Current holder metadata is only attached when its last update predates the
+event. Older or unassigned events retain the card number without guessing who
+held it. Erased slots and system/button events are not mislabeled as swipes.
 
 One app lives on its own subdomain because its design system diverges from portal:
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { listDoorEvents } from "@/lib/door/audit"
+import { fetchEventSyncNotice } from "@/lib/door/hams"
 import { createClient } from "@/lib/supabase/server"
 
 import { DoorLog } from "./_components/door-log"
@@ -15,6 +16,9 @@ export default async function DoorLogPage() {
   const { data: isAdmin } = await supabase.rpc("is_door_admin")
   if (!isAdmin) notFound()
 
-  const events = await listDoorEvents(supabase)
-  return <DoorLog events={events} />
+  const [events, syncNotice] = await Promise.all([
+    listDoorEvents(supabase),
+    fetchEventSyncNotice(),
+  ])
+  return <DoorLog events={events} syncNotice={syncNotice} />
 }

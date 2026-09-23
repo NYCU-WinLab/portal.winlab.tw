@@ -1,5 +1,5 @@
-// Audit trail for /door: one record per press, written to `door_events` and
-// mirrored as an OTel log record so Sensorium has it too. Server-only.
+// Door history reads include web and card events. Web presses are also mirrored
+// to OTel; the dedicated bridge ingest route writes physical card events.
 
 import type { Attributes } from "@opentelemetry/api"
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -8,27 +8,25 @@ import { getClientAttributionAttributes } from "@/lib/otel/attribution"
 import { emitLog } from "@/lib/otel/log"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { NormalizedUser } from "@/lib/user"
+import type { Database } from "@/lib/supabase/database.types"
 
 export type DoorOutcome =
   | { ok: true; latencyMs: number }
   | { ok: false; latencyMs: number; error: string }
 
-export type DoorEvent = {
-  id: string
-  created_at: string
-  user_id: string
-  user_email: string | null
-  user_name: string
-  ok: boolean
-  error: string | null
-  latency_ms: number | null
-  client_address: string | null
-  geo_city: string | null
-}
+export type DoorEvent = Database["public"]["Tables"]["door_events"]["Row"]
 
 // Rows are inserted by the service-role client, so this shape is the whole
 // contract with the table — keep it in step with the migration.
-export type DoorEventInsert = Omit<DoorEvent, "id" | "created_at">
+export type DoorEventInsert = Pick<
+  DoorEvent,
+  | "user_email"
+  | "user_name"
+  | "error"
+  | "latency_ms"
+  | "client_address"
+  | "geo_city"
+> & { user_id: string; ok: boolean }
 
 // Pure: turns a press into the row to store. `attribution` is the
 // `client.address` / `geo.*` set from lib/otel/attribution, already free of
@@ -98,8 +96,8 @@ export async function recordDoorEvent(
   }
 }
 
-// Newest first. RLS limits this to portal admins; anyone else gets an empty
-// list, so callers gate the page on `is_portal_admin` themselves rather than
+// Newest first. RLS limits this to door admins; anyone else gets an empty
+// list, so callers gate the page on `is_door_admin` themselves rather than
 // reading "no rows" as "no events". The client is a parameter because the two
 // callers build different ones: the page a cookie client, the MCP tool one
 // carrying the caller's bearer token.
@@ -110,7 +108,7 @@ export async function listDoorEvents(
   const { data, error } = await supabase
     .from("door_events")
     .select(
-      "id, created_at, user_id, user_email, user_name, ok, error, latency_ms, client_address, geo_city"
+      "id, created_at, user_id, user_email, user_name, ok, error, latency_ms, client_address, geo_city, source, source_event_id, card_id, device_event_code, device_reader, received_at"
     )
     .order("created_at", { ascending: false })
     .limit(limit)

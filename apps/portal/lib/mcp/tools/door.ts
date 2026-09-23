@@ -17,10 +17,13 @@ export type DoorEventRow = {
   created_at: string
   user_name: string
   user_email: string | null
-  ok: boolean
+  ok: boolean | null
   error: string | null
   latency_ms: number | null
   geo_city: string | null
+  source: string
+  card_last_four: string | null
+  device_event_code: string | null
 }
 
 // client_address stays out: the log is read by an agent that may quote it
@@ -35,6 +38,9 @@ export function doorEventRows(events: DoorEvent[]): DoorEventRow[] {
     error: e.error,
     latency_ms: e.latency_ms,
     geo_city: e.geo_city,
+    source: e.source,
+    card_last_four: e.card_id?.slice(-4) ?? null,
+    device_event_code: e.device_event_code,
   }))
 }
 
@@ -69,7 +75,7 @@ export function registerDoorTools(server: McpServer) {
     {
       title: "List door events",
       description:
-        "The lab door unlock log (/door/log), newest first: one row per press with who pressed it, whether the relay answered, how long it took and the city the request came from. Door admins and portal super admins only — door_events is invisible to every other member, so this tool says so instead of handing back a misleadingly empty log. Opening the door is deliberately not a tool: it is a physical action, and members do it themselves at /door.",
+        "The lab door log (/door/log), newest first: web unlock attempts and physical card presentations, distinguished by source. Card times use the uncorrected controller clock; ok means known access granted/denied, and null means an unclassified device code, not failure. A card identifies a credential, not proof that its holder entered. Web entries report relay acknowledgment, latency and city. Door admins and portal super admins only. Card numbers are limited to the last four digits. Opening the door is deliberately not a tool: members do that themselves at /door.",
       inputSchema: z.object({
         limit: z.number().int().min(1).max(200).default(50),
       }),

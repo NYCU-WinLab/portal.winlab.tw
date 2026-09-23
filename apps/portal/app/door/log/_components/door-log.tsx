@@ -20,10 +20,21 @@ const formatter = new Intl.DateTimeFormat("zh-TW", {
   hour12: false,
 })
 
-export function DoorLog({ events }: { events: DoorEvent[] }) {
+export function DoorLog({
+  events,
+  syncNotice,
+}: {
+  events: DoorEvent[]
+  syncNotice: string | null
+}) {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <h1 className="mb-6 text-lg font-semibold">開門紀錄</h1>
+      {syncNotice && (
+        <p role="status" className="mb-4 text-sm text-muted-foreground">
+          {syncNotice}
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -47,7 +58,10 @@ export function DoorLog({ events }: { events: DoorEvent[] }) {
           ) : (
             events.map((e) => (
               <TableRow key={e.id}>
-                <TableCell className="font-mono text-xs tabular-nums">
+                <TableCell
+                  className="font-mono text-xs tabular-nums"
+                  title={e.source === "card" ? "卡機時間" : undefined}
+                >
                   {formatter.format(new Date(e.created_at))}
                 </TableCell>
                 <TableCell>
@@ -57,16 +71,33 @@ export function DoorLog({ events }: { events: DoorEvent[] }) {
                       {e.user_email}
                     </div>
                   )}
+                  {e.card_id && (
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {e.card_id}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <span
                     className={cn(
                       "text-sm",
-                      e.ok ? "text-foreground" : "text-destructive"
+                      e.ok === null
+                        ? "text-muted-foreground"
+                        : e.ok
+                          ? "text-foreground"
+                          : "text-destructive"
                     )}
                     title={e.error ?? undefined}
                   >
-                    {e.ok ? "已開" : "失敗"}
+                    {e.source === "card"
+                      ? e.ok === null
+                        ? `事件 ${e.device_event_code}`
+                        : e.ok
+                          ? "通過"
+                          : "拒絕"
+                      : e.ok
+                        ? "已開"
+                        : "失敗"}
                   </span>
                   {e.error && (
                     <div className="text-xs text-muted-foreground">
@@ -78,7 +109,14 @@ export function DoorLog({ events }: { events: DoorEvent[] }) {
                   {e.latency_ms !== null ? `${e.latency_ms} ms` : ""}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {[e.client_address, e.geo_city].filter(Boolean).join(" · ")}
+                  <div>{e.source === "card" ? "刷卡" : "網頁"}</div>
+                  {e.source === "web" && (
+                    <div>
+                      {[e.client_address, e.geo_city]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ))
