@@ -35,6 +35,7 @@ import {
 import type { RecurringMeeting } from "@/app/rooms/actions"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
 import { formatDayLabel } from "@/lib/rooms/date"
+import { DURATION_PRESET_MINUTES } from "@/lib/rooms/duration"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
@@ -51,8 +52,6 @@ const START_TIMES = Array.from({ length: 28 }, (_, i) => {
   const total = 8 * 60 + i * 30
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
 })
-
-const DURATIONS = [30, 60, 90, 120, 150, 180]
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -262,7 +261,7 @@ export function RecurringTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DURATIONS.map((d) => (
+                {DURATION_PRESET_MINUTES.map((d) => (
                   <SelectItem key={d} value={String(d)}>
                     {d} 分鐘
                   </SelectItem>
