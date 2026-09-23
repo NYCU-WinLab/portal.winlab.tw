@@ -14,6 +14,7 @@ import {
   pulseDoor,
   type DoorState,
 } from "@/lib/door/client"
+import { greetOnDoor } from "@/lib/door/greet"
 import { getCurrentUser, type NormalizedUser } from "@/lib/user"
 
 export type DoorResult =
@@ -44,7 +45,8 @@ export async function getDoorState(): Promise<DoorResult> {
 // One-shot unlock: a short relay pulse. The access controller decides how long
 // the door actually stays unlocked. Every attempt, successful or not, is
 // written to the audit trail after the response goes out so the press never
-// waits on the database.
+// waits on the database. A successful press also puts the member's name on
+// the door's LED panel, on the same deferred path.
 export async function openDoor(): Promise<DoorResult> {
   return guarded(async (user) => {
     const requestHeaders = await headers()
@@ -55,6 +57,7 @@ export async function openDoor(): Promise<DoorResult> {
       after(() =>
         recordDoorEvent(user, { ok: true, latencyMs }, requestHeaders)
       )
+      after(() => greetOnDoor(user))
       return state
     } catch (err) {
       const latencyMs = performance.now() - started
