@@ -18,7 +18,7 @@ import { registerReimburseTools } from "@/lib/mcp/tools/reimburse"
 import { registerRoomsTools } from "@/lib/mcp/tools/rooms"
 import { registerTripTools } from "@/lib/mcp/tools/trip"
 
-export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.2.0" }
+export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.3.0" }
 
 // One module per portal app under lib/mcp/tools/. Adding a tool: register it
 // in that app's module and name it in lib/mcp/instructions.ts.

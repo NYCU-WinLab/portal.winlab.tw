@@ -13,6 +13,7 @@ import {
   type DepositAccount,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
+import { updateReceipt } from "@/lib/receipts/update"
 import { uploadReceiptPdf } from "@/lib/receipts/upload"
 
 import { queryKeys } from "./query-keys"
@@ -92,7 +93,7 @@ export function useUpdateReceipt() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       id,
       name,
       depositAccount,
@@ -100,18 +101,7 @@ export function useUpdateReceipt() {
       id: string
       name: string
       depositAccount: DepositAccount
-    }) => {
-      const trimmed = name.trim()
-      if (!trimmed) throw new Error("名稱不能空白")
-      const { data, error } = await supabase
-        .from(TABLE)
-        .update({ name: trimmed, deposit_account: depositAccount })
-        .eq("id", id)
-        .select()
-        .single()
-      if (error) throw error
-      return toReceipt(data as unknown as DatabaseReceiptWithTags)
-    },
+    }) => updateReceipt(supabase, id, { name, depositAccount }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.receipts.all })
     },
