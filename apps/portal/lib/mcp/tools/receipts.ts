@@ -21,6 +21,7 @@ import {
   STATUS_LABELS,
   type ReceiptStatus,
 } from "@/lib/receipts/types"
+import { updateReceipt } from "@/lib/receipts/update"
 import { uploadReceiptPdf } from "@/lib/receipts/upload"
 
 const STATUSES = Object.keys(STATUS_LABELS) as ReceiptStatus[]
@@ -105,6 +106,42 @@ export function registerReceiptsTools(
           status: receipt.status,
           status_label: STATUS_LABELS[receipt.status],
           deposit_account: receipt.depositAccount,
+          url: "https://portal.winlab.tw/receipts",
+        })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "rename_receipt",
+    {
+      title: "Rename receipt",
+      description:
+        "Change the display name of one receipt, the same edit as the web edit dialog; the stored file, status, deposit account and tags stay as they are. Take id from list_receipts. Receipts admins can rename any receipt; for anyone else the portal refuses and the tool returns an error. Confirm the old and new name with the member first.",
+      inputSchema: z.object({
+        id: z.uuid().describe("Receipt id from list_receipts"),
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .describe(
+            "New display name, e.g. 'Amazon 鍵盤 1618' (item + amount)"
+          ),
+      }),
+    },
+    async ({ id, name }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        const supabase = createUserClient(caller.token)
+        const receipt = await updateReceipt(supabase, id, { name })
+        return json({
+          id: receipt.id,
+          name: receipt.name,
+          status: receipt.status,
+          status_label: STATUS_LABELS[receipt.status],
           url: "https://portal.winlab.tw/receipts",
         })
       } catch (err) {
