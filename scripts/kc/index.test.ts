@@ -1,8 +1,19 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 
 import { defaultConfigPath } from "./config"
 // Importing the entry point must not run the CLI (it would process.exit).
 import { parseArgs, USAGE } from "./index"
+
+// parseArgs is pure. A tripwire in case it ever starts reaching a realm.
+const realFetch = globalThis.fetch
+beforeAll(() => {
+  globalThis.fetch = (() => {
+    throw new Error("network access in a kc unit test")
+  }) as unknown as typeof fetch
+})
+afterAll(() => {
+  globalThis.fetch = realFetch
+})
 
 describe("parseArgs", () => {
   test("no command, --help and -h mean usage", () => {
