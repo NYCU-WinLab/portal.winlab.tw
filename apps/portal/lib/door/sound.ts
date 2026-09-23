@@ -137,3 +137,22 @@ export function newDoorSoundPath(
   const stamp = now.toISOString().replace(/\D/g, "").slice(0, 14)
   return `${userId}/${stamp}-${random}.${ext}`
 }
+
+// What the door plays for a member, by the panel service's rules: their
+// sound when they have one and picked sound_only; otherwise "Hi <name>
+// <suffix>" when they set a greeting suffix; otherwise the lab's default
+// sound. The panel decides the last case by the suffix alone.
+export type DoorSoundOutcome = "sound" | "voice" | "default"
+
+export function doorSoundOutcome({
+  mode,
+  hasFile,
+  suffix,
+}: {
+  mode: DoorSoundMode
+  hasFile: boolean
+  suffix: string | null
+}): DoorSoundOutcome {
+  if (mode === "sound_only" && hasFile) return "sound"
+  return suffix?.trim() ? "voice" : "default"
+}
