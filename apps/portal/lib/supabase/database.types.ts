@@ -797,39 +797,57 @@ export type Database = {
       }
       door_events: {
         Row: {
+          card_id: string | null
           client_address: string | null
           created_at: string
+          device_event_code: string | null
+          device_reader: number | null
           error: string | null
           geo_city: string | null
           id: string
           latency_ms: number | null
-          ok: boolean
+          ok: boolean | null
+          received_at: string | null
+          source: string
+          source_event_id: string | null
           user_email: string | null
-          user_id: string
+          user_id: string | null
           user_name: string
         }
         Insert: {
+          card_id?: string | null
           client_address?: string | null
           created_at?: string
+          device_event_code?: string | null
+          device_reader?: number | null
           error?: string | null
           geo_city?: string | null
           id?: string
           latency_ms?: number | null
-          ok: boolean
+          ok?: boolean | null
+          received_at?: string | null
+          source?: string
+          source_event_id?: string | null
           user_email?: string | null
-          user_id: string
+          user_id?: string | null
           user_name: string
         }
         Update: {
+          card_id?: string | null
           client_address?: string | null
           created_at?: string
+          device_event_code?: string | null
+          device_reader?: number | null
           error?: string | null
           geo_city?: string | null
           id?: string
           latency_ms?: number | null
-          ok?: boolean
+          ok?: boolean | null
+          received_at?: string | null
+          source?: string
+          source_event_id?: string | null
           user_email?: string | null
-          user_id?: string
+          user_id?: string | null
           user_name?: string
         }
         Relationships: []

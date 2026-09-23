@@ -1,5 +1,7 @@
 import "server-only"
 
+import { eventSyncNotice, EventStatusError } from "@/lib/door/event-status"
+
 // Server-only client for hams-bridge, the small HTTP service on lab infra that
 // wraps the Hundure RAC-960PME access controller. The controller speaks a
 // binary TCP protocol and only answers on the lab network, so Vercel talks to
@@ -160,6 +162,25 @@ async function request<T>(
 
 export function fetchControllerHealth(): Promise<ControllerHealth> {
   return request<ControllerHealth>("/health", "GET")
+}
+
+export async function fetchEventSyncNotice(): Promise<string | null> {
+  if (!hamsConfigured()) return "刷卡同步未啟用"
+  try {
+    return eventSyncNotice(await request<unknown>("/events/status", "GET"))
+  } catch (error) {
+    if (!(error instanceof HamsError) && !(error instanceof EventStatusError)) {
+      throw error
+    }
+    if (error instanceof HamsError && error.status === 404) {
+      return "刷卡同步未啟用"
+    }
+    console.error(
+      "[door] event sync status unavailable",
+      error instanceof HamsError ? error.code : "invalid_response"
+    )
+    return "無法確認刷卡同步狀態"
+  }
 }
 
 export async function fetchControllerCardList(): Promise<ControllerCardList> {

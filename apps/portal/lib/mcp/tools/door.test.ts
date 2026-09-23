@@ -15,6 +15,12 @@ const event: DoorEvent = {
   latency_ms: 413,
   client_address: "140.113.1.2",
   geo_city: "Hsinchu",
+  source: "web",
+  source_event_id: null,
+  card_id: null,
+  device_event_code: null,
+  device_reader: null,
+  received_at: null,
 }
 
 describe("doorEventRows", () => {
@@ -28,6 +34,9 @@ describe("doorEventRows", () => {
         error: null,
         latency_ms: 413,
         geo_city: "Hsinchu",
+        source: "web",
+        card_last_four: null,
+        device_event_code: null,
       },
     ])
   })
@@ -48,6 +57,23 @@ describe("doorEventRows", () => {
 
   test("maps an empty log to an empty list", () => {
     expect(doorEventRows([])).toEqual([])
+  })
+
+  test("distinguishes a card event without exposing the full card number", () => {
+    const [row] = doorEventRows([
+      {
+        ...event,
+        source: "card",
+        card_id: "0000000042",
+        device_event_code: "00FE",
+        user_id: null,
+        ok: null,
+      },
+    ])
+    expect(row?.source).toBe("card")
+    expect(row?.card_last_four).toBe("0042")
+    expect(row?.ok).toBeNull()
+    expect(row).not.toHaveProperty("card_id")
   })
 })
 
