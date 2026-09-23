@@ -1,19 +1,21 @@
-// After an unlock, from the /door button or a physical card, the lab's LED
-// panel shows who opened the door. Callers run this inside after(), so neither
-// the press nor the card bridge waits on the profile read or the panel.
+// After a /door unlock, the lab's LED panel shows who opened the door. Portal
+// only picks the name; the panel service applies the display rules and
+// renders it. The caller runs this inside after(), so the press never waits
+// on the profile read or the panel. Card swipes are not greeted here: hams-bridge greets them
+// itself on the lab network, and a second greeting from Portal could show a
+// different name.
 
-import { doorDisplayName, renderNameBitmap } from "@/lib/door/display"
-import { panelConfigured, showOnPanel } from "@/lib/door/panel"
+import { greetNameOnPanel, panelConfigured } from "@/lib/door/panel"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export type GreetOptions = {
   profileTimeoutMs?: number
 }
 
-// Service-role read of one column: for the id getCurrentUser() already
-// verified, or the holder_user_id of a card. It is the same client the audit
-// writes use, and it does not depend on request cookies still being readable
-// once the response has gone out (the card path has no cookies at all).
+// Service-role read of one column for the id getCurrentUser() already
+// verified. It is the same client the audit writes use, and it does not
+// depend on request cookies still being readable once the response has gone
+// out.
 //
 // Bounded, because a hung PostgREST would otherwise keep after() and the
 // function instance alive; on timeout the caller falls back to the JWT name.
@@ -48,7 +50,7 @@ async function fetchProfileName(
 export type PanelGreeting = {
   // user_profiles id whose cleaned name is preferred, if there is one.
   userId: string | null
-  // The JWT name for a /door press, the card's holder_name for a swipe.
+  // The JWT name for a /door press.
   fallbackName: string | null
 }
 
@@ -62,9 +64,9 @@ export async function greetOnPanel(
     const profileName = userId
       ? await fetchProfileName(userId, profileTimeoutMs)
       : null
-    const label = doorDisplayName(profileName, fallbackName)
-    if (!label) return
-    await showOnPanel(renderNameBitmap(label))
+    const name = profileName?.trim() || fallbackName?.trim()
+    if (!name) return
+    await greetNameOnPanel(name)
   } catch (err) {
     console.error("[door] greeting failed", err)
   }
