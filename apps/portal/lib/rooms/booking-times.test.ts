@@ -62,5 +62,14 @@ describe("validateBookingTimes", () => {
     expect(validateBookingTimes("17:30", "18:00", window)).toEqual({
       ok: true,
     })
+
+    const hourly = { startHour: 9, endHour: 18, slotMinutes: 60 }
+    expect(validateBookingTimes("09:30", "10:00", hourly)).toEqual({
+      ok: false,
+      error: "時間要對齊 60 分鐘的時段",
+    })
+    expect(validateBookingTimes("09:00", "10:00", hourly)).toEqual({
+      ok: true,
+    })
   })
 })

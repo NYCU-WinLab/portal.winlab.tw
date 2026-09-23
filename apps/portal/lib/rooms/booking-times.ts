@@ -6,7 +6,6 @@
 // same rules. This is where they are restated for the server.
 
 import type { AvailabilityOptions } from "@/lib/rooms/availability"
-import { SLOT_MINUTES } from "@/lib/rooms/duration"
 
 export type BookingTimesResult = { ok: true } | { ok: false; error: string }
 
@@ -18,13 +17,14 @@ function parseClock(time: unknown): number | null {
   return Number(match[1]) * 60 + Number(match[2])
 }
 
+// Window bounds are whole hours (`startHour` / `endHour`), so this prints `HH:00`.
 function formatHour(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
 }
 
 /**
  * Accepts `startTime`–`endTime` only when both are `HH:MM`, both sit on the
- * `SLOT_MINUTES` grid, both fall inside `window` (the end may equal the
+ * `window.slotMinutes` grid, both fall inside `window` (the end may equal the
  * window's closing hour), and the end is after the start.
  *
  * Takes `unknown` because the caller is a server action: the declared type
@@ -40,8 +40,9 @@ export function validateBookingTimes(
   if (start === null || end === null) {
     return { ok: false, error: "時間格式要是 HH:MM" }
   }
-  if (start % SLOT_MINUTES !== 0 || end % SLOT_MINUTES !== 0) {
-    return { ok: false, error: `時間要對齊 ${SLOT_MINUTES} 分鐘的時段` }
+  const slot = window.slotMinutes
+  if (start % slot !== 0 || end % slot !== 0) {
+    return { ok: false, error: `時間要對齊 ${slot} 分鐘的時段` }
   }
   if (start < window.startHour * 60 || end > window.endHour * 60) {
     return {
