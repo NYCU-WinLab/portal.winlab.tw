@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 
 import { renderNameBitmap } from "@/lib/door/display"
-import { greetOnDoor } from "@/lib/door/greet"
-import type { NormalizedUser } from "@/lib/user"
+import { greetOnPanel } from "@/lib/door/greet"
 
 type FetchImpl = (
   input: Parameters<typeof fetch>[0],
@@ -20,12 +19,11 @@ const ENV_KEYS = [
 ] as const
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
 
-const user: NormalizedUser = {
+const user = {
   id: "11111111-2222-3333-4444-555555555555",
-  email: "member@test.local",
   name: "詠翔 詹",
-  avatarUrl: null,
 }
+const greeting = { userId: user.id, fallbackName: user.name }
 
 let fetchSpy: ReturnType<typeof stubFetch> | undefined
 let errorSpy: ReturnType<typeof spyOn<Console, "error">>
@@ -60,11 +58,11 @@ const isPanel = (input: Parameters<typeof fetch>[0]) =>
 const panelCalls = () =>
   (fetchSpy?.mock.calls ?? []).filter(([input]) => isPanel(input))
 
-describe("greetOnDoor", () => {
+describe("greetOnPanel", () => {
   test("does nothing at all when the panel env is unset", async () => {
     delete process.env.DISPLAY_API_URL
     fetchSpy = stubFetch(async () => new Response(null, { status: 202 }))
-    await greetOnDoor(user)
+    await greetOnPanel(greeting)
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(errorSpy).not.toHaveBeenCalled()
   })
@@ -74,7 +72,7 @@ describe("greetOnDoor", () => {
       if (isPanel(input)) return new Response(null, { status: 202 })
       return Response.json({ name: "郭愷" })
     })
-    await greetOnDoor(user)
+    await greetOnPanel(greeting)
 
     const profileCall = fetchSpy.mock.calls.find(([input]) => !isPanel(input))
     const profileUrl = new URL(
@@ -114,7 +112,7 @@ describe("greetOnDoor", () => {
       })
     })
     const started = performance.now()
-    await greetOnDoor(user, { profileTimeoutMs: 50 })
+    await greetOnPanel(greeting, { profileTimeoutMs: 50 })
     expect(performance.now() - started).toBeLessThan(2000)
 
     const [call] = panelCalls()
@@ -123,5 +121,13 @@ describe("greetOnDoor", () => {
     expect(Array.from(body)).toEqual(Array.from(renderNameBitmap("詹詠翔")))
     // One profile attempt: the abort is not retried.
     expect(fetchSpy.mock.calls.length - panelCalls().length).toBe(1)
+  })
+
+  test("without a user id it skips the profile read and uses the fallback", async () => {
+    fetchSpy = stubFetch(async () => new Response(null, { status: 202 }))
+    await greetOnPanel({ userId: null, fallbackName: "Simon Chu" })
+    expect(fetchSpy.mock.calls.every(([input]) => isPanel(input))).toBe(true)
+    const body = panelCalls()[0]?.[1]?.body as Uint8Array
+    expect(Array.from(body)).toEqual(Array.from(renderNameBitmap("Simon")))
   })
 })

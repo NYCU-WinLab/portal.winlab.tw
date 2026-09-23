@@ -14,7 +14,7 @@ import {
   pulseDoor,
   type DoorState,
 } from "@/lib/door/client"
-import { greetOnDoor } from "@/lib/door/greet"
+import { greetOnPanel } from "@/lib/door/greet"
 import { getCurrentUser, type NormalizedUser } from "@/lib/user"
 
 export type DoorResult =
@@ -57,7 +57,7 @@ export async function openDoor(): Promise<DoorResult> {
       after(() =>
         recordDoorEvent(user, { ok: true, latencyMs }, requestHeaders)
       )
-      after(() => greetOnDoor(user))
+      after(() => greetOnPanel({ userId: user.id, fallbackName: user.name }))
       return state
     } catch (err) {
       const latencyMs = performance.now() - started

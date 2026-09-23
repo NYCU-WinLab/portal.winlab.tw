@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 import {
   buildCardDoorEvent,
   cardIngestAuthorized,
   CardEventInputError,
+  pickCardGreeting,
   readCardSwipes,
 } from "@/lib/door/card-events"
+import { greetOnPanel } from "@/lib/door/greet"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
@@ -48,15 +50,40 @@ export async function POST(request: Request) {
   const rows = events.map((event) =>
     buildCardDoorEvent(event, byCard.get(event.card_id))
   )
-  const { error } = await supabase.from("door_events").upsert(rows, {
-    onConflict: "source_event_id",
-    ignoreDuplicates: true,
-  })
+  // With ignoreDuplicates the returned rows are exactly the ones this request
+  // inserted, which is what tells a fresh swipe from a replayed delivery.
+  const { data: inserted, error } = await supabase
+    .from("door_events")
+    .upsert(rows, { onConflict: "source_event_id", ignoreDuplicates: true })
+    .select("source_event_id")
   if (error) {
     console.error("[door] card event insert failed", error.code)
     return NextResponse.json({ error: "event insert failed" }, { status: 503 })
   }
+  scheduleGreeting(
+    pickCardGreeting(
+      events,
+      byCard,
+      new Set(
+        (inserted ?? []).flatMap((row: { source_event_id: unknown }) =>
+          typeof row.source_event_id === "string" ? [row.source_event_id] : []
+        )
+      )
+    )
+  )
   return NextResponse.json({
     accepted: events.map((event) => event.event_id),
   })
+}
+
+// The panel is cosmetic: it runs after the receipt goes out, and nothing about
+// it may change the receipt, since the bridge only marks events delivered on
+// an exact 200.
+function scheduleGreeting(greeting: ReturnType<typeof pickCardGreeting>) {
+  if (!greeting) return
+  try {
+    after(() => greetOnPanel(greeting))
+  } catch (err) {
+    console.error("[door] card greeting not scheduled", err)
+  }
 }

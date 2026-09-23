@@ -1,18 +1,19 @@
-// After a portal unlock, the lab's LED panel shows who opened the door. Runs
-// inside after(), so the press never waits on the profile read or the panel.
+// After an unlock, from the /door button or a physical card, the lab's LED
+// panel shows who opened the door. Callers run this inside after(), so neither
+// the press nor the card bridge waits on the profile read or the panel.
 
 import { doorDisplayName, renderNameBitmap } from "@/lib/door/display"
 import { panelConfigured, showOnPanel } from "@/lib/door/panel"
 import { createAdminClient } from "@/lib/supabase/admin"
-import type { NormalizedUser } from "@/lib/user"
 
 export type GreetOptions = {
   profileTimeoutMs?: number
 }
 
-// Service-role read of one column for the id getCurrentUser() already
-// verified: the same client recordDoorEvent uses, and it does not depend on
-// request cookies still being readable once the response has gone out.
+// Service-role read of one column: for the id getCurrentUser() already
+// verified, or the holder_user_id of a card. It is the same client the audit
+// writes use, and it does not depend on request cookies still being readable
+// once the response has gone out (the card path has no cookies at all).
 //
 // Bounded, because a hung PostgREST would otherwise keep after() and the
 // function instance alive; on timeout the caller falls back to the JWT name.
@@ -44,15 +45,24 @@ async function fetchProfileName(
   }
 }
 
+export type PanelGreeting = {
+  // user_profiles id whose cleaned name is preferred, if there is one.
+  userId: string | null
+  // The JWT name for a /door press, the card's holder_name for a swipe.
+  fallbackName: string | null
+}
+
 // Never throws: a missing name on the panel is not worth an error anywhere.
-export async function greetOnDoor(
-  user: NormalizedUser,
+export async function greetOnPanel(
+  { userId, fallbackName }: PanelGreeting,
   { profileTimeoutMs = 3000 }: GreetOptions = {}
 ): Promise<void> {
   try {
     if (!panelConfigured()) return
-    const profileName = await fetchProfileName(user.id, profileTimeoutMs)
-    const label = doorDisplayName(profileName, user.name)
+    const profileName = userId
+      ? await fetchProfileName(userId, profileTimeoutMs)
+      : null
+    const label = doorDisplayName(profileName, fallbackName)
     if (!label) return
     await showOnPanel(renderNameBitmap(label))
   } catch (err) {
