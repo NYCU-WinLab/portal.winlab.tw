@@ -4,6 +4,7 @@ import {
   DOOR_SOUND_ACCEPT,
   DOOR_SOUND_MAX_BYTES,
   doorSoundExtension,
+  doorSoundOutcome,
   isDoorSoundMode,
   isDoorSoundPath,
   isDoorSoundPlayMode,
@@ -142,13 +143,32 @@ describe("paths", () => {
 })
 
 describe("modes", () => {
-  test("knows the three modes and which play a file", () => {
+  test("knows the two modes and which plays a file", () => {
     expect(isDoorSoundMode("sound_only")).toBe(true)
-    expect(isDoorSoundMode("sound_then_voice")).toBe(true)
     expect(isDoorSoundMode("voice_only")).toBe(true)
+    expect(isDoorSoundMode("sound_then_voice")).toBe(false)
+    expect(isDoorSoundPlayMode("sound_then_voice")).toBe(false)
     expect(isDoorSoundMode("loud")).toBe(false)
     expect(isDoorSoundPlayMode("voice_only")).toBe(false)
     expect(isDoorSoundPlayMode("sound_only")).toBe(true)
     expect(isDoorSoundPlayMode(null)).toBe(false)
+  })
+})
+
+describe("doorSoundOutcome", () => {
+  test("a sound with sound_only plays the member's own sound", () => {
+    expect(doorSoundOutcome({ mode: "sound_only", hasFile: true })).toBe("own")
+  })
+
+  test("anything else plays the lab default sound", () => {
+    expect(doorSoundOutcome({ mode: "voice_only", hasFile: true })).toBe(
+      "default"
+    )
+    expect(doorSoundOutcome({ mode: "voice_only", hasFile: false })).toBe(
+      "default"
+    )
+    expect(doorSoundOutcome({ mode: "sound_only", hasFile: false })).toBe(
+      "default"
+    )
   })
 })

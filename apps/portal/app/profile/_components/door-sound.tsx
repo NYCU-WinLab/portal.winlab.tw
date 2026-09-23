@@ -24,6 +24,7 @@ import {
   DOOR_SOUND_MAX_SECONDS,
   DOOR_SOUND_MODE_LABELS,
   DOOR_SOUND_MODES,
+  doorSoundOutcome,
   validateDoorSoundFile,
   type DoorSoundMode,
 } from "@/lib/door/sound"
@@ -64,6 +65,7 @@ export function DoorSoundForm({
   const hasFile = Boolean(file || saved.path)
   const dirty = file !== null || modeValue !== saved.mode
   const playerUrl = pickedUrl ?? savedUrl
+  const outcome = doorSoundOutcome({ mode: modeValue, hasFile })
 
   function resetPicker() {
     setFile(null)
@@ -84,8 +86,8 @@ export function DoorSoundForm({
     objectUrls.current.push(objectUrl)
     setFile(next)
     setPickedUrl(objectUrl)
-    // A first upload with the voice-only mode would play nothing new.
-    if (modeValue === "voice_only") setModeValue("sound_then_voice")
+    // A first upload with the default-sound mode would change nothing.
+    if (modeValue === "voice_only") setModeValue("sound_only")
   }
 
   async function submit() {
@@ -123,7 +125,7 @@ export function DoorSoundForm({
   return (
     <Section
       title="開門音效"
-      description="刷卡或按 /door 開門時，門口喇叭播放的音效。"
+      description="刷卡或按 /door 開門時門口喇叭播的音效。有上傳音效就播你的音效，否則播實驗室預設音效。門口看板的後綴只改 LED 上的字，不影響聲音。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"
@@ -209,9 +211,14 @@ export function DoorSoundForm({
           })}
           {!hasFile ? (
             <p className="text-xs text-muted-foreground">
-              上傳音效後才能選前兩項。
+              上傳音效後才能選「播我的音效」。
             </p>
           ) : null}
+          <p aria-live="polite" className="text-xs text-muted-foreground">
+            {outcome === "own"
+              ? "開門時會播你的音效。"
+              : "開門時會播實驗室預設音效。"}
+          </p>
         </fieldset>
 
         <div className="flex justify-end gap-2">
@@ -231,7 +238,7 @@ export function DoorSoundForm({
                 <AlertDialogHeader>
                   <AlertDialogTitle>刪除開門音效？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    刪除後開門改回只念語音，要用音效得重新上傳。
+                    刪除後會播預設音效。要用自己的音效得重新上傳。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
