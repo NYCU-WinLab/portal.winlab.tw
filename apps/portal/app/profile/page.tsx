@@ -4,7 +4,12 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { UserCard } from "@/components/user-card"
+import { normalizeGreetingName } from "@/lib/door/greetings"
 import { accountConsoleUrl } from "@/lib/keycloak/admin"
+import {
+  fetchDoorGreeting,
+  type DoorGreeting,
+} from "@/lib/profile/door-greeting"
 import { fetchProfileStats } from "@/lib/profile/fetch"
 import type { ProfileFieldsResult } from "@/lib/profile/keycloak"
 import {
@@ -14,6 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
+import { DoorGreetingForm } from "./_components/door-greeting"
 import { ProfileAccount } from "./_components/profile-account"
 import { ProfileStatsView } from "./_components/profile-stats"
 import { Section } from "./_components/profile-ui"
@@ -22,6 +28,15 @@ export default async function ProfilePage() {
   const user = (await getCurrentUser())!
   const supabase = await createClient()
   const stats = await fetchProfileStats(supabase, user.id)
+  // The panel greets a /door press with user_profiles.name, so the preview
+  // does too. A failed read hides this section and nothing else.
+  const greeting: DoorGreeting | null = await fetchDoorGreeting(
+    supabase,
+    user.id
+  ).catch((err: unknown) => {
+    console.error("[profile] door greeting read failed", err)
+    return null
+  })
 
   // Account fields come from Keycloak, not Supabase, and are read-only here —
   // the link at the bottom of the section is where they get changed. Hidden
@@ -70,6 +85,13 @@ export default async function ProfilePage() {
               目前無法讀取 Keycloak 帳號資料。稍後再試一次。
             </p>
           </Section>
+        ) : null}
+
+        {greeting ? (
+          <DoorGreetingForm
+            name={normalizeGreetingName(greeting.name?.trim() || user.name)}
+            suffix={greeting.suffix}
+          />
         ) : null}
 
         {stats ? (
