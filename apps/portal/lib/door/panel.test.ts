@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 
-import { greetNameOnPanel } from "@/lib/door/panel"
+import { greetNameOnPanel, reloadPanelGreetings } from "@/lib/door/panel"
 
 type FetchImpl = (
   input: Parameters<typeof fetch>[0],
@@ -116,5 +116,58 @@ describe("greetNameOnPanel", () => {
       throw new TypeError("fetch failed")
     })
     expect(await greetNameOnPanel("Simon")).toBe("failed")
+  })
+})
+
+describe("reloadPanelGreetings", () => {
+  test("posts to /api/greetings/reload with the panel token", async () => {
+    fetchSpy = stubFetch(async () => new Response(null, { status: 204 }))
+    expect(await reloadPanelGreetings()).toBe("reloaded")
+    const [url, init] = fetchSpy.mock.calls[0] ?? []
+    expect(String(url)).toBe("http://panel.test/api/greetings/reload")
+    expect(init?.method).toBe("POST")
+    expect(new Headers(init?.headers).get("Authorization")).toBe(
+      "Bearer panel-secret"
+    )
+  })
+
+  test("skips without a request when either env var is unset", async () => {
+    fetchSpy = stubFetch(async () => new Response(null, { status: 204 }))
+    delete process.env.DISPLAY_API_SECRET
+    expect(await reloadPanelGreetings()).toBe("skipped")
+    process.env.DISPLAY_API_SECRET = "panel-secret"
+    delete process.env.DISPLAY_API_URL
+    expect(await reloadPanelGreetings()).toBe("skipped")
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  test("any non-2xx is logged, not thrown", async () => {
+    for (const status of [401, 404, 500, 503]) {
+      fetchSpy?.mockRestore()
+      fetchSpy = stubFetch(async () => new Response(null, { status }))
+      expect(await reloadPanelGreetings()).toBe("failed")
+    }
+    expect(errorSpy).toHaveBeenCalledTimes(4)
+  })
+
+  test("a timeout is swallowed", async () => {
+    fetchSpy = stubFetch(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason)
+          )
+        })
+    )
+    expect(await reloadPanelGreetings({ timeoutMs: 20 })).toBe("failed")
+    expect(errorSpy).toHaveBeenCalled()
+  })
+
+  test("a network error is swallowed", async () => {
+    fetchSpy = stubFetch(async () => {
+      throw new TypeError("fetch failed")
+    })
+    expect(await reloadPanelGreetings()).toBe("failed")
   })
 })
