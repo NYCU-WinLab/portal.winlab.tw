@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import {
   buildGreetingColorMap,
+  buildGreetingSoundMap,
   buildGreetingSuffixMap,
+  greetingSoundPaths,
   greetingsAuthorized,
   normalizeGreetingName,
 } from "@/lib/door/greetings"
@@ -218,5 +220,101 @@ describe("greetingsAuthorized", () => {
 
   test("never accepts when the secret is too short", () => {
     expect(greetingsAuthorized("Bearer short", "short")).toBe(false)
+  })
+})
+
+describe("buildGreetingSoundMap", () => {
+  const A = "a"
+  const B = "b"
+  const url = (path: string) => `https://storage.example/sign/${path}?token=t`
+  const profiles = [
+    {
+      id: A,
+      name: "詠翔 詹",
+      door_greeting_suffix: null,
+      door_greeting_color: null,
+      door_sound_path: "a/20260923120000-11111111.mp3",
+      door_sound_mode: "sound_then_voice",
+    },
+    {
+      id: B,
+      name: "Simon",
+      door_greeting_suffix: "hi!",
+      door_greeting_color: null,
+      door_sound_path: "b/20260923120000-22222222.ogg",
+      door_sound_mode: "sound_only",
+    },
+    {
+      id: "c",
+      name: "Voice",
+      door_greeting_suffix: null,
+      door_greeting_color: null,
+      door_sound_path: "c/20260923120000-33333333.wav",
+      door_sound_mode: "voice_only",
+    },
+    {
+      id: "d",
+      name: "Borrower",
+      door_greeting_suffix: null,
+      door_greeting_color: null,
+      door_sound_path: "a/20260923120000-11111111.mp3",
+      door_sound_mode: "sound_only",
+    },
+    {
+      id: "e",
+      name: "No File",
+      door_greeting_suffix: "yo",
+      door_greeting_color: null,
+    },
+  ]
+  const cards = [
+    { holder_name: "Loki  Zhan", holder_user_id: A },
+    { holder_name: "Simon Chen", holder_user_id: B },
+  ]
+
+  test("signs only playable sounds in the member's own folder", () => {
+    expect(greetingSoundPaths(profiles)).toEqual([
+      "a/20260923120000-11111111.mp3",
+      "b/20260923120000-22222222.ogg",
+    ])
+  })
+
+  test("keys the contract shape by profile and card names, version is the path", () => {
+    const signed = new Map(
+      greetingSoundPaths(profiles).map((path) => [path, url(path)])
+    )
+    const a = {
+      url: url("a/20260923120000-11111111.mp3"),
+      mode: "sound_then_voice" as const,
+      version: "a/20260923120000-11111111.mp3",
+    }
+    const b = {
+      url: url("b/20260923120000-22222222.ogg"),
+      mode: "sound_only" as const,
+      version: "b/20260923120000-22222222.ogg",
+    }
+    expect(buildGreetingSoundMap(profiles, cards, signed)).toEqual({
+      詹詠翔: a,
+      "Loki Zhan": a,
+      Simon: b,
+      "Simon Chen": b,
+    })
+  })
+
+  test("a path that failed to sign leaves that member out", () => {
+    const signed = new Map([
+      ["b/20260923120000-22222222.ogg", url("b/20260923120000-22222222.ogg")],
+    ])
+    expect(Object.keys(buildGreetingSoundMap(profiles, cards, signed))).toEqual(
+      ["Simon", "Simon Chen"]
+    )
+  })
+
+  test("adding sounds does not change the suffix map", () => {
+    expect(buildGreetingSuffixMap(profiles, cards)).toEqual({
+      Simon: "hi!",
+      "Simon Chen": "hi!",
+      "No File": "yo",
+    })
   })
 })

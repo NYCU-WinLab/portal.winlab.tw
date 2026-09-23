@@ -2818,6 +2818,8 @@ export type Database = {
           discord_user_id: string | null
           door_greeting_color: string | null
           door_greeting_suffix: string | null
+          door_sound_mode: string
+          door_sound_path: string | null
           email: string | null
           id: string
           is_admin: boolean | null
@@ -2837,6 +2839,8 @@ export type Database = {
           discord_user_id?: string | null
           door_greeting_color?: string | null
           door_greeting_suffix?: string | null
+          door_sound_mode?: string
+          door_sound_path?: string | null
           email?: string | null
           id: string
           is_admin?: boolean | null
@@ -2856,6 +2860,8 @@ export type Database = {
           discord_user_id?: string | null
           door_greeting_color?: string | null
           door_greeting_suffix?: string | null
+          door_sound_mode?: string
+          door_sound_path?: string | null
           email?: string | null
           id?: string
           is_admin?: boolean | null

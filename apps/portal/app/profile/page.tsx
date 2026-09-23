@@ -10,16 +10,23 @@ import {
   fetchDoorGreeting,
   type DoorGreeting,
 } from "@/lib/profile/door-greeting"
+import {
+  fetchDoorSound,
+  signOwnDoorSound,
+  type DoorSound,
+} from "@/lib/profile/door-sound"
 import { fetchProfileStats } from "@/lib/profile/fetch"
 import type { ProfileFieldsResult } from "@/lib/profile/keycloak"
 import {
   getProfileFields,
   keycloakSubFromIdentities,
 } from "@/lib/profile/keycloak"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentAuthUser, getCurrentUser } from "@/lib/user"
 
 import { DoorGreetingForm } from "./_components/door-greeting"
+import { DoorSoundForm } from "./_components/door-sound"
 import { ProfileAccount } from "./_components/profile-account"
 import { ProfileStatsView } from "./_components/profile-stats"
 import { Section } from "./_components/profile-ui"
@@ -37,6 +44,17 @@ export default async function ProfilePage() {
     console.error("[profile] door greeting read failed", err)
     return null
   })
+  // Same deal for the door sound. The bucket is readable only by the service
+  // role, so the player gets a URL signed here for the member's own file.
+  const sound: DoorSound | null = await fetchDoorSound(supabase, user.id).catch(
+    (err: unknown) => {
+      console.error("[profile] door sound read failed", err)
+      return null
+    }
+  )
+  const soundUrl = sound?.path
+    ? await signOwnDoorSound(createAdminClient(), user.id, sound.path)
+    : null
 
   // Account fields come from Keycloak, not Supabase, and are read-only here —
   // the link at the bottom of the section is where they get changed. Hidden
@@ -92,6 +110,15 @@ export default async function ProfilePage() {
             name={normalizeGreetingName(greeting.name?.trim() || user.name)}
             suffix={greeting.suffix}
             color={greeting.color}
+          />
+        ) : null}
+
+        {sound ? (
+          <DoorSoundForm
+            userId={user.id}
+            path={sound.path}
+            mode={sound.mode}
+            url={soundUrl}
           />
         ) : null}
 

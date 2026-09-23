@@ -4,7 +4,8 @@
 //   POST /api/greet  {"name": string, "seconds": number}  -> 202
 //   POST /api/greetings/reload                              -> 2xx
 // The second one tells the service to re-read GET /api/door/greetings (the
-// per-member suffixes and name colours) instead of waiting for its next poll.
+// per-member suffixes, name colours and door sounds) instead of waiting for
+// its next poll.
 // The service owns the name rules (family-first Han, Latin first word, length
 // caps) and the font, so Portal sends the raw name. Both env vars are optional
 // and server-only; unset means no panel.
