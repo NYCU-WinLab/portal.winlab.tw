@@ -114,13 +114,19 @@ export async function propfindByDate(opts: {
 }
 
 /**
- * Nextcloud down or rejecting our app password is not a partial result — no
- * listing can be trusted, so the whole scan fails. A single folder that
- * errors any other way (say, no Recordings folder yet this year) still lets
- * the other one link, and is reported as a warning.
+ * Nextcloud down, erroring server-side (5xx), or rejecting our app password is
+ * not a partial result — no listing can be trusted, so the whole scan fails.
+ * A single folder that errors any other way (say, a 404 because there's no
+ * Recordings folder yet this year) still lets the other one link, and is
+ * reported as a warning.
  */
 export function isFatalListingFailure(r: PropfindFailure): boolean {
-  return r.status === undefined || r.status === 401 || r.status === 403
+  return (
+    r.status === undefined ||
+    r.status === 401 ||
+    r.status === 403 ||
+    r.status >= 500
+  )
 }
 
 export function describeListingFailure(
@@ -270,6 +276,16 @@ export async function applyFileUpdates(
   return result
 }
 
+/** How many warning lines a toast shows before collapsing the rest. */
+export const MAX_TOAST_WARNINGS = 3
+
+/** A handful of warnings, then a count — a toast is not a log. */
+function formatWarnings(warnings: string[]): string {
+  const shown = warnings.slice(0, MAX_TOAST_WARNINGS)
+  const hidden = warnings.length - shown.length
+  return hidden > 0 ? `${shown.join("；")}；…另 ${hidden} 筆` : shown.join("；")
+}
+
 /** The toast the admin sees after a scan. Success only when nothing went wrong. */
 export function summarizeSyncResult(r: SyncFilesResult): {
   level: "success" | "warning" | "error"
@@ -279,13 +295,13 @@ export function summarizeSyncResult(r: SyncFilesResult): {
   if (r.failed > 0) {
     return {
       level: "error",
-      message: `掃描完成但有 ${r.failed} 筆更新失敗：${linked}。${r.warnings.join("；")}`,
+      message: `掃描完成但有 ${r.failed} 筆更新失敗：${linked}。${formatWarnings(r.warnings)}`,
     }
   }
   if (r.warnings.length > 0) {
     return {
       level: "warning",
-      message: `掃描部分完成：${linked}。${r.warnings.join("；")}`,
+      message: `掃描部分完成：${linked}。${formatWarnings(r.warnings)}`,
     }
   }
   return { level: "success", message: `掃描完成：${linked}` }

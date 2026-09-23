@@ -471,8 +471,14 @@ export function useSyncMeetingFiles() {
         body: JSON.stringify({ year }),
       })
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error || "掃描失敗")
+        // A proxy or platform error page isn't JSON; don't let it surface as
+        // a SyntaxError instead of the actual failure.
+        const body: { error?: unknown } = await res.json().catch(() => ({}))
+        throw new Error(
+          typeof body.error === "string" && body.error
+            ? body.error
+            : `掃描失敗（HTTP ${res.status}）`
+        )
       }
       return res.json() as Promise<SyncFilesResult>
     },

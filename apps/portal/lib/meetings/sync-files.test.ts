@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   applyFileUpdates,
+  isFatalListingFailure,
   combineListings,
   parsePropfind,
   planFileUpdates,
@@ -104,6 +105,31 @@ describe("propfindByDate", () => {
     const r = await propfind(fetchReturning(new Error("ECONNREFUSED")))
     expect(r).toEqual({ ok: false, reason: "ECONNREFUSED" })
   })
+
+  test("body read failing after a 2xx is a failure, not an empty folder", async () => {
+    const res = new Response("partial", { status: 207 })
+    res.text = async () => {
+      throw new Error("stream reset")
+    }
+    const r = await propfind(fetchReturning(res))
+    expect(r).toEqual({ ok: false, status: 207, reason: "stream reset" })
+  })
+})
+
+describe("isFatalListingFailure", () => {
+  test("unreachable, 401, 403 and any 5xx are fatal; 404 is not", () => {
+    expect(isFatalListingFailure({ ok: false, reason: "x" })).toBe(true)
+    for (const status of [401, 403, 500, 502, 503, 504]) {
+      expect(isFatalListingFailure({ ok: false, status, reason: "x" })).toBe(
+        true
+      )
+    }
+    for (const status of [400, 404, 405]) {
+      expect(isFatalListingFailure({ ok: false, status, reason: "x" })).toBe(
+        false
+      )
+    }
+  })
 })
 
 const ok = (files: [string, string][] = []): PropfindResult => ({
@@ -143,6 +169,16 @@ describe("combineListings", () => {
       )
       expect(r.ok).toBe(false)
     }
+  })
+
+  // A half-broken Nextcloud mustn't read as a partial success.
+  test("a 5xx on one folder is fatal even if the other listing worked", () => {
+    const r = combineListings(
+      listing("PPT", ok([["2026-03-02", "u"]])),
+      listing("錄影", { ok: false, status: 503, reason: "Service Unavailable" })
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain("HTTP 503")
   })
 
   test("one folder 404 is partial: the other still links, with a warning", () => {
@@ -310,5 +346,33 @@ describe("summarizeSyncResult", () => {
     })
     expect(s.level).toBe("error")
     expect(s.message).toContain("1 筆更新失敗")
+  })
+
+  test("long warning lists collapse to three lines plus a count", () => {
+    const warnings = Array.from(
+      { length: 5 },
+      (_, i) => `2026-03-0${i + 1} 的會議更新失敗：x`
+    )
+    const s = summarizeSyncResult({
+      pptUpdated: 0,
+      videoUpdated: 0,
+      failed: 5,
+      warnings,
+    })
+    expect(s.message).toContain(warnings[2]!)
+    expect(s.message).not.toContain(warnings[3]!)
+    expect(s.message).toContain("…另 2 筆")
+  })
+
+  test("exactly three warnings are all shown, no count", () => {
+    const warnings = ["a", "b", "c"]
+    const s = summarizeSyncResult({
+      pptUpdated: 0,
+      videoUpdated: 0,
+      failed: 0,
+      warnings,
+    })
+    expect(s.message).toContain("a；b；c")
+    expect(s.message).not.toContain("另")
   })
 })
