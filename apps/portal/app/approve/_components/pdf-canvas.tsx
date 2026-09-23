@@ -56,8 +56,12 @@ export function PdfCanvas({
         className="relative mx-auto overflow-hidden rounded border bg-background"
         style={{ width: pageWidth + 2, maxWidth: "100%" }}
       >
+        {/* react-pdf 11 suspends by default and routes load errors to an Error
+            Boundary instead of onLoadError. We rely on onLoadError to refresh
+            an expired signed URL, so keep the v10 behaviour. Page inherits it. */}
         <Document
           file={fileUrl}
+          suspense={false}
           onLoadSuccess={({ numPages }) => setNumPages(numPages)}
           onLoadError={onLoadError}
         >
