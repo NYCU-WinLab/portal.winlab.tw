@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -60,6 +61,13 @@ import {
 } from "@/lib/rooms/availability"
 import { addDays, formatDayLabel, todayInTaipei } from "@/lib/rooms/date"
 import {
+  DURATION_PRESETS,
+  SLOT_MINUTES,
+  maxDurationMinutes,
+  parseCustomDuration,
+} from "@/lib/rooms/duration"
+import { endTimeOf } from "@/lib/rooms/recurrence"
+import {
   ADVISOR_USERNAME,
   mergeAttendees,
   type AttendeeContact,
@@ -87,18 +95,6 @@ const TIER_LEGEND: { tier: SlotTier; label: string }[] = [
   { tier: "paid-only", label: "只剩付費教室" },
   { tier: "none", label: "已滿" },
 ]
-
-// Duration options offered in the picker, in minutes — must be multiples of
-// the 30-minute grid so they map onto a whole number of slots.
-const DURATION_OPTIONS = [
-  { minutes: 30, label: "30 分" },
-  { minutes: 60, label: "1 hr" },
-  { minutes: 90, label: "1.5 hr" },
-  { minutes: 120, label: "2 hr" },
-  { minutes: 150, label: "2.5 hr" },
-  { minutes: 180, label: "3 hr" },
-]
-const SLOT_MINUTES = 30
 
 // Time-axis labels shown between the start/end ends of the strip. Positioned
 // by finding the matching slot's index rather than a hardcoded percentage,
@@ -288,6 +284,41 @@ function BookingSuggestion({
   const attendeeGroupsQuery = useAttendeeGroups()
   const attendeeGroups = attendeeGroupsQuery.data
 
+  // Custom duration (#396). A valid entry lands in `durationMinutes` like a
+  // preset does, so everything downstream reads one value; an invalid entry
+  // clears it, which hides the booking form until the input is fixed.
+  const [customMode, setCustomMode] = useState(false)
+  const [customInput, setCustomInput] = useState("")
+  const maxMinutes = maxDurationMinutes(daySlots.length, slotIndex)
+  const customResult = customMode
+    ? parseCustomDuration(customInput, maxMinutes)
+    : null
+  const customError =
+    customResult && !customResult.ok && customInput.trim() !== ""
+      ? customResult.error
+      : null
+  const startTime = daySlots[slotIndex]?.start
+
+  function handlePresetClick(minutes: number) {
+    setCustomMode(false)
+    setDurationMinutes(minutes)
+  }
+
+  function handleCustomInput(value: string) {
+    setCustomInput(value)
+    const parsed = parseCustomDuration(value, maxMinutes)
+    setDurationMinutes(parsed.ok ? parsed.minutes : null)
+  }
+
+  function handleCustomClick() {
+    // Already typing: re-seeding would wipe what's in the box.
+    if (customMode) return
+    setCustomMode(true)
+    // Seed with the preset already picked so switching modes keeps the
+    // choice instead of silently dropping it.
+    handleCustomInput(durationMinutes ? String(durationMinutes) : "")
+  }
+
   const advisor = labUsers?.find(
     (u) => u.username === ADVISOR_USERNAME && u.email
   )
@@ -357,18 +388,70 @@ function BookingSuggestion({
         想借多久?
       </span>
       <div className="flex flex-wrap gap-1.5">
-        {DURATION_OPTIONS.map((opt) => (
+        {DURATION_PRESETS.map((opt) => (
           <Button
             key={opt.minutes}
             size="sm"
-            variant={durationMinutes === opt.minutes ? "default" : "outline"}
+            variant={
+              !customMode && durationMinutes === opt.minutes
+                ? "default"
+                : "outline"
+            }
             className="h-7"
-            onClick={() => setDurationMinutes(opt.minutes)}
+            // Past the end of the day's grid suggestRoom finds nothing and
+            // the UI would blame the rooms instead of the clock.
+            disabled={opt.minutes > maxMinutes}
+            onClick={() => handlePresetClick(opt.minutes)}
           >
             {opt.label}
           </Button>
         ))}
+        <Button
+          size="sm"
+          variant={customMode ? "default" : "outline"}
+          className="h-7"
+          onClick={handleCustomClick}
+        >
+          自訂
+        </Button>
       </div>
+      {customMode && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Input
+              id="custom-duration"
+              // text, not number: Firefox turns "abc" in a number box into
+              // "" with no error. parseCustomDuration rejects non-digits.
+              type="text"
+              inputMode="numeric"
+              aria-label="自訂時長（分鐘）"
+              placeholder={`${SLOT_MINUTES} 的倍數`}
+              value={customInput}
+              onChange={(e) => handleCustomInput(e.target.value)}
+              aria-invalid={customError ? true : undefined}
+              aria-describedby="custom-duration-hint"
+              className="h-7 w-28"
+              autoFocus
+            />
+            <Label className="text-xs font-normal text-muted-foreground">
+              分鐘
+            </Label>
+          </div>
+          <p
+            id="custom-duration-hint"
+            aria-live="polite"
+            className={cn(
+              "text-xs",
+              customError ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {customError ??
+              (customResult?.ok && startTime
+                ? `${startTime}–${endTimeOf(startTime, customResult.minutes)}`
+                : `最多 ${maxMinutes} 分鐘（到當天最後一個時段）`)}
+          </p>
+        </div>
+      )}
       {durationMinutes && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">

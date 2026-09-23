@@ -241,6 +241,30 @@ describe("suggestRoom", () => {
     expect(suggestRoom(daySlots, 4, 2)).toBeNull()
   })
 
+  // A custom duration (#396) can reach the last slot of the day, which the
+  // presets rarely did.
+  describe("custom durations near the end of the day", () => {
+    const tail: AvailabilitySlot[] = ["21:00", "21:30"].map((start, i) => ({
+      start,
+      end: ["21:30", "22:00"][i]!,
+      freeRooms: ["500A"],
+      paidRooms: [],
+      labRooms: [],
+    }))
+
+    test("a span that crosses into the last slot still qualifies", () => {
+      expect(suggestRoom(tail, 1, 1)).toEqual({ room: "500A", tier: "free" })
+    })
+
+    test("a span exactly as long as the slots left qualifies", () => {
+      expect(suggestRoom(tail, 0, 2)).toEqual({ room: "500A", tier: "free" })
+    })
+
+    test("one slot more than is left returns null", () => {
+      expect(suggestRoom(tail, 0, 3)).toBeNull()
+    })
+  })
+
   // Floor, then room number ascending, then the trailing letter reversed.
   describe("room ordering", () => {
     const oneSlot = (freeRooms: string[]): AvailabilitySlot[] => [

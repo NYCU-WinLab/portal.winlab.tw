@@ -8,6 +8,10 @@ import type { TablesInsert } from "@/lib/supabase/database.types"
 import { fetchMeetings } from "@/lib/meetings/fetch"
 import type { Meeting } from "@/lib/meetings/types"
 import type { SemesterKey } from "@/lib/meetings/semester"
+import {
+  summarizeSyncResult,
+  type SyncFilesResult,
+} from "@/lib/meetings/sync-files"
 
 import { queryKeys } from "./query-keys"
 
@@ -467,16 +471,21 @@ export function useSyncMeetingFiles() {
         body: JSON.stringify({ year }),
       })
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error || "掃描失敗")
+        // A proxy or platform error page isn't JSON; don't let it surface as
+        // a SyntaxError instead of the actual failure.
+        const body: { error?: unknown } = await res.json().catch(() => ({}))
+        throw new Error(
+          typeof body.error === "string" && body.error
+            ? body.error
+            : `掃描失敗（HTTP ${res.status}）`
+        )
       }
-      return res.json() as Promise<{ pptUpdated: number; videoUpdated: number }>
+      return res.json() as Promise<SyncFilesResult>
     },
-    onSuccess: ({ pptUpdated, videoUpdated }) => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: queryKeys.meetings.all })
-      toast.success(
-        `掃描完成：PPT ${pptUpdated} 筆、錄影 ${videoUpdated} 筆已連結`
-      )
+      const { level, message } = summarizeSyncResult(result)
+      toast[level](message)
     },
     onError: (e: Error) => toast.error(e.message),
   })
