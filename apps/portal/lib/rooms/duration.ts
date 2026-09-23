@@ -12,12 +12,12 @@ export const SLOT_MINUTES = 30
 
 /** The one-tap durations offered next to the custom input. */
 export const DURATION_PRESETS = [
-  { minutes: 30, label: "30 分" },
+  { minutes: 30, label: "30 mins" },
   { minutes: 60, label: "1 hr" },
-  { minutes: 90, label: "1.5 hr" },
-  { minutes: 120, label: "2 hr" },
-  { minutes: 150, label: "2.5 hr" },
-  { minutes: 180, label: "3 hr" },
+  { minutes: 90, label: "1.5 hrs" },
+  { minutes: 120, label: "2 hrs" },
+  { minutes: 150, label: "2.5 hrs" },
+  { minutes: 180, label: "3 hrs" },
 ] as const
 
 /** Just the minutes, for pickers that label them their own way. */
@@ -50,7 +50,8 @@ export function parseCustomDuration(
   input: string,
   maxMinutes: number
 ): CustomDurationResult {
-  const trimmed = input.trim()
+  // NFKC folds full-width digits (a Taiwanese IME's "９０") to ASCII.
+  const trimmed = input.normalize("NFKC").trim()
   if (trimmed === "") return { ok: false, error: "請輸入分鐘數" }
   if (!/^\d+$/.test(trimmed)) {
     return { ok: false, error: "請輸入整數分鐘" }

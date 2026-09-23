@@ -433,10 +433,7 @@ function BookingSuggestion({
               className="h-7 w-28"
               autoFocus
             />
-            <Label
-              htmlFor="custom-duration"
-              className="text-xs font-normal text-muted-foreground"
-            >
+            <Label className="text-xs font-normal text-muted-foreground">
               分鐘
             </Label>
           </div>

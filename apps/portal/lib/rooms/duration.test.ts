@@ -19,6 +19,17 @@ describe("DURATION_PRESETS", () => {
   test("the minutes-only list mirrors the presets in order", () => {
     expect(DURATION_PRESET_MINUTES).toEqual([30, 60, 90, 120, 150, 180])
   })
+
+  test("labels are English, plural past one hour", () => {
+    expect(DURATION_PRESETS.map((p) => p.label)).toEqual([
+      "30 mins",
+      "1 hr",
+      "1.5 hrs",
+      "2 hrs",
+      "2.5 hrs",
+      "3 hrs",
+    ])
+  })
 })
 
 describe("maxDurationMinutes", () => {
@@ -57,8 +68,25 @@ describe("parseCustomDuration", () => {
   })
 
   test("says so when nothing is left after the start", () => {
-    const r = parseCustomDuration("30", 0)
-    expect(r.ok).toBe(false)
+    expect(parseCustomDuration("30", 0)).toEqual({
+      ok: false,
+      error: "這個時段之後已經沒有可借的時間",
+    })
+  })
+
+  test("accepts full-width digits from a Taiwanese IME", () => {
+    expect(parseCustomDuration("９０", 600)).toEqual({ ok: true, minutes: 90 })
+  })
+
+  test("rejects full-width zero with the positive-duration error", () => {
+    expect(parseCustomDuration("０", 600)).toEqual({
+      ok: false,
+      error: "時長要大於 0",
+    })
+  })
+
+  test("reads a leading zero as decimal minutes", () => {
+    expect(parseCustomDuration("060", 600)).toEqual({ ok: true, minutes: 60 })
   })
 
   test("rejects durations off the 30-minute grid", () => {

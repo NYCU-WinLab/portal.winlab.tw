@@ -35,7 +35,7 @@ import {
 import type { RecurringMeeting } from "@/app/rooms/actions"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
 import { formatDayLabel } from "@/lib/rooms/date"
-import { DURATION_PRESET_MINUTES } from "@/lib/rooms/duration"
+import { DURATION_PRESETS } from "@/lib/rooms/duration"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
@@ -261,9 +261,9 @@ export function RecurringTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DURATION_PRESET_MINUTES.map((d) => (
-                  <SelectItem key={d} value={String(d)}>
-                    {d} 分鐘
+                {DURATION_PRESETS.map((p) => (
+                  <SelectItem key={p.minutes} value={String(p.minutes)}>
+                    {p.label}
                   </SelectItem>
                 ))}
               </SelectContent>
