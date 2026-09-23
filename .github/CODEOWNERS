@@ -7,7 +7,7 @@
 *                                         @NYCU-WinLab/portal-maintainers
 
 # === Shared infra（改動需特別小心，會影響所有 app） ===
-/apps/portal/middleware.ts                @zyx1121
+/apps/portal/proxy.ts                     @zyx1121
 /apps/portal/lib/                         @zyx1121
 /apps/portal/components/                  @zyx1121
 /apps/portal/hooks/use-auth.ts            @zyx1121
