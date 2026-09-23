@@ -1,4 +1,4 @@
--- handle_new_user name order — runs via `supabase test db`.
+-- handle_new_user name order, run via `supabase test db`.
 --
 -- 20260923050000 makes the signup trigger store a Han "given family" name as
 -- "familygiven". Pin the swap, and pin that nothing else about the row
