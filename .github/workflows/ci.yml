@@ -41,11 +41,20 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      # scripts/ is not a workspace, so `turbo typecheck` never reaches it.
+      - name: Typecheck scripts
+        run: bun run typecheck:scripts
+
       - name: Lint
         run: bun run lint
 
       - name: Test
         run: bunx turbo run test -- --coverage
+
+      # `./scripts`, not `scripts`: a bare word is a substring filter and would
+      # also match any future test whose path merely contains "scripts".
+      - name: Test scripts
+        run: bun test ./scripts
 
       - name: Build
         run: bun run build
