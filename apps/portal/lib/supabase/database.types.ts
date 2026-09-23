@@ -2816,6 +2816,7 @@ export type Database = {
           claude_session_id: string | null
           created_at: string | null
           discord_user_id: string | null
+          door_greeting_suffix: string | null
           email: string | null
           id: string
           is_admin: boolean | null
@@ -2833,6 +2834,7 @@ export type Database = {
           claude_session_id?: string | null
           created_at?: string | null
           discord_user_id?: string | null
+          door_greeting_suffix?: string | null
           email?: string | null
           id: string
           is_admin?: boolean | null
@@ -2850,6 +2852,7 @@ export type Database = {
           claude_session_id?: string | null
           created_at?: string | null
           discord_user_id?: string | null
+          door_greeting_suffix?: string | null
           email?: string | null
           id?: string
           is_admin?: boolean | null
