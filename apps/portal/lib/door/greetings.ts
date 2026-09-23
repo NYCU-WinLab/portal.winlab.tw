@@ -1,14 +1,19 @@
-// The name -> suffix and name -> colour maps the door panel service reads from
-// GET /api/door/greetings. The panel looks a greeting up by the name it is
+// The name -> suffix, name -> colour and name -> sound maps the door panel
+// service reads from GET /api/door/greetings. The panel looks a greeting up by the name it is
 // about to draw, and that name reaches it two ways: a /door press sends
 // user_profiles.name, a card swipe carries the controller's holder name
-// (mirrored in door_cards.holder_name). So each member with a suffix or a
-// colour gets a key for both, normalised the way the panel normalises before
+// (mirrored in door_cards.holder_name). So each member with a suffix, a
+// colour or a sound gets a key for both, normalised the way the panel normalises before
 // it looks up.
 
 import { createHash, timingSafeEqual } from "node:crypto"
 
 import { isDoorGreetingColor } from "@/lib/door/greeting-color"
+import {
+  isDoorSoundPath,
+  isDoorSoundPlayMode,
+  type DoorSoundPlayMode,
+} from "@/lib/door/sound"
 
 // Keycloak's full name is "<given> <family>", so a Chinese name arrives as
 // "詠翔 詹". The panel draws family first; handle_new_user() applies the same
@@ -26,6 +31,10 @@ export type GreetingProfile = {
   name: string | null
   door_greeting_suffix: string | null
   door_greeting_color: string | null
+  // Optional so a caller that only reads suffixes and colours can leave them
+  // out; absent means no sound.
+  door_sound_path?: string | null
+  door_sound_mode?: string | null
 }
 
 export type GreetingCardHolder = {
@@ -38,14 +47,14 @@ export type GreetingCardHolder = {
 // does not depend on the order PostgREST returned rows in. Each map applies
 // that rule on its own, over the members that have a value for it, so adding
 // a map never changes the keys of another.
-function buildGreetingMap(
+function buildGreetingMap<T>(
   profiles: GreetingProfile[],
   cards: GreetingCardHolder[],
-  pick: (profile: GreetingProfile) => string | null
-): Record<string, string> {
-  const valueById = new Map<string, string>()
-  const map = new Map<string, string>()
-  const put = (name: string | null, value: string | undefined) => {
+  pick: (profile: GreetingProfile) => T | null
+): Record<string, T> {
+  const valueById = new Map<string, T>()
+  const map = new Map<string, T>()
+  const put = (name: string | null, value: T | undefined) => {
     const key = name ? normalizeGreetingName(name) : ""
     if (key && value && !map.has(key)) map.set(key, value)
   }
@@ -87,6 +96,42 @@ export function buildGreetingColorMap(
   return buildGreetingMap(profiles, cards, (p) =>
     isDoorGreetingColor(p.door_greeting_color) ? p.door_greeting_color : null
   )
+}
+
+export type GreetingSound = {
+  url: string
+  mode: DoorSoundPlayMode
+  version: string
+}
+
+// The paths the endpoint has to sign: members who picked a mode that plays a
+// file, with a path in their own folder. voice_only members are left out so
+// their files are never signed.
+export function greetingSoundPaths(profiles: GreetingProfile[]): string[] {
+  return profiles.flatMap((profile) =>
+    isDoorSoundPlayMode(profile.door_sound_mode) &&
+    isDoorSoundPath(profile.door_sound_path, profile.id)
+      ? [profile.door_sound_path as string]
+      : []
+  )
+}
+
+// signedUrls maps a storage path to its signed URL; a path that failed to
+// sign (a missing object) is absent, and that member falls back to the voice
+// greeting. The path is the version: every upload gets a fresh one, so the
+// panel can cache the file by it.
+export function buildGreetingSoundMap(
+  profiles: GreetingProfile[],
+  cards: GreetingCardHolder[],
+  signedUrls: ReadonlyMap<string, string>
+): Record<string, GreetingSound> {
+  return buildGreetingMap(profiles, cards, (p) => {
+    const path = p.door_sound_path
+    const mode = p.door_sound_mode
+    if (!isDoorSoundPlayMode(mode) || !isDoorSoundPath(path, p.id)) return null
+    const url = signedUrls.get(path as string)
+    return url ? { url, mode, version: path as string } : null
+  })
 }
 
 // The panel service authenticates with the same DISPLAY_API_SECRET Portal uses
