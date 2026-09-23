@@ -142,16 +142,22 @@ const DENIED_CODES: Record<string, string> = {
   "0043": "防反潛回限制",
 }
 
+// A current assignment is not proof of who held a card in older history.
+export function attributedHolder(
+  event: CardSwipe,
+  holder?: CardHolderSnapshot
+): CardHolderSnapshot | undefined {
+  return holder?.card_id === event.card_id &&
+    Date.parse(event.device_time) >= Date.parse(holder.updated_at)
+    ? holder
+    : undefined
+}
+
 export function buildCardDoorEvent(
   event: CardSwipe,
   holder?: CardHolderSnapshot
 ): Database["public"]["Tables"]["door_events"]["Insert"] {
-  // A current assignment is not proof of who held a card in older history.
-  const attributed =
-    holder?.card_id === event.card_id &&
-    Date.parse(event.device_time) >= Date.parse(holder.updated_at)
-      ? holder
-      : undefined
+  const attributed = attributedHolder(event, holder)
   const granted = GRANTED_CODES.has(event.event_code)
   const denial = DENIED_CODES[event.event_code]
   return {
@@ -170,5 +176,38 @@ export function buildCardDoorEvent(
     latency_ms: null,
     client_address: null,
     geo_city: null,
+  }
+}
+
+// A batch this small is someone at the door right now. Anything larger is the
+// bridge catching up after an outage, and greeting a backlog would put a name
+// on the panel minutes after that person walked in.
+export const CARD_GREETING_MAX_BATCH = 2
+
+export type CardGreeting = { userId: string | null; fallbackName: string }
+
+// Who the LED panel should greet for one ingest batch, if anyone: the newest
+// granted swipe with an attributed holder, among the events this request
+// actually inserted (`inserted` comes from the upsert, so a replayed delivery
+// greets nobody).
+export function pickCardGreeting(
+  events: CardSwipe[],
+  holders: ReadonlyMap<string, CardHolderSnapshot>,
+  inserted: ReadonlySet<string>
+): CardGreeting | null {
+  if (events.length > CARD_GREETING_MAX_BATCH) return null
+  let newest: { at: number; holder: CardHolderSnapshot } | undefined
+  for (const event of events) {
+    if (!inserted.has(event.event_id)) continue
+    if (!GRANTED_CODES.has(event.event_code)) continue
+    const holder = attributedHolder(event, holders.get(event.card_id))
+    if (!holder || (!holder.holder_user_id && !holder.holder_name)) continue
+    const at = Date.parse(event.device_time)
+    if (!newest || at >= newest.at) newest = { at, holder }
+  }
+  if (!newest) return null
+  return {
+    userId: newest.holder.holder_user_id,
+    fallbackName: newest.holder.holder_name,
   }
 }
