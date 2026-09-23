@@ -156,33 +156,19 @@ describe("modes", () => {
 })
 
 describe("doorSoundOutcome", () => {
-  test("a sound with sound_only plays the sound, suffix or not", () => {
-    expect(
-      doorSoundOutcome({ mode: "sound_only", hasFile: true, suffix: null })
-    ).toBe("sound")
-    expect(
-      doorSoundOutcome({ mode: "sound_only", hasFile: true, suffix: "好帥" })
-    ).toBe("sound")
+  test("a sound with sound_only plays the member's own sound", () => {
+    expect(doorSoundOutcome({ mode: "sound_only", hasFile: true })).toBe("own")
   })
 
-  test("otherwise a suffix means the spoken greeting", () => {
-    expect(
-      doorSoundOutcome({ mode: "voice_only", hasFile: true, suffix: "好帥" })
-    ).toBe("voice")
-    expect(
-      doorSoundOutcome({ mode: "voice_only", hasFile: false, suffix: "hi!" })
-    ).toBe("voice")
-    expect(
-      doorSoundOutcome({ mode: "sound_only", hasFile: false, suffix: "hi!" })
-    ).toBe("voice")
-  })
-
-  test("no sound played and no suffix falls back to the lab default", () => {
-    expect(
-      doorSoundOutcome({ mode: "voice_only", hasFile: true, suffix: null })
-    ).toBe("default")
-    expect(
-      doorSoundOutcome({ mode: "voice_only", hasFile: false, suffix: "  " })
-    ).toBe("default")
+  test("anything else plays the lab default sound", () => {
+    expect(doorSoundOutcome({ mode: "voice_only", hasFile: true })).toBe(
+      "default"
+    )
+    expect(doorSoundOutcome({ mode: "voice_only", hasFile: false })).toBe(
+      "default"
+    )
+    expect(doorSoundOutcome({ mode: "sound_only", hasFile: false })).toBe(
+      "default"
+    )
   })
 })

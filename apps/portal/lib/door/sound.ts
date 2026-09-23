@@ -30,13 +30,13 @@ export const DOOR_SOUND_MODES = ["sound_only", "voice_only"] as const
 
 export type DoorSoundMode = (typeof DOOR_SOUND_MODES)[number]
 
-// The mode the panel needs a file for; voice_only is the spoken greeting the
-// panel already does for everyone.
+// The mode the panel needs a file for. voice_only keeps its stored name but
+// now means the lab's default sound: the door no longer speaks.
 export type DoorSoundPlayMode = Exclude<DoorSoundMode, "voice_only">
 
 export const DOOR_SOUND_MODE_LABELS: Record<DoorSoundMode, string> = {
-  sound_only: "只播音效",
-  voice_only: "只念語音",
+  sound_only: "播我的音效",
+  voice_only: "播預設音效",
 }
 
 export function isDoorSoundMode(value: unknown): value is DoorSoundMode {
@@ -138,21 +138,17 @@ export function newDoorSoundPath(
   return `${userId}/${stamp}-${random}.${ext}`
 }
 
-// What the door plays for a member, by the panel service's rules: their
-// sound when they have one and picked sound_only; otherwise "Hi <name>
-// <suffix>" when they set a greeting suffix; otherwise the lab's default
-// sound. The panel decides the last case by the suffix alone.
-export type DoorSoundOutcome = "sound" | "voice" | "default"
+// What the door plays for a member, by the panel service's rules: their own
+// sound when they have one and picked sound_only, otherwise the lab's default
+// sound. The greeting suffix only changes the LED text, never the sound.
+export type DoorSoundOutcome = "own" | "default"
 
 export function doorSoundOutcome({
   mode,
   hasFile,
-  suffix,
 }: {
   mode: DoorSoundMode
   hasFile: boolean
-  suffix: string | null
 }): DoorSoundOutcome {
-  if (mode === "sound_only" && hasFile) return "sound"
-  return suffix?.trim() ? "voice" : "default"
+  return mode === "sound_only" && hasFile ? "own" : "default"
 }

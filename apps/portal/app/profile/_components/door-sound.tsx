@@ -36,7 +36,6 @@ export function DoorSoundForm({
   path,
   mode,
   url,
-  suffix,
 }: {
   userId: string
   path: string | null
@@ -44,9 +43,6 @@ export function DoorSoundForm({
   // Signed server-side for the player; null when there is no file or it
   // could not be signed.
   url: string | null
-  // The saved door greeting suffix: without a sound, the panel says
-  // "Hi <name><suffix>" when there is one and plays the lab default when not.
-  suffix: string | null
 }) {
   const { save, remove, pending } = useDoorSound(userId)
   const [saved, setSaved] = useState({ path, mode })
@@ -69,7 +65,7 @@ export function DoorSoundForm({
   const hasFile = Boolean(file || saved.path)
   const dirty = file !== null || modeValue !== saved.mode
   const playerUrl = pickedUrl ?? savedUrl
-  const outcome = doorSoundOutcome({ mode: modeValue, hasFile, suffix })
+  const outcome = doorSoundOutcome({ mode: modeValue, hasFile })
 
   function resetPicker() {
     setFile(null)
@@ -90,7 +86,7 @@ export function DoorSoundForm({
     objectUrls.current.push(objectUrl)
     setFile(next)
     setPickedUrl(objectUrl)
-    // A first upload with the voice-only mode would play nothing new.
+    // A first upload with the default-sound mode would change nothing.
     if (modeValue === "voice_only") setModeValue("sound_only")
   }
 
@@ -129,7 +125,7 @@ export function DoorSoundForm({
   return (
     <Section
       title="開門音效"
-      description="刷卡或按 /door 開門時門口喇叭播什麼：有上傳音效就播你的音效；沒有音效但有設後綴，念「Hi 名字後綴」；兩個都沒設，播實驗室預設音效。"
+      description="刷卡或按 /door 開門時門口喇叭播的音效。有上傳音效就播你的音效，否則播實驗室預設音效。門口看板的後綴只改 LED 上的字，不影響聲音。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"
@@ -215,15 +211,13 @@ export function DoorSoundForm({
           })}
           {!hasFile ? (
             <p className="text-xs text-muted-foreground">
-              上傳音效後才能選「只播音效」。
+              上傳音效後才能選「播我的音效」。
             </p>
           ) : null}
           <p aria-live="polite" className="text-xs text-muted-foreground">
-            {outcome === "sound"
+            {outcome === "own"
               ? "開門時會播你的音效。"
-              : outcome === "voice"
-                ? `開門時會念「Hi 名字${suffix?.trim() ?? ""}」。`
-                : "你還沒設後綴，開門時會播實驗室預設音效。要念招呼，請在上方「門口看板」設後綴。"}
+              : "開門時會播實驗室預設音效。"}
           </p>
         </fieldset>
 
@@ -244,7 +238,7 @@ export function DoorSoundForm({
                 <AlertDialogHeader>
                   <AlertDialogTitle>刪除開門音效？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    刪除後改回只念語音，沒設後綴就播實驗室預設音效。要用音效得重新上傳。
+                    刪除後會播預設音效。要用自己的音效得重新上傳。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

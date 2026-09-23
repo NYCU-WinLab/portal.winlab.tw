@@ -119,7 +119,6 @@ export default async function ProfilePage() {
             path={sound.path}
             mode={sound.mode}
             url={soundUrl}
-            suffix={greeting?.suffix ?? null}
           />
         ) : null}
 
