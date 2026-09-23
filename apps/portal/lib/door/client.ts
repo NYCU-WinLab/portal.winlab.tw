@@ -4,6 +4,7 @@
 //   POST /api/open          -> { open: true }
 //   POST /api/close         -> { open: false }
 //   POST /api/pulse?ms=500  -> { open: false, pulsed_ms: number }  (newer firmware)
+//   POST /api/show?s=10&c=ffffff, body = 128-byte 32x32 bitmap -> 202 (newer firmware)
 // The access controller owns the unlock time, so the relay only needs a short
 // contact closure. Both env vars are server-only; the bearer token must never
 // reach the browser.
@@ -30,17 +31,21 @@ export function parseDoorState(payload: unknown): DoorState {
 
 async function request(
   path: string,
-  method: "GET" | "POST"
+  method: "GET" | "POST",
+  { body, timeoutMs = 8000 }: { body?: Uint8Array; timeoutMs?: number } = {}
 ): Promise<Response> {
   const base = process.env.DOOR_API_URL
   const secret = process.env.DOOR_API_SECRET
   if (!base || !secret) throw new Error("Door API is not configured")
 
+  const headers: Record<string, string> = { Authorization: `Bearer ${secret}` }
+  if (body) headers["Content-Type"] = "application/octet-stream"
   return fetch(`${base.replace(/\/$/, "")}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${secret}` },
+    headers,
+    body: body ? new Uint8Array(body) : undefined,
     cache: "no-store",
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(timeoutMs),
   })
 }
 
@@ -85,4 +90,47 @@ export async function pulseDoor(ms: number = PULSE_MS): Promise<DoorState> {
   throw lastError instanceof Error
     ? lastError
     : new Error("Door relay did not release")
+}
+
+export const SHOW_BITMAP_BYTES = 128
+
+export type ShowOptions = {
+  seconds?: number
+  color?: string
+  timeoutMs?: number
+}
+
+// "unsupported" is firmware without /api/show (404). Anything else that is
+// not a 2xx, and any network error or timeout, is "failed".
+export type ShowResult = "shown" | "unsupported" | "failed"
+
+// Puts a 32x32 1-bit bitmap on the door's LED panel. Cosmetic, so it never
+// throws: it runs after an unlock has already succeeded and a dark panel must
+// not turn that into an error.
+export async function showOnDoor(
+  bitmap: Uint8Array,
+  { seconds = 10, color = "ffffff", timeoutMs = 3000 }: ShowOptions = {}
+): Promise<ShowResult> {
+  try {
+    if (bitmap.length !== SHOW_BITMAP_BYTES) {
+      throw new Error(`bitmap is ${bitmap.length} bytes, expected 128`)
+    }
+    if (!/^[0-9a-f]{6}$/i.test(color)) throw new Error(`bad color ${color}`)
+    const s = Math.min(60, Math.max(1, Math.round(seconds)))
+    const res = await request(
+      `/api/show?s=${s}&c=${color.toLowerCase()}`,
+      "POST",
+      { body: bitmap, timeoutMs }
+    )
+    if (res.ok) return "shown"
+    if (res.status === 404) {
+      console.warn("[door] display skipped: firmware has no /api/show")
+      return "unsupported"
+    }
+    console.error(`[door] display failed: Door API responded ${res.status}`)
+    return "failed"
+  } catch (err) {
+    console.error("[door] display failed", err)
+    return "failed"
+  }
 }
