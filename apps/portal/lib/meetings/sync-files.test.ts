@@ -114,17 +114,43 @@ describe("propfindByDate", () => {
     const r = await propfind(fetchReturning(res))
     expect(r).toEqual({ ok: false, status: 207, reason: "stream reset" })
   })
+
+  // fetch follows redirects, so an SSO login or maintenance page arrives as
+  // a 200 with HTML — that must not read as an empty folder.
+  test("a 2xx that isn't a WebDAV multistatus is a failure", async () => {
+    const r = await propfind(
+      fetchReturning(
+        new Response("<!doctype html><html><body>Log in</body></html>", {
+          status: 200,
+        })
+      )
+    )
+    expect(r).toEqual({
+      ok: false,
+      status: 200,
+      reason: "unexpected response (not a WebDAV multistatus)",
+    })
+  })
+
+  test("an empty multistatus is still a valid, empty listing", async () => {
+    const r = await propfind(
+      fetchReturning(new Response(xmlFor([]), { status: 207 }))
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.files.size).toBe(0)
+  })
 })
 
 describe("isFatalListingFailure", () => {
-  test("unreachable, 401, 403 and any 5xx are fatal; 404 is not", () => {
+  test("unreachable, non-DAV 2xx, 401, 403 and any 5xx are fatal; 404 is not", () => {
     expect(isFatalListingFailure({ ok: false, reason: "x" })).toBe(true)
-    for (const status of [401, 403, 500, 502, 503, 504]) {
+    for (const status of [200, 207, 401, 403, 500, 502, 503, 504]) {
       expect(isFatalListingFailure({ ok: false, status, reason: "x" })).toBe(
         true
       )
     }
-    for (const status of [400, 404, 405]) {
+    // 499 is the boundary: the 5xx rule starts at 500, not before.
+    for (const status of [400, 404, 405, 499]) {
       expect(isFatalListingFailure({ ok: false, status, reason: "x" })).toBe(
         false
       )
@@ -181,6 +207,18 @@ describe("combineListings", () => {
     if (!r.ok) expect(r.error).toContain("HTTP 503")
   })
 
+  test("a login page instead of a listing is fatal", () => {
+    const r = combineListings(
+      listing("PPT", ok([["2026-03-02", "u"]])),
+      listing("錄影", {
+        ok: false,
+        status: 200,
+        reason: "unexpected response (not a WebDAV multistatus)",
+      })
+    )
+    expect(r.ok).toBe(false)
+  })
+
   test("one folder 404 is partial: the other still links, with a warning", () => {
     const r = combineListings(
       listing("PPT", ok([["2026-03-02", "u"]])),
@@ -197,7 +235,7 @@ describe("combineListings", () => {
 
   test("both folders failing is fatal, whatever the status", () => {
     const r = combineListings(
-      listing("PPT", { ok: false, status: 500, reason: "x" }),
+      listing("PPT", { ok: false, status: 400, reason: "x" }),
       listing("錄影", { ok: false, status: 404, reason: "y" })
     )
     expect(r.ok).toBe(false)

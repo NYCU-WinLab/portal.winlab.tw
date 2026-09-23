@@ -103,6 +103,18 @@ export async function propfindByDate(opts: {
     }
   }
 
+  // A 2xx that isn't a multistatus (an SSO login or maintenance page, served
+  // 200 after fetch followed a redirect) would parse to an empty map and read
+  // as "nothing new". parsePropfind only understands the `d:` prefix, which is
+  // what Nextcloud always sends, so that's what we require here too.
+  if (!/<d:multistatus[\s>]/.test(xml)) {
+    return {
+      ok: false,
+      status: res.status,
+      reason: "unexpected response (not a WebDAV multistatus)",
+    }
+  }
+
   return {
     ok: true,
     files: parsePropfind(xml, {
@@ -118,11 +130,14 @@ export async function propfindByDate(opts: {
  * not a partial result — no listing can be trusted, so the whole scan fails.
  * A single folder that errors any other way (say, a 404 because there's no
  * Recordings folder yet this year) still lets the other one link, and is
- * reported as a warning.
+ * reported as a warning. A failure carrying a 2xx status means the reply
+ * wasn't a readable WebDAV listing at all (say, a login page), so we aren't
+ * talking to Nextcloud's DAV endpoint — fatal too.
  */
 export function isFatalListingFailure(r: PropfindFailure): boolean {
   return (
     r.status === undefined ||
+    r.status < 300 ||
     r.status === 401 ||
     r.status === 403 ||
     r.status >= 500
@@ -266,6 +281,9 @@ export async function applyFileUpdates(
   }
   for (const { plan, error } of outcomes) {
     if (error !== null) {
+      console.error(
+        `[meetings/sync-files] update failed for meeting ${plan.id} (${plan.date}): ${error}`
+      )
       result.failed++
       result.warnings.push(`${plan.date} 的會議更新失敗：${error}`)
       continue

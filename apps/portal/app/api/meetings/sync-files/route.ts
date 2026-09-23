@@ -88,6 +88,9 @@ export async function POST(request: NextRequest) {
     { label: "錄影", path: videoPath, result: video }
   )
   if (!listings.ok) {
+    console.error(
+      `[meetings/sync-files] year ${year}: Nextcloud listing failed: ${listings.warnings.join("; ")}`
+    )
     return NextResponse.json(
       { error: listings.error, warnings: listings.warnings },
       { status: 502 }
@@ -110,6 +113,9 @@ export async function POST(request: NextRequest) {
     .eq("is_holiday", false)
 
   if (error) {
+    console.error(
+      `[meetings/sync-files] year ${year}: meetings query failed: ${error.message}`
+    )
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
