@@ -30,7 +30,7 @@ import {
 } from "./keycloak"
 import { Report, describeError } from "./report"
 
-type ClientSpec = {
+export type ClientSpec = {
   clientId: string
   name: string
   description: string
@@ -49,7 +49,7 @@ type ClientSpec = {
 // hosting environment — a value this repository cannot see. Locally they name
 // this client, under a different variable prefix than the one written below.
 // Read the deployment's value before assuming a revocation is contained.
-const CLIENTS: ClientSpec[] = [
+export const CLIENTS: ClientSpec[] = [
   {
     clientId: "winlab-portal-admin",
     name: "WinLab admin tooling (write)",
@@ -68,7 +68,7 @@ const CLIENTS: ClientSpec[] = [
   },
 ]
 
-type ClientRepresentation = {
+export type ClientRepresentation = {
   id?: string
   clientId: string
   name?: string
@@ -85,7 +85,7 @@ type ClientRepresentation = {
 
 type RoleRepresentation = { id: string; name: string }
 
-function desiredRepresentation(spec: ClientSpec): ClientRepresentation {
+export function desiredRepresentation(spec: ClientSpec): ClientRepresentation {
   return {
     clientId: spec.clientId,
     name: spec.name,
@@ -239,8 +239,11 @@ async function verifyClient(
   }
 }
 
-async function realmManagementId(
-  api: AdminApi,
+// Each step below takes only the slice of AdminApi it calls. AdminApi is
+// nominal (its fields are private), so a Pick is what lets a test hand in a
+// plain object. This narrows what a caller must supply; it grants nothing.
+export async function realmManagementId(
+  api: Pick<AdminApi, "get">,
   report: Report
 ): Promise<string | null> {
   try {
@@ -265,8 +268,8 @@ async function realmManagementId(
   }
 }
 
-async function provisionClient(
-  api: AdminApi,
+export async function provisionClient(
+  api: Pick<AdminApi, "get" | "post" | "put">,
   spec: ClientSpec,
   realmManagementUuid: string,
   apply: boolean,
@@ -377,8 +380,8 @@ async function provisionClient(
 // Declaring the attribute as *managed* beats flipping the realm's unmanaged
 // policy to ENABLED: it survives Keycloak's strict default without widening
 // anything else, and the docs explicitly recommend against ENABLED.
-async function provisionAttribute(
-  api: AdminApi,
+export async function provisionAttribute(
+  api: Pick<AdminApi, "get" | "put">,
   name: string,
   apply: boolean,
   report: Report
