@@ -15,7 +15,7 @@ import {
   fetchScheduleYearBounds,
 } from "@/lib/meetings/fetch"
 import { meetingType, MEETING_TYPE_LABELS } from "@/lib/meetings/meeting-type"
-import { getCurrentMeetingId } from "@/lib/meetings/schedule"
+import { fetchNextMeeting } from "@/lib/meetings/next"
 import { defaultScheduleYear } from "@/lib/meetings/schedule-year"
 import type { Meeting, MeetingQuestioner } from "@/lib/meetings/types"
 
@@ -23,17 +23,6 @@ function todayInTaipei(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
     new Date()
   )
-}
-
-/**
- * `getCurrentMeetingId` compares against a Date, and both halves of that
- * comparison have to mean the same instant for a meeting happening today to
- * count as upcoming: `new Date("YYYY-MM-DD")` is UTC midnight, so the Taipei
- * day is anchored at UTC midnight too rather than at the server's own clock,
- * which runs eight hours behind Taipei.
- */
-function taipeiDayStart(day: string): Date {
-  return new Date(`${day}T00:00:00Z`)
 }
 
 export function toMeetingRow(
@@ -134,14 +123,7 @@ export function registerMeetingsTools(server: McpServer) {
         const caller = requireCaller(ctx as ToolContext)
         const supabase = createUserClient(caller.token)
         const today = todayInTaipei()
-        const bounds = await fetchScheduleYearBounds(supabase, today)
-
-        const year = bounds.upcomingDate
-          ? Number(bounds.upcomingDate.slice(0, 4))
-          : null
-        const meetings = year ? await fetchMeetings(supabase, year) : []
-        const nextId = getCurrentMeetingId(meetings, taipeiDayStart(today))
-        const next = meetings.find((m) => m.id === nextId)
+        const next = await fetchNextMeeting(supabase, today)
 
         if (!next) {
           return json({
@@ -153,13 +135,9 @@ export function registerMeetingsTools(server: McpServer) {
           })
         }
 
-        const questioners = await fetchQuestionersByYear(
-          supabase,
-          Number(next.scheduledDate.slice(0, 4))
-        )
         return json({
           today,
-          next_meeting: toMeetingRow(next, questioners.get(next.id) ?? []),
+          next_meeting: toMeetingRow(next.meeting, next.questioners),
         })
       } catch (err) {
         return failure(err)
