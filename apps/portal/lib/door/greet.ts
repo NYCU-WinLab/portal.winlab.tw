@@ -1,11 +1,11 @@
-// After a /door unlock, the lab's LED panel shows who opened the door. The
-// caller runs this inside after(), so the press never waits on the profile
-// read or the panel. Card swipes are not greeted here: hams-bridge greets them
+// After a /door unlock, the lab's LED panel shows who opened the door. Portal
+// only picks the name; the panel service applies the display rules and
+// renders it. The caller runs this inside after(), so the press never waits
+// on the profile read or the panel. Card swipes are not greeted here: hams-bridge greets them
 // itself on the lab network, and a second greeting from Portal could show a
 // different name.
 
-import { doorDisplayName, renderNameBitmap } from "@/lib/door/display"
-import { panelConfigured, showOnPanel } from "@/lib/door/panel"
+import { greetNameOnPanel, panelConfigured } from "@/lib/door/panel"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export type GreetOptions = {
@@ -64,9 +64,9 @@ export async function greetOnPanel(
     const profileName = userId
       ? await fetchProfileName(userId, profileTimeoutMs)
       : null
-    const label = doorDisplayName(profileName, fallbackName)
-    if (!label) return
-    await showOnPanel(renderNameBitmap(label))
+    const name = profileName?.trim() || fallbackName?.trim()
+    if (!name) return
+    await greetNameOnPanel(name)
   } catch (err) {
     console.error("[door] greeting failed", err)
   }
