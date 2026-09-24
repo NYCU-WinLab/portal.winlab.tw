@@ -3507,10 +3507,6 @@ export type Database = {
         }[]
       }
       trip_profile_stats: { Args: { p_user_id: string }; Returns: Json }
-      upsert_user_profile: {
-        Args: { p_email: string; p_name: string }
-        Returns: string
-      }
     }
     Enums: {
       egress_status: "pending" | "approved" | "rejected" | "transferred"
