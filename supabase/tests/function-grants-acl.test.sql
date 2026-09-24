@@ -1,14 +1,20 @@
--- Function grant regression suite for 20260924043129_tighten_function_grants
+-- Function grant regression suite for 20260924050258_tighten_function_grants
 -- — runs via `supabase test db`.
 --
--- Pins three things:
+-- Pins:
 --   * anon (directly or through PUBLIC) holds no EXECUTE on the functions the
 --     migration revoked, while authenticated and service_role still do.
 --     has_function_privilege() resolves PUBLIC membership, so it catches the
 --     "revoked from anon but still granted to PUBLIC" shape that a direct
 --     aclexplode() grantee check misses (see 20260917122038).
---   * the quiz RPCs reject a request with no signed-in user (42501) instead of
---     letting a NULL auth.uid() slip past their host / participant check.
+--   * anon STILL holds EXECUTE on has_role and the approve_* helpers. That is
+--     deliberate: RLS policies declared `to public` call them, and revoking
+--     anon before those policies are narrowed to `to authenticated` would turn
+--     an anon query on those tables into a permission error. If this fails,
+--     fix the policies first.
+--   * the quiz RPCs reject a request with no signed-in user (42501).
+--   * a signed-in member who is not the host gets 'forbidden' from the host
+--     actions.
 --   * the real host can still drive a session: advance, read the question,
 --     reveal.
 --
@@ -20,7 +26,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(25);
+select plan(31);
 
 -- ═══ 1-16. ACL ═════════════════════════════════════════════════════════════
 select ok(
@@ -71,7 +77,19 @@ from unnest(array[
   'public.get_game_leaderboard(public.game_type, smallint)'
 ]) f;
 
--- 17. has_role now pins its search_path
+-- ═══ 17-20. deliberately NOT revoked (policies declared `to public`) ════════
+select ok(
+  has_function_privilege('anon', f::regprocedure, 'EXECUTE'),
+  'anon keeps EXECUTE on ' || f || ' (called from to-public policies)'
+)
+from unnest(array[
+  'public.has_role(uuid, text, text)',
+  'public.approve_doc_status(uuid)',
+  'public.approve_is_creator(uuid, uuid)',
+  'public.approve_is_signer(uuid, uuid)'
+]) f;
+
+-- 21. has_role now pins its search_path
 select ok(
   (select proconfig from pg_proc
     where oid = 'public.has_role(uuid, text, text)'::regprocedure)
@@ -79,7 +97,7 @@ select ok(
   'has_role runs with an empty search_path'
 );
 
--- 18. …and still answers correctly with it
+-- 22. …and still answers correctly with it
 insert into auth.users (id) values
   ('a1a1a1a1-0000-0000-0000-000000000001'), -- host
   ('a1a1a1a1-0000-0000-0000-000000000002'); -- someone else
@@ -95,7 +113,7 @@ select ok(
   'has_role still resolves roles with the pinned search_path'
 );
 
--- 19. get_game_leaderboard still works for a signed-in member
+-- 23. get_game_leaderboard still works for a signed-in member
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -127,16 +145,16 @@ select set_config(
 select public.create_quiz_session('a1a1a1a1-0000-0000-0000-0000000000aa');
 reset role;
 
--- A superuser-owned lookup table, so the no-user block below can name the
--- session without needing RLS read access to quiz_sessions.
+-- A superuser-owned lookup table, so the blocks below can name the session
+-- without needing RLS read access to quiz_sessions.
 create temp table grants_test_session as
 select id as session_id from public.quiz_sessions
  where quiz_set_id = 'a1a1a1a1-0000-0000-0000-0000000000aa';
 grant select on grants_test_session to authenticated;
 
--- ═══ 20-22. no signed-in user → 42501 'not authenticated' ══════════════════
--- Role authenticated with claims carrying no `sub`: auth.uid() is NULL, and
--- the role still holds EXECUTE, so the error below comes from the function
+-- ═══ 24-26. no signed-in user → 42501 'not authenticated' ══════════════════
+-- Role authenticated with claims carrying no `sub`, i.e. no signed-in user.
+-- The role still holds EXECUTE, so the error below comes from the function
 -- body, not from the ACL.
 set local role authenticated;
 select set_config('request.jwt.claims', '{"role":"authenticated"}', true);
@@ -160,7 +178,27 @@ select throws_ok(
   'get_current_question rejects a request with no signed-in user'
 );
 
--- ═══ 23-25. the real host still drives the session ═════════════════════════
+-- ═══ 27-28. a signed-in member who is not the host → 42501 'forbidden' ═════
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a1a1a1a1-0000-0000-0000-000000000002","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  format('select public.advance_quiz_session(%L)',
+         (select session_id from grants_test_session)),
+  '42501', 'forbidden',
+  'advance_quiz_session rejects a signed-in member who is not the host'
+);
+select throws_ok(
+  format('select public.reveal_quiz_answer(%L)',
+         (select session_id from grants_test_session)),
+  '42501', 'forbidden',
+  'reveal_quiz_answer rejects a signed-in member who is not the host'
+);
+
+-- ═══ 29-31. the real host still drives the session ═════════════════════════
 select set_config(
   'request.jwt.claims',
   '{"sub":"a1a1a1a1-0000-0000-0000-000000000001","role":"authenticated"}',

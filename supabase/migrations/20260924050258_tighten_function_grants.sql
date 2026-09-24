@@ -1,18 +1,16 @@
--- Tighten EXECUTE grants on a handful of SECURITY DEFINER functions and give
--- the quiz host actions an explicit sign-in guard.
+-- Tighten EXECUTE grants on a handful of SECURITY DEFINER functions and
+-- require a signed-in caller for the quiz RPCs.
 --
--- Background: this project's default privileges hand EXECUTE on every new
--- function in public to PUBLIC, anon, authenticated and service_role. A bare
--- `revoke ... from public` leaves anon's direct grant in place, and a
--- `create or replace` / re-dump can quietly restore the defaults. The fix is
--- the shape 20260917122038 uses: revoke from both PUBLIC and anon, then
--- restate the intended grantees.
+-- Background: on prod, the functions below carried EXECUTE for anon (observed
+-- 2026-09-24 via the function ACLs), although earlier migrations revoked it
+-- from PUBLIC. This migration revokes PUBLIC and anon explicitly and restates
+-- the intended grantees, the same shape 20260917122038 uses.
+--
+-- Applied to prod before merge, recorded as version 20260924050258.
 --
 -- 1. Quiz RPCs get_current_question / advance_quiz_session /
 --    reveal_quiz_answer (latest bodies from 20260824101006, unchanged except
---    for the leading guard). Their permission checks compare against
---    auth.uid(); with no signed-in user that comparison is NULL rather than
---    false, so a missing user has to be rejected up front.
+--    for a leading guard): the host actions now require a signed-in caller.
 --
 -- 2. get_game_leaderboard: only ever called by signed-in members (the /games
 --    hook behind the proxy, and the MCP tool with the caller's JWT). No RLS
