@@ -33,9 +33,11 @@ jobs:
 
       - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          # Pinned: the CLI picks the postgres image, whose default privileges
+          # shape some function ACLs (#1152). Bump deliberately, not via latest.
+          version: 2.117.0
         env:
-          # Resolving `latest` hits the GitHub API; without a token the
+          # Fetching the CLI release hits the GitHub API; without a token the
           # anonymous rate limit intermittently fails the whole job.
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
