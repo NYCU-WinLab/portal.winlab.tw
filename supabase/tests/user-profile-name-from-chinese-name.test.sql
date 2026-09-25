@@ -4,7 +4,8 @@
 -- name, with #1218's Han reorder of the OIDC name as the fallback, and teaches
 -- the auth.users UPDATE trigger to carry name and email as well as username.
 -- handle-new-user-name-order.test.sql still pins the fallback cases; this file
--- pins the claim, the update path and the helper's ACL.
+-- pins the claim, the update path, the helper's ACL, handle_new_user's pinned
+-- search_path and the migration's one-off backfill.
 --
 -- As in that file: the signup trigger lives on auth.users, which the
 -- migrations do not manage, so attach one for this transaction if it is
@@ -17,7 +18,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(16);
+select plan(22);
 
 do $$
 begin
@@ -170,6 +171,90 @@ select ok(
     where tgrelid = 'auth.users'::regclass
       and tgname = 'on_auth_user_username_sync'),
   'the sync trigger fires on email changes too'
+);
+
+-- ── handle_new_user's search_path ─────────────────────────────────────────
+select ok(
+  (select proconfig from pg_proc
+    where oid = 'public.handle_new_user()'::regprocedure)
+    @> array['search_path=""'],
+  'handle_new_user runs with an empty search_path'
+);
+
+-- Sign up with the caller's search_path emptied too: the trigger must not
+-- lean on it for anything.
+set local search_path = '';
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('b2b2b2b2-0000-0000-0000-000000000006', 'pinned@test.local',
+   '{"custom_claims": {"chinese_name": "林小明", "preferred_username": "pinned.user"}}');
+reset search_path;
+
+select is(
+  (select name || '/' || username from public.user_profiles
+    where id = 'b2b2b2b2-0000-0000-0000-000000000006'),
+  '林小明/pinned.user',
+  'signup still creates the profile under the pinned search_path'
+);
+
+-- ── the backfill ──────────────────────────────────────────────────────────
+-- Profiles in the state prod was in before this migration: names and emails
+-- written once at signup and drifted since. Set directly, since the sync
+-- trigger would otherwise fix them on the auth.users side.
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('b2b2b2b2-0000-0000-0000-000000000007', 'bf-claim@test.local',
+   '{"name": "承運 何", "custom_claims": {"chinese_name": "何承運"}}'),
+  ('b2b2b2b2-0000-0000-0000-000000000008', 'bf-none@test.local',
+   '{"name": "詠翔 詹"}'),
+  ('b2b2b2b2-0000-0000-0000-000000000009', 'bf-empty@test.local',
+   '{"name": "詠翔 詹", "custom_claims": {"chinese_name": ""}}');
+
+update public.user_profiles
+   set name = 'Old Name', email = 'stale@test.local'
+ where id in ('b2b2b2b2-0000-0000-0000-000000000007',
+              'b2b2b2b2-0000-0000-0000-000000000008',
+              'b2b2b2b2-0000-0000-0000-000000000009');
+
+-- Verbatim from 20260924014503 section 4.
+update public.user_profiles p
+set name  = case
+              when nullif(trim(u.raw_user_meta_data->'custom_claims'->>'chinese_name'), '') is not null
+              then public.member_display_name(u.raw_user_meta_data, u.email)
+              else p.name
+            end,
+    email = u.email
+from auth.users u
+where u.id = p.id
+  and (
+    (nullif(trim(u.raw_user_meta_data->'custom_claims'->>'chinese_name'), '') is not null
+     and p.name is distinct from public.member_display_name(u.raw_user_meta_data, u.email))
+    or p.email is distinct from u.email
+  );
+
+select is(
+  (select name from public.user_profiles where id = 'b2b2b2b2-0000-0000-0000-000000000007'),
+  '何承運',
+  'the backfill renames a member whose metadata carries a chinese_name'
+);
+
+select is(
+  (select name from public.user_profiles where id = 'b2b2b2b2-0000-0000-0000-000000000008'),
+  'Old Name',
+  'the backfill leaves the name alone when there is no claim'
+);
+
+select is(
+  (select name from public.user_profiles where id = 'b2b2b2b2-0000-0000-0000-000000000009'),
+  'Old Name',
+  'the backfill leaves the name alone when the claim is empty'
+);
+
+select is(
+  (select array_agg(email order by email) from public.user_profiles
+    where id in ('b2b2b2b2-0000-0000-0000-000000000007',
+                 'b2b2b2b2-0000-0000-0000-000000000008',
+                 'b2b2b2b2-0000-0000-0000-000000000009')),
+  array['bf-claim@test.local', 'bf-empty@test.local', 'bf-none@test.local'],
+  'the backfill repairs every drifted email'
 );
 
 select * from finish();

@@ -60,11 +60,15 @@ grant execute on function public.member_display_name(jsonb, text)
   to service_role;
 
 -- ── 2. signup ──────────────────────────────────────────────────────────────
--- Only the name expression changes; the rest is 20260923050000 verbatim.
+-- The name expression changes and the search_path is now pinned; the rest is
+-- 20260923050000 verbatim. It is SECURITY DEFINER and had no search_path of
+-- its own, so it resolved names through whatever the caller had set. Every
+-- reference below is schema-qualified, which is what makes '' safe.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
+set search_path = ''
 as $function$
 BEGIN
   INSERT INTO public.user_profiles (id, email, name, username)
