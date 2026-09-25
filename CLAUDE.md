@@ -132,7 +132,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 Auth is MCP-spec OAuth 2.1 with **Supabase Auth as the authorization server** (Dashboard → Authentication → OAuth Server). Keycloak stays upstream: the client is sent to `/oauth/consent`, the proxy bounces an anonymous visitor through `/auth/login?next=…`, Keycloak signs them in, and the consent page approves the client via `supabase.auth.oauth.*`. `/.well-known/oauth-protected-resource` (excluded from the proxy) tells clients where the authorization server is. Tokens are verified by asking Supabase (`auth.getUser(jwt)`) because the project signs with HS256; do not swap that for a local signature check. OAuth scopes (`openid` / `email` / `profile`) only shape the ID token: an approved client acts with the member's **full** RLS permissions, admin roles included, so the consent page says so and tools must never widen what the web app lets that member do.
 
-Write tools exist only for what a member already does for themselves at low risk (receipt upload, a receipts admin renaming a receipt, own bento lines, own leave, a normal chat message). Physical or shared-credential actions (door unlock, room booking through the shared account), signing, bookkeeping and role grants have **no** tool on purpose; do not add one without the maintainer's say-so. A tool must never use the service-role client.
+Write tools exist only for what a member already does for themselves at low risk (receipt upload, a receipts admin renaming a receipt, own bento lines, own leave). Physical or shared-credential actions (door unlock, room booking through the shared account), signing, bookkeeping and role grants have **no** tool on purpose; do not add one without the maintainer's say-so. A tool must never use the service-role client.
 
 `lib/mcp/instructions.ts` is the `instructions` string returned on `initialize`. MCP clients paste it into the agent's system prompt, so it is the agent's only map of the portal: what the apps are, which have tools, how RLS shapes results. When you add a tool, name it there; `lib/mcp/server.test.ts` fails if a registered tool is missing from the instructions or has a one-line description.
 
@@ -236,7 +236,7 @@ Real examples of each, all under `apps/portal/app/api/`:
   root: Vercel reads `vercel.json` from the project's configured Root Directory, which is
   `apps/portal` here (and `apps/gallery` for gallery). A repo-root `vercel.json` is read by
   neither project and silently does nothing.
-- **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/unnotified-mentions`, `bulletin/unnotified-broadcasts`, `bulletin/mark-notified`, `bulletin/mark-mentions-notified`, `bulletin/mark-broadcast-notified`, `bulletin/messages`.
+- **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/mark-notified`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
 
 ### Portal ↔ GitLab boundary
