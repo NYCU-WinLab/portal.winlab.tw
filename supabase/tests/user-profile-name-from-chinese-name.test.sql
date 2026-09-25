@@ -18,7 +18,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(22);
+select plan(27);
 
 do $$
 begin
@@ -43,7 +43,9 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('b2b2b2b2-0000-0000-0000-000000000004', 'latin@test.local',
    '{"name": "Simon Chu"}'),
   ('b2b2b2b2-0000-0000-0000-000000000005', 'no-name@test.local',
-   '{}');
+   '{}'),
+  ('b2b2b2b2-0000-0000-0000-000000000010', 'korean@test.local',
+   '{"name": "민수 김"}');
 
 -- ── signup ────────────────────────────────────────────────────────────────
 select is(
@@ -74,6 +76,12 @@ select is(
   (select name from public.user_profiles where id = 'b2b2b2b2-0000-0000-0000-000000000005'),
   'no-name@test.local',
   'no name at all falls back to the email'
+);
+
+select is(
+  (select name from public.user_profiles where id = 'b2b2b2b2-0000-0000-0000-000000000010'),
+  '민수 김',
+  'a Hangul "given family" name with no claim is stored as sent, not reordered'
 );
 
 -- ── later sign-ins ────────────────────────────────────────────────────────
@@ -149,6 +157,37 @@ select is(
   public.member_display_name('{"name": "   "}', 'x@test.local'),
   'x@test.local',
   'member_display_name treats a blank name as missing'
+);
+
+-- ── the Han ranges ────────────────────────────────────────────────────────
+-- The migration writes its ranges as \u escapes, because a literal U+F900
+-- is NFC-normalised to U+8C48 on the way to prod, which stretches the range
+-- over Hangul (U+AC00-D7A3) and the private-use area. Compatibility
+-- ideographs are built with chr() so this file holds none of them literally.
+select ok(
+  chr(63744) ~ '^[\uF900-\uFAFF]$' and chr(44032) !~ '^[\uF900-\uFAFF]$',
+  'a standard-conforming literal reads \uXXXX as an ARE escape'
+);
+
+select is(
+  public.member_display_name('{"name": "민수 김"}', 'x@test.local'),
+  '민수 김',
+  'member_display_name does not reorder a Hangul name'
+);
+
+select is(
+  public.member_display_name(
+    jsonb_build_object('name', chr(57344) || ' ' || chr(57345)), 'x@test.local'),
+  chr(57344) || ' ' || chr(57345),
+  'member_display_name does not reorder private-use characters'
+);
+
+select is(
+  public.member_display_name(
+    jsonb_build_object('name', chr(63744) || chr(63745) || ' ' || chr(26446)),
+    'x@test.local'),
+  chr(26446) || chr(63744) || chr(63745),
+  'member_display_name still reorders a name using U+F900-FAFF compatibility ideographs'
 );
 
 select is(

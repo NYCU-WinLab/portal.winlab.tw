@@ -17,8 +17,7 @@
 -- Nothing else writes user_profiles.name: the web app stopped editing names
 -- in #417, and the only BEFORE UPDATE guard on the table
 -- (prevent_role_escalation) pins roles, is_admin and lab_status, not name or
--- email. The baseline's upsert_user_profile() also writes name, but nothing
--- calls it; it is left alone here.
+-- email.
 
 -- ── 1. one rule for a member's display name ────────────────────────────────
 -- First match wins:
@@ -37,11 +36,13 @@ set search_path = ''
 as $function$
   select coalesce(
     nullif(trim(meta->'custom_claims'->>'chinese_name'), ''),
+    -- The ranges are \u escapes on purpose: NFC normalisation rewrites a
+    -- literal compatibility ideograph (U+F900 -> U+8C48) and widens the range.
     case
-      when meta->>'name' ~ '^([㐀-䶿一-鿿豈-﫿\U00020000-\U0003ffff]+) ([㐀-䶿一-鿿豈-﫿\U00020000-\U0003ffff]+)$'
+      when meta->>'name' ~ '^([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\U00020000-\U0003FFFF]+) ([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\U00020000-\U0003FFFF]+)$'
       then regexp_replace(
         meta->>'name',
-        '^([㐀-䶿一-鿿豈-﫿\U00020000-\U0003ffff]+) ([㐀-䶿一-鿿豈-﫿\U00020000-\U0003ffff]+)$',
+        '^([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\U00020000-\U0003FFFF]+) ([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\U00020000-\U0003FFFF]+)$',
         '\2\1'
       )
     end,
