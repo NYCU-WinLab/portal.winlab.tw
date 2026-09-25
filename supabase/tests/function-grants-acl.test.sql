@@ -1,5 +1,6 @@
 -- Function grant regression suite for 20260924050258_tighten_function_grants
--- — runs via `supabase test db`.
+-- and 20260925051401_rls_helpers_authenticated_only — runs via
+-- `supabase test db`.
 --
 -- Pins:
 --   * anon (directly or through PUBLIC) holds no EXECUTE on the functions the
@@ -7,11 +8,12 @@
 --     has_function_privilege() resolves PUBLIC membership, so it catches the
 --     "revoked from anon but still granted to PUBLIC" shape that a direct
 --     aclexplode() grantee check misses (see 20260917122038).
---   * anon STILL holds EXECUTE on has_role and the approve_* helpers. That is
---     deliberate: RLS policies declared `to public` call them, and revoking
---     anon before those policies are narrowed to `to authenticated` would turn
---     an anon query on those tables into a permission error. If this fails,
---     fix the policies first.
+--   * anon (directly or through PUBLIC) holds no EXECUTE on has_role and the
+--     approve_* helpers either. 20260924050258 left those four in place
+--     because RLS policies declared `to public` called them; 20260925051401
+--     narrowed every such policy to `to authenticated` and then revoked them.
+--     rls-helpers-authenticated.test.sql checks that no anon-applicable policy
+--     calls them, so anon queries on those tables stay error-free.
 --   * the quiz RPCs reject a request with no signed-in user (42501).
 --   * a signed-in member who is not the host gets 'forbidden' from the host
 --     actions.
@@ -77,10 +79,10 @@ from unnest(array[
   'public.get_game_leaderboard(public.game_type, smallint)'
 ]) f;
 
--- ═══ 17-20. deliberately NOT revoked (policies declared `to public`) ════════
+-- ═══ 17-20. RLS helpers: revoked once their policies left anon ══════════════
 select ok(
-  has_function_privilege('anon', f::regprocedure, 'EXECUTE'),
-  'anon keeps EXECUTE on ' || f || ' (called from to-public policies)'
+  not has_function_privilege('anon', f::regprocedure, 'EXECUTE'),
+  'anon cannot execute ' || f
 )
 from unnest(array[
   'public.has_role(uuid, text, text)',
