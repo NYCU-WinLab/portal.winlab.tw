@@ -39,6 +39,22 @@ export default async function AdminLayout({
       <PortalShell
         appName="Admin"
         appHref="/admin"
+        topRight={
+          <nav aria-label="管理功能" className="flex gap-4">
+            <Link
+              href="/admin"
+              className="transition-colors hover:text-foreground"
+            >
+              用戶管理
+            </Link>
+            <Link
+              href="/admin/ip-users"
+              className="transition-colors hover:text-foreground"
+            >
+              IP USER
+            </Link>
+          </nav>
+        }
         bottomLeft={
           <Link href="/" className="transition-colors hover:text-foreground">
             Portal
