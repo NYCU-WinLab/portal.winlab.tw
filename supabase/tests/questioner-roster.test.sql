@@ -1,7 +1,7 @@
 -- Questioner roster + reconcile-on-commit regression suite (#1173) — runs via
 -- `supabase test db`. Replaces questioner-rotation.test.sql, which exercised
 -- the old sync-on-edit RPC and the full rebalance on past-dated weeks; the
--- first is gone (20260925074724 dropped its shim) and the second no longer
+-- first is gone (20260925081129 dropped its shim) and the second no longer
 -- touches past weeks (see 20260918104130's header).
 --
 -- Conventions as in the rest of the meetings suites: seed as superuser, act as
