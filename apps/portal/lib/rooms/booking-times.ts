@@ -78,6 +78,29 @@ export function addMinutesToClock(
 /** Longest cadence the recurring form offers: 每週 (1) or 隔週 (2). */
 export const MAX_INTERVAL_WEEKS = 2
 
+/**
+ * Length bounds of a standing meeting — the `duration_minutes` CHECK on
+ * `rooms_recurring_meetings`. Restated here so a request outside them gets a
+ * readable error instead of the raw constraint violation from the insert.
+ */
+export const RECURRING_MIN_MINUTES = 30
+export const RECURRING_MAX_MINUTES = 300
+
+/**
+ * Every start time `window` offers, `HH:MM` on its grid, from the opening
+ * hour to the last slot before closing (08:00 … 21:30 for `DAY_WINDOW`).
+ */
+export function slotStartTimes(window: AvailabilityOptions): string[] {
+  const first = window.startHour * 60
+  const count = ((window.endHour - window.startHour) * 60) / window.slotMinutes
+  return Array.from({ length: count }, (_, i) => {
+    const total = first + i * window.slotMinutes
+    const hh = String(Math.floor(total / 60)).padStart(2, "0")
+    const mm = String(total % 60).padStart(2, "0")
+    return `${hh}:${mm}`
+  })
+}
+
 export interface RecurringScheduleInput {
   weekday: unknown
   startTime: unknown
@@ -115,8 +138,13 @@ export function validateRecurringSchedule(
   if (!isIntegerIn(intervalWeeks, 1, MAX_INTERVAL_WEEKS)) {
     return { ok: false, error: "頻率只能是每週或隔週" }
   }
-  if (!isIntegerIn(durationMinutes, 1, 24 * 60)) {
-    return { ok: false, error: "時長要是正整數分鐘" }
+  if (
+    !isIntegerIn(durationMinutes, RECURRING_MIN_MINUTES, RECURRING_MAX_MINUTES)
+  ) {
+    return {
+      ok: false,
+      error: `時長要在 ${RECURRING_MIN_MINUTES}–${RECURRING_MAX_MINUTES} 分鐘之間`,
+    }
   }
   if (parseClock(startTime) === null) {
     return { ok: false, error: "時間格式要是 HH:MM" }

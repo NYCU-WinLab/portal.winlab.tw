@@ -2,9 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import {
   addMinutesToClock,
+  slotStartTimes,
   validateBookingTimes,
   validateRecurringSchedule,
 } from "@/lib/rooms/booking-times"
+import {
+  DURATION_PRESET_MINUTES,
+  maxDurationMinutes,
+} from "@/lib/rooms/duration"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
 
 const check = (start: unknown, end: unknown) =>
@@ -127,8 +132,8 @@ describe("validateRecurringSchedule", () => {
   test("rejects a series that runs past the day's window", () => {
     expect(check({ startTime: "21:30", durationMinutes: 180 }).ok).toBe(false)
     expect(check({ startTime: "21:30", durationMinutes: 60 }).ok).toBe(false)
-    // Past midnight, not merely past 22:00.
-    expect(check({ startTime: "21:30", durationMinutes: 300 }).ok).toBe(false)
+    // Past midnight, not merely past 22:00 — still the window's message.
+    expect(check({ startTime: "21:30", durationMinutes: 300 })).toEqual(outside)
   })
 
   test("rejects a start before the window or off the grid", () => {
@@ -156,9 +161,40 @@ describe("validateRecurringSchedule", () => {
     }
   })
 
-  test("duration must be a positive integer", () => {
-    for (const bad of [0, -60, 60.5, "60", null]) {
-      expect(check({ durationMinutes: bad }).ok).toBe(false)
+  test("duration is an integer within the table's 30–300 CHECK", () => {
+    for (const bad of [0, -60, 60.5, "60", null, 29, 330, 24 * 60]) {
+      expect(check({ durationMinutes: bad })).toEqual({
+        ok: false,
+        error: "時長要在 30–300 分鐘之間",
+      })
     }
+    expect(check({ startTime: "08:00", durationMinutes: 300 })).toEqual({
+      ok: true,
+    })
+  })
+
+  // Pins the recurring form to this check: every start it offers, with every
+  // preset it leaves enabled, must be accepted, and the first one it disables
+  // must not be. A change to DAY_WINDOW or the presets that splits the two
+  // fails here instead of at the nightly run.
+  test("accepts exactly what the recurring form leaves enabled", () => {
+    const starts = slotStartTimes(DAY_WINDOW)
+    starts.forEach((startTime, i) => {
+      const max = maxDurationMinutes(starts.length, i)
+      for (const durationMinutes of DURATION_PRESET_MINUTES) {
+        const result = check({ startTime, durationMinutes })
+        expect(result.ok).toBe(durationMinutes <= max)
+      }
+    })
+  })
+})
+
+describe("slotStartTimes", () => {
+  test("covers the day window on its grid, closing slot excluded", () => {
+    const starts = slotStartTimes(DAY_WINDOW)
+    expect(starts).toHaveLength(28)
+    expect(starts[0]).toBe("08:00")
+    expect(starts[1]).toBe("08:30")
+    expect(starts.at(-1)).toBe("21:30")
   })
 })

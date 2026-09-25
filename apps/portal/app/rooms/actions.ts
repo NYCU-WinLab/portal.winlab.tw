@@ -631,9 +631,10 @@ export async function createRecurringMeeting(
   const user = await getCurrentUser()
   if (!user) return { booked: 0, failed: 0, errors: [], error: "請先登入" }
 
-  // The form only offers valid choices, but the DB only bounds the duration,
-  // so a bad start time or weekday would otherwise be stored and fail a week
-  // later in the nightly run. Checked before anything is written.
+  // The form only offers valid choices, but `start_time` is plain text in the
+  // DB, so a start off the grid or past the day's window would otherwise be
+  // stored and fail a week later in the nightly run. Checked before anything
+  // is written; the rest mirrors the table's CHECKs with readable errors.
   const schedule = validateRecurringSchedule(input, DAY_WINDOW)
   if (!schedule.ok) {
     return { booked: 0, failed: 0, errors: [], error: schedule.error }

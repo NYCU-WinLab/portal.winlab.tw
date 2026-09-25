@@ -34,12 +34,14 @@ import {
 } from "@/hooks/rooms/use-recurring"
 import type { RecurringMeeting } from "@/app/rooms/actions"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
+import { slotStartTimes } from "@/lib/rooms/booking-times"
 import { formatDayLabel } from "@/lib/rooms/date"
 import {
   DURATION_PRESETS,
   clampToPreset,
   maxDurationMinutes,
 } from "@/lib/rooms/duration"
+import { DAY_WINDOW } from "@/lib/rooms/fetch"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
@@ -50,12 +52,9 @@ import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 
-// Same 30-minute grid the availability strip uses, so a standing meeting can
-// always be matched to a slot boundary.
-const START_TIMES = Array.from({ length: 28 }, (_, i) => {
-  const total = 8 * 60 + i * 30
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
-})
+// Same grid the availability strip uses, and the one the server checks a
+// series against, so every start offered here is one it accepts.
+const START_TIMES = slotStartTimes(DAY_WINDOW)
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback

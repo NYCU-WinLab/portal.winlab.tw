@@ -8,10 +8,12 @@ import {
   maxDurationMinutes,
   parseCustomDuration,
 } from "./duration"
+import { slotStartTimes } from "./booking-times"
+import { DAY_WINDOW } from "./fetch"
 
 describe("recurring-form preset bounding", () => {
   // The recurring form's start times: 08:00 … 21:30, one per slot.
-  const START_COUNT = 28
+  const START_COUNT = slotStartTimes(DAY_WINDOW).length
   const allowed = (startIndex: number) => {
     const max = maxDurationMinutes(START_COUNT, startIndex)
     return DURATION_PRESET_MINUTES.filter((m) => m <= max)
