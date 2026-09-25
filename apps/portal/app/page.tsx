@@ -6,7 +6,6 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Toaster } from "@workspace/ui/components/sonner"
 
 import { BulletinBoard } from "@/app/_components/bulletin-board"
-import { BulletinChat } from "@/app/_components/bulletin-chat"
 import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -31,16 +30,6 @@ function BulletinBoardSkeleton() {
     <div className="flex flex-col gap-3">
       <Skeleton className="h-5 w-32" />
       <Skeleton className="h-24 w-full" />
-    </div>
-  )
-}
-
-function BulletinChatSkeleton() {
-  return (
-    <div className="flex flex-col gap-3">
-      <Skeleton className="h-5 w-24" />
-      <Skeleton className="h-40 w-full" />
-      <Skeleton className="h-9 w-full" />
     </div>
   )
 }
@@ -100,9 +89,6 @@ export default async function Page() {
         />
         <Suspense fallback={<BulletinBoardSkeleton />}>
           <BulletinBoard />
-        </Suspense>
-        <Suspense fallback={<BulletinChatSkeleton />}>
-          <BulletinChat />
         </Suspense>
         <nav className="flex flex-col gap-3">
           {apps.map((app) => (
