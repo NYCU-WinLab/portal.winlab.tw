@@ -1,6 +1,6 @@
 -- user_profiles.name from Keycloak's chinese_name (#415), via `supabase test db`.
 --
--- 20260924014503 makes custom_claims.chinese_name the source of a member's
+-- 20260925051225 makes custom_claims.chinese_name the source of a member's
 -- name, with #1218's Han reorder of the OIDC name as the fallback, and teaches
 -- the auth.users UPDATE trigger to carry name and email as well as username.
 -- handle-new-user-name-order.test.sql still pins the fallback cases; this file
@@ -253,7 +253,7 @@ update public.user_profiles
               'b2b2b2b2-0000-0000-0000-000000000008',
               'b2b2b2b2-0000-0000-0000-000000000009');
 
--- Verbatim from 20260924014503 section 4.
+-- Verbatim from 20260925051225 section 4.
 update public.user_profiles p
 set name  = case
               when nullif(trim(u.raw_user_meta_data->'custom_claims'->>'chinese_name'), '') is not null
