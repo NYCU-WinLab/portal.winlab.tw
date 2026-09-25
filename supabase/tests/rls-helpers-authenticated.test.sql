@@ -1,4 +1,4 @@
--- RLS regression suite for 20260924092533_rls_helpers_authenticated_only
+-- RLS regression suite for 20260925051401_rls_helpers_authenticated_only
 -- — runs via `supabase test db`.
 --
 -- Pins:

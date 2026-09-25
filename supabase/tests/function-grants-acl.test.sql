@@ -1,5 +1,5 @@
 -- Function grant regression suite for 20260924050258_tighten_function_grants
--- and 20260924092533_rls_helpers_authenticated_only — runs via
+-- and 20260925051401_rls_helpers_authenticated_only — runs via
 -- `supabase test db`.
 --
 -- Pins:
@@ -10,7 +10,7 @@
 --     aclexplode() grantee check misses (see 20260917122038).
 --   * anon (directly or through PUBLIC) holds no EXECUTE on has_role and the
 --     approve_* helpers either. 20260924050258 left those four in place
---     because RLS policies declared `to public` called them; 20260924092533
+--     because RLS policies declared `to public` called them; 20260925051401
 --     narrowed every such policy to `to authenticated` and then revoked them.
 --     rls-helpers-authenticated.test.sql checks that no anon-applicable policy
 --     calls them, so anon queries on those tables stay error-free.
