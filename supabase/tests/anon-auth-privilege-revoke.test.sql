@@ -17,7 +17,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(14);
+select plan(15);
 
 -- ── 1-6. no public relation hands anon or authenticated these three ────────
 -- Covers views and materialised views too (relkind v/m), which carry the same
@@ -114,7 +114,7 @@ select ok(
   'a newly created table does not hand authenticated TRIGGER'
 );
 
--- ── 11-14. #1144: the questioner tables hand anon no DML ──────────────────
+-- ── 11-15. #1144: the questioner tables hand anon no DML ──────────────────
 -- Named table by table rather than schema-wide, unlike everything above: this
 -- is not a property of the whole schema (authenticated legitimately holds the
 -- same privileges here, governed by RLS), it is a property of three tables
@@ -133,15 +133,20 @@ select is(
 
 -- The counter-assertions. Without them a future migration could satisfy the
 -- line above by revoking these tables from everyone and the suite would stay
--- green. The first one is load-bearing: useAddPoolMember upserts
--- meeting_question_pool directly from the browser client
--- (hooks/meetings/use-question-pool.ts), so that grant is a live dependency.
--- The presenter-pool one is not — every write there goes through the
--- meetings_pool_* RPCs — it is here so the pair reads as "the revoke was
--- surgical", matching assertions 7-8 above.
+-- green. meeting_question_pool used to keep authenticated INSERT for the old
+-- panel's direct upsert; the #1175 contract migration took that back, so
+-- every write goes through the meetings_question_pool_* RPCs and only SELECT
+-- (governed by the read policy) is left. The presenter-pool one is here so
+-- the set reads as "the revoke was surgical", matching assertions 7-8 above.
 select ok(
-  has_table_privilege('authenticated', 'public.meeting_question_pool', 'INSERT'),
-  'authenticated keeps INSERT on meeting_question_pool — the browser client upserts it directly'
+  not has_table_privilege('authenticated', 'public.meeting_question_pool', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.meeting_question_pool', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.meeting_question_pool', 'DELETE'),
+  'authenticated holds no INSERT/UPDATE/DELETE on meeting_question_pool — writes go through the RPCs'
+);
+select ok(
+  has_table_privilege('authenticated', 'public.meeting_question_pool', 'SELECT'),
+  'authenticated keeps SELECT on meeting_question_pool'
 );
 select ok(
   has_table_privilege('authenticated', 'public.meeting_presenter_pool', 'DELETE'),

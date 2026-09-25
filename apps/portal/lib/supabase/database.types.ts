@@ -1653,13 +1653,6 @@ export type Database = {
             foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "meeting_question_pool_members"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "meeting_question_pool_pauses_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "meeting_question_rotation"
             referencedColumns: ["user_id"]
           },
@@ -2985,29 +2978,6 @@ export type Database = {
           },
         ]
       }
-      meeting_question_pool_members: {
-        Row: {
-          email: string | null
-          is_active: boolean | null
-          last_asked_date: string | null
-          name: string | null
-          opportunities: number | null
-          pool_added_at: string | null
-          rate: number | null
-          times_asked: number | null
-          times_asked_scheduled: number | null
-          user_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "meeting_question_pool_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       meeting_question_rotation: {
         Row: {
           email: string | null
@@ -3019,7 +2989,6 @@ export type Database = {
           last_asked_date: string | null
           name: string | null
           opportunities: number | null
-          pool_added_at: string | null
           rate: number | null
           times_asked: number | null
           times_asked_scheduled: number | null
@@ -3415,10 +3384,6 @@ export type Database = {
         Args: { p_dry_run: boolean; p_full: boolean }
         Returns: Json
       }
-      meetings_remove_from_pool: {
-        Args: { p_user: string }
-        Returns: undefined
-      }
       meetings_remove_week: {
         Args: { p_at_meeting_id: string }
         Returns: undefined
@@ -3433,10 +3398,6 @@ export type Database = {
       }
       meetings_request_reconcile: { Args: never; Returns: undefined }
       meetings_swap: { Args: { p_a: string; p_b: string }; Returns: undefined }
-      meetings_sync_questioners: {
-        Args: { p_meeting_id: string }
-        Returns: undefined
-      }
       meetings_tier_rank: { Args: { p_status: string }; Returns: number }
       meetings_week_takes_questioners: {
         Args: {
