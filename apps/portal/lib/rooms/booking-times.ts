@@ -53,3 +53,108 @@ export function validateBookingTimes(
   if (end <= start) return { ok: false, error: "結束時間要晚於開始時間" }
   return { ok: true }
 }
+
+/**
+ * `HH:MM` plus a whole number of minutes, as the `HH:MM` it ends at. Null for
+ * anything that isn't a strict `HH:MM` and a non-negative integer, and for a
+ * result past 23:59 — a meeting that ends tomorrow is not one the day's grid
+ * can hold, and wrapping it round to `00:30` would pass for valid.
+ */
+export function addMinutesToClock(
+  time: unknown,
+  minutes: unknown
+): string | null {
+  const start = parseClock(time)
+  if (start === null) return null
+  if (typeof minutes !== "number" || !Number.isInteger(minutes)) return null
+  if (minutes < 0) return null
+  const total = start + minutes
+  if (total >= 24 * 60) return null
+  const hh = String(Math.floor(total / 60)).padStart(2, "0")
+  const mm = String(total % 60).padStart(2, "0")
+  return `${hh}:${mm}`
+}
+
+/** Longest cadence the recurring form offers: 每週 (1) or 隔週 (2). */
+export const MAX_INTERVAL_WEEKS = 2
+
+/**
+ * Length bounds of a standing meeting — the `duration_minutes` CHECK on
+ * `rooms_recurring_meetings`. Restated here so a request outside them gets a
+ * readable error instead of the raw constraint violation from the insert.
+ */
+export const RECURRING_MIN_MINUTES = 30
+export const RECURRING_MAX_MINUTES = 300
+
+/**
+ * Every start time `window` offers, `HH:MM` on its grid, from the opening
+ * hour to the last slot before closing (08:00 … 21:30 for `DAY_WINDOW`).
+ */
+export function slotStartTimes(window: AvailabilityOptions): string[] {
+  const first = window.startHour * 60
+  const count = ((window.endHour - window.startHour) * 60) / window.slotMinutes
+  return Array.from({ length: count }, (_, i) => {
+    const total = first + i * window.slotMinutes
+    const hh = String(Math.floor(total / 60)).padStart(2, "0")
+    const mm = String(total % 60).padStart(2, "0")
+    return `${hh}:${mm}`
+  })
+}
+
+export interface RecurringScheduleInput {
+  weekday: unknown
+  startTime: unknown
+  durationMinutes: unknown
+  intervalWeeks: unknown
+}
+
+function isIntegerIn(value: unknown, min: number, max: number): boolean {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= max
+  )
+}
+
+/**
+ * Server-side check of a standing meeting's schedule, before it is stored.
+ *
+ * Without it a series that starts off the grid, or runs past the day's
+ * window, is saved happily and only fails in the nightly run — a week later,
+ * long after the person who made it has left the page (#1233).
+ *
+ * `weekday` is 0 = Sunday … 6 = Saturday, as `RecurrenceRule` and
+ * `Date#getUTCDay()` read it.
+ */
+export function validateRecurringSchedule(
+  input: RecurringScheduleInput,
+  window: AvailabilityOptions
+): BookingTimesResult {
+  const { weekday, startTime, durationMinutes, intervalWeeks } = input
+  if (!isIntegerIn(weekday, 0, 6)) {
+    return { ok: false, error: "星期不正確" }
+  }
+  if (!isIntegerIn(intervalWeeks, 1, MAX_INTERVAL_WEEKS)) {
+    return { ok: false, error: "頻率只能是每週或隔週" }
+  }
+  if (
+    !isIntegerIn(durationMinutes, RECURRING_MIN_MINUTES, RECURRING_MAX_MINUTES)
+  ) {
+    return {
+      ok: false,
+      error: `時長要在 ${RECURRING_MIN_MINUTES}–${RECURRING_MAX_MINUTES} 分鐘之間`,
+    }
+  }
+  if (parseClock(startTime) === null) {
+    return { ok: false, error: "時間格式要是 HH:MM" }
+  }
+  const endTime = addMinutesToClock(startTime, durationMinutes)
+  if (endTime === null) {
+    return {
+      ok: false,
+      error: `超出可借的時段(${formatHour(window.startHour)}–${formatHour(window.endHour)})`,
+    }
+  }
+  return validateBookingTimes(startTime, endTime, window)
+}

@@ -21,13 +21,12 @@ import {
 import { placeBooking } from "./book"
 import { fetchBusySlotsForDates, fetchRooms } from "./client"
 import { addDays, formatDayLabel, todayInTaipei } from "./date"
+import { SLOT_MINUTES } from "./duration"
+import { DAY_WINDOW } from "./fetch"
 import { endTimeOf, occursOn, occurrencesBetween } from "./recurrence"
 
 /** How far ahead to book. Early enough to get a room, late enough not to hoard one. */
 export const LEAD_DAYS = 7
-
-const DAY_WINDOW = { startHour: 8, endHour: 22, slotMinutes: 30 }
-const SLOT_MINUTES = 30
 
 export interface RecurringRunResult {
   date: string

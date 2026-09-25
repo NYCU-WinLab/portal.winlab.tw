@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
-import { validateBookingTimes } from "@/lib/rooms/booking-times"
+import {
+  addMinutesToClock,
+  slotStartTimes,
+  validateBookingTimes,
+  validateRecurringSchedule,
+} from "@/lib/rooms/booking-times"
+import {
+  DURATION_PRESET_MINUTES,
+  maxDurationMinutes,
+} from "@/lib/rooms/duration"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
 
 const check = (start: unknown, end: unknown) =>
@@ -71,5 +80,121 @@ describe("validateBookingTimes", () => {
     expect(validateBookingTimes("09:00", "10:00", hourly)).toEqual({
       ok: true,
     })
+  })
+})
+
+describe("addMinutesToClock", () => {
+  test("adds across the hour", () => {
+    expect(addMinutesToClock("09:00", 60)).toBe("10:00")
+    expect(addMinutesToClock("21:30", 30)).toBe("22:00")
+    expect(addMinutesToClock("09:45", 30)).toBe("10:15")
+    expect(addMinutesToClock("08:00", 0)).toBe("08:00")
+  })
+
+  test("returns null instead of wrapping past midnight", () => {
+    expect(addMinutesToClock("23:30", 30)).toBeNull()
+    expect(addMinutesToClock("22:00", 180)).toBeNull()
+    expect(addMinutesToClock("23:59", 0)).toBe("23:59")
+  })
+
+  test("returns null for malformed input", () => {
+    for (const bad of ["9:00", "24:00", "09:60", "", null, undefined, 900]) {
+      expect(addMinutesToClock(bad, 30)).toBeNull()
+    }
+    for (const bad of [-30, 30.5, Number.NaN, Infinity, "30", null]) {
+      expect(addMinutesToClock("09:00", bad)).toBeNull()
+    }
+  })
+})
+
+describe("validateRecurringSchedule", () => {
+  const base = {
+    weekday: 1,
+    startTime: "09:00",
+    durationMinutes: 60,
+    intervalWeeks: 1,
+  }
+  const check = (patch: Partial<Record<keyof typeof base, unknown>>) =>
+    validateRecurringSchedule({ ...base, ...patch }, DAY_WINDOW)
+
+  test("accepts what the form offers", () => {
+    expect(check({})).toEqual({ ok: true })
+    expect(check({ weekday: 0 })).toEqual({ ok: true })
+    expect(check({ weekday: 6, intervalWeeks: 2 })).toEqual({ ok: true })
+    expect(check({ startTime: "21:30", durationMinutes: 30 })).toEqual({
+      ok: true,
+    })
+    expect(check({ startTime: "19:00", durationMinutes: 180 })).toEqual({
+      ok: true,
+    })
+  })
+
+  test("rejects a series that runs past the day's window", () => {
+    expect(check({ startTime: "21:30", durationMinutes: 180 }).ok).toBe(false)
+    expect(check({ startTime: "21:30", durationMinutes: 60 }).ok).toBe(false)
+    // Past midnight, not merely past 22:00 — still the window's message.
+    expect(check({ startTime: "21:30", durationMinutes: 300 })).toEqual(outside)
+  })
+
+  test("rejects a start before the window or off the grid", () => {
+    expect(check({ startTime: "07:30" }).ok).toBe(false)
+    expect(check({ startTime: "09:15" }).ok).toBe(false)
+    expect(check({ durationMinutes: 45 }).ok).toBe(false)
+    expect(check({ startTime: "9:00" }).ok).toBe(false)
+  })
+
+  test("weekday is an integer 0 (Sunday) to 6 (Saturday)", () => {
+    for (const bad of [-1, 7, 1.5, "1", null]) {
+      expect(check({ weekday: bad })).toEqual({
+        ok: false,
+        error: "星期不正確",
+      })
+    }
+  })
+
+  test("interval is weekly or fortnightly only", () => {
+    for (const bad of [0, 3, -1, 1.5, "2", null]) {
+      expect(check({ intervalWeeks: bad })).toEqual({
+        ok: false,
+        error: "頻率只能是每週或隔週",
+      })
+    }
+  })
+
+  test("duration is an integer within the table's 30–300 CHECK", () => {
+    for (const bad of [0, -60, 60.5, "60", null, 29, 330, 24 * 60]) {
+      expect(check({ durationMinutes: bad })).toEqual({
+        ok: false,
+        error: "時長要在 30–300 分鐘之間",
+      })
+    }
+    expect(check({ startTime: "08:00", durationMinutes: 300 })).toEqual({
+      ok: true,
+    })
+  })
+
+  // Pins the recurring form to this check: every start it offers, with every
+  // preset it leaves enabled, must be accepted, and the first one it disables
+  // must not be. A change to DAY_WINDOW or the presets that splits the two
+  // fails here instead of at the nightly run.
+  test("accepts exactly what the recurring form leaves enabled", () => {
+    const starts = slotStartTimes(DAY_WINDOW)
+    starts.forEach((startTime, i) => {
+      const max = maxDurationMinutes(starts.length, i)
+      for (const durationMinutes of DURATION_PRESET_MINUTES) {
+        const result = check({ startTime, durationMinutes })
+        expect(result.ok).toBe(durationMinutes <= max)
+      }
+    })
+  })
+})
+
+describe("slotStartTimes", () => {
+  test("covers the day window on its grid, closing slot excluded", () => {
+    const starts = slotStartTimes(DAY_WINDOW)
+    expect(starts).toHaveLength(28)
+    expect(starts[0]).toBe("08:00")
+    expect(starts[1]).toBe("08:30")
+    expect(starts.at(-1)).toBe("21:30")
   })
 })

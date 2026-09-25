@@ -15,7 +15,10 @@ import {
   type AttendeeContact,
   type PickableGroup,
 } from "@/lib/rooms/attendee-groups"
-import { validateBookingTimes } from "@/lib/rooms/booking-times"
+import {
+  validateBookingTimes,
+  validateRecurringSchedule,
+} from "@/lib/rooms/booking-times"
 import {
   DAY_WINDOW,
   fetchAvailabilityRange,
@@ -615,13 +618,27 @@ export interface CreateRecurringResult {
   /** Ones that needed a room and could not get one. */
   failed: number
   errors: string[]
+  /**
+   * Set when nothing was created. Returned rather than thrown: a thrown
+   * error is redacted to something meaningless in production.
+   */
+  error?: string
 }
 
 export async function createRecurringMeeting(
   input: CreateRecurringInput
 ): Promise<CreateRecurringResult> {
   const user = await getCurrentUser()
-  if (!user) throw new Error("請先登入")
+  if (!user) return { booked: 0, failed: 0, errors: [], error: "請先登入" }
+
+  // The form only offers valid choices, but `start_time` is plain text in the
+  // DB, so a start off the grid or past the day's window would otherwise be
+  // stored and fail a week later in the nightly run. Checked before anything
+  // is written; the rest mirrors the table's CHECKs with readable errors.
+  const schedule = validateRecurringSchedule(input, DAY_WINDOW)
+  if (!schedule.ok) {
+    return { booked: 0, failed: 0, errors: [], error: schedule.error }
+  }
 
   // Frozen at creation, not recomputed per occurrence: if the prefix were
   // rebuilt each week from whoever is in the group by then, someone joining
@@ -666,7 +683,12 @@ export async function createRecurringMeeting(
     .select("id")
     .single()
   if (error || !created) {
-    throw new Error(`建立固定會議失敗:${error?.message ?? "unknown"}`)
+    return {
+      booked: 0,
+      failed: 0,
+      errors: [],
+      error: `建立固定會議失敗:${error?.message ?? "unknown"}`,
+    }
   }
 
   // The nightly run only ever looks at today + 7, so any occurrence already

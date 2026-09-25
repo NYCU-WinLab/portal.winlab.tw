@@ -34,8 +34,14 @@ import {
 } from "@/hooks/rooms/use-recurring"
 import type { RecurringMeeting } from "@/app/rooms/actions"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
+import { slotStartTimes } from "@/lib/rooms/booking-times"
 import { formatDayLabel } from "@/lib/rooms/date"
-import { DURATION_PRESETS } from "@/lib/rooms/duration"
+import {
+  DURATION_PRESETS,
+  clampToPreset,
+  maxDurationMinutes,
+} from "@/lib/rooms/duration"
+import { DAY_WINDOW } from "@/lib/rooms/fetch"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
@@ -46,12 +52,9 @@ import { TopicField } from "./topic-field"
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 
-// Same 30-minute grid the availability strip uses, so a standing meeting can
-// always be matched to a slot boundary.
-const START_TIMES = Array.from({ length: 28 }, (_, i) => {
-  const total = 8 * 60 + i * 30
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
-})
+// Same grid the availability strip uses, and the one the server checks a
+// series against, so every start offered here is one it accepts.
+const START_TIMES = slotStartTimes(DAY_WINDOW)
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -120,6 +123,25 @@ export function RecurringTab() {
     if (next?.description && !agenda.trim()) setAgenda(next.description)
   }
 
+  // Minutes left in the day's grid from the chosen start, so the duration
+  // picker can't offer a series that runs past 22:00 (#1233).
+  const maxMinutes = maxDurationMinutes(
+    START_TIMES.length,
+    START_TIMES.indexOf(startTime)
+  )
+
+  function handleStartTimeChange(next: string) {
+    setStartTime(next)
+    // A later start can strand the picked duration past the end of the day;
+    // step it down to the longest preset that still fits rather than leave
+    // the select showing a choice it now disables.
+    const fitted = clampToPreset(
+      durationMinutes,
+      maxDurationMinutes(START_TIMES.length, START_TIMES.indexOf(next))
+    )
+    if (fitted !== null) setDurationMinutes(fitted)
+  }
+
   // Mirrors what the server derives; the server recomputes rather than
   // trusting this.
   const prefix = topicPrefix({
@@ -143,6 +165,12 @@ export function RecurringTab() {
       },
       {
         onSuccess: (result) => {
+          // Failures come back as a value, not a throw — a thrown error would
+          // be redacted to something meaningless in production.
+          if (result.error) {
+            toast.error(result.error)
+            return
+          }
           // The catch-up runs inside the create, so its outcome belongs in the
           // same toast — a series whose next meeting is days away is a
           // different situation from one whose next meeting is tomorrow and
@@ -235,7 +263,7 @@ export function RecurringTab() {
             <Label htmlFor="recurring-start" className="text-xs">
               開始時間
             </Label>
-            <Select value={startTime} onValueChange={setStartTime}>
+            <Select value={startTime} onValueChange={handleStartTimeChange}>
               <SelectTrigger id="recurring-start" className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -262,7 +290,11 @@ export function RecurringTab() {
               </SelectTrigger>
               <SelectContent>
                 {DURATION_PRESETS.map((p) => (
-                  <SelectItem key={p.minutes} value={String(p.minutes)}>
+                  <SelectItem
+                    key={p.minutes}
+                    value={String(p.minutes)}
+                    disabled={p.minutes > maxMinutes}
+                  >
                     {p.label}
                   </SelectItem>
                 ))}
