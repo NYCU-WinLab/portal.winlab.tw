@@ -1,7 +1,8 @@
 -- Questioner roster + reconcile-on-commit regression suite (#1173) — runs via
 -- `supabase test db`. Replaces questioner-rotation.test.sql, which exercised
--- meetings_sync_questioners and the old full rebalance on past-dated weeks;
--- neither exists in that form any more (see 20260918104130's header).
+-- the old sync-on-edit RPC and the full rebalance on past-dated weeks; the
+-- first is gone (20260925074724 dropped its shim) and the second no longer
+-- touches past weeks (see 20260918104130's header).
 --
 -- Conventions as in the rest of the meetings suites: seed as superuser, act as
 -- `authenticated` with request.jwt.claims set, assert as superuser after
@@ -30,7 +31,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(111);
+select plan(116);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -348,6 +349,29 @@ select is(
   'and takes the pause history with it'
 );
 
+-- An extra questioner (not a presenter) leaves through the RPC, pause and all.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.meetings_question_pool_add('e3000000-0000-0000-0000-000000000002');
+select public.meetings_question_pool_set_enabled('e3000000-0000-0000-0000-000000000002', false);
+select lives_ok(
+  $$ select public.meetings_question_pool_remove('e3000000-0000-0000-0000-000000000002') $$,
+  'an admin removes an extra questioner through the RPC');
+reset role;
+
+select is(
+  (select count(*)::int from public.meeting_question_pool
+    where user_id = 'e3000000-0000-0000-0000-000000000002'),
+  0,
+  'the removed extra questioner is off the roster'
+);
+select is(
+  (select count(*)::int from public.meeting_question_pool_pauses
+    where user_id = 'e3000000-0000-0000-0000-000000000002'),
+  0,
+  'and their pause goes with them'
+);
+
 -- #1175 contract: the expand-phase shims are gone, and the pool table takes
 -- no direct writes from signed-in users — not even from an admin.
 select hasnt_function('public', 'meetings_sync_questioners', array['uuid'],
@@ -358,6 +382,21 @@ select hasnt_view('public', 'meeting_question_pool_members',
   'the extras view is gone');
 select hasnt_column('public', 'meeting_question_rotation', 'pool_added_at',
   'the rotation no longer carries pool_added_at');
+select bag_eq(
+  $$ select column_name::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'meeting_question_rotation' $$,
+  $$ values ('user_id'), ('name'), ('email'), ('joined_on'), ('last_asked_date'),
+            ('times_asked'), ('is_active'), ('times_asked_scheduled'),
+            ('opportunities'), ('rate'), ('lab_status'), ('is_enabled'),
+            ('is_presenter') $$,
+  'the rebuilt rotation has exactly the columns the panel reads'
+);
+select ok(
+  (select 'security_invoker=true' = any(c.reloptions)
+     from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'meeting_question_rotation'),
+  'the rebuilt rotation still runs as the caller, so RLS applies'
+);
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'public' and tablename = 'meeting_question_pool'
@@ -868,8 +907,10 @@ select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-0000000
 select ok(
   (select not r ? 'dryRun' and not r ? 'assigned' and r ? 'weeks' and r ? 'frozenDate'
           and r ? 'added' and r ? 'removed' and (r->>'full')::boolean
+          and r ? 'roster' and jsonb_typeof(r->'roster') = 'array'
+          and (r->'roster'->0) ?& array['meetingId', 'date', 'questioners']
      from (select public.meetings_rebalance_questioners(true) as r) t),
-  'the dry run answers without the retired dryRun/assigned keys'
+  'the dry run answers with the roster and without the retired dryRun/assigned keys'
 );
 select public.meetings_rebalance_questioners(false);
 reset role;
