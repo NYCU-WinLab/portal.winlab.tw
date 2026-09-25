@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { validateBookingTimes } from "@/lib/rooms/booking-times"
+import {
+  addMinutesToClock,
+  validateBookingTimes,
+  validateRecurringSchedule,
+} from "@/lib/rooms/booking-times"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
 
 const check = (start: unknown, end: unknown) =>
@@ -71,5 +75,90 @@ describe("validateBookingTimes", () => {
     expect(validateBookingTimes("09:00", "10:00", hourly)).toEqual({
       ok: true,
     })
+  })
+})
+
+describe("addMinutesToClock", () => {
+  test("adds across the hour", () => {
+    expect(addMinutesToClock("09:00", 60)).toBe("10:00")
+    expect(addMinutesToClock("21:30", 30)).toBe("22:00")
+    expect(addMinutesToClock("09:45", 30)).toBe("10:15")
+    expect(addMinutesToClock("08:00", 0)).toBe("08:00")
+  })
+
+  test("returns null instead of wrapping past midnight", () => {
+    expect(addMinutesToClock("23:30", 30)).toBeNull()
+    expect(addMinutesToClock("22:00", 180)).toBeNull()
+    expect(addMinutesToClock("23:59", 0)).toBe("23:59")
+  })
+
+  test("returns null for malformed input", () => {
+    for (const bad of ["9:00", "24:00", "09:60", "", null, undefined, 900]) {
+      expect(addMinutesToClock(bad, 30)).toBeNull()
+    }
+    for (const bad of [-30, 30.5, Number.NaN, Infinity, "30", null]) {
+      expect(addMinutesToClock("09:00", bad)).toBeNull()
+    }
+  })
+})
+
+describe("validateRecurringSchedule", () => {
+  const base = {
+    weekday: 1,
+    startTime: "09:00",
+    durationMinutes: 60,
+    intervalWeeks: 1,
+  }
+  const check = (patch: Partial<Record<keyof typeof base, unknown>>) =>
+    validateRecurringSchedule({ ...base, ...patch }, DAY_WINDOW)
+
+  test("accepts what the form offers", () => {
+    expect(check({})).toEqual({ ok: true })
+    expect(check({ weekday: 0 })).toEqual({ ok: true })
+    expect(check({ weekday: 6, intervalWeeks: 2 })).toEqual({ ok: true })
+    expect(check({ startTime: "21:30", durationMinutes: 30 })).toEqual({
+      ok: true,
+    })
+    expect(check({ startTime: "19:00", durationMinutes: 180 })).toEqual({
+      ok: true,
+    })
+  })
+
+  test("rejects a series that runs past the day's window", () => {
+    expect(check({ startTime: "21:30", durationMinutes: 180 }).ok).toBe(false)
+    expect(check({ startTime: "21:30", durationMinutes: 60 }).ok).toBe(false)
+    // Past midnight, not merely past 22:00.
+    expect(check({ startTime: "21:30", durationMinutes: 300 }).ok).toBe(false)
+  })
+
+  test("rejects a start before the window or off the grid", () => {
+    expect(check({ startTime: "07:30" }).ok).toBe(false)
+    expect(check({ startTime: "09:15" }).ok).toBe(false)
+    expect(check({ durationMinutes: 45 }).ok).toBe(false)
+    expect(check({ startTime: "9:00" }).ok).toBe(false)
+  })
+
+  test("weekday is an integer 0 (Sunday) to 6 (Saturday)", () => {
+    for (const bad of [-1, 7, 1.5, "1", null]) {
+      expect(check({ weekday: bad })).toEqual({
+        ok: false,
+        error: "星期不正確",
+      })
+    }
+  })
+
+  test("interval is weekly or fortnightly only", () => {
+    for (const bad of [0, 3, -1, 1.5, "2", null]) {
+      expect(check({ intervalWeeks: bad })).toEqual({
+        ok: false,
+        error: "頻率只能是每週或隔週",
+      })
+    }
+  })
+
+  test("duration must be a positive integer", () => {
+    for (const bad of [0, -60, 60.5, "60", null]) {
+      expect(check({ durationMinutes: bad }).ok).toBe(false)
+    }
   })
 })

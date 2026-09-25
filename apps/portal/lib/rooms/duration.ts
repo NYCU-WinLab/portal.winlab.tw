@@ -37,6 +37,20 @@ export function maxDurationMinutes(
   return Math.max(0, slotCount - startIndex) * SLOT_MINUTES
 }
 
+/**
+ * The preset to keep once the start time moves and only `maxMinutes` are left
+ * in the day: the current one if it still fits, else the longest preset that
+ * does, else null when not even the shortest fits.
+ */
+export function clampToPreset(
+  current: number,
+  maxMinutes: number
+): number | null {
+  if (current <= maxMinutes) return current
+  const fitting = DURATION_PRESET_MINUTES.filter((m) => m <= maxMinutes)
+  return fitting.at(-1) ?? null
+}
+
 export type CustomDurationResult =
   | { ok: true; minutes: number }
   | { ok: false; error: string }

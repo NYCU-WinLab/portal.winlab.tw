@@ -4,9 +4,48 @@ import {
   DURATION_PRESET_MINUTES,
   DURATION_PRESETS,
   SLOT_MINUTES,
+  clampToPreset,
   maxDurationMinutes,
   parseCustomDuration,
 } from "./duration"
+
+describe("recurring-form preset bounding", () => {
+  // The recurring form's start times: 08:00 … 21:30, one per slot.
+  const START_COUNT = 28
+  const allowed = (startIndex: number) => {
+    const max = maxDurationMinutes(START_COUNT, startIndex)
+    return DURATION_PRESET_MINUTES.filter((m) => m <= max)
+  }
+
+  test("a 21:30 start only allows 30 minutes", () => {
+    expect(allowed(27)).toEqual([30])
+  })
+
+  test("a 20:00 start allows up to 2 hours", () => {
+    expect(allowed(24)).toEqual([30, 60, 90, 120])
+  })
+
+  test("a morning start allows every preset", () => {
+    expect(allowed(0)).toEqual([...DURATION_PRESET_MINUTES])
+  })
+})
+
+describe("clampToPreset", () => {
+  test("keeps a duration that still fits", () => {
+    expect(clampToPreset(60, 120)).toBe(60)
+    expect(clampToPreset(120, 120)).toBe(120)
+  })
+
+  test("steps down to the longest preset that fits", () => {
+    expect(clampToPreset(180, 30)).toBe(30)
+    expect(clampToPreset(180, 120)).toBe(120)
+    expect(clampToPreset(150, 100)).toBe(90)
+  })
+
+  test("returns null when nothing fits", () => {
+    expect(clampToPreset(60, 0)).toBeNull()
+  })
+})
 
 describe("DURATION_PRESETS", () => {
   test("every preset lands on the slot grid", () => {
