@@ -1492,6 +1492,93 @@ export type Database = {
         }
         Relationships: []
       }
+      ip_user_changes: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after_data: Json | null
+          before_data: Json | null
+          changed_at: string
+          entry_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_at?: string
+          entry_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          changed_at?: string
+          entry_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      ip_user_entries: {
+        Row: {
+          category: string
+          id: string
+          ip: unknown
+          notes: string
+          revision: number
+          updated_at: string
+          updated_by: string | null
+          user_name: string
+        }
+        Insert: {
+          category?: string
+          id?: string
+          ip: unknown
+          notes?: string
+          revision?: number
+          updated_at?: string
+          updated_by?: string | null
+          user_name?: string
+        }
+        Update: {
+          category?: string
+          id?: string
+          ip?: unknown
+          notes?: string
+          revision?: number
+          updated_at?: string
+          updated_by?: string | null
+          user_name?: string
+        }
+        Relationships: []
+      }
+      ip_user_settings: {
+        Row: {
+          dns_servers: unknown[]
+          gateway: unknown
+          id: boolean
+          source_updated_on: string
+          subnet: unknown
+        }
+        Insert: {
+          dns_servers?: unknown[]
+          gateway: unknown
+          id?: boolean
+          source_updated_on: string
+          subnet: unknown
+        }
+        Update: {
+          dns_servers?: unknown[]
+          gateway?: unknown
+          id?: boolean
+          source_updated_on?: string
+          subnet?: unknown
+        }
+        Relationships: []
+      }
       lab_status_sync_runs: {
         Row: {
           changed: number
@@ -3136,6 +3223,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_ip_user_entry: {
+        Args: { p_expected_revision: number; p_id: string }
+        Returns: undefined
+      }
       gallery_admin_delete_unused_tag: {
         Args: { p_tag_id: string }
         Returns: undefined
@@ -3437,6 +3528,32 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "quiz_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_ip_user_entry: {
+        Args: {
+          p_category: string
+          p_expected_revision: number | null
+          p_id: string | null
+          p_ip: string
+          p_notes: string
+          p_user_name: string
+        }
+        Returns: {
+          category: string
+          id: string
+          ip: unknown
+          notes: string
+          revision: number
+          updated_at: string
+          updated_by: string | null
+          user_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ip_user_entries"
           isOneToOne: true
           isSetofReturn: false
         }
