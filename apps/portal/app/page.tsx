@@ -10,6 +10,7 @@ import { PortalShell } from "@/components/portal-shell"
 import { SignOutButton } from "@/components/sign-out-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserCard } from "@/components/user-card"
+import { isPortalAdmin } from "@/lib/admin/admin"
 import { isReceiptsAdmin } from "@/lib/receipts/admin"
 import { getCurrentUser } from "@/lib/user"
 
@@ -48,14 +49,25 @@ const baseApps = [
 ]
 
 export default async function Page() {
-  const [user, showReceipts] = await Promise.all([
+  const [user, showReceipts, showAdmin] = await Promise.all([
     getCurrentUser(),
     isReceiptsAdmin(),
+    isPortalAdmin(),
   ])
   const currentUser = user!
 
   const apps = [
     ...baseApps,
+    ...(showAdmin
+      ? [
+          { href: "/admin", label: "Admin", note: "用戶與權限管理" },
+          {
+            href: "/admin/ip-users",
+            label: "IP USER",
+            note: "IP 使用管理",
+          },
+        ]
+      : []),
     ...(showReceipts
       ? [{ href: "/receipts", label: "Receipts", note: "收據審核" }]
       : []),
