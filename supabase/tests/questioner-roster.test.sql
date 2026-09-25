@@ -30,7 +30,7 @@ create extension if not exists pgtap with schema public;
 -- pgTAP assertion fns must be callable after we drop to the authenticated role.
 grant execute on all functions in schema public to authenticated;
 
-select plan(112);
+select plan(111);
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
@@ -176,12 +176,6 @@ select results_eq(
   $$ values ('e3000000-0000-0000-0000-000000000001'::uuid, true, true),
             ('e3000000-0000-0000-0000-000000000002'::uuid, false, true) $$,
   'the rotation lists both, telling the presenter from the extra member'
-);
-select results_eq(
-  $$ select user_id from public.meeting_question_pool_members
-     where user_id::text like 'e3%' order by user_id $$,
-  $$ values ('e3000000-0000-0000-0000-000000000002'::uuid) $$,
-  'the extras view lists only the member who is not a presenter'
 );
 reset role;
 
@@ -354,41 +348,32 @@ select is(
   'and takes the pause history with it'
 );
 
--- Expand-phase shims: the deployed frontend still calls these by name.
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
-select throws_ok(
-  $$ select public.meetings_remove_from_pool('e3000000-0000-0000-0000-000000000002') $$,
-  '42501', NULL, 'the old remove RPC is still admin-only');
-reset role;
+-- #1175 contract: the expand-phase shims are gone, and the pool table takes
+-- no direct writes from signed-in users — not even from an admin.
+select hasnt_function('public', 'meetings_sync_questioners', array['uuid'],
+  'the no-op sync shim is gone');
+select hasnt_function('public', 'meetings_remove_from_pool', array['uuid'],
+  'the forwarding remove shim is gone');
+select hasnt_view('public', 'meeting_question_pool_members',
+  'the extras view is gone');
+select hasnt_column('public', 'meeting_question_rotation', 'pool_added_at',
+  'the rotation no longer carries pool_added_at');
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and tablename = 'meeting_question_pool'
+      and policyname = 'meetings admin write meeting_question_pool'),
+  0,
+  'the admin write policy on meeting_question_pool is gone'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-select public.meetings_question_pool_add('e3000000-0000-0000-0000-000000000002');
-select lives_ok(
-  $$ select public.meetings_remove_from_pool('e3000000-0000-0000-0000-000000000002') $$,
-  'the old remove RPC forwards to the new one');
-select lives_ok(
-  $$ select public.meetings_sync_questioners(gen_random_uuid()) $$,
-  'the old sync RPC is accepted and does nothing');
+select throws_ok(
+  $$ insert into public.meeting_question_pool (user_id)
+     values ('e3000000-0000-0000-0000-000000000002') $$,
+  '42501', NULL,
+  'even an admin cannot insert into meeting_question_pool directly');
 reset role;
-
-select is(
-  (select count(*)::int from public.meeting_question_pool
-    where user_id = 'e3000000-0000-0000-0000-000000000002'),
-  0,
-  'and the forwarded remove took the extra member off'
-);
-select has_column('public', 'meeting_question_rotation', 'pool_added_at',
-  'the rotation keeps pool_added_at for the deployed panel''s ordering');
-select bag_eq(
-  $$ select column_name::text from information_schema.columns
-     where table_schema = 'public' and table_name = 'meeting_question_pool_members' $$,
-  $$ values ('user_id'), ('name'), ('email'), ('pool_added_at'), ('last_asked_date'),
-            ('times_asked'), ('is_active'), ('times_asked_scheduled'),
-            ('opportunities'), ('rate') $$,
-  'the extras view keeps exactly the columns the deployed panel reads'
-);
 
 -- ═══ B. the reconcile ══════════════════════════════════════════════════════
 -- Six members who joined long ago; five future weeks presented by people
@@ -881,10 +866,10 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"e0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 select ok(
-  (select r ? 'dryRun' and r ? 'assigned' and r ? 'weeks' and r ? 'frozenDate'
+  (select not r ? 'dryRun' and not r ? 'assigned' and r ? 'weeks' and r ? 'frozenDate'
           and r ? 'added' and r ? 'removed' and (r->>'full')::boolean
      from (select public.meetings_rebalance_questioners(true) as r) t),
-  'the dry run still answers in the shape the deployed panel reads'
+  'the dry run answers without the retired dryRun/assigned keys'
 );
 select public.meetings_rebalance_questioners(false);
 reset role;

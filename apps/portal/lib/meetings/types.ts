@@ -249,7 +249,6 @@ export interface RebalanceWeek {
 }
 
 export interface RebalanceResult {
-  dryRun: boolean
   /**
    * 被保留不動的那一場：明天以後第一個要排提問人的週次（今天與更早的週次本來
    * 就不會被改）。沒有未來會議時為 null。
@@ -257,8 +256,6 @@ export interface RebalanceResult {
   frozenDate: string | null
   /** frozenDate 之後的週數，也就是 roster 的長度。 */
   weeks: number
-  /** 那些週次合計的提問名額。 */
-  assigned: number
   /** 這次會新增 / 移除的提問列數。 */
   added: number
   removed: number
