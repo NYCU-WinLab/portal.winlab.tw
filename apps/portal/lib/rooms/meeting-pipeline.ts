@@ -42,16 +42,20 @@ export interface MeetingRequestInput {
   /**
    * The epics this meeting belongs to, canonicalised as `group&iid`.
    *
-   * Load-bearing: with it the pipeline puts a booking marker on that epic;
-   * without it it opens a fresh group-level epic that has no parent
-   * workstream and has to be re-filed by hand. Empty is a real answer for an
-   * ad-hoc meeting, but it should be a chosen one.
+   * The helper interprets the referenced epic's durable classification:
+   * Sync creates/reuses a booking child; tracked records remain single.
+   * Empty is a real answer for an ad-hoc meeting.
    */
   issueRefs?: readonly string[]
 }
 
 export interface MeetingCancelInput {
   bookingId: string
+  /** The original create request id; never the cancellation callback id. */
+  bookingRequestId: string
+  title: string
+  groupName?: string | null
+  issueRefs?: readonly string[]
   /**
    * The meeting's cancel_id — the 04000000… GlobalObjectId, NOT the
    * AAMkAG… Outlook event id. The spec calls this out explicitly because
@@ -116,14 +120,36 @@ export async function triggerMeetingCancel(
   input: MeetingCancelInput
 ): Promise<MeetingTriggerOutcome> {
   return run(admin, "cancel", input.bookingId, (form) => {
-    form.set("variables[ACTION]", "cancel")
-    form.set("variables[EVENT_ID]", input.cancelId)
-    form.set("variables[MESSAGE_ID]", input.messageId)
-    form.set("variables[START_TIME]", input.start)
-    if (input.reason) {
-      form.set("variables[CANCELLATION_MESSAGE]", input.reason)
+    for (const [key, value] of Object.entries(cancelPipelineVariables(input))) {
+      form.set(`variables[${key}]`, value)
     }
   })
+}
+
+/**
+ * Helper-facing cancellation context.
+ *
+ * `REQUEST_ID` is deliberately absent: run() owns the fresh cancellation id
+ * used by its callback. `BOOKING_REQUEST_ID` identifies the original create
+ * only, so the runner can use it for the GitLab helper without corrupting the
+ * Portal callback identity.
+ */
+export function cancelPipelineVariables(
+  input: MeetingCancelInput
+): Record<string, string> {
+  const variables: Record<string, string> = {
+    ACTION: "cancel",
+    BOOKING_REQUEST_ID: input.bookingRequestId,
+    EVENT_ID: input.cancelId,
+    MESSAGE_ID: input.messageId,
+    START_TIME: input.start,
+    SUBJECT: input.title,
+  }
+  if (input.groupName) variables.GROUP_NAME = input.groupName
+  const issueRefs = issueRefsParam(input.issueRefs ?? [])
+  if (issueRefs) variables.ISSUE_REFS = issueRefs
+  if (input.reason) variables.CANCELLATION_MESSAGE = input.reason
+  return variables
 }
 
 async function run(
