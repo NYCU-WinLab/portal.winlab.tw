@@ -6,15 +6,15 @@ on:
   push:
     branches: [main]
     paths:
-      - "supabase/migrations/**"
-      - "supabase/tests/**"
-      - "supabase/config.toml"
+      - "packages/db/supabase/migrations/**"
+      - "packages/db/supabase/tests/**"
+      - "packages/db/supabase/config.toml"
       - ".github/workflows/db-tests.yml"
   pull_request:
     paths:
-      - "supabase/migrations/**"
-      - "supabase/tests/**"
-      - "supabase/config.toml"
+      - "packages/db/supabase/migrations/**"
+      - "packages/db/supabase/tests/**"
+      - "packages/db/supabase/config.toml"
       - ".github/workflows/db-tests.yml"
 
 concurrency:
@@ -28,6 +28,10 @@ jobs:
   pgtap:
     name: pgTAP RLS
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The Supabase CLI project lives in the db workspace, not the repo root.
+        working-directory: packages/db
     steps:
       - uses: actions/checkout@v7
 
@@ -42,7 +46,7 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Boots a local Postgres (Docker on the runner) and applies
-      # supabase/migrations/** — the captured baseline plus any
+      # packages/db/supabase/migrations/** — the captured baseline plus any
       # `<timestamp>_name.sql` migrations (dash-named files are skipped).
       - name: Start local database
         run: supabase db start

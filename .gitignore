@@ -44,7 +44,7 @@ npm-debug.log*
 .worktrees/
 
 # Supabase CLI scratch
-supabase/.temp/
+packages/db/supabase/.temp/
 
 # Local-only design docs and plans (superpowers brainstorming output)
 docs/superpowers/
