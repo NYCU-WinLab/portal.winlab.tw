@@ -50,11 +50,11 @@ bun run test                     # all workspaces (turbo test)
 cd apps/portal && bun test       # one workspace
 ```
 
-Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP via `supabase test db`, see `.github/workflows/db-tests.yml`), not by `bun test`.
+Keep the pure logic in `lib/` (no React, no Supabase I/O) — that's what's unit-testable. RLS / SECURITY DEFINER policies are tested separately against Postgres (pgTAP via `supabase test db` run from `packages/db`, see `.github/workflows/db-tests.yml`), not by `bun test`.
 
 ### Adding a Supabase migration
 
-Name every new file `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` — the Supabase CLI's `db reset` / `db start` (what `db-tests` CI runs against) only replays files matching that exact timestamp pattern and silently **skips** anything else (e.g. dash-dated names like `2026-07-17-thing.sql`). A skipped migration still applies fine to prod via `apply_migration`, but the local/CI test database silently diverges from prod — that's what #332 was.
+Name every new file `packages/db/supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` — the Supabase CLI's `db reset` / `db start` (what `db-tests` CI runs against) only replays files matching that exact timestamp pattern and silently **skips** anything else (e.g. dash-dated names like `2026-07-17-thing.sql`). A skipped migration still applies fine to prod via `apply_migration`, but the local/CI test database silently diverges from prod — that's what #332 was.
 
 ### Git hooks (husky)
 
@@ -107,6 +107,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 - `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
+- `packages/db`: the Supabase CLI project (`supabase/`: migrations, pgTAP tests, `config.toml`). Run CLI commands from here, e.g. `cd packages/db && supabase db start`. No app depends on it, so a migration-only commit doesn't rebuild portal or gallery on Vercel.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
 - `packages/eslint-config` — flat-config presets: `base` / `next-js` / `react-internal`.
 - `packages/typescript-config` — `base.json` / `nextjs.json` / `react-library.json`.
