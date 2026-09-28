@@ -43,8 +43,9 @@ npm-debug.log*
 # Git worktrees
 .worktrees/
 
-# Supabase CLI scratch
+# Supabase CLI scratch (older clones still have one at the old root path)
 packages/db/supabase/.temp/
+supabase/.temp/
 
 # Local-only design docs and plans (superpowers brainstorming output)
 docs/superpowers/

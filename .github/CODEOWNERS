@@ -13,6 +13,8 @@
 /apps/portal/hooks/use-auth.ts            @zyx1121
 /apps/portal/app/layout.tsx               @zyx1121
 /packages/                                @zyx1121
+# Migrations and pgTAP tests keep the reviewers they had at the repo root (#1257)
+/packages/db/                             @NYCU-WinLab/portal-maintainers
 
 # === CI / repo 設定 ===
 /.github/                                 @zyx1121
