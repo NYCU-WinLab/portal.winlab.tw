@@ -7,7 +7,7 @@ import { emitErrorLog } from "@/lib/otel/log"
 
 /**
  * OpenTelemetry bootstrap — producer for the Sensorium observability
- * platform (sensorium.zyx.tw). Sends request-span traces (4xx/5xx included)
+ * platform (sensorium.winlab.tw). Sends request-span traces (4xx/5xx included)
  * plus explicit application log records (server-side render errors) over
  * OTLP so agents (kilo/noir) can query them via Sensorium's MCP.
  *
