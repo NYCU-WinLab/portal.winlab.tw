@@ -43,6 +43,12 @@ const ISO_DATE = z.iso.date()
 // store a figure the table would round and an edit dialog would refuse.
 export const AMOUNT = z.number().finite().nonnegative().multipleOf(0.01)
 
+// multipleOf tolerates float noise such as 0.1 + 0.2, so a computed amount is
+// rounded to the cent before it is stored.
+export function cents(amount: number): number {
+  return Math.round(amount * 100) / 100
+}
+
 const REIMBURSE_URL = `${PORTAL_URL}/reimburse`
 
 // The applicant picker on /reimburse only offers members by their portal
@@ -86,13 +92,14 @@ export function egressUpdates(changes: EgressChanges): UpdateEgress {
     updates.applicant_name = changes.applicant_name
   if (changes.item_name !== undefined) updates.item_name = changes.item_name
   if (changes.item_amount !== undefined)
-    updates.item_amount = changes.item_amount
+    updates.item_amount = cents(changes.item_amount)
   if (changes.invoice_date !== undefined)
     updates.invoice_date = changes.invoice_date
   if (changes.transfer_date !== undefined)
     updates.transfer_date = changes.transfer_date
   if (changes.transfer_fee !== undefined)
-    updates.transfer_fee = changes.transfer_fee
+    updates.transfer_fee =
+      changes.transfer_fee === null ? null : cents(changes.transfer_fee)
   if (Object.keys(updates).length === 0) {
     throw new Error("nothing to change: pass at least one field")
   }
@@ -110,7 +117,7 @@ export function ingressUpdates(changes: IngressChanges): UpdateIngress {
   if (changes.ingress_date !== undefined)
     updates.ingress_date = changes.ingress_date
   if (changes.ingress_amount !== undefined)
-    updates.ingress_amount = changes.ingress_amount
+    updates.ingress_amount = cents(changes.ingress_amount)
   if (changes.ingress_comment !== undefined)
     updates.ingress_comment = changes.ingress_comment || null
   if (Object.keys(updates).length === 0) {
@@ -249,10 +256,11 @@ export function registerReimburseTools(server: McpServer) {
         const row = await insertEgress(supabase, {
           applicant_name: applicant,
           item_name: args.item_name,
-          item_amount: args.item_amount,
+          item_amount: cents(args.item_amount),
           invoice_date: args.invoice_date,
           transfer_date: args.transfer_date ?? null,
-          transfer_fee: args.transfer_fee ?? null,
+          transfer_fee:
+            args.transfer_fee === undefined ? null : cents(args.transfer_fee),
           user_id: caller.userId,
         })
         return json({ entry: egressEntry(row), url: REIMBURSE_URL })
@@ -375,7 +383,7 @@ export function registerReimburseTools(server: McpServer) {
         await requireAdmin(supabase, "is_reimburse_admin", "add ledger entries")
         const row = await insertIngress(supabase, {
           ingress_date: args.ingress_date,
-          ingress_amount: args.ingress_amount,
+          ingress_amount: cents(args.ingress_amount),
           ingress_comment: args.ingress_comment || null,
           user_id: caller.userId,
         })
