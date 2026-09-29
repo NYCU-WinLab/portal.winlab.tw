@@ -25,3 +25,11 @@ alter table public.door_events
 
 comment on column public.door_events.source is
   'web: the /door button. mcp: an agent through /api/mcp, for the member named. card: the physical reader.';
+comment on table public.door_events is
+  'Unlock attempts from /door (web) and the MCP server (mcp), and physical card '
+  'events. Identity is an ingestion-time snapshot, not a foreign key. Only '
+  'service_role writes; only door admins read.';
+comment on column public.door_events.created_at is
+  'Server time for web and mcp unlocks; uncorrected controller time (Asia/Taipei) for card events.';
+comment on column public.door_events.ok is
+  'For web and mcp: relay acknowledgment. For card: known access granted/denied; NULL for an unclassified device code.';

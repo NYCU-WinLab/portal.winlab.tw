@@ -14,7 +14,8 @@ describe("buildDoorEvent", () => {
     const row = buildDoorEvent(
       user,
       { ok: true, latencyMs: 412.6 },
-      { "client.address": "140.113.1.2", "geo.city": "Hsinchu" }
+      { "client.address": "140.113.1.2", "geo.city": "Hsinchu" },
+      "web"
     )
     expect(row).toEqual({
       source: "web",
@@ -33,7 +34,8 @@ describe("buildDoorEvent", () => {
     const row = buildDoorEvent(
       user,
       { ok: false, latencyMs: 8000, error: "Door API responded 504" },
-      {}
+      {},
+      "web"
     )
     expect(row.ok).toBe(false)
     expect(row.error).toBe("Door API responded 504")
@@ -54,7 +56,12 @@ describe("buildDoorEvent from the MCP server", () => {
 describe("doorEventAttributes", () => {
   test("omits absent optional fields instead of writing null", () => {
     const attrs = doorEventAttributes(
-      buildDoorEvent({ ...user, email: null }, { ok: true, latencyMs: 100 }, {})
+      buildDoorEvent(
+        { ...user, email: null },
+        { ok: true, latencyMs: 100 },
+        {},
+        "web"
+      )
     )
     expect(attrs).toEqual({
       "door.action": "open",
@@ -69,7 +76,12 @@ describe("doorEventAttributes", () => {
 
 describe("buildDoorEvent with an empty error message", () => {
   test("still stores a reason so the row passes the ok/error check", () => {
-    const row = buildDoorEvent(user, { ok: false, latencyMs: 1, error: "" }, {})
+    const row = buildDoorEvent(
+      user,
+      { ok: false, latencyMs: 1, error: "" },
+      {},
+      "web"
+    )
     expect(row.error).toBe("Door API request failed")
   })
 })

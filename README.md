@@ -12,23 +12,23 @@ Bun 1.3 · Turborepo 2 · Next.js 16 (App Router + Turbopack) · React 19 · Tai
 
 ## Apps
 
-| Path         | What it is                                                       |
-| ------------ | ---------------------------------------------------------------- |
-| `/`          | Home — welcome card + nav to every app                           |
-| `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`)  |
-| `/approve`   | Document signing with PDF field placement + email outbox         |
-| `/bento`     | Lunch-ordering for the lab — orders, menus, realtime             |
-| `/bulletin`  | Announcements board                                              |
-| `/door`      | Lab door: unlock pulse, card management, and web/card access log |
-| `/games`     | Mini-games (2048, snake, …) with global leaderboards             |
-| `/leave`     | Monday-meeting attendance sign-ups                               |
-| `/meetings`  | Lab-meeting weekly schedule + teacher papers                     |
-| `/profile`   | Personal account + bento / leave / approve / trip stats          |
-| `/receipts`  | Admin-only receipt review (PDF archive workflow)                 |
-| `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                     |
-| `/rooms`     | CS dept. meeting room availability query                         |
-| `/trip`      | Travel-document uploads with admin folder export                 |
-| `/api/mcp`   | Remote MCP server for AI agents (OAuth 2.1 via Supabase Auth)    |
+| Path         | What it is                                                      |
+| ------------ | --------------------------------------------------------------- |
+| `/`          | Home — welcome card + nav to every app                          |
+| `/admin`     | Super-admin role management (gated by `user_profiles.is_admin`) |
+| `/approve`   | Document signing with PDF field placement + email outbox        |
+| `/bento`     | Lunch-ordering for the lab — orders, menus, realtime            |
+| `/bulletin`  | Announcements board                                             |
+| `/door`      | Lab door: unlock pulse, card management, and access log         |
+| `/games`     | Mini-games (2048, snake, …) with global leaderboards            |
+| `/leave`     | Monday-meeting attendance sign-ups                              |
+| `/meetings`  | Lab-meeting weekly schedule + teacher papers                    |
+| `/profile`   | Personal account + bento / leave / approve / trip stats         |
+| `/receipts`  | Admin-only receipt review (PDF archive workflow)                |
+| `/reimburse` | Lab cash-flow bookkeeping (egress + ingress)                    |
+| `/rooms`     | CS dept. meeting room availability query                        |
+| `/trip`      | Travel-document uploads with admin folder export                |
+| `/api/mcp`   | Remote MCP server for AI agents (OAuth 2.1 via Supabase Auth)   |
 
 ### Connecting an AI agent (MCP)
 
@@ -42,8 +42,9 @@ Every app has tools (39 today): reads for all of them, plus the writes a member 
 
 ### Physical card log
 
-`/door/log` distinguishes web unlock requests from physical card presentations.
-Both remain visible only to door admins and portal super admins. A successful
+`/door/log` distinguishes unlock requests from the `/door` button (web) and
+from agents through the MCP server (mcp) from physical card presentations.
+All three remain visible only to door admins and portal super admins. A successful
 card event means the controller granted access, not proof that a particular
 person entered; unclassified device codes remain unknown instead of becoming
 false successes or failures.

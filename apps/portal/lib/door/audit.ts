@@ -39,7 +39,7 @@ export function buildDoorEvent(
   user: NormalizedUser,
   outcome: DoorOutcome,
   attribution: Attributes,
-  source: DoorSource = "web"
+  source: DoorSource
 ): DoorEventInsert {
   const str = (v: unknown) => (typeof v === "string" ? v : null)
   return {
@@ -80,7 +80,7 @@ export async function recordDoorEvent(
   user: NormalizedUser,
   outcome: DoorOutcome,
   headers: Headers,
-  source: DoorSource = "web"
+  source: DoorSource
 ): Promise<void> {
   try {
     const event = buildDoorEvent(

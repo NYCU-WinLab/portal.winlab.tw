@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { decodeBase64, errorMessage } from "@/lib/mcp/context"
+import { callerAsUser, decodeBase64, errorMessage } from "@/lib/mcp/context"
 
 describe("errorMessage", () => {
   test("reads an Error", () => {
@@ -48,5 +48,31 @@ describe("decodeBase64", () => {
     const over = Buffer.alloc(17).toString("base64")
     expect(decodeBase64(at, 16).byteLength).toBe(16)
     expect(() => decodeBase64(over, 16)).toThrow(/limit is 16/)
+  })
+})
+
+describe("callerAsUser", () => {
+  const caller = {
+    token: "t",
+    userId: "u1",
+    email: "loki@winlab.tw",
+    name: "詹詠翔",
+    keycloakSub: null,
+  }
+
+  test("keeps the id, email and name the door audit records", () => {
+    expect(callerAsUser(caller)).toEqual({
+      id: "u1",
+      email: "loki@winlab.tw",
+      name: "詹詠翔",
+      avatarUrl: null,
+    })
+  })
+
+  test("falls back to the email, then Unknown, like normalizeUser", () => {
+    expect(callerAsUser({ ...caller, name: null }).name).toBe("loki@winlab.tw")
+    expect(callerAsUser({ ...caller, name: null, email: null }).name).toBe(
+      "Unknown"
+    )
   })
 })
