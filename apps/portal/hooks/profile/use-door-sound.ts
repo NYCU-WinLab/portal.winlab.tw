@@ -3,21 +3,17 @@
 import { useCallback, useState } from "react"
 
 import { deleteDoorSound, saveDoorSound } from "@/app/profile/actions"
+import type { DoorSoundMode } from "@/lib/door/sound"
 import {
-  looksLikeDoorSound,
-  SOUND_NOT_AUDIO,
-  validateDoorSoundFile,
-  type DoorSoundMode,
-} from "@/lib/door/sound"
-import {
-  uploadDoorSound,
+  saveDoorSoundFile,
   type SaveDoorSoundResult,
 } from "@/lib/profile/door-sound"
 import { createClient } from "@/lib/supabase/client"
 
 // Uploads go straight from the browser into the member's own folder (the
 // storage INSERT policy allows nothing else), then the server action checks
-// the stored object and points user_profiles at it.
+// the stored object and points user_profiles at it. The steps live in
+// saveDoorSoundFile, so they are tested without React.
 export function useDoorSound(userId: string) {
   const [pending, setPending] = useState(false)
 
@@ -25,21 +21,12 @@ export function useDoorSound(userId: string) {
     async (file: File | null, mode: DoorSoundMode) => {
       setPending(true)
       try {
-        if (!file) return await saveDoorSound({ mode })
-        const check = validateDoorSoundFile(file)
-        if (!check.ok) return check
-        const head = new Uint8Array(await file.slice(0, 16).arrayBuffer())
-        if (!looksLikeDoorSound(check.ext, head)) {
-          return { ok: false, error: SOUND_NOT_AUDIO } as const
-        }
-        const upload = await uploadDoorSound(
+        return await saveDoorSoundFile(
           createClient(),
           userId,
-          file,
-          check
+          { file, mode },
+          saveDoorSound
         )
-        if (!upload.ok) return upload
-        return await saveDoorSound({ path: upload.path, mode })
       } catch (err) {
         console.error("[profile] door sound save failed", err)
         return { ok: false, error: "儲存失敗，請重試。" } as const
