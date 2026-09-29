@@ -10,6 +10,7 @@ import {
   updateUserRoles,
 } from "@/lib/admin/roles"
 import {
+  errorMessage,
   failure,
   json,
   PORTAL_URL,
@@ -127,7 +128,7 @@ export function registerAdminTools(server: McpServer) {
     "update_member_roles",
     {
       title: "Update member roles",
-      description: `Changes what a member may administer, the 編輯權限 dialog on /admin: grant_admin makes them an admin of each listed app (${KNOWN_ROLE_APPS.join(", ")}, or any other app a member already holds a role in, spelled as stored), revoke_admin takes that away, and is_admin sets or clears portal super admin, which admits them to everything including this tool. Omitted fields stay as they are, and other roles in an app (such as a legacy "user") are kept. Portal super admins only; for anyone else the tool fails. A super admin cannot clear their own flag. Each call rewrites the member's whole role map, so put every change for one member into a single call and never call it twice at once for the same member; if another change lands in between, the tool fails and shows what is stored. A call that changes nothing writes nothing and returns changed: false. It takes effect on the member's next request, so confirm the member, each app and the direction with the caller first.`,
+      description: `Changes what a member may administer, the 編輯權限 dialog on /admin: grant_admin makes them an admin of each listed app (${KNOWN_ROLE_APPS.join(", ")}, or any other app a member already holds a role in, spelled as stored), revoke_admin takes that away, and is_admin sets or clears portal super admin, which admits them to everything including this tool. Omitted fields stay as they are, and other roles in an app (such as a legacy "user") are kept. Portal super admins only; for anyone else the tool fails. A super admin cannot clear their own flag. Each call rewrites the member's whole role map, so put every change for one member into a single call and never call it twice at once for the same member: two such calls can overwrite each other, and the tool's read-back catches that most of the time but not always. A call that changes nothing writes nothing and returns changed: false. It takes effect on the member's next request, so confirm the member, each app and the direction with the caller first.`,
       inputSchema: z.object({
         user_id: z
           .string()
@@ -202,9 +203,17 @@ export function registerAdminTools(server: McpServer) {
         // The RPC replaces the whole map, so a change that raced this one can
         // undo it. Read back and report what is stored, and fail when it is
         // not what this call wrote.
-        const stored = (await fetchAdminUsers(supabase)).find(
-          (u) => u.id === target.id
-        )
+        let stored: AdminUser | undefined
+        try {
+          stored = (await fetchAdminUsers(supabase)).find(
+            (u) => u.id === target.id
+          )
+        } catch (err) {
+          throw new Error(
+            `the change was written but reading it back failed (${errorMessage(err)}); calling again with the same change is safe and returns changed: false if it stuck`,
+            { cause: err }
+          )
+        }
         const after = {
           is_admin: stored?.is_admin ?? null,
           roles: stored?.roles ?? {},

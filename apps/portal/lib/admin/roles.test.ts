@@ -53,6 +53,20 @@ describe("applyRoleChanges", () => {
     ).toEqual({ trip: ["admin"] })
   })
 
+  test("leaves apps it was not asked about exactly as they were", () => {
+    expect(
+      applyRoleChanges({ trip: [], bento: ["user"] }, { grant: ["door"] }, APPS)
+    ).toEqual({ trip: [], bento: ["user"], door: ["admin"] })
+  })
+
+  test("copes with an app whose list is null", () => {
+    const roles = { trip: null } as unknown as Record<string, string[]>
+    expect(applyRoleChanges(roles, { revoke: ["trip"] }, APPS)).toEqual({})
+    expect(applyRoleChanges(roles, { grant: ["trip"] }, APPS)).toEqual({
+      trip: ["admin"],
+    })
+  })
+
   test("matches app names as stored, without folding case", () => {
     expect(() => applyRoleChanges({}, { grant: ["Trip"] }, APPS)).toThrow(
       /no role for Trip/

@@ -49,13 +49,17 @@ export function applyRoleChanges(
   }
   const next: Record<string, string[]> = {}
   for (const [app, list] of Object.entries(roles)) {
-    const kept = revoke.includes(app)
-      ? list.filter((role) => role !== "admin")
-      : list
+    if (!revoke.includes(app)) {
+      next[app] = list
+      continue
+    }
+    const kept = (Array.isArray(list) ? list : []).filter(
+      (role) => role !== "admin"
+    )
     if (kept.length > 0) next[app] = kept
   }
   for (const app of grant) {
-    const current = next[app] ?? []
+    const current = Array.isArray(next[app]) ? next[app] : []
     next[app] = current.includes("admin") ? current : [...current, "admin"]
   }
   return next
@@ -71,7 +75,10 @@ export function sameRoles(
     JSON.stringify(
       Object.keys(roles)
         .sort()
-        .map((app) => [app, [...(roles[app] ?? [])].sort()])
+        .map((app) => {
+          const list = roles[app]
+          return [app, Array.isArray(list) ? [...list].sort() : list]
+        })
     )
   return canonical(a) === canonical(b)
 }
