@@ -2,13 +2,24 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 
 import {
+  DOOR_SOUND_MAX_BYTES,
+  DOOR_SOUND_MODE_LABELS,
+  DOOR_SOUND_MODES,
+  DOOR_SOUND_TYPES,
+  doorSoundOutcome,
+  type DoorSoundExtension,
+} from "@/lib/door/sound"
+import {
+  decodeBase64,
   failure,
   json,
   PORTAL_URL,
   requireCaller,
+  type Caller,
   type ToolContext,
 } from "@/lib/mcp/context"
 import { createUserClient } from "@/lib/mcp/supabase"
+import { setOwnDoorSound, type DoorSoundBytes } from "@/lib/profile/door-sound"
 import { fetchProfileStats } from "@/lib/profile/fetch"
 import {
   getProfileFields,
@@ -45,7 +56,36 @@ export function keycloakAccount(
   }
 }
 
-export function registerProfileTools(server: McpServer) {
+const DOOR_SOUND_FORMATS = Object.keys(DOOR_SOUND_TYPES) as DoorSoundExtension[]
+
+export type ProfileHooks = {
+  // Runs after a door sound save, like saveDoorSound's after(): remove the
+  // replaced file and have the door panel fetch greetings again.
+  afterDoorSoundSave?: (
+    caller: Caller,
+    files: { keep: string | null; previous: string | null }
+  ) => void
+}
+
+// format and file_base64 travel as a pair: both to upload a new sound, neither
+// to change only the mode.
+export function doorSoundFile(
+  format: DoorSoundExtension | undefined,
+  fileBase64: string | undefined
+): DoorSoundBytes | undefined {
+  if (format === undefined && fileBase64 === undefined) return undefined
+  if (format === undefined || fileBase64 === undefined) {
+    throw new Error(
+      "format and file_base64 go together: pass both to upload a sound, or neither to change only the mode"
+    )
+  }
+  return { ext: format, bytes: decodeBase64(fileBase64, DOOR_SOUND_MAX_BYTES) }
+}
+
+export function registerProfileTools(
+  server: McpServer,
+  hooks: ProfileHooks = {}
+) {
   server.registerTool(
     "get_profile",
     {
@@ -67,6 +107,58 @@ export function registerProfileTools(server: McpServer) {
           url: `${PORTAL_URL}/profile`,
           keycloak: keycloakAccount(account),
           stats,
+        })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "set_door_sound",
+    {
+      title: "Set door sound",
+      description:
+        "Set what the lab door plays when the member opens it, the 開門音效 setting on /profile. Self only. Send an audio file as base64 (mp3, m4a, aac, wav or ogg, max 3 MB decoded) to replace the member's sound; the door plays at most its first 10 seconds, loudness levelled. mode sound_only (播我的音效) plays the member's file, voice_only (播預設音效) plays the lab's default sound and keeps the file. Pass format and file_base64 together, or neither to change only the mode. The replaced file is deleted and the door picks up the change within seconds. Confirm with the member before replacing their sound.",
+      inputSchema: z.object({
+        mode: z
+          .enum(DOOR_SOUND_MODES)
+          .default("sound_only")
+          .describe("sound_only = 播我的音效, voice_only = 播預設音效"),
+        format: z
+          .enum(DOOR_SOUND_FORMATS)
+          .optional()
+          .describe("File type of file_base64"),
+        file_base64: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Audio file contents, base64"),
+      }),
+    },
+    async ({ mode, format, file_base64 }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        const file = doorSoundFile(format, file_base64)
+        const supabase = createUserClient(caller.token)
+        const result = await setOwnDoorSound(supabase, caller.userId, {
+          mode,
+          file,
+        })
+        if (!result.ok) return failure(result.error)
+        hooks.afterDoorSoundSave?.(caller, {
+          keep: result.path,
+          previous: result.previous ?? null,
+        })
+        return json({
+          mode: result.mode,
+          mode_label: DOOR_SOUND_MODE_LABELS[result.mode],
+          plays: doorSoundOutcome({
+            mode: result.mode,
+            hasFile: result.path !== null,
+          }),
+          uploaded: file !== undefined,
+          url: `${PORTAL_URL}/profile`,
         })
       } catch (err) {
         return failure(err)

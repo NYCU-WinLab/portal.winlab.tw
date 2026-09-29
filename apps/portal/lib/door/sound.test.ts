@@ -12,7 +12,9 @@ import {
   newDoorSoundPath,
   SOUND_BAD_TYPE,
   SOUND_EMPTY,
+  SOUND_NOT_AUDIO,
   SOUND_TOO_LARGE,
+  validateDoorSoundBytes,
   validateDoorSoundFile,
 } from "@/lib/door/sound"
 
@@ -113,6 +115,36 @@ describe("looksLikeDoorSound", () => {
     expect(looksLikeDoorSound("wav", bytes("RIFF", 1, 2, 3, 4, "AVI "))).toBe(
       false
     )
+  })
+})
+
+describe("validateDoorSoundBytes", () => {
+  test("accepts audio bytes and sends the extension's content type", () => {
+    expect(validateDoorSoundBytes("mp3", bytes("ID3", 4, 0))).toEqual({
+      ok: true,
+      ext: "mp3",
+      contentType: "audio/mpeg",
+    })
+    expect(
+      validateDoorSoundBytes("m4a", bytes(0, 0, 0, 0x20, "ftypM4A "))
+    ).toEqual({ ok: true, ext: "m4a", contentType: "audio/mp4" })
+  })
+
+  test("rejects empty, oversized and non-audio bytes", () => {
+    expect(validateDoorSoundBytes("mp3", new Uint8Array())).toEqual({
+      ok: false,
+      error: SOUND_EMPTY,
+    })
+    const big = new Uint8Array(DOOR_SOUND_MAX_BYTES + 1)
+    big.set(bytes("ID3"))
+    expect(validateDoorSoundBytes("mp3", big)).toEqual({
+      ok: false,
+      error: SOUND_TOO_LARGE,
+    })
+    expect(validateDoorSoundBytes("ogg", bytes("%PDF-1.7"))).toEqual({
+      ok: false,
+      error: SOUND_NOT_AUDIO,
+    })
   })
 })
 

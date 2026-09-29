@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import { keycloakAccount } from "@/lib/mcp/tools/profile"
+import { DOOR_SOUND_MAX_BYTES } from "@/lib/door/sound"
+import { doorSoundFile, keycloakAccount } from "@/lib/mcp/tools/profile"
 
 describe("keycloakAccount", () => {
   test("renames the camelCase Keycloak fields to snake_case", () => {
@@ -49,5 +50,27 @@ describe("keycloakAccount", () => {
   test("is null when Keycloak is unconfigured or unreachable", () => {
     expect(keycloakAccount({ status: "unconfigured" })).toBeNull()
     expect(keycloakAccount({ status: "unavailable" })).toBeNull()
+  })
+})
+
+describe("doorSoundFile", () => {
+  test("is undefined when only the mode changes", () => {
+    expect(doorSoundFile(undefined, undefined)).toBeUndefined()
+  })
+
+  test("decodes the pair into bytes", () => {
+    const file = doorSoundFile("mp3", Buffer.from("ID3").toString("base64"))
+    expect(file?.ext).toBe("mp3")
+    expect(new TextDecoder().decode(file?.bytes)).toBe("ID3")
+  })
+
+  test("refuses half a pair", () => {
+    expect(() => doorSoundFile("mp3", undefined)).toThrow(/go together/)
+    expect(() => doorSoundFile(undefined, "SUQz")).toThrow(/go together/)
+  })
+
+  test("holds the file to the door sound limit", () => {
+    const over = Buffer.alloc(DOOR_SOUND_MAX_BYTES + 1).toString("base64")
+    expect(() => doorSoundFile("mp3", over)).toThrow(/limit/)
   })
 })

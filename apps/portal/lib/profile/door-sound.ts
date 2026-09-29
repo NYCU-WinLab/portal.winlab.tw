@@ -6,6 +6,9 @@ import {
   DOOR_SOUND_TYPES,
   isDoorSoundMode,
   isDoorSoundPath,
+  newDoorSoundPath,
+  validateDoorSoundBytes,
+  type DoorSoundExtension,
   type DoorSoundMode,
 } from "@/lib/door/sound"
 
@@ -74,6 +77,7 @@ export const SOUND_MODE_INVALID = "播放方式不正確。"
 export const SOUND_MODE_NEEDS_FILE = "要先上傳音效，才能選這個播放方式。"
 export const SOUND_UPLOAD_MISSING = "找不到剛上傳的音檔，請重新上傳。"
 export const SOUND_UPLOAD_REJECTED = "音檔格式或大小不符，請重新上傳。"
+export const SOUND_UPLOAD_FAILED = "上傳失敗，請重試。"
 
 const ALLOWED_TYPES = new Set<string>(Object.values(DOOR_SOUND_TYPES))
 
@@ -157,6 +161,62 @@ export async function updateDoorSound(
   if (error || !data || data.length !== 1) {
     if (error) console.error("[profile] door sound save failed", error.code)
     if (newPath !== current.path) await discard()
+    return { ok: false, error: SAVE_SOUND_FAILED }
+  }
+  return { ok: true, path, mode, previous: current.path }
+}
+
+export type DoorSoundBytes = { ext: DoorSoundExtension; bytes: Uint8Array }
+
+// The MCP tool's save. It holds the file itself, so unlike updateDoorSound it
+// checks the bytes before storing them and uploads with the member's own
+// client (the INSERT policy keeps the file in their folder): there is no
+// browser upload to re-check and no service-role client, which a tool must
+// never use. Without a file only the mode changes. Removing the replaced file
+// is the caller's follow-up, as it is for saveDoorSound.
+export async function setOwnDoorSound(
+  supabase: SupabaseClient,
+  userId: string,
+  { mode, file }: { mode: DoorSoundMode; file?: DoorSoundBytes }
+): Promise<SaveDoorSoundResult & { previous?: string | null }> {
+  const check = file ? validateDoorSoundBytes(file.ext, file.bytes) : null
+  if (check && !check.ok) return check
+
+  let current: DoorSound
+  try {
+    current = await fetchDoorSound(supabase, userId)
+  } catch (err) {
+    console.error("[profile] door sound read failed", err)
+    return { ok: false, error: SAVE_SOUND_FAILED }
+  }
+  if (!file && !current.path && mode !== "voice_only") {
+    return { ok: false, error: SOUND_MODE_NEEDS_FILE }
+  }
+
+  let path = current.path
+  if (file && check) {
+    path = newDoorSoundPath(userId, check.ext)
+    const body = new Blob([new Uint8Array(file.bytes)], {
+      type: check.contentType,
+    })
+    const { error } = await supabase.storage
+      .from(DOOR_SOUND_BUCKET)
+      .upload(path, body, { contentType: check.contentType, upsert: false })
+    if (error) {
+      console.error("[profile] door sound upload failed", error.message)
+      return { ok: false, error: SOUND_UPLOAD_FAILED }
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .update({ door_sound_path: path, door_sound_mode: mode })
+    .eq("id", userId)
+    .select("id")
+  if (error || !data || data.length !== 1) {
+    // A file uploaded just now stays in the folder until the next save's
+    // cleanup takes it with the other stale files.
+    if (error) console.error("[profile] door sound save failed", error.code)
     return { ok: false, error: SAVE_SOUND_FAILED }
   }
   return { ok: true, path, mode, previous: current.path }

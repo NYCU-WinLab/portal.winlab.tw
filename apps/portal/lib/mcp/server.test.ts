@@ -118,6 +118,7 @@ describe("portal MCP handler", () => {
         "list_trips",
         "remove_bento_order_item",
         "rename_receipt",
+        "set_door_sound",
         "upload_receipt",
         "whoami",
       ].sort()

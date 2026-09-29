@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { errorMessage } from "@/lib/mcp/context"
+import { decodeBase64, errorMessage } from "@/lib/mcp/context"
 
 describe("errorMessage", () => {
   test("reads an Error", () => {
@@ -24,5 +24,29 @@ describe("errorMessage", () => {
 
   test("stringifies anything else", () => {
     expect(errorMessage("nope")).toBe("nope")
+  })
+})
+
+describe("decodeBase64", () => {
+  const text = Buffer.from("hello door").toString("base64")
+
+  test("strips a data: URL prefix and whitespace", () => {
+    const bytes = decodeBase64(
+      `data:audio/mpeg;base64,${text.slice(0, 4)}\n${text.slice(4)}`,
+      1024
+    )
+    expect(new TextDecoder().decode(bytes)).toBe("hello door")
+  })
+
+  test("rejects garbage and empty input", () => {
+    expect(() => decodeBase64("", 1024)).toThrow()
+    expect(() => decodeBase64("not base64!!", 1024)).toThrow()
+  })
+
+  test("holds the payload to the caller's limit", () => {
+    const at = Buffer.alloc(16).toString("base64")
+    const over = Buffer.alloc(17).toString("base64")
+    expect(decodeBase64(at, 16).byteLength).toBe(16)
+    expect(() => decodeBase64(over, 16)).toThrow(/limit is 16/)
   })
 })
