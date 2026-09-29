@@ -512,6 +512,37 @@ describe("saveDoorSoundFile", () => {
     expect(saved).toEqual([])
   })
 
+  test("a save the server refuses is what the member sees", async () => {
+    const refused = { ok: false as const, error: SOUND_UPLOAD_REJECTED }
+    expect(
+      await saveDoorSoundFile(
+        member(),
+        USER,
+        { file: m4a(), mode: "sound_only" },
+        async () => refused
+      )
+    ).toEqual(refused)
+  })
+
+  test("the member's mode reaches the save on both branches", async () => {
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: m4a(), mode: "voice_only" },
+      action
+    )
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: null, mode: "sound_only" },
+      action
+    )
+    expect(saved.map((input) => input.mode)).toEqual([
+      "voice_only",
+      "sound_only",
+    ])
+  })
+
   test("without a file only the mode goes to the save", async () => {
     await saveDoorSoundFile(
       member(),
