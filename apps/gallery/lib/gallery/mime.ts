@@ -46,6 +46,18 @@ export function resolveMediaMimeType(file: File): ResolvedMime | null {
   return null
 }
 
+/**
+ * storage-js sends a Blob or File as one multipart part and the bucket checks
+ * that part's own type; the upload's `contentType` option never reaches the
+ * server. So the bytes go out re-typed with the resolved MIME, whatever the
+ * browser called the file ("" for an untyped HEIC, "image/jpg", …).
+ */
+export function typedUploadBody(body: Blob, contentType: string): Blob {
+  return body.type === contentType
+    ? body
+    : new Blob([body], { type: contentType })
+}
+
 /** Backwards-compat shim used by server-side validation paths. */
 export function resolveImageMimeType(file: File): string | null {
   const resolved = resolveMediaMimeType(file)
