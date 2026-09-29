@@ -21,7 +21,7 @@ import { registerReimburseTools } from "@/lib/mcp/tools/reimburse"
 import { registerRoomsTools } from "@/lib/mcp/tools/rooms"
 import { registerTripTools } from "@/lib/mcp/tools/trip"
 
-export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.4.0" }
+export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.5.0" }
 
 // Follow-ups route.ts runs after a tool call, outside the tool itself.
 export type ToolHooks = ReceiptHooks & ProfileHooks
