@@ -1,28 +1,41 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { createClient } from "@supabase/supabase-js"
 
-import { uploadBytesToStorage } from "@/lib/gallery/upload-pipeline"
+import {
+  uploadBytesToStorage,
+  uploadImageFile,
+} from "@/lib/gallery/upload-pipeline"
 
 // The gallery bucket checks the multipart part's own type, so these hold the
 // type that goes over the wire, not the contentType option.
 let parts: { url: string; type: string }[]
+let removed: string[]
 let refuse: boolean
+// Aborted while the storage request is in flight, like a member pressing
+// cancel mid-upload: storage-js never sees the signal, so the upload lands.
+let cancelDuringUpload: AbortController | null
 const restorers: (() => void)[] = []
 
 beforeEach(() => {
   parts = []
+  removed = []
   refuse = false
+  cancelDuringUpload = null
   const fetchSpy = spyOn(globalThis, "fetch")
   restorers.push(() => fetchSpy.mockRestore())
   const respond = async (
     input: Parameters<typeof fetch>[0],
     init?: Parameters<typeof fetch>[1]
   ): Promise<Response> => {
+    const url = decodeURIComponent(String(input))
+    if (init?.method === "DELETE") {
+      const body = JSON.parse(String(init.body)) as { prefixes: string[] }
+      removed.push(...body.prefixes)
+      return Response.json([])
+    }
     const part = init?.body instanceof FormData ? init.body.get("") : null
-    parts.push({
-      url: decodeURIComponent(String(input)),
-      type: part instanceof Blob ? part.type : "",
-    })
+    parts.push({ url, type: part instanceof Blob ? part.type : "" })
+    cancelDuringUpload?.abort()
     return refuse
       ? Response.json(
           {
@@ -71,5 +84,69 @@ describe("uploadBytesToStorage", () => {
     await expect(
       uploadBytesToStorage(member(), "u1/c.jpg", jpg, "image/jpeg")
     ).rejects.toMatchObject({ stage: "storage-upload" })
+  })
+})
+
+describe("cancelling an upload", () => {
+  const jpeg = () =>
+    new File(
+      [
+        new Uint8Array([
+          0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46,
+        ]),
+      ],
+      "photo.jpg",
+      { type: "image/jpeg" }
+    )
+
+  test("before the upload, nothing is sent", async () => {
+    const controller = new AbortController()
+    controller.abort()
+    await expect(
+      uploadBytesToStorage(
+        member(),
+        "u1/e.jpg",
+        jpeg(),
+        "image/jpeg",
+        controller.signal
+      )
+    ).rejects.toMatchObject({ name: "AbortError" })
+    expect(parts).toEqual([])
+  })
+
+  test("while the bytes are in flight, the caller gets to clean up", async () => {
+    const controller = new AbortController()
+    cancelDuringUpload = controller
+    await uploadBytesToStorage(
+      member(),
+      "u1/d.jpg",
+      jpeg(),
+      "image/jpeg",
+      controller.signal
+    )
+    expect(controller.signal.aborted).toBe(true)
+    expect(parts).toHaveLength(1)
+  })
+
+  test("a photo that landed is removed, then the cancel is reported", async () => {
+    const controller = new AbortController()
+    cancelDuringUpload = controller
+    await expect(
+      uploadImageFile({
+        supabase: member(),
+        userId: "u1",
+        file: jpeg(),
+        resolved: { kind: "image", mime: "image/jpeg" },
+        artworkName: "cancelled",
+        setStatus: () => {},
+        labelPrefix: "",
+        sequenceId: null,
+        sequenceIndex: null,
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: "AbortError" })
+    const stored = parts[0]?.url.split("/object/gallery/")[1] ?? ""
+    expect(stored).toMatch(/^u1\/.+\.jpg$/)
+    expect(removed).toEqual([stored])
   })
 })

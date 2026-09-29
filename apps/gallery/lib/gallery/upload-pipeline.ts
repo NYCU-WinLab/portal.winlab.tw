@@ -82,7 +82,9 @@ function throwIfAborted(signal?: AbortSignal) {
 }
 
 // Every photo, video and poster goes to storage through here; exported for
-// its test.
+// its test. A cancel that lands while the bytes are in flight is left to the
+// caller: storage-js never sees the signal, so the object exists by then, and
+// only the caller knows what else to remove with it.
 export async function uploadBytesToStorage(
   supabase: SupabaseBrowser,
   objectPath: string,
@@ -111,7 +113,6 @@ export async function uploadBytesToStorage(
       described.userMessage
     )
   }
-  throwIfAborted(signal)
 }
 
 async function registerOrCleanup(
@@ -294,7 +295,8 @@ export async function uploadVideoFile(ctx: UploadCtx): Promise<string> {
       signal
     )
   } catch (error) {
-    await supabase.storage.from("gallery").remove([videoPath])
+    // The poster may have landed before the step failed; drop it too.
+    await supabase.storage.from("gallery").remove([videoPath, posterPath])
     throw error
   }
 
