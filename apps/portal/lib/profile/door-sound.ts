@@ -4,6 +4,7 @@ import {
   DOOR_SOUND_BUCKET,
   DOOR_SOUND_MAX_BYTES,
   DOOR_SOUND_TYPES,
+  doorSoundUploadBody,
   isDoorSoundMode,
   isDoorSoundPath,
   newDoorSoundPath,
@@ -196,12 +197,12 @@ export async function setOwnDoorSound(
   let path = current.path
   if (file && check) {
     path = newDoorSoundPath(userId, check.ext)
-    const body = new Blob([new Uint8Array(file.bytes)], {
-      type: check.contentType,
-    })
     const { error } = await supabase.storage
       .from(DOOR_SOUND_BUCKET)
-      .upload(path, body, { contentType: check.contentType, upsert: false })
+      .upload(path, doorSoundUploadBody(file.bytes, check.contentType), {
+        contentType: check.contentType,
+        upsert: false,
+      })
     if (error) {
       console.error("[profile] door sound upload failed", error.message)
       return { ok: false, error: SOUND_UPLOAD_FAILED }

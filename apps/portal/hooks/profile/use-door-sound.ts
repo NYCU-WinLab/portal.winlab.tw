@@ -5,6 +5,7 @@ import { useCallback, useState } from "react"
 import { deleteDoorSound, saveDoorSound } from "@/app/profile/actions"
 import {
   DOOR_SOUND_BUCKET,
+  doorSoundUploadBody,
   looksLikeDoorSound,
   newDoorSoundPath,
   SOUND_NOT_AUDIO,
@@ -34,7 +35,10 @@ export function useDoorSound(userId: string) {
         const path = newDoorSoundPath(userId, check.ext)
         const { error } = await createClient()
           .storage.from(DOOR_SOUND_BUCKET)
-          .upload(path, file, { contentType: check.contentType, upsert: false })
+          .upload(path, doorSoundUploadBody(file, check.contentType), {
+            contentType: check.contentType,
+            upsert: false,
+          })
         if (error) {
           console.error("[profile] door sound upload failed", error.message)
           return { ok: false, error: "上傳失敗，請重試。" } as const
