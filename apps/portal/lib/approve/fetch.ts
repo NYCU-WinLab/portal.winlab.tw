@@ -4,6 +4,7 @@ import type {
   ApproveDocument,
   ApproveField,
   ApproveSigner,
+  ApproveUserFieldValue,
 } from "@/lib/approve/types"
 
 export type DocumentCreator = {
@@ -128,4 +129,52 @@ export async function fetchDocumentFields(
     .order("page", { ascending: true })
   if (error) throw error
   return (data ?? []) as unknown as ApproveField[]
+}
+
+// The member's own signer row on one document, or null when they are not
+// one of its signers.
+export async function fetchMySigner(
+  supabase: SupabaseClient,
+  documentId: string,
+  userId: string
+): Promise<Pick<ApproveSigner, "id" | "status"> | null> {
+  const { data, error } = await supabase
+    .from("approve_signers")
+    .select("id, status")
+    .eq("document_id", documentId)
+    .eq("signer_id", userId)
+    .maybeSingle()
+  if (error) throw error
+  return (data as Pick<ApproveSigner, "id" | "status"> | null) ?? null
+}
+
+// Only the fields assigned to this member, even when they also created the
+// document and could read everyone's.
+export async function fetchMyFields(
+  supabase: SupabaseClient,
+  documentId: string,
+  userId: string
+): Promise<ApproveField[]> {
+  const { data, error } = await supabase
+    .from("approve_fields")
+    .select("*")
+    .eq("document_id", documentId)
+    .eq("signer_id", userId)
+    .order("page", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as unknown as ApproveField[]
+}
+
+// What the member entered last time per predefined category, the signature
+// image included. The signing page starts every such field from these.
+export async function fetchUserFieldValues(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ApproveUserFieldValue[]> {
+  const { data, error } = await supabase
+    .from("approve_user_field_values")
+    .select("*")
+    .eq("user_id", userId)
+  if (error) throw error
+  return (data ?? []) as unknown as ApproveUserFieldValue[]
 }

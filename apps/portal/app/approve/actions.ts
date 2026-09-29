@@ -10,6 +10,7 @@ import { validateForSubmit } from "@/lib/approve/validation"
 import { APPROVE_BUCKET, documentStoragePath } from "@/lib/approve/storage"
 import { drainOutboxBatch } from "@/lib/approve/email-drain"
 import { computeOrphanedSigners } from "@/lib/approve/signers"
+import { submitSignatureValues, type SignatureValue } from "@/lib/approve/sign"
 
 // Fire the outbox drain after the response is sent to the browser. Using
 // `after()` keeps the submit flow fast (user doesn't wait on Resend) while
@@ -251,7 +252,7 @@ export async function submitDocument(documentId: string): Promise<void> {
   // the client's try/catch treats NEXT_REDIRECT as a real error.
 }
 
-export type SignatureValue = { fieldId: string; value: string }
+export type { SignatureValue }
 
 export async function submitSignature(
   documentId: string,
@@ -261,11 +262,7 @@ export async function submitSignature(
   const supabase = await createClient()
   // All writes (fields, user-values, signer status, maybe-complete doc) run
   // inside the Postgres function — atomic via a single SQL transaction.
-  const { error } = await supabase.rpc("approve_submit_signature", {
-    p_document_id: documentId,
-    p_values: values.map((v) => ({ fieldId: v.fieldId, value: v.value })),
-  })
-  if (error) throw new Error(error.message)
+  await submitSignatureValues(supabase, documentId, values)
 
   // RPC may have completed the doc, which fires the trigger that enqueues a
   // document-completed mail to the creator. Drain after response either way —

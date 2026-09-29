@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
 import { after } from "next/server"
 
+import { drainOutboxBatch as drainApproveOutbox } from "@/lib/approve/email-drain"
 import { reloadPanelGreetings } from "@/lib/door/panel"
 import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
 import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
@@ -29,6 +30,18 @@ const handler = withMcpAuth(
               if (ok) await drainOutboxBatch()
             } catch (err) {
               console.error("[mcp] receipt email drain failed", err)
+            }
+          })
+        },
+        // submitSignature's after(): a signature that completes a document
+        // queues mail to its creator, and this sends it without waiting for
+        // the daily sweep.
+        afterApproveSignature: () => {
+          after(async () => {
+            try {
+              await drainApproveOutbox()
+            } catch (err) {
+              console.error("[mcp] approve email drain failed", err)
             }
           })
         },
