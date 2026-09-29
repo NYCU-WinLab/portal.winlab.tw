@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 
 import { fetchAdminUsers, type AdminUser } from "@/lib/admin/fetch"
+import { applyRoleChanges, roleApps, updateUserRoles } from "@/lib/admin/roles"
 import {
   failure,
   json,
@@ -59,7 +60,7 @@ export function registerAdminTools(server: McpServer) {
     {
       title: "List portal users",
       description:
-        'The lab member directory with permissions (/admin): id, name, email, is_admin for portal super admins, and roles, a map of app name to role list such as {"trip": ["admin"]}. Portal super admins only — for anyone else the tool fails instead of returning a shorter list, because this is the whole membership and everyone\'s access. Read only: granting or removing a role stays a deliberate click on https://portal.winlab.tw/admin and has no tool.',
+        'The lab member directory with permissions (/admin): id, name, email, is_admin for portal super admins, and roles, a map of app name to role list such as {"trip": ["admin"]}. Portal super admins only — for anyone else the tool fails instead of returning a shorter list, because this is the whole membership and everyone\'s access. Roles are changed with update_member_roles.',
       inputSchema: z.object({
         role_app: z
           .string()
@@ -109,6 +110,85 @@ export function registerAdminTools(server: McpServer) {
             is_admin: u.is_admin,
             roles: u.roles ?? {},
           })),
+        })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "update_member_roles",
+    {
+      title: "Update member roles",
+      description:
+        "Changes what a member may administer, the 編輯權限 dialog on /admin: grant_admin makes them an admin of each listed app (approve, bento, door, leave, meetings, receipts, reimburse, trip, or any app a member already holds a role in), revoke_admin takes that away, and is_admin sets or clears portal super admin, which admits them to everything including this tool. Omitted fields stay as they are. Portal super admins only; for anyone else the tool fails. A super admin cannot clear their own flag. It takes effect on the member's next request, so confirm the member, each app and the direction with the caller before calling. The result shows the roles before and after.",
+      inputSchema: z.object({
+        user_id: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Member id from list_portal_users"),
+        grant_admin: z
+          .array(z.string().trim().toLowerCase().min(1))
+          .max(20)
+          .default([])
+          .describe('Apps to make them an admin of, e.g. ["trip"]'),
+        revoke_admin: z
+          .array(z.string().trim().toLowerCase().min(1))
+          .max(20)
+          .default([])
+          .describe("Apps whose admin role to take away"),
+        is_admin: z
+          .boolean()
+          .optional()
+          .describe("Portal super admin; omit to leave it unchanged"),
+      }),
+    },
+    async ({ user_id, grant_admin, revoke_admin, is_admin }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        if (
+          grant_admin.length === 0 &&
+          revoke_admin.length === 0 &&
+          is_admin === undefined
+        ) {
+          throw new Error(
+            "nothing to change: pass grant_admin, revoke_admin or is_admin"
+          )
+        }
+        const supabase = createUserClient(caller.token)
+        await requireAdmin(supabase, "is_portal_admin", "change roles")
+        const users = await fetchAdminUsers(supabase)
+        const target = users.find((u) => u.id === user_id)
+        if (!target) {
+          throw new Error(
+            `no member with id ${user_id}; call list_portal_users for the ids`
+          )
+        }
+        const isAdmin = is_admin ?? target.is_admin
+        if (target.id === caller.userId && !isAdmin) {
+          throw new Error(
+            "a super admin cannot clear their own super admin flag; another super admin has to"
+          )
+        }
+        const roles = applyRoleChanges(
+          target.roles ?? {},
+          { grant: grant_admin, revoke: revoke_admin },
+          roleApps(users)
+        )
+        await updateUserRoles(supabase, {
+          targetId: target.id,
+          roles,
+          isAdmin,
+        })
+        return json({
+          id: target.id,
+          name: target.name,
+          email: target.email,
+          before: { is_admin: target.is_admin, roles: target.roles ?? {} },
+          after: { is_admin: isAdmin, roles },
+          url: `${PORTAL_URL}/admin`,
         })
       } catch (err) {
         return failure(err)

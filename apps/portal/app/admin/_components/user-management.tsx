@@ -17,35 +17,16 @@ import {
 
 import type { AdminUser } from "@/hooks/admin/use-admin-users"
 import { useAdminUsers } from "@/hooks/admin/use-admin-users"
+import { roleApps } from "@/lib/admin/roles"
 
 import { RoleEditorDialog } from "./role-editor-dialog"
-
-// Derive the full app list from actual data + known portal apps.
-// Every app with an is_<app>_admin() wrapper in the database has to be listed
-// here, or its role can only be granted by hand-editing user_profiles.roles.
-const KNOWN_APPS = [
-  "approve",
-  "bento",
-  "door",
-  "leave",
-  "meetings",
-  "receipts",
-  "reimburse",
-  "trip",
-]
-
-function deriveApps(users: AdminUser[]): string[] {
-  const set = new Set<string>(KNOWN_APPS)
-  users.forEach((u) => Object.keys(u.roles).forEach((k) => set.add(k)))
-  return Array.from(set).sort()
-}
 
 export function UserManagement() {
   const { data: users, isLoading, error } = useAdminUsers()
   const [search, setSearch] = useState("")
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
 
-  const apps = useMemo(() => deriveApps(users ?? []), [users])
+  const apps = useMemo(() => roleApps(users ?? []), [users])
 
   const filtered = useMemo(() => {
     if (!users) return []

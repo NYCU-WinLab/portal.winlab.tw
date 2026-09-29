@@ -124,6 +124,7 @@ describe("portal MCP handler", () => {
         "remove_bento_order_item",
         "rename_receipt",
         "set_door_sound",
+        "update_member_roles",
         "update_reimburse_egress",
         "update_reimburse_ingress",
         "upload_receipt",
