@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { fetchAdminUsers } from "@/lib/admin/fetch"
+import { updateUserRoles } from "@/lib/admin/roles"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -28,12 +29,7 @@ export function useUpdateUserRoles() {
       roles: Record<string, string[]>
       isAdmin: boolean
     }) => {
-      const { error } = await supabase.rpc("portal_admin_update_user", {
-        p_target_id: params.targetId,
-        p_roles: params.roles,
-        p_is_admin: params.isAdmin,
-      })
-      if (error) throw error
+      await updateUserRoles(supabase, params)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users })

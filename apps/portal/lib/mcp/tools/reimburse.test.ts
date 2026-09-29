@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   AMOUNT,
+  cents,
   egressUpdates,
   ingressUpdates,
   matchApplicant,
@@ -86,6 +87,20 @@ describe("ingressUpdates with an empty note", () => {
   test("clears the note, as the web does with an empty box", () => {
     expect(ingressUpdates({ ingress_comment: "" })).toEqual({
       ingress_comment: null,
+    })
+  })
+})
+
+describe("cents", () => {
+  test("drops float noise a computed amount carries", () => {
+    expect(cents(0.1 + 0.2)).toBe(0.3)
+    expect(cents(1.1 * 3)).toBe(3.3)
+    expect(cents(19.99)).toBe(19.99)
+  })
+
+  test("updates are stored rounded", () => {
+    expect(egressUpdates({ item_amount: 0.1 + 0.2 })).toEqual({
+      item_amount: 0.3,
     })
   })
 })
