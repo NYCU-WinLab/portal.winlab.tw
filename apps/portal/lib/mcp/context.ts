@@ -1,4 +1,7 @@
 import type { AuthInfo } from "@modelcontextprotocol/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+import type { Database } from "@/lib/supabase/database.types"
 
 // Shared plumbing for every tool module under lib/mcp/tools/. A tool gets the
 // caller from the verified bearer token, builds a per-request Supabase client
@@ -25,6 +28,17 @@ export function requireCaller(ctx: ToolContext): Caller {
     keycloakSub:
       typeof extra.keycloakSub === "string" ? extra.keycloakSub : null,
   }
+}
+
+// For tools whose web page only portal super admins reach. Checked up front
+// so anyone else gets a plain refusal, not RLS's empty result.
+export async function requirePortalAdmin(
+  supabase: SupabaseClient<Database>,
+  action: string
+): Promise<void> {
+  const { data, error } = await supabase.rpc("is_portal_admin")
+  if (error) throw error
+  if (data !== true) throw new Error(`only portal admins can ${action}`)
 }
 
 export function json(value: unknown) {
