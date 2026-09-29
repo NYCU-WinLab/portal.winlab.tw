@@ -149,7 +149,7 @@ export function registerBulletinTools(server: McpServer) {
     {
       title: "Create announcement",
       description:
-        "Posts an announcement to the lab board on the portal home page (/bulletin), the 新增公告 dialog. Portal super admins only; for anyone else the tool fails. It is published at once and every member sees it, with the caller as author. notify decides the mail: true leaves it for the lab's notifier script, which mails it to everyone as it does a web post; false posts it quietly: it is marked as already mailed (the green bell on its web page), so the script skips it. The body is markdown. Show the member the exact title, body, tags, pinned and notify choice and get their yes before calling; never write or reword the text for them unasked.",
+        "Posts an announcement to the lab board on the portal home page (/bulletin), the 新增公告 dialog. Portal super admins only; for anyone else the tool fails. It is published at once and every member sees it, with the caller as author. notify decides the mail: true leaves it for the lab's notifier script, which mails it to everyone as it does a web post; false posts it quietly: it is marked as already mailed (the green bell on its web page), so the script skips it. The page shows the body as plain text with its line breaks, so markdown syntax appears as typed. Show the member the exact title, body, tags, pinned and notify choice and get their yes before calling; never write or reword the text for them unasked.",
       inputSchema: z.object({
         title: z
           .string()
@@ -162,7 +162,7 @@ export function registerBulletinTools(server: McpServer) {
           .trim()
           .min(1)
           .max(20000)
-          .describe("Body in markdown, exactly as it should read"),
+          .describe("Body as it should read; line breaks are kept"),
         tags: z
           .array(z.string().trim().min(1).max(40))
           .max(10)
