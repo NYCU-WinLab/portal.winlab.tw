@@ -92,7 +92,7 @@ export async function GET(request: Request) {
     }
 
     // One call for every sound. A path whose object is gone comes back with
-    // its own error and that member just gets the voice greeting; the whole
+    // its own error and that member just gets the default sound; the whole
     // call failing is a 503 like a failed table read.
     const signedUrls = new Map<string, string>()
     const paths = greetingSoundPaths(rows)

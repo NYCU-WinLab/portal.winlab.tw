@@ -117,8 +117,8 @@ export function greetingSoundPaths(profiles: GreetingProfile[]): string[] {
 }
 
 // signedUrls maps a storage path to its signed URL; a path that failed to
-// sign (a missing object) is absent, and that member falls back to the voice
-// greeting. The path is the version: every upload gets a fresh one, so the
+// sign (a missing object) is absent, and that member gets the lab's default
+// sound after the spoken greeting. The path is the version: every upload gets a fresh one, so the
 // panel can cache the file by it.
 export function buildGreetingSoundMap(
   profiles: GreetingProfile[],

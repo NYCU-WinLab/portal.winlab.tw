@@ -125,7 +125,7 @@ export function DoorSoundForm({
   return (
     <Section
       title="開門音效"
-      description="刷卡、按 /door 或請 agent 開門時，門口喇叭先念「Hi」加你的名字和看板後綴，再播音效。有上傳音效就播你的音效，否則播實驗室預設音效。"
+      description="刷卡、按 /door 或請 agent 開門時，門口喇叭先念「Hi」加你的名字和看板後綴的文字(符號不念)，再播音效：選「播我的音效」就播你上傳的音效，否則播實驗室預設音效。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"

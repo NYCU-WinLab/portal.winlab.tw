@@ -276,7 +276,7 @@ export async function setOwnDoorSound(
   return { ok: true, path, mode, previous: current.path }
 }
 
-// Clears the file and falls back to the voice greeting.
+// Clears the file, so the door plays the lab's default sound again.
 export async function clearDoorSound(
   supabase: SupabaseClient,
   userId: string

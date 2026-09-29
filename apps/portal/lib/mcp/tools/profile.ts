@@ -119,7 +119,7 @@ export function registerProfileTools(
     "set_door_sound",
     {
       title: "Set door sound",
-      description: `Set what the lab door plays when the member opens it, the 開門音效 setting on /profile. Self only. The door first says "Hi" with the member's given name and greeting suffix, then plays this sound. Send an audio file as base64 (mp3, m4a, aac, wav or ogg, max 3 MB decoded) to replace the member's sound; the door plays at most its first ${DOOR_SOUND_MAX_SECONDS} seconds, loudness levelled. mode sound_only (播我的音效) plays the member's file, voice_only (播預設音效) plays the lab's default sound and keeps the file. Pass format and file_base64 together, or neither to change only the mode. The replaced file is deleted and the door picks up the change within seconds. Confirm with the member before replacing their sound.`,
+      description: `Set what the lab door plays when the member opens it, the 開門音效 setting on /profile. Self only. The door first says "Hi" with the member's given name and the words of their greeting suffix (symbols are not spoken), then plays the sound. Send an audio file as base64 (mp3, m4a, aac, wav or ogg, max 3 MB decoded) to replace the member's sound; the door plays at most its first ${DOOR_SOUND_MAX_SECONDS} seconds, loudness levelled. mode sound_only (播我的音效) plays the member's file, voice_only (播預設音效) plays the lab's default sound and keeps the file. Pass format and file_base64 together, or neither to change only the mode. The replaced file is deleted and the door picks up the change within seconds. Confirm with the member before replacing their sound.`,
       inputSchema: z.object({
         mode: z
           .enum(DOOR_SOUND_MODES)

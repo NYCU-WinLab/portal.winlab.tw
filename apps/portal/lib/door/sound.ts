@@ -170,9 +170,10 @@ export function newDoorSoundPath(
 }
 
 // What the door plays for a member, by the panel service's rules. It first
-// says "Hi" with their given name and the text of their greeting suffix, then
-// plays their own sound when they have one and picked sound_only, otherwise
-// the lab's default sound.
+// says "Hi" with their given name and the words of their greeting suffix
+// (symbols such as the default "！！" are not spoken), then plays their own
+// sound when they have one and picked sound_only, otherwise the lab's default
+// sound.
 export type DoorSoundOutcome = "own" | "default"
 
 export function doorSoundOutcome({
