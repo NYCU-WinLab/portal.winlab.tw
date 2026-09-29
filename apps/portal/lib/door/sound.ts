@@ -8,9 +8,10 @@ export const DOOR_SOUND_BUCKET = "door-sounds"
 export const DOOR_SOUND_MAX_BYTES = 3 * 1024 * 1024
 export const DOOR_SOUND_MAX_SECONDS = 10
 
-// One content type per extension, sent with the upload so the bucket's
-// allowed_mime_types can be an exact list instead of whatever each browser
-// guesses (Safari says audio/x-m4a, Chrome audio/mp4, some say nothing).
+// One content type per extension, stamped on the upload itself
+// (doorSoundUploadBody) so the bucket's allowed_mime_types can be an exact
+// list instead of whatever each browser guesses (Safari says audio/x-m4a,
+// Chrome audio/mp4, some say nothing).
 export const DOOR_SOUND_TYPES = {
   mp3: "audio/mpeg",
   m4a: "audio/mp4",
@@ -130,6 +131,18 @@ export function validateDoorSoundBytes(
     return { ok: false, error: SOUND_NOT_AUDIO }
   }
   return { ok: true, ext, contentType: DOOR_SOUND_TYPES[ext] }
+}
+
+// storage-js sends a Blob or File as one multipart part and the bucket checks
+// that part's own type; the upload's contentType option never reaches the
+// server. So the bytes go out re-typed with the extension's one content type,
+// whatever the browser called the file.
+export function doorSoundUploadBody(
+  content: Blob | Uint8Array,
+  contentType: string
+): Blob {
+  const part = content instanceof Blob ? content : new Uint8Array(content)
+  return new Blob([part], { type: contentType })
 }
 
 const PATH_NAME = /^[A-Za-z0-9_-]{1,64}\.(mp3|m4a|aac|wav|ogg)$/

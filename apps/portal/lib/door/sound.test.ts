@@ -5,6 +5,7 @@ import {
   DOOR_SOUND_MAX_BYTES,
   doorSoundExtension,
   doorSoundOutcome,
+  doorSoundUploadBody,
   isDoorSoundMode,
   isDoorSoundPath,
   isDoorSoundPlayMode,
@@ -145,6 +146,26 @@ describe("validateDoorSoundBytes", () => {
       ok: false,
       error: SOUND_NOT_AUDIO,
     })
+  })
+})
+
+describe("doorSoundUploadBody", () => {
+  test("re-types a picked file with the bucket's content type", async () => {
+    const picked = new File([bytes("ftypM4A ")], "clip.m4a", {
+      type: "audio/x-m4a",
+    })
+    const body = doorSoundUploadBody(picked, "audio/mp4")
+    expect(body.type).toBe("audio/mp4")
+    expect(new Uint8Array(await body.arrayBuffer())).toEqual(bytes("ftypM4A "))
+  })
+
+  test("types a file the browser left untyped, and raw bytes", () => {
+    const untyped = new File([bytes("ID3")], "clip.mp3")
+    expect(untyped.type).toBe("")
+    expect(doorSoundUploadBody(untyped, "audio/mpeg").type).toBe("audio/mpeg")
+    expect(doorSoundUploadBody(bytes("OggS"), "audio/ogg").type).toBe(
+      "audio/ogg"
+    )
   })
 })
 
