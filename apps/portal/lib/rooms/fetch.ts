@@ -249,3 +249,24 @@ async function requesterNames(
   }
   return names
 }
+
+export interface LabMember {
+  id: string
+  name: string | null
+  email: string | null
+  /** Keycloak account name (`preferred_username`), e.g. "n0ball". */
+  username: string | null
+}
+
+// Every member, for the attendee picker and for book_room to resolve who an
+// agent means. Only members with an email can be invited.
+export async function fetchLabMembers(
+  supabase: SupabaseClient
+): Promise<LabMember[]> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("id, name, email, username")
+    .order("name")
+  if (error) throw error
+  return (data ?? []) as LabMember[]
+}

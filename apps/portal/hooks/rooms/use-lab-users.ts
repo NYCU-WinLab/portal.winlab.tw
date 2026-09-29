@@ -7,6 +7,7 @@ import {
   getEpicDeliverables,
   getGroupEpics,
 } from "@/app/rooms/actions"
+import { fetchLabMembers } from "@/lib/rooms/fetch"
 import { createClient } from "@/lib/supabase/client"
 
 import { queryKeys } from "./query-keys"
@@ -29,19 +30,7 @@ export function useLabUsers() {
 
   return useQuery({
     queryKey: queryKeys.labUsers.all,
-    queryFn: async (): Promise<LabUser[]> => {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select("id, name, email, username")
-        .order("name")
-      if (error) throw error
-      return (data ?? []).map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        username: u.username,
-      }))
-    },
+    queryFn: (): Promise<LabUser[]> => fetchLabMembers(supabase),
     staleTime: 5 * 60_000,
   })
 }

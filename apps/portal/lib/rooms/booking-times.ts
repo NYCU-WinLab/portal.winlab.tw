@@ -23,6 +23,33 @@ function formatHour(hour: number): string {
 }
 
 /**
+ * Accepts a booking date only when it is a real `YYYY-MM-DD` calendar day.
+ * `new Date` rolls an impossible one such as 2026-11-31 over to the next
+ * month, so without this the department system would be asked for 12/01
+ * while `rooms_bookings.date` refuses the insert, leaving a reservation
+ * nobody can see or cancel.
+ */
+export function validateBookingDate(date: unknown): BookingTimesResult {
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, error: "日期格式要是 YYYY-MM-DD" }
+  }
+  const [year, month, day] = date.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ]
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return { ok: false, error: `${date} 不是存在的日期` }
+  }
+  return { ok: true }
+}
+
+/**
  * Accepts `startTime`–`endTime` only when both are `HH:MM`, both sit on the
  * `window.slotMinutes` grid, both fall inside `window` (the end may equal the
  * window's closing hour), and the end is after the start.

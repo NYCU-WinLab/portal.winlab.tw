@@ -21,13 +21,17 @@ import {
   type ReceiptHooks,
 } from "@/lib/mcp/tools/receipts"
 import { registerReimburseTools } from "@/lib/mcp/tools/reimburse"
-import { registerRoomsTools } from "@/lib/mcp/tools/rooms"
+import { registerRoomsTools, type RoomsHooks } from "@/lib/mcp/tools/rooms"
 import { registerTripTools } from "@/lib/mcp/tools/trip"
 
-export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.9.0" }
+export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.10.0" }
 
 // Follow-ups route.ts runs after a tool call, outside the tool itself.
-export type ToolHooks = ReceiptHooks & ProfileHooks & ApproveHooks & DoorHooks
+export type ToolHooks = ReceiptHooks &
+  ProfileHooks &
+  ApproveHooks &
+  DoorHooks &
+  RoomsHooks
 
 // One module per portal app under lib/mcp/tools/. Adding a tool: register it
 // in that app's module and name it in lib/mcp/instructions.ts.
@@ -38,7 +42,7 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}) {
   registerBentoTools(server)
   registerLeaveTools(server)
   registerMeetingsTools(server)
-  registerRoomsTools(server)
+  registerRoomsTools(server, hooks)
   registerReceiptsTools(server, hooks)
   registerTripTools(server)
   registerApproveTools(server, hooks)
