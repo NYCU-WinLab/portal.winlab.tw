@@ -7,6 +7,7 @@ import {
   inferMimeFromFilename,
   resolveImageMimeType,
   resolveMediaMimeType,
+  typedUploadBody,
 } from "@/lib/gallery/mime"
 
 describe("resolveMediaMimeType", () => {
@@ -121,5 +122,19 @@ describe("whitelist invariants", () => {
     for (const mime of ALLOWED_IMAGE_MIME) {
       expect(ALLOWED_VIDEO_MIME.has(mime)).toBe(false)
     }
+  })
+})
+
+describe("typedUploadBody", () => {
+  test("re-types an untyped HEIC and an image/jpg JPEG", () => {
+    const heic = new File(["x"], "IMG_0001.heic")
+    expect(typedUploadBody(heic, "image/heic").type).toBe("image/heic")
+    const jpg = new File(["x"], "photo.jpg", { type: "image/jpg" })
+    expect(typedUploadBody(jpg, "image/jpeg").type).toBe("image/jpeg")
+  })
+
+  test("passes a body that already has the type through untouched", () => {
+    const poster = new Blob(["x"], { type: "image/webp" })
+    expect(typedUploadBody(poster, "image/webp")).toBe(poster)
   })
 })

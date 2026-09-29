@@ -22,7 +22,11 @@ import {
   resolveStorageExtension,
 } from "@/lib/gallery/upload-path"
 import { extractTakenAtFromFile } from "@/lib/gallery/extract-taken-at-client"
-import { resolveMediaMimeType, type ResolvedMime } from "@/lib/gallery/mime"
+import {
+  resolveMediaMimeType,
+  typedUploadBody,
+  type ResolvedMime,
+} from "@/lib/gallery/mime"
 import { createClient } from "@/lib/supabase/client"
 import {
   VIDEO_MAX_DURATION_SECONDS,
@@ -77,7 +81,9 @@ function throwIfAborted(signal?: AbortSignal) {
     : new DOMException("Upload aborted.", "AbortError")
 }
 
-async function uploadBytesToStorage(
+// Every photo, video and poster goes to storage through here; exported for
+// its test.
+export async function uploadBytesToStorage(
   supabase: SupabaseBrowser,
   objectPath: string,
   body: Blob,
@@ -88,7 +94,7 @@ async function uploadBytesToStorage(
   try {
     const { error } = await supabase.storage
       .from("gallery")
-      .upload(objectPath, body, {
+      .upload(objectPath, typedUploadBody(body, contentType), {
         contentType,
         upsert: false,
       })
@@ -261,17 +267,13 @@ export async function uploadVideoFile(ctx: UploadCtx): Promise<string> {
     label: `${labelPrefix}Uploading video`,
     ratio: 0.3,
   })
-  try {
-    await uploadBytesToStorage(
-      supabase,
-      videoPath,
-      compressed.video,
-      compressed.videoMime,
-      signal
-    )
-  } catch (error) {
-    throw error
-  }
+  await uploadBytesToStorage(
+    supabase,
+    videoPath,
+    compressed.video,
+    compressed.videoMime,
+    signal
+  )
 
   if (signal?.aborted) {
     await supabase.storage.from("gallery").remove([videoPath])
