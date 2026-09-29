@@ -18,6 +18,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
+import { createAnnouncement } from "@/lib/bulletin/mutations"
 import { createClient } from "@/lib/supabase/client"
 
 interface AnnouncementDialogProps {
@@ -72,10 +73,7 @@ export function AnnouncementDialog({
           .eq("id", initial.id)
         if (error) throw error
       } else {
-        const { error } = await supabase
-          .from("announcements")
-          .insert({ title, content, tags, pinned })
-        if (error) throw error
+        await createAnnouncement(supabase, { title, content, tags, pinned })
       }
       toast.success(initial ? "公告已更新" : "公告已新增")
       onOpenChange(false)

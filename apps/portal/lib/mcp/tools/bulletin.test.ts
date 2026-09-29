@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { announcementExcerpt } from "@/lib/mcp/tools/bulletin"
+import { announcementExcerpt, normalizeTags } from "@/lib/mcp/tools/bulletin"
 
 describe("announcementExcerpt", () => {
   test("returns short plain text unchanged", () => {
@@ -44,5 +44,15 @@ describe("announcementExcerpt", () => {
 
   test("survives an empty body", () => {
     expect(announcementExcerpt("")).toBe("")
+  })
+})
+
+describe("normalizeTags", () => {
+  test("keeps each tag once, in the order given", () => {
+    expect(normalizeTags(["clean", "核銷", "clean"])).toEqual(["clean", "核銷"])
+  })
+
+  test("leaves an empty list empty", () => {
+    expect(normalizeTags([])).toEqual([])
   })
 })

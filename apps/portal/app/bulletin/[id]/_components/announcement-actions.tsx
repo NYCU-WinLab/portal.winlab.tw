@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
 
 import { createClient } from "@/lib/supabase/client"
+import { deleteAnnouncement } from "@/lib/bulletin/mutations"
 import { type Announcement } from "@/lib/bulletin/types"
 import { AnnouncementDialog } from "@/app/_components/announcement-dialog"
 import { ConfirmDialog } from "@/app/bento/_components/confirm-dialog"
@@ -28,12 +29,7 @@ export function AnnouncementActions({
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("announcements")
-        .delete()
-        .eq("id", announcement.id)
-      if (error) throw error
+      await deleteAnnouncement(createClient(), announcement.id)
       toast.success("公告已刪除")
       router.push("/")
       router.refresh()

@@ -93,7 +93,9 @@ describe("portal MCP handler", () => {
     expect(names).toEqual(
       [
         "add_bento_order_item",
+        "create_announcement",
         "create_leave",
+        "delete_announcement",
         "delete_leave",
         "get_announcement",
         "get_approve_document",
