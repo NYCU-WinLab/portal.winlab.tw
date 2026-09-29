@@ -121,6 +121,7 @@ describe("portal MCP handler", () => {
         "list_room_bookings",
         "list_trip_files",
         "list_trips",
+        "open_door",
         "remove_bento_order_item",
         "rename_receipt",
         "set_door_sound",

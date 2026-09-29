@@ -20,6 +20,14 @@ const formatter = new Intl.DateTimeFormat("zh-TW", {
   hour12: false,
 })
 
+// The 來源 column. mcp is an agent pressing the button for the member in the
+// row, through the portal's MCP server.
+const SOURCE_LABEL: Record<string, string> = {
+  web: "網頁",
+  mcp: "MCP",
+  card: "刷卡",
+}
+
 export function DoorLog({
   events,
   syncNotice,
@@ -109,8 +117,8 @@ export function DoorLog({
                   {e.latency_ms !== null ? `${e.latency_ms} ms` : ""}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  <div>{e.source === "card" ? "刷卡" : "網頁"}</div>
-                  {e.source === "web" && (
+                  <div>{SOURCE_LABEL[e.source] ?? e.source}</div>
+                  {e.source !== "card" && (
                     <div>
                       {[e.client_address, e.geo_city]
                         .filter(Boolean)

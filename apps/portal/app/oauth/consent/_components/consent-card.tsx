@@ -111,7 +111,9 @@ export function ConsentCard({
         </p>
       </div>
       <ul className="flex flex-col gap-1 text-sm">
-        <li>Act on portal with your permissions (receipts and more)</li>
+        <li>
+          Act on portal with your permissions (receipts, the lab door and more)
+        </li>
         {state.scopes.map((scope) => (
           <li key={scope}>{SCOPE_LABELS[scope] ?? scope}</li>
         ))}

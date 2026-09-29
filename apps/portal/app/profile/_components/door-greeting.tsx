@@ -69,7 +69,7 @@ export function DoorGreetingForm({
   return (
     <Section
       title="門口看板"
-      description="刷卡或按 /door 開門時，門口 LED 看板顯示的內容。"
+      description="刷卡、按 /door 或請 agent 開門時，門口 LED 看板顯示的內容。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"

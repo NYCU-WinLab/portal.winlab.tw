@@ -14,9 +14,11 @@ describe("buildDoorEvent", () => {
     const row = buildDoorEvent(
       user,
       { ok: true, latencyMs: 412.6 },
-      { "client.address": "140.113.1.2", "geo.city": "Hsinchu" }
+      { "client.address": "140.113.1.2", "geo.city": "Hsinchu" },
+      "web"
     )
     expect(row).toEqual({
+      source: "web",
       user_id: user.id,
       user_email: user.email,
       user_name: user.name,
@@ -32,7 +34,8 @@ describe("buildDoorEvent", () => {
     const row = buildDoorEvent(
       user,
       { ok: false, latencyMs: 8000, error: "Door API responded 504" },
-      {}
+      {},
+      "web"
     )
     expect(row.ok).toBe(false)
     expect(row.error).toBe("Door API responded 504")
@@ -41,13 +44,28 @@ describe("buildDoorEvent", () => {
   })
 })
 
+describe("buildDoorEvent from the MCP server", () => {
+  test("records the agent's unlock as its own source", () => {
+    const row = buildDoorEvent(user, { ok: true, latencyMs: 300 }, {}, "mcp")
+    expect(row.source).toBe("mcp")
+    expect(row.user_id).toBe(user.id)
+    expect(doorEventAttributes(row)["door.source"]).toBe("mcp")
+  })
+})
+
 describe("doorEventAttributes", () => {
   test("omits absent optional fields instead of writing null", () => {
     const attrs = doorEventAttributes(
-      buildDoorEvent({ ...user, email: null }, { ok: true, latencyMs: 100 }, {})
+      buildDoorEvent(
+        { ...user, email: null },
+        { ok: true, latencyMs: 100 },
+        {},
+        "web"
+      )
     )
     expect(attrs).toEqual({
       "door.action": "open",
+      "door.source": "web",
       "door.ok": true,
       "user.id": user.id,
       "user.name": user.name,
@@ -58,7 +76,12 @@ describe("doorEventAttributes", () => {
 
 describe("buildDoorEvent with an empty error message", () => {
   test("still stores a reason so the row passes the ok/error check", () => {
-    const row = buildDoorEvent(user, { ok: false, latencyMs: 1, error: "" }, {})
+    const row = buildDoorEvent(
+      user,
+      { ok: false, latencyMs: 1, error: "" },
+      {},
+      "web"
+    )
     expect(row.error).toBe("Door API request failed")
   })
 })
