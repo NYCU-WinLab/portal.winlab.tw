@@ -11,12 +11,18 @@ import {
 
 import { SigningView } from "../../_components/signing-view"
 
+// A mangled link from an invite mail is a page that does not exist, not a
+// failure worth retrying, so it never reaches the database.
+const DOCUMENT_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default async function SignPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  if (!DOCUMENT_ID.test(id)) notFound()
   const user = (await getCurrentUser())!
   const supabase = await createClient()
 

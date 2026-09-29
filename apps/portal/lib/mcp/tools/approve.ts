@@ -233,7 +233,7 @@ export function registerApproveTools(
     {
       title: "Sign approve document",
       description:
-        "Signs a document in the member's approve inbox (/approve), the 送出簽核 button on its signing page. Every field assigned to the member is filled the way that page fills it: the signature with the signature image they saved the last time they signed, the address, id number and phone fields with the values they saved, and the free-text fields from values. values may also replace a saved address, id number or phone for this document, and becomes their saved value, as on the web; a signature can never be supplied. Nothing is submitted while any field is still empty: the error lists them, so ask the member for the text and call again. A member with no saved signature has to sign once on the web first. Only a document waiting for signatures (status pending) where the member has not signed yet can be signed, and signing cannot be undone. Tell the member the document title and what goes into each field, get their yes, then call.",
+        "Signs a document in the member's approve inbox (/approve), the 送出簽核 button on its signing page. Every field assigned to the member is filled the way that page fills it: the signature with the signature image saved on their account (kept whenever they sign on /approve or /trip), the address, id number and phone fields with the values they saved, and the free-text fields from values. values may also replace a saved address, id number or phone for this document, and becomes their saved value, as on the web; a signature can never be supplied. Nothing is submitted while any field is still empty: the error lists them, so ask the member for the text and call again. A member with no saved signature has to sign once on the web (/approve or /trip) first. Only a document waiting for signatures (status pending) where the member has not signed yet can be signed, and signing cannot be undone. Tell the member the document title and what goes into each field, get their yes, then call.",
       inputSchema: z.object({
         document_id: z
           .uuid()
@@ -291,14 +291,22 @@ export function registerApproveTools(
                 )
                 .join(", ")}.`,
               noSignature
-                ? " The member has no saved signature; they have to sign once on the web first."
+                ? " The member has no saved signature; they have to sign once on the web (/approve or /trip) first."
                 : " Pass them in values.",
             ].join("")
           )
         }
         await submitSignatureValues(supabase, document.id, plan.values)
         hooks.afterApproveSignature?.()
-        const after = await fetchDocument(supabase, document.id)
+        // The signature is committed by now, so a failed read-back must not
+        // come back as a failed signature; completion is just unknown then.
+        let completed: boolean | null = null
+        try {
+          const after = await fetchDocument(supabase, document.id)
+          completed = after ? after.status === "completed" : null
+        } catch {
+          completed = null
+        }
         return json({
           signed: true,
           document_id: document.id,
@@ -306,7 +314,7 @@ export function registerApproveTools(
           fields_signed: plan.values.length,
           filled_from_saved: plan.fromSaved,
           filled_from_values: plan.provided,
-          document_completed: after?.status === "completed",
+          document_completed: completed,
           url: `${PORTAL_URL}/approve/view/${document.id}`,
         })
       } catch (err) {
