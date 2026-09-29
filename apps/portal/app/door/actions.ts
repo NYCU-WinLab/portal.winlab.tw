@@ -5,16 +5,13 @@
 // client bundle and the device only has to trust one caller.
 
 import { headers } from "next/headers"
-import { after } from "next/server"
 
-import { recordDoorEvent } from "@/lib/door/audit"
 import {
   doorConfigured,
   fetchDoorState,
-  pulseDoor,
   type DoorState,
 } from "@/lib/door/client"
-import { greetOnPanel } from "@/lib/door/greet"
+import { pressDoor } from "@/lib/door/open"
 import { getCurrentUser, type NormalizedUser } from "@/lib/user"
 
 export type DoorResult =
@@ -48,25 +45,5 @@ export async function getDoorState(): Promise<DoorResult> {
 // waits on the database. A successful press also puts the member's name on
 // the door's LED panel, on the same deferred path.
 export async function openDoor(): Promise<DoorResult> {
-  return guarded(async (user) => {
-    const requestHeaders = await headers()
-    const started = performance.now()
-    try {
-      const state = await pulseDoor()
-      const latencyMs = performance.now() - started
-      after(() =>
-        recordDoorEvent(user, { ok: true, latencyMs }, requestHeaders)
-      )
-      after(() => greetOnPanel({ userId: user.id, fallbackName: user.name }))
-      return state
-    } catch (err) {
-      const latencyMs = performance.now() - started
-      const error =
-        err instanceof Error ? err.message : "Door API request failed"
-      after(() =>
-        recordDoorEvent(user, { ok: false, latencyMs, error }, requestHeaders)
-      )
-      throw err
-    }
-  })
+  return guarded(async (user) => pressDoor(user, await headers(), "web"))
 }

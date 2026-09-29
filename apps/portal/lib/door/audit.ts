@@ -16,6 +16,10 @@ export type DoorOutcome =
 
 export type DoorEvent = Database["public"]["Tables"]["door_events"]["Row"]
 
+// Who pressed: the /door button, or an agent through the MCP server acting
+// for the member. Card events come from the bridge, not from here.
+export type DoorSource = "web" | "mcp"
+
 // Rows are inserted by the service-role client, so this shape is the whole
 // contract with the table — keep it in step with the migration.
 export type DoorEventInsert = Pick<
@@ -26,7 +30,7 @@ export type DoorEventInsert = Pick<
   | "latency_ms"
   | "client_address"
   | "geo_city"
-> & { user_id: string; ok: boolean }
+> & { user_id: string; ok: boolean; source: DoorSource }
 
 // Pure: turns a press into the row to store. `attribution` is the
 // `client.address` / `geo.*` set from lib/otel/attribution, already free of
@@ -34,10 +38,12 @@ export type DoorEventInsert = Pick<
 export function buildDoorEvent(
   user: NormalizedUser,
   outcome: DoorOutcome,
-  attribution: Attributes
+  attribution: Attributes,
+  source: DoorSource = "web"
 ): DoorEventInsert {
   const str = (v: unknown) => (typeof v === "string" ? v : null)
   return {
+    source,
     user_id: user.id,
     user_email: user.email,
     user_name: user.name,
@@ -54,6 +60,7 @@ export function buildDoorEvent(
 export function doorEventAttributes(event: DoorEventInsert): Attributes {
   const attrs: Attributes = {
     "door.action": "open",
+    "door.source": event.source,
     "door.ok": event.ok,
     "user.id": event.user_id,
     "user.name": event.user_name,
@@ -72,13 +79,15 @@ export function doorEventAttributes(event: DoorEventInsert): Attributes {
 export async function recordDoorEvent(
   user: NormalizedUser,
   outcome: DoorOutcome,
-  headers: Headers
+  headers: Headers,
+  source: DoorSource = "web"
 ): Promise<void> {
   try {
     const event = buildDoorEvent(
       user,
       outcome,
-      getClientAttributionAttributes(headers)
+      getClientAttributionAttributes(headers),
+      source
     )
 
     emitLog({

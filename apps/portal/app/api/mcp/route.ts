@@ -1,8 +1,12 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { headers } from "next/headers"
 import { after } from "next/server"
 
 import { drainOutboxBatch as drainApproveOutbox } from "@/lib/approve/email-drain"
+import { doorConfigured } from "@/lib/door/client"
+import { pressDoor } from "@/lib/door/open"
 import { reloadPanelGreetings } from "@/lib/door/panel"
+import { callerAsUser } from "@/lib/mcp/context"
 import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
 import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
 import { createUserClient, verifySupabaseToken } from "@/lib/mcp/supabase"
@@ -32,6 +36,12 @@ const handler = withMcpAuth(
               console.error("[mcp] receipt email drain failed", err)
             }
           })
+        },
+        // The /door button's own press, marked as an agent's: same relay
+        // pulse, same audit row and panel greeting after the response.
+        openDoor: async (caller) => {
+          if (!doorConfigured()) throw new Error("Door API is not configured")
+          return pressDoor(callerAsUser(caller), await headers(), "mcp")
         },
         // submitSignature's after(): a signature that completes a document
         // queues mail to its creator, and this sends it without waiting for

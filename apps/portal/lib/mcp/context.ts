@@ -2,6 +2,7 @@ import type { AuthInfo } from "@modelcontextprotocol/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { Database } from "@/lib/supabase/database.types"
+import type { NormalizedUser } from "@/lib/user"
 
 // Shared plumbing for every tool module under lib/mcp/tools/. A tool gets the
 // caller from the verified bearer token, builds a per-request Supabase client
@@ -50,6 +51,17 @@ export async function requireAdmin(
   if (error) throw error
   if (data !== true) {
     throw new Error(`only ${ADMIN_CHECKS[check]} can ${action}`)
+  }
+}
+
+// The caller in the shape the web's server actions pass around, with the
+// same name fallback as normalizeUser.
+export function callerAsUser(caller: Caller): NormalizedUser {
+  return {
+    id: caller.userId,
+    email: caller.email,
+    name: caller.name ?? caller.email ?? "Unknown",
+    avatarUrl: null,
   }
 }
 
