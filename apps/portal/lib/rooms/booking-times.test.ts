@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   addMinutesToClock,
   slotStartTimes,
+  validateBookingDate,
   validateBookingTimes,
   validateRecurringSchedule,
 } from "@/lib/rooms/booking-times"
@@ -196,5 +197,23 @@ describe("slotStartTimes", () => {
     expect(starts[0]).toBe("08:00")
     expect(starts[1]).toBe("08:30")
     expect(starts.at(-1)).toBe("21:30")
+  })
+})
+
+describe("validateBookingDate", () => {
+  test("accepts real days, leap days included", () => {
+    expect(validateBookingDate("2026-10-01")).toEqual({ ok: true })
+    expect(validateBookingDate("2028-02-29")).toEqual({ ok: true })
+  })
+
+  test("refuses days that do not exist instead of rolling them over", () => {
+    expect(validateBookingDate("2026-11-31").ok).toBe(false)
+    expect(validateBookingDate("2027-02-29").ok).toBe(false)
+    expect(validateBookingDate("2026-13-01").ok).toBe(false)
+  })
+
+  test("refuses anything that is not YYYY-MM-DD", () => {
+    expect(validateBookingDate("2026-1-5").ok).toBe(false)
+    expect(validateBookingDate(20261005).ok).toBe(false)
   })
 })

@@ -12,7 +12,10 @@ import { fetchEpic, fetchEpicDeliverables } from "@/lib/gitlab/client"
 import type { AttendeeContact } from "@/lib/rooms/attendee-groups"
 import { nextInviteSequence, placeBooking } from "@/lib/rooms/book"
 import { cancelRoomBooking } from "@/lib/rooms/booking-client"
-import { validateBookingTimes } from "@/lib/rooms/booking-times"
+import {
+  validateBookingDate,
+  validateBookingTimes,
+} from "@/lib/rooms/booking-times"
 import { taipeiIso } from "@/lib/rooms/date"
 import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
 import { parseEpicRef } from "@/lib/rooms/epic-refs"
@@ -144,6 +147,8 @@ export async function confirmBookingFor(
 ): Promise<BookingResult> {
   // The picker only offers valid slots, but this action takes whatever the
   // request carries. Checked before anything is booked, triggered or written.
+  const day = validateBookingDate(input.date)
+  if (!day.ok) return { error: day.error }
   const times = validateBookingTimes(input.startTime, input.endTime, DAY_WINDOW)
   if (!times.ok) return { error: times.error }
 
@@ -180,7 +185,13 @@ export async function confirmBookingFor(
       issueRefs: epicLink.issueRefs,
     })
 
-    revalidatePath("/rooms")
+    // The booking is made by now; a cache refresh that fails must not read
+    // as a failed booking, or the caller may book the room twice.
+    try {
+      revalidatePath("/rooms")
+    } catch (err) {
+      console.error("[rooms] revalidate after booking failed", err)
+    }
     return {
       bookingId: outcome.bookingId,
       ...(outcome.inviteError ? { inviteError: outcome.inviteError } : {}),

@@ -4,6 +4,7 @@ import {
   advisorContact,
   mergeRuns,
   resolveAttendees,
+  roomForSpan,
 } from "@/lib/mcp/tools/rooms"
 import type { LabMember } from "@/lib/rooms/fetch"
 import type { AvailabilitySlot } from "@/lib/rooms/availability"
@@ -92,7 +93,7 @@ describe("resolveAttendees", () => {
     ).toEqual([
       { name: "詹詠翔", email: "loki@winlab.tw", username: "zyx1121" },
       { name: "Mike", email: "mike@winlab.tw" },
-      { name: "曾建超", email: "cc@winlab.tw", username: "cctseng" },
+      { name: "曾建超", email: "cc@winlab.tw" },
     ])
   })
 
@@ -123,5 +124,31 @@ describe("advisorContact", () => {
 
   test("is null when the advisor has no account", () => {
     expect(advisorContact(MEMBERS.slice(0, 2))).toBeNull()
+  })
+})
+
+describe("roomForSpan", () => {
+  const day = [
+    slot("10:00", "10:30", { freeRooms: ["600A"], paidRooms: ["334"] }),
+    slot("10:30", "11:00", { freeRooms: ["600A"], paidRooms: ["334"] }),
+    slot("11:00", "11:30", { freeRooms: [], paidRooms: ["334"] }),
+  ]
+
+  test("takes the free room open for the whole span", () => {
+    expect(roomForSpan(day, "10:00", "11:00")).toEqual({
+      room: "600A",
+      tier: "free",
+    })
+  })
+
+  test("falls back to a paid room only when no free one covers it", () => {
+    expect(roomForSpan(day, "10:00", "11:30")).toEqual({
+      room: "334",
+      tier: "paid",
+    })
+  })
+
+  test("refuses a span off the grid", () => {
+    expect(() => roomForSpan(day, "10:15", "11:00")).toThrow(/30-minute grid/)
   })
 })

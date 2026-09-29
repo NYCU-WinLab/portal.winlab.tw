@@ -25,6 +25,7 @@ import {
 } from "@/lib/rooms/meeting-topic"
 import {
   slotTier,
+  suggestRoom,
   type AvailabilitySlot,
   type SlotTier,
 } from "@/lib/rooms/availability"
@@ -74,9 +75,13 @@ export function resolveAttendees(
     else if (!member.email) unmailable.push(member.name ?? raw)
     else {
       contacts.push({
-        name: member.name ?? member.email,
+        name: member.name ?? member.username ?? member.email,
         email: member.email,
-        ...(member.username ? { username: member.username } : {}),
+        // The advisor never names the recording's project, even when listed
+        // by hand, as the /rooms page adds him by email only.
+        ...(member.username && member.username !== ADVISOR_USERNAME
+          ? { username: member.username }
+          : {}),
       })
     }
   }
@@ -158,6 +163,24 @@ function hhmm(time: string): string {
 
 function hour(h: number): string {
   return `${String(h).padStart(2, "0")}:00`
+}
+
+// The room /rooms would book for this span: it never lets a member pick one,
+// it asks suggestRoom, which takes a room open for every slot, free before
+// paid. The span has to sit on the day's grid, as the page's slots do.
+export function roomForSpan(
+  slots: AvailabilitySlot[],
+  startTime: string,
+  endTime: string
+): { room: string; tier: "free" | "paid" } | null {
+  const startIndex = slots.findIndex((slot) => slot.start === startTime)
+  const endIndex = slots.findIndex((slot) => slot.end === endTime)
+  if (startIndex < 0 || endIndex < startIndex) {
+    throw new Error(
+      `${startTime}-${endTime} is not a span on the 30-minute grid between 08:00 and 22:00`
+    )
+  }
+  return suggestRoom(slots, startIndex, endIndex - startIndex + 1)
 }
 
 export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
@@ -289,12 +312,9 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
     "book_room",
     {
       title: "Book room",
-      description: `Books a CS department meeting room through the lab's shared account, the 確認預約 button on /rooms, with the member as organizer. As on the web, every booking also gets a Teams meeting (its link arrives a few minutes later) and every attendee gets a calendar invite by mail; room null makes it an online-only meeting that reserves no room. Times are Asia/Taipei HH:MM on the 30-minute grid between 08:00 and 22:00; check list_room_availability first, and the room is checked again right before it is reserved. attendees are portal user ids, emails or Keycloak usernames. group is a project group from the /rooms group buttons: its members are invited too unless invite_group_members is false, and it names the project the Teams recording files under (without a group, the first attendee's username does). include_advisor has no default because it mails the advisor. Do not book the Monday lab seminar here; it has a standing booking. Read back the date, time, room, title, attendees and the advisor choice and get the member's yes first. Cancel with cancel_room_booking.`,
+      description: `Books a CS department meeting room through the lab's shared account, the 確認預約 button on /rooms, with the member as organizer. As on the page, the member does not pick the room: the tool takes the one /rooms would, open for the whole span, free before paid, and a paid room (the department charges for it) is only booked with allow_paid true. online_only books no room at all. Every booking also gets a Teams meeting in the WinLab channel that is recorded automatically, with a transcript and an AI summary everyone in the channel can see, and every attendee gets a calendar invite by mail. Times are Asia/Taipei HH:MM on the 30-minute grid between 08:00 and 22:00; check list_room_availability first. attendees are portal user ids, emails or Keycloak usernames. group is a project group from the /rooms group buttons: its members are invited too unless invite_group_members is false, and it names the project the recording files under (without a group, the first attendee's username does). include_advisor has no default because it mails the advisor. Do not book the Monday lab seminar here; it has a standing booking. Read back the date, time, whether a room or online only, the title, the attendees, the advisor choice and the recording, and get the member's yes first. Cancel with cancel_room_booking.`,
       inputSchema: z.object({
-        date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "expected a YYYY-MM-DD date")
-          .describe("Meeting date in Asia/Taipei"),
+        date: z.iso.date().describe("Meeting date in Asia/Taipei"),
         start_time: z
           .string()
           .regex(/^\d{2}:\d{2}$/, "expected HH:MM")
@@ -303,14 +323,14 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           .string()
           .regex(/^\d{2}:\d{2}$/, "expected HH:MM")
           .describe("End, HH:MM on the 30-minute grid"),
-        room: z
-          .string()
-          .trim()
-          .min(1)
-          .nullable()
-          .describe(
-            "Room name as list_room_availability gives it, or null for an online-only meeting"
-          ),
+        online_only: z
+          .boolean()
+          .default(false)
+          .describe("A Teams meeting with no room, as the page's 線上會議"),
+        allow_paid: z
+          .boolean()
+          .default(false)
+          .describe("Accept a paid room when no free room is open"),
         title: z
           .string()
           .trim()
@@ -338,7 +358,6 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
         agenda: z
           .string()
           .trim()
-          .min(1)
           .max(2000)
           .optional()
           .describe("What the meeting is for"),
@@ -394,18 +413,49 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           attendees = mergeAttendees(attendees, [advisor])
         }
 
+        let room: string | null = null
+        let tier: "free" | "paid" | null = null
+        if (!args.online_only) {
+          const [day] = await fetchAvailabilityRange(args.date, 1)
+          const pick = roomForSpan(
+            day?.slots ?? [],
+            args.start_time,
+            args.end_time
+          )
+          if (!pick) {
+            throw new Error(
+              `no room is open for all of ${args.date} ${args.start_time}-${args.end_time}; list_room_availability shows the open times, or book it online_only`
+            )
+          }
+          if (pick.tier === "paid" && !args.allow_paid) {
+            throw new Error(
+              `only a paid room (${pick.room}) is open for that span and the department charges for it; ask the member, then call again with allow_paid true, or choose another time`
+            )
+          }
+          room = pick.room
+          tier = pick.tier
+        }
+
         const result = await hooks.bookRoom(caller, {
           date: args.date,
-          room: args.room,
+          room,
           startTime: args.start_time,
           endTime: args.end_time,
           titleSuffix: args.title,
           attendees,
           groupName,
-          agenda: args.agenda ?? null,
+          agenda: args.agenda || null,
           issueRefs: args.epic_iid ? [`&${args.epic_iid}`] : [],
         })
-        if (result.error) throw new Error(result.error)
+        if (result.error) {
+          // placeBooking's one failure after the department already holds
+          // the room: booking again would reserve a second one.
+          throw new Error(
+            result.error.includes("已在外部系統訂到教室")
+              ? `${result.error} Do not call book_room again for this meeting; tell the member an admin has to record it.`
+              : result.error
+          )
+        }
 
         const prefix = topicPrefix({
           groupName,
@@ -414,8 +464,9 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
         return json({
           booked: true,
           booking_id: result.bookingId ?? null,
-          room: args.room,
-          online_only: args.room === null,
+          room,
+          room_tier: tier,
+          online_only: room === null,
           date: args.date,
           start_time: args.start_time,
           end_time: args.end_time,
