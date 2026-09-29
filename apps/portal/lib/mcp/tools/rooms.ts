@@ -313,7 +313,7 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
     {
       title: "Book room",
       description: `Books a CS department meeting room through the lab's shared account, the 確認預約 button on /rooms, with the member as organizer. As on the page, the member does not pick the room: the tool takes the one /rooms would, open for the whole span, free before paid, and a paid room (the department charges for it) is only booked with allow_paid true. online_only books no room at all. Every booking also gets a Teams meeting in the WinLab channel that is recorded automatically, with a transcript and an AI summary everyone in the channel can see, and every attendee gets a calendar invite by mail. Times are Asia/Taipei HH:MM on the 30-minute grid between 08:00 and 22:00; check list_room_availability first. attendees are portal user ids, emails or Keycloak usernames. group is a project group from the /rooms group buttons: its members are invited too unless invite_group_members is false, and it names the project the recording files under (without a group, the first attendee's username does). include_advisor has no default because it mails the advisor. Do not book the Monday lab seminar here; it has a standing booking. Read back the date, time, whether a room or online only, the title, the attendees, the advisor choice and the recording, and get the member's yes first. Cancel with cancel_room_booking.`,
-      inputSchema: z.object({
+      inputSchema: z.strictObject({
         date: z.iso.date().describe("Meeting date in Asia/Taipei"),
         start_time: z
           .string()
@@ -330,7 +330,9 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
         allow_paid: z
           .boolean()
           .default(false)
-          .describe("Accept a paid room when no free room is open"),
+          .describe(
+            "Only once the member agreed to pay: accept a paid room when no free one is open"
+          ),
         title: z
           .string()
           .trim()

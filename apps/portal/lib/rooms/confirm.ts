@@ -299,7 +299,13 @@ export async function cancelBookingFor(
 
   await cancelTeamsMeeting(booking.id, booking.date, booking.start_time)
 
-  revalidatePath("/rooms")
+  // Released and recorded by now; a cache refresh that fails must not stop
+  // the cancellation mail or read as a failed cancel.
+  try {
+    revalidatePath("/rooms")
+  } catch (err) {
+    console.error("[rooms] revalidate after cancel failed", err)
+  }
 
   // Same reasoning as confirmBooking: the cancellation already went through,
   // so a mail failure is reported rather than thrown.
