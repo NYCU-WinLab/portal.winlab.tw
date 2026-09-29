@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { AdminUser } from "@/lib/admin/fetch"
-import { applyRoleChanges, roleApps } from "@/lib/admin/roles"
+import { applyRoleChanges, roleApps, sameRoles } from "@/lib/admin/roles"
 
 const APPS = ["approve", "bento", "door", "trip"]
 
@@ -34,6 +34,31 @@ describe("applyRoleChanges", () => {
     expect(roles).toEqual({ bento: ["admin"] })
   })
 
+  test("keeps an app's other roles on grant and revoke", () => {
+    expect(
+      applyRoleChanges({ bento: ["user"] }, { grant: ["bento"] }, APPS)
+    ).toEqual({ bento: ["user", "admin"] })
+    expect(
+      applyRoleChanges(
+        { bento: ["user", "admin"] },
+        { revoke: ["bento"] },
+        APPS
+      )
+    ).toEqual({ bento: ["user"] })
+  })
+
+  test("granting an app they already administer changes nothing", () => {
+    expect(
+      applyRoleChanges({ trip: ["admin"] }, { grant: ["trip"] }, APPS)
+    ).toEqual({ trip: ["admin"] })
+  })
+
+  test("matches app names as stored, without folding case", () => {
+    expect(() => applyRoleChanges({}, { grant: ["Trip"] }, APPS)).toThrow(
+      /no role for Trip/
+    )
+  })
+
   test("refuses an app with no role", () => {
     expect(() => applyRoleChanges({}, { grant: ["games"] }, APPS)).toThrow(
       /no role for games/
@@ -62,5 +87,21 @@ describe("roleApps", () => {
     expect(apps).toContain("zeta")
     expect(apps).toContain("trip")
     expect(apps).toEqual([...apps].sort())
+  })
+})
+
+describe("sameRoles", () => {
+  test("ignores the order of apps and of roles", () => {
+    expect(
+      sameRoles(
+        { trip: ["admin"], bento: ["user", "admin"] },
+        { bento: ["admin", "user"], trip: ["admin"] }
+      )
+    ).toBe(true)
+  })
+
+  test("tells a missing app or role apart", () => {
+    expect(sameRoles({ trip: ["admin"] }, {})).toBe(false)
+    expect(sameRoles({ bento: ["user"] }, { bento: ["admin"] })).toBe(false)
   })
 })

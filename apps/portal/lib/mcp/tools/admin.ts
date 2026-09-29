@@ -2,7 +2,13 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 
 import { fetchAdminUsers, type AdminUser } from "@/lib/admin/fetch"
-import { applyRoleChanges, roleApps, updateUserRoles } from "@/lib/admin/roles"
+import {
+  applyRoleChanges,
+  KNOWN_ROLE_APPS,
+  roleApps,
+  sameRoles,
+  updateUserRoles,
+} from "@/lib/admin/roles"
 import {
   failure,
   json,
@@ -121,8 +127,7 @@ export function registerAdminTools(server: McpServer) {
     "update_member_roles",
     {
       title: "Update member roles",
-      description:
-        "Changes what a member may administer, the 編輯權限 dialog on /admin: grant_admin makes them an admin of each listed app (approve, bento, door, leave, meetings, receipts, reimburse, trip, or any app a member already holds a role in), revoke_admin takes that away, and is_admin sets or clears portal super admin, which admits them to everything including this tool. Omitted fields stay as they are. Portal super admins only; for anyone else the tool fails. A super admin cannot clear their own flag. It takes effect on the member's next request, so confirm the member, each app and the direction with the caller before calling. The result shows the roles before and after.",
+      description: `Changes what a member may administer, the 編輯權限 dialog on /admin: grant_admin makes them an admin of each listed app (${KNOWN_ROLE_APPS.join(", ")}, or any other app a member already holds a role in, spelled as stored), revoke_admin takes that away, and is_admin sets or clears portal super admin, which admits them to everything including this tool. Omitted fields stay as they are, and other roles in an app (such as a legacy "user") are kept. Portal super admins only; for anyone else the tool fails. A super admin cannot clear their own flag. Each call rewrites the member's whole role map, so put every change for one member into a single call and never call it twice at once for the same member; if another change lands in between, the tool fails and shows what is stored. A call that changes nothing writes nothing and returns changed: false. It takes effect on the member's next request, so confirm the member, each app and the direction with the caller first.`,
       inputSchema: z.object({
         user_id: z
           .string()
@@ -130,12 +135,12 @@ export function registerAdminTools(server: McpServer) {
           .min(1)
           .describe("Member id from list_portal_users"),
         grant_admin: z
-          .array(z.string().trim().toLowerCase().min(1))
+          .array(z.string().trim().min(1))
           .max(20)
           .default([])
           .describe('Apps to make them an admin of, e.g. ["trip"]'),
         revoke_admin: z
-          .array(z.string().trim().toLowerCase().min(1))
+          .array(z.string().trim().min(1))
           .max(20)
           .default([])
           .describe("Apps whose admin role to take away"),
@@ -177,17 +182,45 @@ export function registerAdminTools(server: McpServer) {
           { grant: grant_admin, revoke: revoke_admin },
           roleApps(users)
         )
+        const before = { is_admin: target.is_admin, roles: target.roles ?? {} }
+        if (isAdmin === target.is_admin && sameRoles(roles, before.roles)) {
+          return json({
+            changed: false,
+            id: target.id,
+            name: target.name,
+            email: target.email,
+            is_admin: before.is_admin,
+            roles: before.roles,
+            url: `${PORTAL_URL}/admin`,
+          })
+        }
         await updateUserRoles(supabase, {
           targetId: target.id,
           roles,
           isAdmin,
         })
+        // The RPC replaces the whole map, so a change that raced this one can
+        // undo it. Read back and report what is stored, and fail when it is
+        // not what this call wrote.
+        const stored = (await fetchAdminUsers(supabase)).find(
+          (u) => u.id === target.id
+        )
+        const after = {
+          is_admin: stored?.is_admin ?? null,
+          roles: stored?.roles ?? {},
+        }
+        if (after.is_admin !== isAdmin || !sameRoles(after.roles, roles)) {
+          throw new Error(
+            `another change to this member landed at the same time, so this one may not have stuck; stored now: ${JSON.stringify(after)}. Check with list_portal_users and call again with every change for this member in one call.`
+          )
+        }
         return json({
+          changed: true,
           id: target.id,
           name: target.name,
           email: target.email,
-          before: { is_admin: target.is_admin, roles: target.roles ?? {} },
-          after: { is_admin: isAdmin, roles },
+          before,
+          after,
           url: `${PORTAL_URL}/admin`,
         })
       } catch (err) {

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import type { Database } from "@/lib/supabase/database.types"
+
 import type { AdminUser } from "./fetch"
 
 // Every app with an is_<app>_admin() wrapper in the database has to be listed
@@ -24,8 +26,10 @@ export function roleApps(users: AdminUser[]): string[] {
 
 export type RoleChanges = { grant?: string[]; revoke?: string[] }
 
-// The edit the /admin dialog makes: granting an app sets its list to
-// ["admin"], revoking drops the app.
+// The admin half of the /admin dialog's edit, and nothing else: granting adds
+// "admin" to the app's list, revoking takes "admin" out and drops the app
+// once its list is empty. Any other role a member holds, such as a legacy
+// "user", is left as it was.
 export function applyRoleChanges(
   roles: Record<string, string[]>,
   changes: RoleChanges,
@@ -43,18 +47,40 @@ export function applyRoleChanges(
   if (both.length > 0) {
     throw new Error(`cannot both grant and revoke ${both.join(", ")}`)
   }
-  const next = Object.fromEntries(
-    Object.entries(roles).filter(([app]) => !revoke.includes(app))
-  )
-  for (const app of grant) next[app] = ["admin"]
+  const next: Record<string, string[]> = {}
+  for (const [app, list] of Object.entries(roles)) {
+    const kept = revoke.includes(app)
+      ? list.filter((role) => role !== "admin")
+      : list
+    if (kept.length > 0) next[app] = kept
+  }
+  for (const app of grant) {
+    const current = next[app] ?? []
+    next[app] = current.includes("admin") ? current : [...current, "admin"]
+  }
   return next
+}
+
+// Whether two role maps grant the same thing, whatever order the keys and
+// lists are in.
+export function sameRoles(
+  a: Record<string, string[]>,
+  b: Record<string, string[]>
+): boolean {
+  const canonical = (roles: Record<string, string[]>) =>
+    JSON.stringify(
+      Object.keys(roles)
+        .sort()
+        .map((app) => [app, [...(roles[app] ?? [])].sort()])
+    )
+  return canonical(a) === canonical(b)
 }
 
 // portal_admin_update_user replaces roles and is_admin wholesale. It is
 // SECURITY DEFINER, refuses anyone but a portal super admin, and refuses a
 // super admin clearing their own flag.
 export async function updateUserRoles(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   params: {
     targetId: string
     roles: Record<string, string[]>
