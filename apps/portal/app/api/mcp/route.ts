@@ -1,10 +1,13 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
 import { after } from "next/server"
 
+import { reloadPanelGreetings } from "@/lib/door/panel"
 import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
 import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
 import { createUserClient, verifySupabaseToken } from "@/lib/mcp/supabase"
+import { removeStaleDoorSounds } from "@/lib/profile/door-sound"
 import { drainOutboxBatch } from "@/lib/receipts/email-drain"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // Remote MCP endpoint for portal. Auth is plain OAuth 2.1 against Supabase
 // Auth (which in turn signs people in through Keycloak), so a tool call runs
@@ -27,6 +30,24 @@ const handler = withMcpAuth(
             } catch (err) {
               console.error("[mcp] receipt email drain failed", err)
             }
+          })
+        },
+        // What saveDoorSound runs after its response. The tool stays on the
+        // member's client; removing the replaced file needs the service role
+        // (the bucket has no member SELECT policy) and, as on /profile, only
+        // ever touches the caller's own folder.
+        afterDoorSoundSave: (caller, files) => {
+          after(async () => {
+            try {
+              await removeStaleDoorSounds(
+                createAdminClient(),
+                caller.userId,
+                files
+              )
+            } catch (err) {
+              console.error("[mcp] door sound cleanup failed", err)
+            }
+            await reloadPanelGreetings()
           })
         },
       }),

@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { createClient } from "@supabase/supabase-js"
 
-import { DOOR_SOUND_MAX_BYTES } from "@/lib/door/sound"
+import { DOOR_SOUND_MAX_BYTES, SOUND_NOT_AUDIO } from "@/lib/door/sound"
 import {
   clearDoorSound,
   fetchDoorSound,
   removeStaleDoorSounds,
   SAVE_SOUND_FAILED,
+  setOwnDoorSound,
   signOwnDoorSound,
   SOUND_MODE_INVALID,
   SOUND_MODE_NEEDS_FILE,
+  SOUND_UPLOAD_FAILED,
   SOUND_UPLOAD_MISSING,
   SOUND_UPLOAD_REJECTED,
   updateDoorSound,
@@ -25,6 +27,8 @@ let calls: Call[]
 let row: { door_sound_path: string | null; door_sound_mode: string } | null
 let info: Record<string, unknown> | null
 let patchOk: boolean
+let uploadOk: boolean
+let uploads: { url: string; type: string }[]
 let listing: { name: string; id: string | null; created_at: string }[]
 const restorers: (() => void)[] = []
 
@@ -33,6 +37,8 @@ beforeEach(() => {
   row = { door_sound_path: OLD, door_sound_mode: "sound_only" }
   info = { name: NEW, size: 1234, content_type: "audio/mp4" }
   patchOk = true
+  uploadOk = true
+  uploads = []
   listing = []
   const fetchSpy = spyOn(globalThis, "fetch")
   const errorSpy = spyOn(console, "error").mockImplementation(() => {})
@@ -52,6 +58,22 @@ beforeEach(() => {
       body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
       apikey: new Headers(init?.headers).get("apikey") ?? "",
     })
+    if (url.includes("/storage/v1/object/door-sounds/") && method === "POST") {
+      const part = init?.body instanceof FormData ? init.body.get("") : null
+      uploads.push({
+        url,
+        type:
+          part instanceof Blob
+            ? part.type
+            : (new Headers(init?.headers).get("content-type") ?? ""),
+      })
+      return uploadOk
+        ? Response.json({ Key: url.split("/object/")[1], Id: "obj" })
+        : Response.json(
+            { statusCode: "403", error: "Unauthorized", message: "RLS" },
+            { status: 400 }
+          )
+    }
     if (url.includes("/rest/v1/user_profiles")) {
       if (method === "GET") return Response.json(row)
       return patchOk
@@ -305,5 +327,72 @@ describe("signOwnDoorSound", () => {
     expect(await signOwnDoorSound(admin(), USER, OLD)).toBe(
       "https://database.example/storage/v1/object/sign/door-sounds/x?token=t"
     )
+  })
+})
+
+describe("setOwnDoorSound", () => {
+  const mp3 = { ext: "mp3" as const, bytes: new Uint8Array([0x49, 0x44, 0x33]) }
+
+  test("uploads with the member's own client, then points their row at it", async () => {
+    const result = await setOwnDoorSound(member(), USER, {
+      mode: "sound_only",
+      file: mp3,
+    })
+    if (!result.ok) throw new Error(result.error)
+    expect(result.previous).toBe(OLD)
+    expect(result.path).toMatch(
+      new RegExp(`^${USER}/\\d{14}-[0-9a-f]{8}\\.mp3$`)
+    )
+    expect(uploads).toEqual([
+      {
+        url: `https://database.example/storage/v1/object/door-sounds/${result.path}`,
+        type: "audio/mpeg",
+      },
+    ])
+    expect(patches()).toEqual([
+      { door_sound_path: result.path, door_sound_mode: "sound_only" },
+    ])
+    expect(calls.every((c) => c.apikey === "member-jwt")).toBe(true)
+  })
+
+  test("without a file only the mode changes and the file stays", async () => {
+    expect(
+      await setOwnDoorSound(member(), USER, { mode: "voice_only" })
+    ).toEqual({ ok: true, path: OLD, mode: "voice_only", previous: OLD })
+    expect(uploads).toEqual([])
+    expect(patches()).toEqual([
+      { door_sound_path: OLD, door_sound_mode: "voice_only" },
+    ])
+  })
+
+  test("will not play a sound the member never uploaded", async () => {
+    row = { door_sound_path: null, door_sound_mode: "voice_only" }
+    expect(
+      await setOwnDoorSound(member(), USER, { mode: "sound_only" })
+    ).toEqual({ ok: false, error: SOUND_MODE_NEEDS_FILE })
+    expect(patches()).toEqual([])
+  })
+
+  test("refuses bytes that are not audio before storing anything", async () => {
+    const pdf = { ext: "mp3" as const, bytes: new TextEncoder().encode("%PDF") }
+    expect(
+      await setOwnDoorSound(member(), USER, { mode: "sound_only", file: pdf })
+    ).toEqual({ ok: false, error: SOUND_NOT_AUDIO })
+    expect(calls).toEqual([])
+  })
+
+  test("a refused upload leaves the row alone", async () => {
+    uploadOk = false
+    expect(
+      await setOwnDoorSound(member(), USER, { mode: "sound_only", file: mp3 })
+    ).toEqual({ ok: false, error: SOUND_UPLOAD_FAILED })
+    expect(patches()).toEqual([])
+  })
+
+  test("a row write that fails is reported", async () => {
+    patchOk = false
+    expect(
+      await setOwnDoorSound(member(), USER, { mode: "sound_only", file: mp3 })
+    ).toEqual({ ok: false, error: SAVE_SOUND_FAILED })
   })
 })

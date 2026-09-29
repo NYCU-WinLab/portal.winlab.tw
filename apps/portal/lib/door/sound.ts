@@ -116,6 +116,22 @@ export function looksLikeDoorSound(
   }
 }
 
+// The same checks for bytes that never went through a file picker (the MCP
+// tool decodes them from base64), with the extension given separately.
+export function validateDoorSoundBytes(
+  ext: DoorSoundExtension,
+  bytes: Uint8Array
+): DoorSoundFileCheck {
+  if (bytes.byteLength === 0) return { ok: false, error: SOUND_EMPTY }
+  if (bytes.byteLength > DOOR_SOUND_MAX_BYTES) {
+    return { ok: false, error: SOUND_TOO_LARGE }
+  }
+  if (!looksLikeDoorSound(ext, bytes.subarray(0, 16))) {
+    return { ok: false, error: SOUND_NOT_AUDIO }
+  }
+  return { ok: true, ext, contentType: DOOR_SOUND_TYPES[ext] }
+}
+
 const PATH_NAME = /^[A-Za-z0-9_-]{1,64}\.(mp3|m4a|aac|wav|ogg)$/
 
 // True only for a file in this member's own folder, the same shape the

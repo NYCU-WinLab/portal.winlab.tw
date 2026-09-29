@@ -17,22 +17,6 @@ export const MAX_RECEIPT_BYTES = 3 * 1024 * 1024
 
 const PDF_MAGIC = "%PDF"
 
-export function decodeBase64(input: string): Uint8Array {
-  const stripped = input.replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "")
-  if (!stripped) throw new Error("file_base64 is empty")
-  if (!/^[A-Za-z0-9+/]+=*$/.test(stripped)) {
-    throw new Error("file_base64 is not valid base64")
-  }
-  const bytes = new Uint8Array(Buffer.from(stripped, "base64"))
-  if (bytes.byteLength === 0) throw new Error("file_base64 decoded to 0 bytes")
-  if (bytes.byteLength > MAX_RECEIPT_BYTES) {
-    throw new Error(
-      `file is ${bytes.byteLength} bytes; the limit is ${MAX_RECEIPT_BYTES}`
-    )
-  }
-  return bytes
-}
-
 export async function toReceiptPdf(
   bytes: Uint8Array,
   mime: McpReceiptMime

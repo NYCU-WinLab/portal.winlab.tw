@@ -55,4 +55,23 @@ export function failure(err: unknown) {
   }
 }
 
+// Tools that take a file get it as base64 in the arguments. Vercel rejects
+// request bodies above ~4.5 MB and base64 inflates by a third, so each
+// caller's maxBytes has to stay well under that.
+export function decodeBase64(input: string, maxBytes: number): Uint8Array {
+  const stripped = input.replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "")
+  if (!stripped) throw new Error("file_base64 is empty")
+  if (!/^[A-Za-z0-9+/]+=*$/.test(stripped)) {
+    throw new Error("file_base64 is not valid base64")
+  }
+  const bytes = new Uint8Array(Buffer.from(stripped, "base64"))
+  if (bytes.byteLength === 0) throw new Error("file_base64 decoded to 0 bytes")
+  if (bytes.byteLength > maxBytes) {
+    throw new Error(
+      `file is ${bytes.byteLength} bytes; the limit is ${maxBytes}`
+    )
+  }
+  return bytes
+}
+
 export const PORTAL_URL = "https://portal.winlab.tw"

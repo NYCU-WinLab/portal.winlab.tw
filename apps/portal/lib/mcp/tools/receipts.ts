@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 
 import {
+  decodeBase64,
   failure,
   json,
   requireCaller,
@@ -9,7 +10,7 @@ import {
   type ToolContext,
 } from "@/lib/mcp/context"
 import {
-  decodeBase64,
+  MAX_RECEIPT_BYTES,
   MCP_RECEIPT_MIMES,
   toReceiptPdf,
 } from "@/lib/mcp/receipt-file"
@@ -92,7 +93,10 @@ export function registerReceiptsTools(
     async ({ name, deposit_account, mime, file_base64 }, ctx) => {
       try {
         const caller = requireCaller(ctx as ToolContext)
-        const pdf = await toReceiptPdf(decodeBase64(file_base64), mime)
+        const pdf = await toReceiptPdf(
+          decodeBase64(file_base64, MAX_RECEIPT_BYTES),
+          mime
+        )
         const supabase = createUserClient(caller.token)
         const receipt = await uploadReceiptPdf(supabase, {
           name,
