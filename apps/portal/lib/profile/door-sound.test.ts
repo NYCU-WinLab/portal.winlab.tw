@@ -15,6 +15,7 @@ import {
   SOUND_UPLOAD_MISSING,
   SOUND_UPLOAD_REJECTED,
   updateDoorSound,
+  uploadDoorSound,
 } from "@/lib/profile/door-sound"
 
 const USER = "51111111-1111-1111-1111-111111111111"
@@ -394,5 +395,38 @@ describe("setOwnDoorSound", () => {
     expect(
       await setOwnDoorSound(member(), USER, { mode: "sound_only", file: mp3 })
     ).toEqual({ ok: false, error: SAVE_SOUND_FAILED })
+  })
+})
+
+describe("uploadDoorSound", () => {
+  test("sends a Safari-typed .m4a as audio/mp4 under a fresh name", async () => {
+    const picked = new File([new Uint8Array([0, 0, 0, 0x20])], "clip.m4a", {
+      type: "audio/x-m4a",
+    })
+    const result = await uploadDoorSound(member(), USER, picked, {
+      ext: "m4a",
+      contentType: "audio/mp4",
+    })
+    if (!result.ok) throw new Error(result.error)
+    expect(result.path).toMatch(
+      new RegExp(`^${USER}/\\d{14}-[0-9a-f]{8}\\.m4a$`)
+    )
+    expect(uploads).toEqual([
+      {
+        url: `https://database.example/storage/v1/object/door-sounds/${result.path}`,
+        type: "audio/mp4",
+      },
+    ])
+  })
+
+  test("a refused upload is reported", async () => {
+    uploadOk = false
+    const picked = new File([new Uint8Array([0x49, 0x44, 0x33])], "a.mp3")
+    expect(
+      await uploadDoorSound(member(), USER, picked, {
+        ext: "mp3",
+        contentType: "audio/mpeg",
+      })
+    ).toEqual({ ok: false, error: SOUND_UPLOAD_FAILED })
   })
 })

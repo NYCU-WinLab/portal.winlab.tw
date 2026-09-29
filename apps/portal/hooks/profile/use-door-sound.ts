@@ -4,15 +4,15 @@ import { useCallback, useState } from "react"
 
 import { deleteDoorSound, saveDoorSound } from "@/app/profile/actions"
 import {
-  DOOR_SOUND_BUCKET,
-  doorSoundUploadBody,
   looksLikeDoorSound,
-  newDoorSoundPath,
   SOUND_NOT_AUDIO,
   validateDoorSoundFile,
   type DoorSoundMode,
 } from "@/lib/door/sound"
-import type { SaveDoorSoundResult } from "@/lib/profile/door-sound"
+import {
+  uploadDoorSound,
+  type SaveDoorSoundResult,
+} from "@/lib/profile/door-sound"
 import { createClient } from "@/lib/supabase/client"
 
 // Uploads go straight from the browser into the member's own folder (the
@@ -32,18 +32,14 @@ export function useDoorSound(userId: string) {
         if (!looksLikeDoorSound(check.ext, head)) {
           return { ok: false, error: SOUND_NOT_AUDIO } as const
         }
-        const path = newDoorSoundPath(userId, check.ext)
-        const { error } = await createClient()
-          .storage.from(DOOR_SOUND_BUCKET)
-          .upload(path, doorSoundUploadBody(file, check.contentType), {
-            contentType: check.contentType,
-            upsert: false,
-          })
-        if (error) {
-          console.error("[profile] door sound upload failed", error.message)
-          return { ok: false, error: "上傳失敗，請重試。" } as const
-        }
-        return await saveDoorSound({ path, mode })
+        const upload = await uploadDoorSound(
+          createClient(),
+          userId,
+          file,
+          check
+        )
+        if (!upload.ok) return upload
+        return await saveDoorSound({ path: upload.path, mode })
       } catch (err) {
         console.error("[profile] door sound save failed", err)
         return { ok: false, error: "儲存失敗，請重試。" } as const

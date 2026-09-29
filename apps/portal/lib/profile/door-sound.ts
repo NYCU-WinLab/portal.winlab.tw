@@ -167,6 +167,30 @@ export async function updateDoorSound(
   return { ok: true, path, mode, previous: current.path }
 }
 
+// Stores a new file in the member's folder under a fresh name, re-typed with
+// its extension's one content type (doorSoundUploadBody). The /profile hook
+// passes the picked File and the MCP save the decoded bytes; both upload with
+// the member's own client, so the INSERT policy keeps it in their folder.
+export async function uploadDoorSound(
+  supabase: SupabaseClient,
+  userId: string,
+  content: Blob | Uint8Array,
+  { ext, contentType }: { ext: DoorSoundExtension; contentType: string }
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const path = newDoorSoundPath(userId, ext)
+  const { error } = await supabase.storage
+    .from(DOOR_SOUND_BUCKET)
+    .upload(path, doorSoundUploadBody(content, contentType), {
+      contentType,
+      upsert: false,
+    })
+  if (error) {
+    console.error("[profile] door sound upload failed", error.message)
+    return { ok: false, error: SOUND_UPLOAD_FAILED }
+  }
+  return { ok: true, path }
+}
+
 export type DoorSoundBytes = { ext: DoorSoundExtension; bytes: Uint8Array }
 
 // The MCP tool's save. It holds the file itself, so unlike updateDoorSound it
@@ -196,17 +220,9 @@ export async function setOwnDoorSound(
 
   let path = current.path
   if (file && check) {
-    path = newDoorSoundPath(userId, check.ext)
-    const { error } = await supabase.storage
-      .from(DOOR_SOUND_BUCKET)
-      .upload(path, doorSoundUploadBody(file.bytes, check.contentType), {
-        contentType: check.contentType,
-        upsert: false,
-      })
-    if (error) {
-      console.error("[profile] door sound upload failed", error.message)
-      return { ok: false, error: SOUND_UPLOAD_FAILED }
-    }
+    const upload = await uploadDoorSound(supabase, userId, file.bytes, check)
+    if (!upload.ok) return upload
+    path = upload.path
   }
 
   const { data, error } = await supabase
