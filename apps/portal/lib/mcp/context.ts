@@ -30,15 +30,27 @@ export function requireCaller(ctx: ToolContext): Caller {
   }
 }
 
-// For tools whose web page only portal super admins reach. Checked up front
-// so anyone else gets a plain refusal, not RLS's empty result.
-export async function requirePortalAdmin(
+// The SQL role checks an admin-only tool can ask for, and who they admit in
+// the refusal. Each is the same function the app's RLS policies call.
+const ADMIN_CHECKS = {
+  is_portal_admin: "portal admins",
+  is_reimburse_admin: "reimburse admins",
+} as const
+
+export type AdminCheck = keyof typeof ADMIN_CHECKS
+
+// For tools whose web page only an app's admins reach. Checked up front so
+// anyone else gets a plain refusal, not RLS's empty result.
+export async function requireAdmin(
   supabase: SupabaseClient<Database>,
+  check: AdminCheck,
   action: string
 ): Promise<void> {
-  const { data, error } = await supabase.rpc("is_portal_admin")
+  const { data, error } = await supabase.rpc(check)
   if (error) throw error
-  if (data !== true) throw new Error(`only portal admins can ${action}`)
+  if (data !== true) {
+    throw new Error(`only ${ADMIN_CHECKS[check]} can ${action}`)
+  }
 }
 
 export function json(value: unknown) {

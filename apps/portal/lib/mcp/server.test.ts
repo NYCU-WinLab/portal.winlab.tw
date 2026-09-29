@@ -93,10 +93,13 @@ describe("portal MCP handler", () => {
     expect(names).toEqual(
       [
         "add_bento_order_item",
+        "add_reimburse_egress",
+        "add_reimburse_ingress",
         "create_announcement",
         "create_leave",
         "delete_announcement",
         "delete_leave",
+        "delete_reimburse_egress",
         "get_announcement",
         "get_approve_document",
         "get_bento_order",
@@ -121,6 +124,8 @@ describe("portal MCP handler", () => {
         "remove_bento_order_item",
         "rename_receipt",
         "set_door_sound",
+        "update_reimburse_egress",
+        "update_reimburse_ingress",
         "upload_receipt",
         "whoami",
       ].sort()

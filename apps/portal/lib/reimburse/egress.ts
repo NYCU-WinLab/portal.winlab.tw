@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 
 import { fetchEgress } from "./fetch"
+import { insertEgress, patchEgress, removeEgress } from "./mutations"
 import type { DatabaseEgress, InsertEgress, UpdateEgress } from "./types"
 
 const TABLE = "reimburse_egress"
@@ -26,32 +27,15 @@ export async function createEgress(payload: InsertEgress) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert({ ...payload, user_id: user?.id ?? null })
-    .select()
-    .single()
-
-  if (error) throw new Error(`Failed to create egress: ${error.message}`)
-  return data as DatabaseEgress
+  return insertEgress(supabase, { ...payload, user_id: user?.id ?? null })
 }
 
 export async function updateEgress(id: string, updates: UpdateEgress) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single()
-
-  if (error) throw new Error(`Failed to update egress: ${error.message}`)
-  return data as DatabaseEgress
+  const row = await patchEgress(await createClient(), id, updates)
+  if (!row) throw new Error("Failed to update egress: no such entry")
+  return row
 }
 
 export async function deleteEgress(id: string) {
-  const supabase = await createClient()
-  const { error } = await supabase.from(TABLE).delete().eq("id", id)
-  if (error) throw new Error(`Failed to delete egress: ${error.message}`)
+  await removeEgress(await createClient(), id)
 }

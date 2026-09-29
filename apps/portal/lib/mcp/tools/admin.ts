@@ -7,7 +7,7 @@ import {
   json,
   PORTAL_URL,
   requireCaller,
-  requirePortalAdmin,
+  requireAdmin,
   type ToolContext,
 } from "@/lib/mcp/context"
 import { createUserClient } from "@/lib/mcp/supabase"
@@ -86,7 +86,11 @@ export function registerAdminTools(server: McpServer) {
       try {
         const caller = requireCaller(ctx as ToolContext)
         const supabase = createUserClient(caller.token)
-        await requirePortalAdmin(supabase, "list members and roles")
+        await requireAdmin(
+          supabase,
+          "is_portal_admin",
+          "list members and roles"
+        )
 
         const matched = filterAdminUsers(await fetchAdminUsers(supabase), {
           roleApp: role_app,

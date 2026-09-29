@@ -16,7 +16,7 @@ import {
   json,
   PORTAL_URL,
   requireCaller,
-  requirePortalAdmin,
+  requireAdmin,
   type ToolContext,
 } from "@/lib/mcp/context"
 import { createUserClient } from "@/lib/mcp/supabase"
@@ -183,7 +183,7 @@ export function registerBulletinTools(server: McpServer) {
       try {
         const caller = requireCaller(ctx as ToolContext)
         const supabase = createUserClient(caller.token)
-        await requirePortalAdmin(supabase, "post announcements")
+        await requireAdmin(supabase, "is_portal_admin", "post announcements")
         const row = await createAnnouncement(supabase, {
           title,
           content,
@@ -225,7 +225,7 @@ export function registerBulletinTools(server: McpServer) {
       try {
         const caller = requireCaller(ctx as ToolContext)
         const supabase = createUserClient(caller.token)
-        await requirePortalAdmin(supabase, "delete announcements")
+        await requireAdmin(supabase, "is_portal_admin", "delete announcements")
         const removed = await deleteAnnouncement(supabase, announcement_id)
         if (!removed) {
           throw new Error(
