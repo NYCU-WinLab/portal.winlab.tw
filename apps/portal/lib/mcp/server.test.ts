@@ -95,6 +95,8 @@ describe("portal MCP handler", () => {
         "add_bento_order_item",
         "add_reimburse_egress",
         "add_reimburse_ingress",
+        "book_room",
+        "cancel_room_booking",
         "create_announcement",
         "create_leave",
         "delete_announcement",

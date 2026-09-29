@@ -10,6 +10,7 @@ import { callerAsUser } from "@/lib/mcp/context"
 import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
 import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
 import { createUserClient, verifySupabaseToken } from "@/lib/mcp/supabase"
+import { cancelBookingFor, confirmBookingFor } from "@/lib/rooms/confirm"
 import { removeStaleDoorSounds } from "@/lib/profile/door-sound"
 import { drainOutboxBatch } from "@/lib/receipts/email-drain"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -43,6 +44,21 @@ const handler = withMcpAuth(
           if (!doorConfigured()) throw new Error("Door API is not configured")
           return pressDoor(callerAsUser(caller), await headers(), "mcp")
         },
+        // The /rooms actions' booking and cancelling, run as the caller: RLS
+        // on their own client for the booking row, the shared dept account,
+        // the Teams pipeline and the invite mail as on the web.
+        bookRoom: (caller, input) =>
+          confirmBookingFor(
+            createUserClient(caller.token),
+            callerAsUser(caller),
+            input
+          ),
+        cancelRoomBooking: (caller, bookingId) =>
+          cancelBookingFor(
+            createUserClient(caller.token),
+            callerAsUser(caller),
+            bookingId
+          ),
         // submitSignature's after(): a signature that completes a document
         // queues mail to its creator, and this sends it without waiting for
         // the daily sweep.
