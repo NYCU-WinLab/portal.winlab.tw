@@ -727,6 +727,41 @@ export type Database = {
           },
         ]
       }
+      door_default_sounds: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          id: string
+          label: string
+          path: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          label: string
+          path: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          label?: string
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "door_default_sounds_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       door_events: {
         Row: {
           card_id: string | null
