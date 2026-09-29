@@ -1,12 +1,13 @@
 // A member's door sound: a short audio file the panel service plays when they
 // open the door, uploaded on /profile. The same rules are the bucket limits,
 // the storage INSERT policy and the checks on user_profiles.door_sound_path /
-// door_sound_mode (20260923140000). The service trims past 10 seconds and
-// levels the loudness, so Portal only checks type and size.
+// door_sound_mode (20260923140000). The service trims past
+// DOOR_SOUND_MAX_SECONDS and levels the loudness, so Portal only checks type
+// and size.
 
 export const DOOR_SOUND_BUCKET = "door-sounds"
 export const DOOR_SOUND_MAX_BYTES = 3 * 1024 * 1024
-export const DOOR_SOUND_MAX_SECONDS = 10
+export const DOOR_SOUND_MAX_SECONDS = 30
 
 // One content type per extension, stamped on the upload itself
 // (doorSoundUploadBody) so the bucket's allowed_mime_types can be an exact
@@ -32,7 +33,8 @@ export const DOOR_SOUND_MODES = ["sound_only", "voice_only"] as const
 export type DoorSoundMode = (typeof DOOR_SOUND_MODES)[number]
 
 // The mode the panel needs a file for. voice_only keeps its stored name but
-// now means the lab's default sound: the door no longer speaks.
+// means the lab's default sound, which plays after the spoken greeting like
+// any other.
 export type DoorSoundPlayMode = Exclude<DoorSoundMode, "voice_only">
 
 export const DOOR_SOUND_MODE_LABELS: Record<DoorSoundMode, string> = {
@@ -167,9 +169,10 @@ export function newDoorSoundPath(
   return `${userId}/${stamp}-${random}.${ext}`
 }
 
-// What the door plays for a member, by the panel service's rules: their own
-// sound when they have one and picked sound_only, otherwise the lab's default
-// sound. The greeting suffix only changes the LED text, never the sound.
+// What the door plays for a member, by the panel service's rules. It first
+// says "Hi" with their given name and the text of their greeting suffix, then
+// plays their own sound when they have one and picked sound_only, otherwise
+// the lab's default sound.
 export type DoorSoundOutcome = "own" | "default"
 
 export function doorSoundOutcome({

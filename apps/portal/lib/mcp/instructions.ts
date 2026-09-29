@@ -7,7 +7,7 @@ export const MCP_INSTRUCTIONS = `WinLab portal (https://portal.winlab.tw), the i
 Call whoami first when you need to know who the member is or what they may see. Its roles map (app name -> ["admin"]) says which apps they administer, and is_admin marks a portal super admin.
 
 Apps and their tools:
-- profile (own account, activity stats and door sound, /profile): whoami, get_profile, set_door_sound. Self only. set_door_sound sets the clip the lab door plays when the member opens it: their own audio file or the lab's default sound.
+- profile (own account, activity stats and door sound, /profile): whoami, get_profile, set_door_sound. Self only. set_door_sound sets the clip the lab door plays after greeting the member by name: their own audio file or the lab's default sound.
 - bulletin (lab announcements, /bulletin): list_announcements, get_announcement, create_announcement, delete_announcement. Every member reads the published board; posting and deleting are for portal super admins. create_announcement with notify true is mailed to the whole lab by the notifier script, notify false posts without mail. Editing an announcement stays on the web: deleting and posting again gives it a new id and, with notify true, mails everyone a second time.
 - bento (lunch orders, /bento): list_bento_orders, get_bento_order, add_bento_order_item, remove_bento_order_item. Every member reads every order; these tools add or remove only the member's own lines, even for a bento admin. Ordering for someone else, creating or closing an order is web only.
 - leave (absence sign-ups for the Monday lab meeting, /leave): list_leaves, create_leave, delete_leave. Everyone sees all sign-ups; a member signs up or withdraws only themselves, for one of the next 8 Mondays.
