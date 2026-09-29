@@ -29,3 +29,32 @@ export async function fetchIngress(
   if (error) throw new Error(`Failed to fetch ingress: ${error.message}`)
   return (data ?? []) as DatabaseIngress[]
 }
+
+export async function fetchEgressById(
+  supabase: SupabaseClient,
+  id: string
+): Promise<DatabaseEgress | null> {
+  const { data, error } = await supabase
+    .from("reimburse_egress")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to fetch egress: ${error.message}`)
+  return (data as DatabaseEgress | null) ?? null
+}
+
+// The names the /reimburse applicant picker offers: every member who has one.
+export async function fetchApplicantNames(
+  supabase: SupabaseClient
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("name")
+    .order("name")
+
+  if (error) throw new Error(`Failed to fetch lab members: ${error.message}`)
+  return ((data ?? []) as { name: string | null }[])
+    .map((row) => row.name)
+    .filter((name): name is string => !!name)
+}

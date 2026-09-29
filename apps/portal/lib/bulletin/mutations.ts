@@ -37,7 +37,8 @@ export async function createAnnouncement(
 
 // Null when nothing was deleted. RLS hides every row from a non-admin's
 // delete, so an unknown id and a missing permission both come back as null
-// rather than as an error.
+// rather than as an error. Drafts are left alone: the board and
+// get_announcement never show one, so nothing could have pointed at it.
 export async function deleteAnnouncement(
   supabase: SupabaseClient,
   id: string
@@ -46,6 +47,7 @@ export async function deleteAnnouncement(
     .from("announcements")
     .delete()
     .eq("id", id)
+    .eq("is_published", true)
     .select("id, title")
     .maybeSingle()
   if (error) throw error
