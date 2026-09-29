@@ -7,8 +7,11 @@ import {
   doorSoundUploadBody,
   isDoorSoundMode,
   isDoorSoundPath,
+  looksLikeDoorSound,
   newDoorSoundPath,
+  SOUND_NOT_AUDIO,
   validateDoorSoundBytes,
+  validateDoorSoundFile,
   type DoorSoundExtension,
   type DoorSoundMode,
 } from "@/lib/door/sound"
@@ -167,6 +170,59 @@ export async function updateDoorSound(
   return { ok: true, path, mode, previous: current.path }
 }
 
+// Stores a new file in the member's folder under a fresh name. The content
+// type comes from the extension alone and doorSoundUploadBody re-types the
+// bytes with it, so no caller can hand the bucket a browser's guess. The
+// /profile save passes the picked File and the MCP save the decoded bytes;
+// both upload with the member's own client, so the INSERT policy keeps the
+// file in their folder.
+export async function uploadDoorSound(
+  supabase: SupabaseClient,
+  userId: string,
+  content: Blob | Uint8Array,
+  ext: DoorSoundExtension
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const path = newDoorSoundPath(userId, ext)
+  const contentType = DOOR_SOUND_TYPES[ext]
+  const { error } = await supabase.storage
+    .from(DOOR_SOUND_BUCKET)
+    .upload(path, doorSoundUploadBody(content, contentType), {
+      contentType,
+      upsert: false,
+    })
+  if (error) {
+    console.error("[profile] door sound upload failed", error.message)
+    return { ok: false, error: SOUND_UPLOAD_FAILED }
+  }
+  return { ok: true, path }
+}
+
+export type SaveDoorSoundAction = (
+  input: SaveDoorSoundInput
+) => Promise<SaveDoorSoundResult>
+
+// The /profile save without React: check the picked file, upload it, then
+// hand the path to the server action (`save` is saveDoorSound in the app).
+// useDoorSound only wraps this in its pending state, so a test can drive
+// every step a member's upload takes.
+export async function saveDoorSoundFile(
+  supabase: SupabaseClient,
+  userId: string,
+  { file, mode }: { file: File | null; mode: DoorSoundMode },
+  save: SaveDoorSoundAction
+): Promise<SaveDoorSoundResult> {
+  if (!file) return await save({ mode })
+  const check = validateDoorSoundFile(file)
+  if (!check.ok) return check
+  const head = new Uint8Array(await file.slice(0, 16).arrayBuffer())
+  if (!looksLikeDoorSound(check.ext, head)) {
+    return { ok: false, error: SOUND_NOT_AUDIO }
+  }
+  const upload = await uploadDoorSound(supabase, userId, file, check.ext)
+  if (!upload.ok) return upload
+  return await save({ path: upload.path, mode })
+}
+
 export type DoorSoundBytes = { ext: DoorSoundExtension; bytes: Uint8Array }
 
 // The MCP tool's save. It holds the file itself, so unlike updateDoorSound it
@@ -196,17 +252,14 @@ export async function setOwnDoorSound(
 
   let path = current.path
   if (file && check) {
-    path = newDoorSoundPath(userId, check.ext)
-    const { error } = await supabase.storage
-      .from(DOOR_SOUND_BUCKET)
-      .upload(path, doorSoundUploadBody(file.bytes, check.contentType), {
-        contentType: check.contentType,
-        upsert: false,
-      })
-    if (error) {
-      console.error("[profile] door sound upload failed", error.message)
-      return { ok: false, error: SOUND_UPLOAD_FAILED }
-    }
+    const upload = await uploadDoorSound(
+      supabase,
+      userId,
+      file.bytes,
+      check.ext
+    )
+    if (!upload.ok) return upload
+    path = upload.path
   }
 
   const { data, error } = await supabase

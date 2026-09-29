@@ -7,6 +7,7 @@ import {
   fetchDoorSound,
   removeStaleDoorSounds,
   SAVE_SOUND_FAILED,
+  saveDoorSoundFile,
   setOwnDoorSound,
   signOwnDoorSound,
   SOUND_MODE_INVALID,
@@ -15,6 +16,9 @@ import {
   SOUND_UPLOAD_MISSING,
   SOUND_UPLOAD_REJECTED,
   updateDoorSound,
+  uploadDoorSound,
+  type SaveDoorSoundInput,
+  type SaveDoorSoundResult,
 } from "@/lib/profile/door-sound"
 
 const USER = "51111111-1111-1111-1111-111111111111"
@@ -394,5 +398,159 @@ describe("setOwnDoorSound", () => {
     expect(
       await setOwnDoorSound(member(), USER, { mode: "sound_only", file: mp3 })
     ).toEqual({ ok: false, error: SAVE_SOUND_FAILED })
+  })
+})
+
+describe("uploadDoorSound", () => {
+  test("sends a Safari-typed .m4a as audio/mp4 under a fresh name", async () => {
+    const picked = new File([new Uint8Array([0, 0, 0, 0x20])], "clip.m4a", {
+      type: "audio/x-m4a",
+    })
+    const result = await uploadDoorSound(member(), USER, picked, "m4a")
+    if (!result.ok) throw new Error(result.error)
+    expect(result.path).toMatch(
+      new RegExp(`^${USER}/\\d{14}-[0-9a-f]{8}\\.m4a$`)
+    )
+    expect(uploads).toEqual([
+      {
+        url: `https://database.example/storage/v1/object/door-sounds/${result.path}`,
+        type: "audio/mp4",
+      },
+    ])
+  })
+
+  test("a refused upload is reported", async () => {
+    uploadOk = false
+    const picked = new File([new Uint8Array([0x49, 0x44, 0x33])], "a.mp3")
+    expect(await uploadDoorSound(member(), USER, picked, "mp3")).toEqual({
+      ok: false,
+      error: SOUND_UPLOAD_FAILED,
+    })
+  })
+})
+
+describe("saveDoorSoundFile", () => {
+  // Every step a member's upload takes on /profile; useDoorSound only adds
+  // its pending state around this.
+  const m4a = () =>
+    new File(
+      [
+        new Uint8Array([
+          0,
+          0,
+          0,
+          0x20,
+          ...new TextEncoder().encode("ftypM4A "),
+        ]),
+      ],
+      "clip.m4a",
+      { type: "audio/x-m4a" }
+    )
+  const saved: SaveDoorSoundInput[] = []
+  const action = async (
+    input: SaveDoorSoundInput
+  ): Promise<SaveDoorSoundResult> => {
+    saved.push(input)
+    const path = typeof input.path === "string" ? input.path : null
+    return { ok: true, path, mode: "sound_only" }
+  }
+  beforeEach(() => {
+    saved.length = 0
+  })
+
+  test("a Safari .m4a goes out as audio/mp4 and its path reaches the save", async () => {
+    const result = await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: m4a(), mode: "sound_only" },
+      action
+    )
+    expect(uploads.map((u) => u.type)).toEqual(["audio/mp4"])
+    const path = uploads[0]?.url.split("/object/door-sounds/")[1] ?? ""
+    expect(path).toMatch(new RegExp(`^${USER}/\\d{14}-[0-9a-f]{8}\\.m4a$`))
+    expect(saved).toEqual([{ path, mode: "sound_only" }])
+    expect(result).toEqual({ ok: true, path, mode: "sound_only" })
+  })
+
+  test("a file the browser left untyped goes out with its extension's type", async () => {
+    const mp3 = new File([new Uint8Array([0x49, 0x44, 0x33, 4])], "clip.mp3")
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: mp3, mode: "sound_only" },
+      action
+    )
+    expect(uploads.map((u) => u.type)).toEqual(["audio/mpeg"])
+  })
+
+  test("a renamed PDF never reaches storage or the save", async () => {
+    const pdf = new File([new TextEncoder().encode("%PDF-1.7")], "clip.mp3", {
+      type: "audio/mpeg",
+    })
+    expect(
+      await saveDoorSoundFile(
+        member(),
+        USER,
+        { file: pdf, mode: "sound_only" },
+        action
+      )
+    ).toEqual({ ok: false, error: SOUND_NOT_AUDIO })
+    expect(uploads).toEqual([])
+    expect(saved).toEqual([])
+  })
+
+  test("a refused upload never reaches the save", async () => {
+    uploadOk = false
+    expect(
+      await saveDoorSoundFile(
+        member(),
+        USER,
+        { file: m4a(), mode: "sound_only" },
+        action
+      )
+    ).toEqual({ ok: false, error: SOUND_UPLOAD_FAILED })
+    expect(saved).toEqual([])
+  })
+
+  test("a save the server refuses is what the member sees", async () => {
+    const refused = { ok: false as const, error: SOUND_UPLOAD_REJECTED }
+    expect(
+      await saveDoorSoundFile(
+        member(),
+        USER,
+        { file: m4a(), mode: "sound_only" },
+        async () => refused
+      )
+    ).toEqual(refused)
+  })
+
+  test("the member's mode reaches the save on both branches", async () => {
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: m4a(), mode: "voice_only" },
+      action
+    )
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: null, mode: "sound_only" },
+      action
+    )
+    expect(saved.map((input) => input.mode)).toEqual([
+      "voice_only",
+      "sound_only",
+    ])
+  })
+
+  test("without a file only the mode goes to the save", async () => {
+    await saveDoorSoundFile(
+      member(),
+      USER,
+      { file: null, mode: "voice_only" },
+      action
+    )
+    expect(uploads).toEqual([])
+    expect(saved).toEqual([{ mode: "voice_only" }])
   })
 })
