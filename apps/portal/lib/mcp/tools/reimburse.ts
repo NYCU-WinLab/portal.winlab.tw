@@ -37,11 +37,11 @@ import type {
   UpdateIngress,
 } from "@/lib/reimburse/types"
 
-const ISO_DATE = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected a YYYY-MM-DD date")
+const ISO_DATE = z.iso.date()
 
-const AMOUNT = z.number().finite().nonnegative()
+// The /reimburse dialogs take amounts in steps of 0.01, so a tool must not
+// store a figure the table would round and an edit dialog would refuse.
+export const AMOUNT = z.number().finite().nonnegative().multipleOf(0.01)
 
 const REIMBURSE_URL = `${PORTAL_URL}/reimburse`
 
@@ -112,7 +112,7 @@ export function ingressUpdates(changes: IngressChanges): UpdateIngress {
   if (changes.ingress_amount !== undefined)
     updates.ingress_amount = changes.ingress_amount
   if (changes.ingress_comment !== undefined)
-    updates.ingress_comment = changes.ingress_comment
+    updates.ingress_comment = changes.ingress_comment || null
   if (Object.keys(updates).length === 0) {
     throw new Error("nothing to change: pass at least one field")
   }
@@ -268,11 +268,7 @@ export function registerReimburseTools(server: McpServer) {
       title: "Update reimburse egress",
       description: `Changes a money-out entry (支出) on /reimburse, the edit dialog on its row. Pass only the fields to change. The usual edit is marking it paid: transfer_date (and transfer_fee if the bank charged one); transfer_date null puts it back to 未轉帳. A new applicant_name must be a member's portal name; an old entry keeps whatever name it has unless you change it. Get the id from list_reimburse_entries. ${ADMIN_ONLY}`,
       inputSchema: z.object({
-        entry_id: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("Egress id from list_reimburse_entries"),
+        entry_id: z.uuid().describe("Egress id from list_reimburse_entries"),
         applicant_name: z.string().trim().min(1).optional(),
         item_name: z.string().trim().min(1).max(200).optional(),
         item_amount: AMOUNT.optional().describe("Amount in TWD"),
@@ -301,14 +297,16 @@ export function registerReimburseTools(server: McpServer) {
             `no egress entry with id ${entry_id}; call list_reimburse_entries for the current ids`
           )
         }
-        if (
-          updates.applicant_name !== undefined &&
-          updates.applicant_name !== current.applicant_name
-        ) {
-          updates.applicant_name = matchApplicant(
-            await fetchApplicantNames(supabase),
-            updates.applicant_name
-          )
+        if (updates.applicant_name !== undefined) {
+          // Resending the stored name, even one from before the picker, is
+          // not a change; anything else must be a member's portal name.
+          updates.applicant_name =
+            updates.applicant_name === current.applicant_name.trim()
+              ? current.applicant_name
+              : matchApplicant(
+                  await fetchApplicantNames(supabase),
+                  updates.applicant_name
+                )
         }
         const row = await patchEgress(supabase, entry_id, updates)
         if (!row) throw new Error(`egress entry ${entry_id} was not updated`)
@@ -325,11 +323,7 @@ export function registerReimburseTools(server: McpServer) {
       title: "Delete reimburse egress",
       description: `Deletes one money-out entry (支出) from /reimburse for good, the delete button on its row; there is no undo, and the balance changes at once. Money-in entries have no delete, as on the web. Read the entry back (list_reimburse_entries) and confirm it with the member first. Reimburse admins only; for anyone else the tool fails.`,
       inputSchema: z.object({
-        entry_id: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("Egress id from list_reimburse_entries"),
+        entry_id: z.uuid().describe("Egress id from list_reimburse_entries"),
       }),
     },
     async ({ entry_id }, ctx) => {
@@ -369,7 +363,6 @@ export function registerReimburseTools(server: McpServer) {
         ingress_comment: z
           .string()
           .trim()
-          .min(1)
           .max(200)
           .optional()
           .describe("Note shown in the ledger"),
@@ -383,7 +376,7 @@ export function registerReimburseTools(server: McpServer) {
         const row = await insertIngress(supabase, {
           ingress_date: args.ingress_date,
           ingress_amount: args.ingress_amount,
-          ingress_comment: args.ingress_comment ?? null,
+          ingress_comment: args.ingress_comment || null,
           user_id: caller.userId,
         })
         return json({ entry: ingressEntry(row), url: REIMBURSE_URL })
@@ -399,17 +392,12 @@ export function registerReimburseTools(server: McpServer) {
       title: "Update reimburse ingress",
       description: `Changes a money-in entry (收入) on /reimburse, the edit dialog on its row. Pass only the fields to change; ingress_comment null clears the note. Get the id from list_reimburse_entries. ${ADMIN_ONLY}`,
       inputSchema: z.object({
-        entry_id: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("Ingress id from list_reimburse_entries"),
+        entry_id: z.uuid().describe("Ingress id from list_reimburse_entries"),
         ingress_date: ISO_DATE.optional(),
         ingress_amount: AMOUNT.optional().describe("Amount in TWD"),
         ingress_comment: z
           .string()
           .trim()
-          .min(1)
           .max(200)
           .nullable()
           .optional()

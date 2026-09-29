@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  AMOUNT,
   egressUpdates,
   ingressUpdates,
   matchApplicant,
@@ -64,5 +65,27 @@ describe("ingressUpdates", () => {
 
   test("refuses an update with nothing in it", () => {
     expect(() => ingressUpdates({})).toThrow(/nothing to change/)
+  })
+})
+
+describe("AMOUNT", () => {
+  test("takes whole and two-decimal amounts, as the web form does", () => {
+    expect(AMOUNT.safeParse(19.99).success).toBe(true)
+    expect(AMOUNT.safeParse(0.1 + 0.2).success).toBe(true)
+    expect(AMOUNT.safeParse(1200).success).toBe(true)
+  })
+
+  test("refuses finer amounts and negative ones", () => {
+    expect(AMOUNT.safeParse(100 / 3).success).toBe(false)
+    expect(AMOUNT.safeParse(0.005).success).toBe(false)
+    expect(AMOUNT.safeParse(-1).success).toBe(false)
+  })
+})
+
+describe("ingressUpdates with an empty note", () => {
+  test("clears the note, as the web does with an empty box", () => {
+    expect(ingressUpdates({ ingress_comment: "" })).toEqual({
+      ingress_comment: null,
+    })
   })
 })
