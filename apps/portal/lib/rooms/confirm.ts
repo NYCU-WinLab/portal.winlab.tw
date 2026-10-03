@@ -16,6 +16,10 @@ import {
   validateBookingDate,
   validateBookingTimes,
 } from "@/lib/rooms/booking-times"
+import {
+  decideCancelTarget,
+  type CreateRequestRow,
+} from "@/lib/rooms/cancel-target"
 import { taipeiIso } from "@/lib/rooms/date"
 import { decideEpicLink, type EpicLink } from "@/lib/rooms/epic-link"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
@@ -207,48 +211,48 @@ async function cancelTeamsMeeting(booking: {
   groupName: string | null
   issueRefs: string[]
 }): Promise<string | undefined> {
-  // Without a trigger token this deployment never asked for a meeting, so
-  // there is nothing to take down (and no reason to need the admin client).
-  if (!meetingPipelineConfigured()) return undefined
   try {
-    const admin = createAdminClient()
-    const { data, error } = await admin
-      .from("rooms_meeting_requests")
-      .select("request_id, cancel_id, message_id, status")
-      .eq("booking_id", booking.id)
-      .eq("kind", "create")
-      .order("created_at", { ascending: false })
+    // Without a trigger token this deployment never asked for a meeting, so
+    // there is nothing to look up (and no reason to need the admin client).
+    const pipelineConfigured = meetingPipelineConfigured()
+    const admin = pipelineConfigured ? createAdminClient() : null
+    let requests: CreateRequestRow[] = []
+    if (admin) {
+      const { data, error } = await admin
+        .from("rooms_meeting_requests")
+        .select("request_id, cancel_id, message_id, status")
+        .eq("booking_id", booking.id)
+        .eq("kind", "create")
+        .order("created_at", { ascending: false })
 
-    if (error) {
-      console.error(
-        "[rooms] could not resolve original meeting request for cancellation",
-        error
-      )
-      return `查不到原本的 Teams 會議紀錄:${error.message}`
-    }
-
-    const requests = data ?? []
-    const created = requests.find((r) => r.cancel_id && r.message_id)
-    if (!created?.cancel_id || !created.message_id) {
-      // Pending, or reported success without the ids a cancel needs: a
-      // meeting may exist (or still appear) that nothing here can name.
-      if (requests.some((r) => r.status !== "failed")) {
-        console.warn(
-          "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
+      if (error) {
+        console.error(
+          "[rooms] could not resolve original meeting request for cancellation",
+          error
         )
-        return "Teams 會議尚未建立完成或沒有回報會議識別碼"
+        return `查不到原本的 Teams 會議紀錄:${error.message}`
       }
-      return undefined
+      requests = data ?? []
     }
+
+    const target = decideCancelTarget({ pipelineConfigured, requests })
+    if (target.kind === "warn") {
+      console.warn(
+        "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
+      )
+      return target.message
+    }
+    // A cancel target implies the pipeline is configured, so admin exists.
+    if (target.kind === "none" || !admin) return undefined
 
     const outcome = await triggerMeetingCancel(admin, {
       bookingId: booking.id,
-      bookingRequestId: created.request_id,
+      bookingRequestId: target.requestId,
       title: booking.title,
       groupName: booking.groupName,
       issueRefs: booking.issueRefs,
-      cancelId: created.cancel_id,
-      messageId: created.message_id,
+      cancelId: target.cancelId,
+      messageId: target.messageId,
       start: taipeiIso(booking.date, booking.startTime),
       reason: "此會議已取消(教室預約已取消)",
     })
