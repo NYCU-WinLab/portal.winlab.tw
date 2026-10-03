@@ -29,6 +29,7 @@ import {
   gitlabPathForGroup,
 } from "@/lib/rooms/keycloak-groups"
 import {
+  fetchEpic,
   fetchEpicDeliverables,
   fetchOpenEpics,
   type EpicDeliverablesResult,
@@ -44,6 +45,7 @@ import { todayInTaipei } from "@/lib/rooms/date"
 import {
   cancelBookingFor,
   confirmBookingFor,
+  failureText,
   resolveEpicLink,
   type BookingResult,
   type ConfirmBookingInput,
@@ -130,7 +132,17 @@ export async function getEpicDeliverables(
   if (!groupPath) {
     return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
   }
-  return fetchEpicDeliverables(groupPath, iid)
+  const read = await fetchEpic(groupPath, iid)
+  if (!read.ok) {
+    return {
+      status: "error",
+      detail:
+        read.reason === "not_found"
+          ? `Epic &${iid} 已不存在`
+          : `讀不到 Epic &${iid}:${read.detail}`,
+    }
+  }
+  return fetchEpicDeliverables(groupPath, read.epic)
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
@@ -334,8 +346,8 @@ export interface CreateRecurringInput {
   /** Free text: what the meeting is for. Handed to GitLab as AGENDA. */
   agenda?: string | null
   /**
-   * Epics every occurrence of this series belongs to. Deliverables follow
-   * from them, as with a one-off booking.
+   * Optional Sync container reused by every occurrence. A selected Report or
+   * single Meeting is rejected server-side.
    */
   issueRefs?: string[]
 }
@@ -388,7 +400,20 @@ export async function createRecurringMeeting(
   // Frozen at creation for the same reason the prefix is: the epic a standing
   // series reports into shouldn't change under it because someone relabelled
   // something in GitLab midway through a term.
-  const epicLink = await resolveEpicLink(input.groupName, input.issueRefs ?? [])
+  // Thrown on a bad, unreadable or non-Sync epic. Returned rather than let
+  // through: a Server Action's thrown error reaches the form redacted.
+  let epicLink: Awaited<ReturnType<typeof resolveEpicLink>>
+  try {
+    epicLink = await resolveEpicLink(
+      input.groupName,
+      input.issueRefs ?? [],
+      true
+    )
+  } catch (err) {
+    // Logged as well as returned, as confirmBookingFor does.
+    console.error("[rooms] recurring epic link failed", err)
+    return { booked: 0, failed: 0, errors: [], error: failureText(err) }
+  }
 
   const supabase = await createClient()
   const { data: created, error } = await supabase

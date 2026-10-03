@@ -368,7 +368,9 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           .int()
           .positive()
           .optional()
-          .describe("With group: the GitLab epic this meeting belongs to"),
+          .describe(
+            "With group: the GitLab epic this meeting belongs to. If the epic can't be read (deleted, or GitLab unreachable) the whole booking fails rather than booking without the link"
+          ),
       }),
     },
     async (args, ctx) => {
@@ -512,6 +514,11 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           cancellation_mail: result.inviteError
             ? `not sent: ${result.inviteError}`
             : "sent",
+          ...(result.teamsCancelError
+            ? {
+                teams_meeting: `not cancelled: ${result.teamsCancelError}. It will still start and record; tell the member to delete it in Teams by hand.`,
+              }
+            : {}),
           url: `${PORTAL_URL}/rooms`,
         })
       } catch (err) {
