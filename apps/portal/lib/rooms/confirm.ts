@@ -230,7 +230,7 @@ async function cancelTeamsMeeting(booking: {
           "[rooms] could not resolve original meeting request for cancellation",
           error
         )
-        return `查不到原本的 Teams 會議紀錄:${error.message}`
+        return `查不到原本的 Teams 會議紀錄：${error.message}`
       }
       requests = data ?? []
     }

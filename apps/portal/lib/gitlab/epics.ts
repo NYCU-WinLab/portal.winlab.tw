@@ -36,22 +36,23 @@ export interface GitLabEpic {
 export type EpicClassification = "sync" | "report" | "meeting"
 
 /**
- * One epic looked up by iid, or why it couldn't be.
- *
- * `not_found` is GitLab saying the epic isn't there (404): the person picked
- * something that has since been deleted or moved, and retrying won't help.
- * Everything else — no token, a token GitLab rejects, a 5xx, a network
- * failure, a body that isn't an epic — is `unavailable`: the epic may be fine
- * and the booking should be tried again later. Telling a person "that epic is
- * gone" during a GitLab outage sends them hunting for a problem that isn't
- * theirs.
- */
-/**
  * What a read reports when Portal has no GitLab token at all. Shared so the
  * booking path can tell "nobody configured this" from "GitLab is down".
  */
 export const GITLAB_TOKEN_MISSING = "GITLAB_API_TOKEN 未設定"
 
+/**
+ * One epic looked up by iid, or why it couldn't be.
+ *
+ * `not_found` is GitLab saying the epic isn't there (404): the person picked
+ * something that has since been deleted or moved, and retrying won't help.
+ * Everything else — no token, a token GitLab rejects, a 5xx, a network
+ * failure, a body that isn't an epic — is `unavailable`: the epic may be fine.
+ * `status` and `detail` say which, so the booking path can send a token
+ * problem to an admin and ask for a retry only when GitLab itself is down.
+ * Telling a person "that epic is gone" during a GitLab outage sends them
+ * hunting for a problem that isn't theirs.
+ */
 export type EpicRead =
   | { ok: true; epic: GitLabEpic }
   | {
