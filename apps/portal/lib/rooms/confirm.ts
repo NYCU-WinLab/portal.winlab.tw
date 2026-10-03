@@ -237,39 +237,35 @@ async function cancelTeamsMeeting(booking: {
   issueRefs: string[]
 }): Promise<void> {
   if (!meetingPipelineConfigured()) return
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from("rooms_meeting_requests")
-    .select("request_id, cancel_id, message_id")
-    .eq("booking_id", booking.id)
-    .eq("kind", "create")
-    .not("cancel_id", "is", null)
-    .not("message_id", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error) {
-    console.error(
-      "[rooms] could not resolve original meeting request for cancellation",
-      error
-    )
-    return
-  }
-  if (!data) {
-    console.warn(
-      "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
-    )
-    return
-  }
-  if (!data.cancel_id || !data.message_id) {
-    console.warn(
-      "[rooms] original create request has no completed Teams cancellation identity"
-    )
-    return
-  }
-
   try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from("rooms_meeting_requests")
+      .select("request_id, cancel_id, message_id")
+      .eq("booking_id", booking.id)
+      .eq("kind", "create")
+      .not("cancel_id", "is", null)
+      .not("message_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error(
+        "[rooms] could not resolve original meeting request for cancellation",
+        error
+      )
+      return
+    }
+    // The query already excludes rows missing either id; the null checks
+    // are here for the type narrowing, not as a separate case.
+    if (!data?.cancel_id || !data.message_id) {
+      console.warn(
+        "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
+      )
+      return
+    }
+
     await triggerMeetingCancel(admin, {
       bookingId: booking.id,
       bookingRequestId: data.request_id,
