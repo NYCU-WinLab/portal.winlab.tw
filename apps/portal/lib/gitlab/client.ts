@@ -22,6 +22,7 @@ import {
   type GitLabEpic,
 } from "./epics"
 import type { Deliverable } from "@/lib/rooms/deliverables"
+import { collectPages, type PageRead } from "./pages"
 
 const DEFAULT_BASE_URL = "https://gitlab.winlab.tw"
 
@@ -62,6 +63,7 @@ export async function fetchOpenEpics(
   if (!path) return { status: "unlinked" }
 
   const read = await getAllPages(
+    EPIC_PAGE_SIZE,
     (page) =>
       `/groups/${encodeURIComponent(path)}/epics` +
       `?state=opened&order_by=updated_at&sort=desc&per_page=${EPIC_PAGE_SIZE}&page=${page}`
@@ -70,9 +72,7 @@ export async function fetchOpenEpics(
   return { status: "ok", epics: readEpics(read.body) }
 }
 
-type Read =
-  | { ok: true; body: unknown }
-  | { ok: false; detail: string; status?: number }
+type Read = PageRead
 
 /**
  * One authenticated GET, reporting why it failed rather than just that it did.
@@ -145,19 +145,11 @@ export type EpicDeliverablesResult =
 
 const ISSUE_PAGE_SIZE = 100
 
-async function getAllPages(
+function getAllPages(
+  pageSize: number,
   pathForPage: (page: number) => string
 ): Promise<Read> {
-  const rows: unknown[] = []
-  for (let page = 1; ; page++) {
-    const read = await getJson(pathForPage(page))
-    if (!read.ok) return read
-    if (!Array.isArray(read.body)) {
-      return { ok: false, detail: "GitLab 回應不是清單" }
-    }
-    rows.push(...read.body)
-    if (read.body.length < ISSUE_PAGE_SIZE) return { ok: true, body: rows }
-  }
+  return collectPages(pageSize, (page) => getJson(pathForPage(page)))
 }
 
 function property(value: unknown, key: string): unknown {
@@ -175,7 +167,7 @@ async function validateReviewIteration(
   groupPath: string,
   iterationId: number
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
-  const read = await getAllPages((page) =>
+  const read = await getAllPages(ISSUE_PAGE_SIZE, (page) =>
     groupIterationsPath(groupPath, page, ISSUE_PAGE_SIZE)
   )
   if (!read.ok) return read
@@ -232,6 +224,7 @@ export async function fetchEpicDeliverables(
 
     const group = encodeURIComponent(groupPath)
     const read = await getAllPages(
+      ISSUE_PAGE_SIZE,
       (page) =>
         `/groups/${group}/issues?${reportIssuesQuery(
           iterationId,
@@ -252,7 +245,7 @@ export async function fetchEpicDeliverables(
     }
   }
 
-  const read = await getAllPages((page) =>
+  const read = await getAllPages(ISSUE_PAGE_SIZE, (page) =>
     epicIssuesPath(groupPath, epic.iid, page, ISSUE_PAGE_SIZE)
   )
   if (!read.ok) return { status: "error", detail: read.detail }
