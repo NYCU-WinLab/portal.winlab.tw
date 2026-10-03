@@ -69,11 +69,18 @@ export function OnlineMeetings() {
                 onSuccess: (result) => {
                   if (result.error) {
                     toast.error(result.error)
-                  } else if (result.inviteError) {
+                    return
+                  }
+                  if (result.teamsCancelError) {
                     toast.warning(
-                      `已取消,但取消通知信寄送失敗:${result.inviteError}`
+                      `預約已取消，但 Teams 會議沒有取消成功：${result.teamsCancelError}，請手動刪除 Teams 會議`
                     )
-                  } else {
+                  }
+                  if (result.inviteError) {
+                    toast.warning(
+                      `已取消，但取消通知信寄送失敗：${result.inviteError}`
+                    )
+                  } else if (!result.teamsCancelError) {
                     toast.success("已取消這場線上會議")
                   }
                 },

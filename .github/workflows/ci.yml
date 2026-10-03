@@ -36,7 +36,11 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Audit dependencies
-        run: bun audit --audit-level=high
+        # braces <=3.0.3 has no patched release. It comes in via micromatch
+        # (eslint-plugin-next, and shadcn, a runtime dep of @workspace/ui), so it
+        # ships in the Docker image's node_modules but no request path loads it.
+        # Drop the ignore once braces publishes a fix.
+        run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
 
       - name: Typecheck
         run: bun run typecheck
