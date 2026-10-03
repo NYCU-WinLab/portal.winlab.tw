@@ -78,7 +78,7 @@ export function OnlineMeetings() {
                   }
                   if (result.inviteError) {
                     toast.warning(
-                      `已取消,但取消通知信寄送失敗:${result.inviteError}`
+                      `已取消，但取消通知信寄送失敗：${result.inviteError}`
                     )
                   } else if (!result.teamsCancelError) {
                     toast.success("已取消這場線上會議")

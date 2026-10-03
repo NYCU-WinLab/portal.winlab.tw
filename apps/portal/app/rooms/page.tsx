@@ -640,7 +640,7 @@ function LabBookingCancel({
               }
               if (result.inviteError) {
                 toast.warning(
-                  `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`
+                  `已取消 ${room}，但取消通知信寄送失敗：${result.inviteError}`
                 )
               } else if (!result.teamsCancelError) {
                 toast.success(`已取消 ${room} 的預約`)
