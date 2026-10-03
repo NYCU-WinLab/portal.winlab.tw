@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { collectPages, type PageRead } from "./pages"
+import { collectPages, MAX_PAGES, type PageRead } from "./pages"
 
 function pagesOf(...pages: unknown[][]) {
   const asked: number[] = []
@@ -48,5 +48,15 @@ describe("collectPages", () => {
       body: { message: "nope" },
     }))
     expect(read.ok).toBe(false)
+  })
+
+  test("gives up after MAX_PAGES full pages instead of looping forever", async () => {
+    let asked = 0
+    const read = await collectPages(1, async () => {
+      asked++
+      return { ok: true, body: [asked] }
+    })
+    expect(read.ok).toBe(false)
+    expect(asked).toBe(MAX_PAGES)
   })
 })

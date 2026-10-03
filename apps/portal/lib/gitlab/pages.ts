@@ -5,6 +5,11 @@ export type PageRead =
   | { ok: true; body: unknown }
   | { ok: false; detail: string; status?: number }
 
+// 50 pages of 100 is far past any group the lab has. A GitLab that keeps
+// returning full pages past that is misbehaving, and a booking should fail
+// rather than hang on it.
+export const MAX_PAGES = 50
+
 /**
  * Reads every page of a GitLab list, stopping at the first short page.
  *
@@ -17,7 +22,7 @@ export async function collectPages(
   readPage: (page: number) => Promise<PageRead>
 ): Promise<PageRead> {
   const rows: unknown[] = []
-  for (let page = 1; ; page++) {
+  for (let page = 1; page <= MAX_PAGES; page++) {
     const read = await readPage(page)
     if (!read.ok) return read
     if (!Array.isArray(read.body)) {
@@ -26,4 +31,5 @@ export async function collectPages(
     rows.push(...read.body)
     if (read.body.length < pageSize) return { ok: true, body: rows }
   }
+  return { ok: false, detail: `GitLab 清單超過 ${MAX_PAGES} 頁，已停止讀取` }
 }
