@@ -298,7 +298,8 @@ test("Report validation includes ancestor iterations and all states", () => {
 test("Report issue query pins iteration, descendants, and page", () => {
   const query = new URLSearchParams(reportIssuesQuery(10, 3))
   expect(query.get("iteration_id")).toBe("10")
-  expect(query.get("include_subgroups")).toBe("true")
+  // Not a parameter of GET /groups/:id/issues; subgroups are included anyway.
+  expect(query.has("include_subgroups")).toBe(false)
   expect(query.get("scope")).toBe("all")
   expect(query.get("state")).toBe("all")
   expect(query.get("per_page")).toBe("100")

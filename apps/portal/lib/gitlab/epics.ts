@@ -267,7 +267,14 @@ export function agendaAfterEpicSelection(
   return epic.description ?? (inherited ? "" : currentAgenda)
 }
 
-/** Query for a Report review, scoped to the selected group and descendants. */
+/**
+ * Query for a Report review, scoped to the selected group and descendants.
+ *
+ * GET /groups/:id/issues already covers every subgroup's projects (the API
+ * runs its finder with subgroups included and offers no switch for it), so
+ * there's no `include_subgroups` here — that isn't a parameter of this
+ * endpoint.
+ */
 export function reportIssuesQuery(
   iterationId: number,
   page: number,
@@ -275,7 +282,6 @@ export function reportIssuesQuery(
 ): string {
   const params = new URLSearchParams({
     iteration_id: String(iterationId),
-    include_subgroups: "true",
     scope: "all",
     state: "all",
     per_page: String(perPage),

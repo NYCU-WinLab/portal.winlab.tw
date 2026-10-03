@@ -79,6 +79,7 @@ export function DeliverablesField({
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
+            {/* GET /groups/:id/issues includes subgroup projects by default. */}
             {epic?.classification === "report"
               ? `列出所選群組與子群組中 Iteration #${epic.reviewIterationId} 的 issue；交付物仍以 Deliverable 標籤為準。`
               : "來自這個 epic 底下 issue 的 Deliverable 標籤,要改請改 GitLab。"}
