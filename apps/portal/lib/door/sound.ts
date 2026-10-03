@@ -33,8 +33,9 @@ export const DOOR_SOUND_MODES = ["sound_only", "voice_only"] as const
 export type DoorSoundMode = (typeof DOOR_SOUND_MODES)[number]
 
 // The mode the panel needs a file for. voice_only keeps its stored name but
-// means one of the lab's default sounds, picked at random by the panel, which
-// plays after the spoken greeting like any other.
+// means one of the lab's default sounds, picked at random by the panel (its
+// built-in sound when none are enabled), which plays after the spoken
+// greeting like any other.
 export type DoorSoundPlayMode = Exclude<DoorSoundMode, "voice_only">
 
 export const DOOR_SOUND_MODE_LABELS: Record<DoorSoundMode, string> = {
@@ -173,7 +174,8 @@ export function newDoorSoundPath(
 // says "Hi" with their given name and the words of their greeting suffix
 // (symbols such as the default "！！" are not spoken), then plays their own
 // sound when they have one and picked sound_only, otherwise a random one of
-// the lab's default sounds.
+// the lab's default sounds, or the panel's built-in sound when none are
+// enabled.
 export type DoorSoundOutcome = "own" | "default"
 
 export function doorSoundOutcome({
