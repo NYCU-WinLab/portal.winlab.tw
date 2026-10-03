@@ -35,6 +35,27 @@ export interface GitLabEpic {
 
 export type EpicClassification = "sync" | "report" | "meeting"
 
+/**
+ * One epic looked up by iid, or why it couldn't be.
+ *
+ * `not_found` is GitLab saying the epic isn't there (404): the person picked
+ * something that has since been deleted or moved, and retrying won't help.
+ * Everything else — no token, a token GitLab rejects, a 5xx, a network
+ * failure, a body that isn't an epic — is `unavailable`: the epic may be fine
+ * and the booking should be tried again later. Telling a person "that epic is
+ * gone" during a GitLab outage sends them hunting for a problem that isn't
+ * theirs.
+ */
+export type EpicRead =
+  | { ok: true; epic: GitLabEpic }
+  | {
+      ok: false
+      reason: "not_found" | "unavailable"
+      /** GitLab's HTTP status, when it answered at all. */
+      status?: number
+      detail: string
+    }
+
 const KNOWN_DELIVERABLES = new Set<string>(DELIVERABLES.map((d) => d.value))
 const MEETING_TRACK_LABEL = "Meeting::Track"
 const REVIEW_MARKER = /<!--\s*winlab:review(?=\s|-->)([^>]*)-->/g
@@ -204,9 +225,22 @@ export function readEpic(raw: RawEpic): GitLabEpic | null {
 
 export function readEpics(body: unknown): GitLabEpic[] {
   if (!Array.isArray(body)) return []
-  return body
-    .map((row) => (typeof row === "object" && row ? readEpic(row) : null))
-    .filter((e): e is GitLabEpic => e !== null)
+  const epics: GitLabEpic[] = []
+  for (const row of body) {
+    const epic = typeof row === "object" && row ? readEpic(row) : null
+    if (epic) {
+      epics.push(epic)
+      continue
+    }
+    // Dropped rather than failing the whole list, but never silently: an epic
+    // that vanishes from the picker with nothing in the log is a support
+    // ticket nobody can answer.
+    console.warn("[gitlab] dropped malformed epic row", {
+      id: property(row, "id"),
+      iid: property(row, "iid"),
+    })
+  }
+  return epics
 }
 
 /**

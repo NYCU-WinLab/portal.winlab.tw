@@ -19,6 +19,7 @@ import {
   readEpics,
   readReviewIssues,
   type EpicIssue,
+  type EpicRead,
   type GitLabEpic,
 } from "./epics"
 import type { Deliverable } from "@/lib/rooms/deliverables"
@@ -115,14 +116,29 @@ async function getJson(path: string): Promise<Read> {
 export async function fetchEpic(
   groupPath: string,
   iid: number
-): Promise<GitLabEpic | null> {
+): Promise<EpicRead> {
   const read = await getJson(
     `/groups/${encodeURIComponent(groupPath)}/epics/${iid}`
   )
-  if (!read.ok) return null
+  if (!read.ok) {
+    return {
+      ok: false,
+      reason: read.status === 404 ? "not_found" : "unavailable",
+      ...(read.status !== undefined ? { status: read.status } : {}),
+      detail: read.detail,
+    }
+  }
   // Reuses the list reader so a single epic is validated the same way as one
   // that arrived in a list.
-  return readEpics([read.body])[0] ?? null
+  const epic = readEpics([read.body])[0]
+  if (!epic) {
+    return {
+      ok: false,
+      reason: "unavailable",
+      detail: "GitLab 回傳的 Epic 格式無法辨識",
+    }
+  }
+  return { ok: true, epic }
 }
 
 export type EpicDeliverablesResult =

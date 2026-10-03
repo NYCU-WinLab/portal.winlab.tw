@@ -17,8 +17,7 @@ import {
   validateBookingTimes,
 } from "@/lib/rooms/booking-times"
 import { taipeiIso } from "@/lib/rooms/date"
-import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
-import { parseEpicRef } from "@/lib/rooms/epic-refs"
+import { decideEpicLink, type EpicLink } from "@/lib/rooms/epic-link"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
 import { sendBookingInvite } from "@/lib/rooms/invite-mail"
 import { gitlabPathForGroup } from "@/lib/rooms/keycloak-groups"
@@ -59,54 +58,14 @@ export async function resolveEpicLink(
   groupName: string | null | undefined,
   requested: readonly string[],
   recurring = false
-): Promise<{ issueRefs: string[]; deliverables: string[] }> {
-  const empty = { issueRefs: [], deliverables: [] }
-  if (requested.length === 0) return empty
-
-  const groupPath = await gitlabPathForGroup(groupName)
-  if (!groupPath) {
-    throw new Error("所選群組沒有設定 gitlab_path，無法確認 Epic")
-  }
-
-  const refs = requested
-    .map((raw) => parseEpicRef(raw, groupPath))
-    .filter((ref) => ref !== null)
-    .filter((ref) => ref.groupPath === groupPath)
-
-  if (refs.length !== requested.length || refs.length === 0) {
-    throw new Error("Epic reference 無效或不屬於所選群組")
-  }
-
-  const resolved = await Promise.all(
-    refs.map((ref) => fetchEpic(groupPath, ref.iid))
+): Promise<EpicLink> {
+  if (requested.length === 0) return { issueRefs: [], deliverables: [] }
+  return decideEpicLink(
+    await gitlabPathForGroup(groupName),
+    requested,
+    recurring,
+    { fetchEpic, fetchEpicDeliverables }
   )
-  if (resolved.some((epic) => epic === null)) {
-    throw new Error("所選 Epic 已不存在或目前無法讀取")
-  }
-  const epics = resolved.filter((epic) => epic !== null)
-
-  if (recurring && epics.some((epic) => epic.classification !== "sync")) {
-    throw new Error(
-      "固定群組會議只能選 Sync container；Report 與單場 Meeting 不能重複使用"
-    )
-  }
-
-  const deliverables = await Promise.all(
-    epics.map((epic) => fetchEpicDeliverables(groupPath, epic))
-  )
-  const failed = deliverables.find((result) => result.status === "error")
-  if (failed?.status === "error") {
-    throw new Error(`無法確認所選 Epic:${failed.detail}`)
-  }
-
-  return {
-    issueRefs: epics.map((epic) => `${groupPath}&${epic.iid}`),
-    // Re-normalised rather than concatenated: two epics can each be in
-    // canonical order and still interleave when joined.
-    deliverables: sanitizeDeliverables(
-      deliverables.flatMap((d) => (d.status === "ok" ? d.deliverables : []))
-    ),
-  }
 }
 
 export interface ConfirmBookingInput {

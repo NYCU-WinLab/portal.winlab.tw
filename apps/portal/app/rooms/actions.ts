@@ -132,11 +132,17 @@ export async function getEpicDeliverables(
   if (!groupPath) {
     return { status: "error", detail: "這個群組沒有設定 gitlab_path" }
   }
-  const epic = await fetchEpic(groupPath, iid)
-  if (!epic) {
-    return { status: "error", detail: `讀不到 Epic &${iid}` }
+  const read = await fetchEpic(groupPath, iid)
+  if (!read.ok) {
+    return {
+      status: "error",
+      detail:
+        read.reason === "not_found"
+          ? `Epic &${iid} 已不存在`
+          : `讀不到 Epic &${iid}:${read.detail}`,
+    }
   }
-  return fetchEpicDeliverables(groupPath, epic)
+  return fetchEpicDeliverables(groupPath, read.epic)
 }
 
 /** Bookings Portal itself made (any lab member's), for matching against the grid. */
