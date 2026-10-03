@@ -14,6 +14,7 @@ import {
   deliverablesOf,
   epicIssuesPath,
   groupIterationsPath,
+  iterationBelongs,
   reportIssuesQuery,
   readEpicIssues,
   readEpics,
@@ -168,17 +169,6 @@ function getAllPages(
   return collectPages(pageSize, (page) => getJson(pathForPage(page)))
 }
 
-function property(value: unknown, key: string): unknown {
-  return typeof value === "object" && value !== null
-    ? Reflect.get(value, key)
-    : undefined
-}
-
-function positiveInteger(value: unknown): number | null {
-  const parsed = typeof value === "number" ? value : Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 async function validateReviewIteration(
   groupPath: string,
   iterationId: number
@@ -187,14 +177,7 @@ async function validateReviewIteration(
     groupIterationsPath(groupPath, page, ISSUE_PAGE_SIZE)
   )
   if (!read.ok) return read
-  if (
-    Array.isArray(read.body) &&
-    read.body.some(
-      (iteration) => positiveInteger(property(iteration, "id")) === iterationId
-    )
-  ) {
-    return { ok: true }
-  }
+  if (iterationBelongs(read.body, iterationId)) return { ok: true }
   return {
     ok: false,
     detail: `Iteration #${iterationId} 不屬於所選群組或其上層群組`,

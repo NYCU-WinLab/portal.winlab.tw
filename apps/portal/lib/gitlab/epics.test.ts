@@ -6,6 +6,7 @@ import {
   deliverablesOf,
   epicIssuesPath,
   groupIterationsPath,
+  iterationBelongs,
   readEpic,
   readEpicIssues,
   readEpics,
@@ -377,5 +378,27 @@ describe("deliverablesOf", () => {
 
   test("nothing in, nothing out", () => {
     expect(deliverablesOf([])).toEqual([])
+  })
+})
+
+describe("iterationBelongs", () => {
+  test("finds the id among the group's iterations", () => {
+    expect(iterationBelongs([{ id: 9 }, { id: 10 }], 10)).toBe(true)
+  })
+
+  test("an id the list doesn't carry does not belong", () => {
+    expect(iterationBelongs([{ id: 9 }, { id: 11 }], 10)).toBe(false)
+    expect(iterationBelongs([], 10)).toBe(false)
+  })
+
+  test("string ids from GitLab still match", () => {
+    expect(iterationBelongs([{ id: "10" }], 10)).toBe(true)
+    expect(iterationBelongs([{ id: "10x" }], 10)).toBe(false)
+  })
+
+  test("a body that isn't a list contains nothing", () => {
+    expect(iterationBelongs({ id: 10 }, 10)).toBe(false)
+    expect(iterationBelongs(null, 10)).toBe(false)
+    expect(iterationBelongs([null, "10", { iid: 10 }], 10)).toBe(false)
   })
 })

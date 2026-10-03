@@ -300,6 +300,21 @@ export function epicIssuesPath(
   return `/groups/${encodeURIComponent(groupPath)}/epics/${epicIid}/issues?per_page=${perPage}&page=${page}`
 }
 
+/**
+ * Whether an iterations list (from `groupIterationsPath`) contains this id.
+ *
+ * Ids are compared as positive integers so a string id from GitLab still
+ * matches; anything that isn't a list contains nothing.
+ */
+export function iterationBelongs(body: unknown, iterationId: number): boolean {
+  return (
+    Array.isArray(body) &&
+    body.some(
+      (iteration) => positiveInteger(property(iteration, "id")) === iterationId
+    )
+  )
+}
+
 /** Lists the selected group's iterations plus ancestors for id validation. */
 export function groupIterationsPath(
   groupPath: string,
