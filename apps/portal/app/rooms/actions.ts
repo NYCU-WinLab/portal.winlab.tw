@@ -45,6 +45,7 @@ import { todayInTaipei } from "@/lib/rooms/date"
 import {
   cancelBookingFor,
   confirmBookingFor,
+  failureText,
   resolveEpicLink,
   type BookingResult,
   type ConfirmBookingInput,
@@ -393,11 +394,18 @@ export async function createRecurringMeeting(
   // Frozen at creation for the same reason the prefix is: the epic a standing
   // series reports into shouldn't change under it because someone relabelled
   // something in GitLab midway through a term.
-  const epicLink = await resolveEpicLink(
-    input.groupName,
-    input.issueRefs ?? [],
-    true
-  )
+  // Thrown on a bad, unreadable or non-Sync epic. Returned rather than let
+  // through: a Server Action's thrown error reaches the form redacted.
+  let epicLink: Awaited<ReturnType<typeof resolveEpicLink>>
+  try {
+    epicLink = await resolveEpicLink(
+      input.groupName,
+      input.issueRefs ?? [],
+      true
+    )
+  } catch (err) {
+    return { booked: 0, failed: 0, errors: [], error: failureText(err) }
+  }
 
   const supabase = await createClient()
   const { data: created, error } = await supabase

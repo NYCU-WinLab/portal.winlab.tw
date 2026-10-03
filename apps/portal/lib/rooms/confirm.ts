@@ -148,7 +148,7 @@ export type BookingResult = {
   error?: string
 }
 
-function failureText(err: unknown): string {
+export function failureText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
