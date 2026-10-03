@@ -36,7 +36,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Audit dependencies
-        run: bun audit --audit-level=high
+        # braces <=3.0.3 has no patched release. It only arrives through dev
+        # tooling (eslint-plugin-next, the shadcn CLI) via micromatch, never
+        # the shipped app. Drop the ignore once braces publishes a fix.
+        run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
 
       - name: Typecheck
         run: bun run typecheck
