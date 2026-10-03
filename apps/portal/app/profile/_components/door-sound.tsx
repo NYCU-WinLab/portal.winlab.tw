@@ -125,7 +125,7 @@ export function DoorSoundForm({
   return (
     <Section
       title="開門音效"
-      description="刷卡、按 /door 或請 agent 開門時，門口喇叭先念「Hi」加你的名字和看板後綴的文字(符號不念)，再播音效：選「播我的音效」就播你上傳的音效，否則播實驗室預設音效。"
+      description="刷卡、按 /door 或請 agent 開門時，門口播放器會先念「Hi」加你的名字和看板後綴的文字（符號不念），再播音效：選「播我的音效」就播你上傳的音效，否則從實驗室預設音效隨機挑一首。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"
@@ -152,8 +152,8 @@ export function DoorSoundForm({
             id="door-sound-file-help"
             className="text-xs text-muted-foreground"
           >
-            mp3、m4a、aac、wav、ogg，3 MB 以內。超過 {DOOR_SOUND_MAX_SECONDS}{" "}
-            秒會被截掉，音量會自動調成一致。
+            mp3、m4a、aac、wav、ogg，3 MB 以內（wav 檔大，約 17 秒就到上限）。
+            門口播放器只播前 {DOOR_SOUND_MAX_SECONDS} 秒，音量會自動調成一致。
           </p>
           {fileError ? (
             <p className="text-xs text-destructive">{fileError}</p>
@@ -217,7 +217,7 @@ export function DoorSoundForm({
           <p aria-live="polite" className="text-xs text-muted-foreground">
             {outcome === "own"
               ? "開門時念完名字會播你的音效。"
-              : "開門時念完名字會播實驗室預設音效。"}
+              : "開門時念完名字會從實驗室預設音效隨機播一首。"}
           </p>
         </fieldset>
 
