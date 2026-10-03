@@ -410,6 +410,8 @@ export async function createRecurringMeeting(
       true
     )
   } catch (err) {
+    // Logged as well as returned, as confirmBookingFor does.
+    console.error("[rooms] recurring epic link failed", err)
     return { booked: 0, failed: 0, errors: [], error: failureText(err) }
   }
 
