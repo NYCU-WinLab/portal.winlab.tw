@@ -238,8 +238,8 @@ function AddDefaultSound({ onAdded }: { onAdded: () => void }) {
         id="default-sound-help"
         className="w-full text-xs text-muted-foreground"
       >
-        mp3、m4a、aac、wav、ogg，3 MB 以內，超過 {DOOR_SOUND_MAX_SECONDS}{" "}
-        秒會被截掉。
+        mp3、m4a、aac、wav、ogg，3 MB 以內（wav 檔大，約 18 秒就到上限）。
+        門口面板只播前 {DOOR_SOUND_MAX_SECONDS} 秒。
       </p>
       {error ? (
         <p className="w-full text-xs text-destructive">{error}</p>

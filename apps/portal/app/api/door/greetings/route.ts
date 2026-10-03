@@ -115,8 +115,9 @@ export async function GET(request: Request) {
     }
 
     // One call for every sound, member and default. A path whose object is
-    // gone comes back with its own error and is just left out; the whole
-    // call failing is a 503 like a failed table read.
+    // gone comes back with its own error and is just left out: that member
+    // gets a default sound, and a missing default drops out of the pool; the
+    // whole call failing is a 503 like a failed table read.
     const signedUrls = new Map<string, string>()
     const paths = [
       ...greetingSoundPaths(rows),
