@@ -633,11 +633,16 @@ function LabBookingCancel({
                 toast.error(result.error)
                 return
               }
+              if (result.teamsCancelError) {
+                toast.warning(
+                  `房間已取消，但 Teams 會議沒有取消成功：${result.teamsCancelError}，請手動刪除 Teams 會議`
+                )
+              }
               if (result.inviteError) {
                 toast.warning(
                   `已取消 ${room},但取消通知信寄送失敗:${result.inviteError}`
                 )
-              } else {
+              } else if (!result.teamsCancelError) {
                 toast.success(`已取消 ${room} 的預約`)
               }
               onCancelled()

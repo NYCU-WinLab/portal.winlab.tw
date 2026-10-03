@@ -97,6 +97,12 @@ export type BookingResult = {
   bookingId?: string
   inviteError?: string
   /**
+   * Set on a cancellation that went through when its Teams meeting could not
+   * be taken down: the meeting will still start and record unless someone
+   * deletes it by hand.
+   */
+  teamsCancelError?: string
+  /**
    * Why the booking didn't happen, when it didn't.
    *
    * Returned rather than thrown because Next.js redacts errors thrown from a
@@ -182,10 +188,16 @@ export async function confirmBookingFor(
  *
  * Never throws: the room is already released and the attendees already have
  * their cancellation by the time this runs, so failing here must not read as
- * "the cancellation didn't work". A meeting that can't be taken down is
- * reported to its creator by the callback instead — it's the one case where
- * something is genuinely left behind, since it will still start and still
- * record.
+ * "the cancellation didn't work". It does return why it failed, though — a
+ * meeting left behind still starts and still records, and the person who
+ * just pressed cancel is the one who can delete it by hand.
+ *
+ * Only a booking that was meant to have a Teams meeting can fail this way. No
+ * create request at all, or only failed ones, means there is no meeting to
+ * take down and nothing worth telling anyone.
+ *
+ * @returns undefined when the meeting was handed to the pipeline or never
+ *   existed; otherwise the reason it wasn't.
  */
 async function cancelTeamsMeeting(booking: {
   id: string
@@ -194,50 +206,63 @@ async function cancelTeamsMeeting(booking: {
   title: string
   groupName: string | null
   issueRefs: string[]
-}): Promise<void> {
-  if (!meetingPipelineConfigured()) return
+}): Promise<string | undefined> {
+  // Without a trigger token this deployment never asked for a meeting, so
+  // there is nothing to take down (and no reason to need the admin client).
+  if (!meetingPipelineConfigured()) return undefined
   try {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from("rooms_meeting_requests")
-      .select("request_id, cancel_id, message_id")
+      .select("request_id, cancel_id, message_id, status")
       .eq("booking_id", booking.id)
       .eq("kind", "create")
-      .not("cancel_id", "is", null)
-      .not("message_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
     if (error) {
       console.error(
         "[rooms] could not resolve original meeting request for cancellation",
         error
       )
-      return
-    }
-    // The query already excludes rows missing either id; the null checks
-    // are here for the type narrowing, not as a separate case.
-    if (!data?.cancel_id || !data.message_id) {
-      console.warn(
-        "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
-      )
-      return
+      return `查不到原本的 Teams 會議紀錄:${error.message}`
     }
 
-    await triggerMeetingCancel(admin, {
+    const requests = data ?? []
+    const created = requests.find((r) => r.cancel_id && r.message_id)
+    if (!created?.cancel_id || !created.message_id) {
+      // Pending, or reported success without the ids a cancel needs: a
+      // meeting may exist (or still appear) that nothing here can name.
+      if (requests.some((r) => r.status !== "failed")) {
+        console.warn(
+          "[rooms] no create request has Teams identifiers; no Teams or GitLab cancellation was sent"
+        )
+        return "Teams 會議尚未建立完成或沒有回報會議識別碼"
+      }
+      return undefined
+    }
+
+    const outcome = await triggerMeetingCancel(admin, {
       bookingId: booking.id,
-      bookingRequestId: data.request_id,
+      bookingRequestId: created.request_id,
       title: booking.title,
       groupName: booking.groupName,
       issueRefs: booking.issueRefs,
-      cancelId: data.cancel_id,
-      messageId: data.message_id,
+      cancelId: created.cancel_id,
+      messageId: created.message_id,
       start: taipeiIso(booking.date, booking.startTime),
       reason: "此會議已取消(教室預約已取消)",
     })
+    if (outcome.error) {
+      console.error(
+        "[rooms] teams meeting cancel trigger failed",
+        outcome.error
+      )
+      return outcome.error
+    }
+    return undefined
   } catch (err) {
     console.error("[rooms] teams meeting cancel trigger failed", err)
+    return failureText(err)
   }
 }
 
@@ -292,7 +317,7 @@ export async function cancelBookingFor(
     }
   }
 
-  await cancelTeamsMeeting({
+  const teamsCancelError = await cancelTeamsMeeting({
     id: booking.id,
     date: booking.date,
     startTime: booking.start_time,
@@ -329,5 +354,8 @@ export async function cancelBookingFor(
     sequence: await nextInviteSequence(booking.id),
   })
 
-  return sent.ok ? {} : { inviteError: sent.error }
+  return {
+    ...(sent.ok ? {} : { inviteError: sent.error }),
+    ...(teamsCancelError ? { teamsCancelError } : {}),
+  }
 }

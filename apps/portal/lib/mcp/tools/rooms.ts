@@ -514,6 +514,11 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           cancellation_mail: result.inviteError
             ? `not sent: ${result.inviteError}`
             : "sent",
+          ...(result.teamsCancelError
+            ? {
+                teams_meeting: `not cancelled: ${result.teamsCancelError}. It will still start and record; tell the member to delete it in Teams by hand.`,
+              }
+            : {}),
           url: `${PORTAL_URL}/rooms`,
         })
       } catch (err) {
