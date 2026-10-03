@@ -141,6 +141,9 @@ function classifyEpic(
   GitLabEpic,
   "classification" | "reviewIterationId" | "reviewMarkerError"
 > {
+  // Unlabelled means Sync container, by decision rather than by default: a
+  // one-off meeting epic must carry Meeting::Track, or it is treated as a
+  // standing container and contributes no agenda or deliverables.
   if (!labels.includes(MEETING_TRACK_LABEL)) {
     return { classification: "sync" }
   }
