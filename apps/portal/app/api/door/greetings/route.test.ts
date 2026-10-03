@@ -17,6 +17,14 @@ let calls: {
 }[]
 let profilesFail = false
 let signFail = false
+let defaultsFail = false
+let DEFAULTS: {
+  id: string
+  label: string
+  path: string
+  enabled: boolean
+  created_at: string
+}[] = []
 const restorers: (() => void)[] = []
 
 const PROFILES = [
@@ -70,6 +78,7 @@ const PROFILES = [
   },
 ]
 const MISSING_OBJECT = "u6/20260923120000-deadbeef.m4a"
+const MISSING_OBJECT_DEFAULT = "defaults/20260929000003-cccccccc.wav"
 const CARDS = [
   { holder_name: "Loki  Zhan", holder_user_id: "u1" },
   { holder_name: "詹詠翔", holder_user_id: "u1" },
@@ -80,6 +89,8 @@ beforeEach(() => {
   calls = []
   profilesFail = false
   signFail = false
+  defaultsFail = false
+  DEFAULTS = []
   process.env.DISPLAY_API_SECRET = SECRET
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://database.example"
   process.env.SUPABASE_SECRET_KEY = "test-server-only-key"
@@ -112,6 +123,15 @@ beforeEach(() => {
       return Response.json(PROFILES)
     }
     if (url.includes("/door_cards")) return Response.json(CARDS)
+    if (url.includes("/door_default_sounds")) {
+      if (defaultsFail) {
+        return Response.json(
+          { code: "XX000", message: "test failure" },
+          { status: 500 }
+        )
+      }
+      return Response.json(DEFAULTS)
+    }
     if (url.includes("/storage/v1/object/sign/door-sounds")) {
       if (signFail) {
         return Response.json(
@@ -122,7 +142,7 @@ beforeEach(() => {
       const { paths } = JSON.parse(String(init?.body)) as { paths: string[] }
       return Response.json(
         paths.map((path) =>
-          path === MISSING_OBJECT
+          path === MISSING_OBJECT || path === MISSING_OBJECT_DEFAULT
             ? { path, signedURL: null, error: "Object not found" }
             : {
                 path,
@@ -205,6 +225,7 @@ test("200 maps profile names and linked card holder names, normalised", async ()
         version: "u3/20260923120000-ffff0000.ogg",
       },
     },
+    default: [],
   })
   const profileRead = calls.find((call) => call.url.includes("/user_profiles"))
   expect(profileRead?.method).toBe("GET")
@@ -268,4 +289,67 @@ test("a database failure is a 503, not an empty map", async () => {
   const body = await response.json()
   expect(body).not.toHaveProperty("suffix")
   expect(body).not.toHaveProperty("color")
+})
+
+test("publishes enabled default sounds oldest first, signed with the rest", async () => {
+  DEFAULTS = [
+    {
+      id: "d2",
+      label: "第二首",
+      path: "defaults/20260929000002-bbbbbbbb.ogg",
+      enabled: true,
+      created_at: "2026-09-29T02:00:00Z",
+    },
+    {
+      id: "d1",
+      label: "第一首",
+      path: "defaults/20260929000001-aaaaaaaa.mp3",
+      enabled: true,
+      created_at: "2026-09-29T01:00:00Z",
+    },
+    {
+      id: "d3",
+      label: "檔案不見了",
+      path: MISSING_OBJECT_DEFAULT,
+      enabled: true,
+      created_at: "2026-09-29T03:00:00Z",
+    },
+  ]
+  const response = await GET(request())
+  expect(response.status).toBe(200)
+  expect((await response.json()).default).toEqual([
+    {
+      url: "https://database.example/storage/v1/object/sign/door-sounds/defaults/20260929000001-aaaaaaaa.mp3?token=t-de",
+      version: "defaults/20260929000001-aaaaaaaa.mp3",
+      label: "第一首",
+    },
+    {
+      url: "https://database.example/storage/v1/object/sign/door-sounds/defaults/20260929000002-bbbbbbbb.ogg?token=t-de",
+      version: "defaults/20260929000002-bbbbbbbb.ogg",
+      label: "第二首",
+    },
+  ])
+  const defaultRead = calls.find((call) =>
+    call.url.includes("/door_default_sounds")
+  )
+  expect(decodeURIComponent(defaultRead?.url ?? "")).toContain(
+    "enabled=eq.true"
+  )
+  const signs = calls.filter((call) => call.url.includes("/storage/"))
+  expect(signs).toHaveLength(1)
+  expect(JSON.parse(signs[0]?.body ?? "{}").paths).toEqual([
+    "u1/20260923120000-abcd1234.mp3",
+    "u3/20260923120000-ffff0000.ogg",
+    "u6/20260923120000-deadbeef.m4a",
+    "defaults/20260929000002-bbbbbbbb.ogg",
+    "defaults/20260929000001-aaaaaaaa.mp3",
+    MISSING_OBJECT_DEFAULT,
+  ])
+})
+
+test("a failed default sound read is a 503, not an empty list", async () => {
+  defaultsFail = true
+  const response = await GET(request())
+  expect(response.status).toBe(503)
+  expect(await response.json()).not.toHaveProperty("default")
 })

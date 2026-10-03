@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 
 import {
+  buildPanelDefaultSounds,
+  defaultSoundPaths,
+  type DefaultSoundRow,
+} from "@/lib/door/default-sounds"
+import {
   buildGreetingColorMap,
   buildGreetingSoundMap,
   buildGreetingSuffixMap,
@@ -25,9 +30,12 @@ const SOUND_URL_TTL_SECONDS = 60 * 60
 // shares with Portal. Service role, read only, a few columns of two tables
 // plus signed URLs for the door sounds. Returns
 //   {"suffix": {name: suffix}, "color": {name: "#rrggbb"},
-//    "sound": {name: {url, mode, version}}}
-// all keyed the same way; a member appears in a map only when they set that
-// value, and in "sound" only with a file and a mode that plays it.
+//    "sound": {name: {url, mode, version}},
+//    "default": [{url, version, label}]}
+// the three maps keyed the same way; a member appears in a map only when they
+// set that value, and in "sound" only with a file and a mode that plays it.
+// "default" is the enabled default sounds, oldest first, for the panel to
+// pick from at random for everyone else; empty keeps its built-in sound.
 export async function GET(request: Request) {
   const secret = process.env.DISPLAY_API_SECRET
   if (!secret || secret.length < 32) {
@@ -70,6 +78,21 @@ export async function GET(request: Request) {
     }
     const rows = (profiles.data ?? []) as GreetingProfile[]
 
+    const defaults = await supabase
+      .from("door_default_sounds")
+      .select("id, label, path, enabled, created_at")
+      .eq("enabled", true)
+      .abortSignal(controller.signal)
+      .retry(false)
+    if (defaults.error) {
+      console.error("[door] greetings default read failed", defaults.error.code)
+      return NextResponse.json(
+        { error: "read failed" },
+        { status: 503, headers: NO_STORE }
+      )
+    }
+    const defaultRows = (defaults.data ?? []) as DefaultSoundRow[]
+
     let cards: GreetingCardHolder[] = []
     if (rows.length > 0) {
       const holders = await supabase
@@ -91,11 +114,15 @@ export async function GET(request: Request) {
       cards = (holders.data ?? []) as GreetingCardHolder[]
     }
 
-    // One call for every sound. A path whose object is gone comes back with
-    // its own error and that member just gets the default sound; the whole
-    // call failing is a 503 like a failed table read.
+    // One call for every sound, member and default. A path whose object is
+    // gone comes back with its own error and is just left out: that member
+    // gets a default sound, and a missing default drops out of the pool; the
+    // whole call failing is a 503 like a failed table read.
     const signedUrls = new Map<string, string>()
-    const paths = greetingSoundPaths(rows)
+    const paths = [
+      ...greetingSoundPaths(rows),
+      ...defaultSoundPaths(defaultRows),
+    ]
     if (paths.length > 0) {
       const signed = await createAdminClient({ signal: controller.signal })
         .storage.from(DOOR_SOUND_BUCKET)
@@ -119,6 +146,7 @@ export async function GET(request: Request) {
         suffix: buildGreetingSuffixMap(rows, cards),
         color: buildGreetingColorMap(rows, cards),
         sound: buildGreetingSoundMap(rows, cards, signedUrls),
+        default: buildPanelDefaultSounds(defaultRows, signedUrls),
       },
       { headers: NO_STORE }
     )
