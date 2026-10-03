@@ -46,6 +46,12 @@ export type EpicClassification = "sync" | "report" | "meeting"
  * gone" during a GitLab outage sends them hunting for a problem that isn't
  * theirs.
  */
+/**
+ * What a read reports when Portal has no GitLab token at all. Shared so the
+ * booking path can tell "nobody configured this" from "GitLab is down".
+ */
+export const GITLAB_TOKEN_MISSING = "GITLAB_API_TOKEN 未設定"
+
 export type EpicRead =
   | { ok: true; epic: GitLabEpic }
   | {

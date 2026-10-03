@@ -12,6 +12,7 @@ import "server-only"
 
 import {
   deliverablesOf,
+  GITLAB_TOKEN_MISSING,
   epicIssuesPath,
   groupIterationsPath,
   iterationBelongs,
@@ -86,7 +87,7 @@ type Read = PageRead
  */
 async function getJson(path: string): Promise<Read> {
   const token = process.env.GITLAB_API_TOKEN
-  if (!token) return { ok: false, detail: "GITLAB_API_TOKEN 未設定" }
+  if (!token) return { ok: false, detail: GITLAB_TOKEN_MISSING }
 
   try {
     const response = await fetch(`${baseUrl()}/api/v4${path}`, {

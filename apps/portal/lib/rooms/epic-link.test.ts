@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Deliverable } from "@/lib/rooms/deliverables"
-import type { EpicRead, GitLabEpic } from "@/lib/gitlab/epics"
+import {
+  GITLAB_TOKEN_MISSING,
+  type EpicRead,
+  type GitLabEpic,
+} from "@/lib/gitlab/epics"
 
 import { decideEpicLink, type EpicLinkFetchers } from "./epic-link"
 
@@ -108,8 +112,19 @@ describe("decideEpicLink", () => {
     )
   })
 
+  test("a rejected token asks for an admin, not a retry", async () => {
+    for (const status of [401, 403]) {
+      const f = fetchers({
+        4: { ok: false, reason: "unavailable", status, detail: "x" },
+      })
+      await expect(decideEpicLink(GROUP, ["&4"], false, f)).rejects.toThrow(
+        `GitLab 拒絕了 Portal 的存取（HTTP ${status}），請通知管理員檢查 GitLab token`
+      )
+    }
+  })
+
   test("an outage says try again later, with the status", async () => {
-    for (const status of [401, 403, 503]) {
+    for (const status of [500, 502, 503]) {
       const f = fetchers({
         4: { ok: false, reason: "unavailable", status, detail: "x" },
       })
@@ -119,16 +134,25 @@ describe("decideEpicLink", () => {
     }
   })
 
-  test("an outage with no status says why instead", async () => {
+  test("a missing token asks for an admin", async () => {
     const f = fetchers({
       4: {
         ok: false,
         reason: "unavailable",
-        detail: "GITLAB_API_TOKEN 未設定",
+        detail: GITLAB_TOKEN_MISSING,
       },
     })
     await expect(decideEpicLink(GROUP, ["&4"], false, f)).rejects.toThrow(
-      "GitLab 目前無法讀取 Epic（GITLAB_API_TOKEN 未設定），請稍後再試"
+      `Portal 尚未設定 GitLab token（${GITLAB_TOKEN_MISSING}），請通知管理員`
+    )
+  })
+
+  test("a network failure with no status says why and to retry", async () => {
+    const f = fetchers({
+      4: { ok: false, reason: "unavailable", detail: "fetch failed" },
+    })
+    await expect(decideEpicLink(GROUP, ["&4"], false, f)).rejects.toThrow(
+      "GitLab 目前無法讀取 Epic（fetch failed），請稍後再試"
     )
   })
 

@@ -6,7 +6,11 @@
 // lib/rooms/confirm.ts wires in the real GitLab client.
 
 import type { EpicDeliverablesResult } from "@/lib/gitlab/client"
-import type { EpicRead, GitLabEpic } from "@/lib/gitlab/epics"
+import {
+  GITLAB_TOKEN_MISSING,
+  type EpicRead,
+  type GitLabEpic,
+} from "@/lib/gitlab/epics"
 import { sanitizeDeliverables } from "@/lib/rooms/deliverables"
 import { parseEpicRef, type EpicRef } from "@/lib/rooms/epic-refs"
 
@@ -33,6 +37,14 @@ export function epicReadFailure(
   read: Extract<EpicRead, { ok: false }>
 ): string {
   if (read.reason === "not_found") return `所選 Epic 已不存在（${refKey(ref)}）`
+  // A rejected or missing token won't fix itself by waiting; telling the
+  // booker to retry would just send them round the loop until someone notices.
+  if (read.status === 401 || read.status === 403) {
+    return `GitLab 拒絕了 Portal 的存取（HTTP ${read.status}），請通知管理員檢查 GitLab token`
+  }
+  if (read.status === undefined && read.detail === GITLAB_TOKEN_MISSING) {
+    return `Portal 尚未設定 GitLab token（${GITLAB_TOKEN_MISSING}），請通知管理員`
+  }
   const why = read.status !== undefined ? `HTTP ${read.status}` : read.detail
   return `GitLab 目前無法讀取 Epic（${why}），請稍後再試`
 }
