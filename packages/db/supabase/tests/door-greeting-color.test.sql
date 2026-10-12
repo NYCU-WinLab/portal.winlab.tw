@@ -88,7 +88,7 @@ select set_config(
 select throws_ok(
   $$ update public.user_profiles set door_greeting_color = '#ffffff', is_admin = true
       where id = '61111111-1111-1111-1111-111111111111' $$,
-  'Direct modification of is_admin is not allowed',
+  '42501', null,
   'a colour write cannot smuggle an is_admin change'
 );
 

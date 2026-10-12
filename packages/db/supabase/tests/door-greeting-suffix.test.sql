@@ -76,7 +76,7 @@ select set_config(
 select throws_ok(
   $$ update public.user_profiles set door_greeting_suffix = '！', is_admin = true
       where id = '51111111-1111-1111-1111-111111111111' $$,
-  'Direct modification of is_admin is not allowed',
+  '42501', null,
   'a suffix write cannot smuggle an is_admin change'
 );
 
