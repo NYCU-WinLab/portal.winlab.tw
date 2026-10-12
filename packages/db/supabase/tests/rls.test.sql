@@ -29,23 +29,24 @@ select set_config(
   true
 );
 
--- 1-2. prevent_role_escalation trigger blocks self-privilege changes
+-- 1-3. members hold UPDATE on their door_* columns only
+--    (20261012145616_user_profiles_column_grants), so privileged columns and
+--    the Keycloak-synced name are refused by the grant before
+--    prevent_role_escalation runs; the trigger stays as the second layer.
 select throws_ok(
   $$ update public.user_profiles set is_admin = true where id = '11111111-1111-1111-1111-111111111111' $$,
-  'Direct modification of is_admin is not allowed',
+  '42501', null,
   'a non-admin cannot self-promote is_admin'
 );
 select throws_ok(
   $$ update public.user_profiles set roles = '{"bento":["admin"]}'::jsonb where id = '11111111-1111-1111-1111-111111111111' $$,
-  'Direct modification of roles is not allowed',
+  '42501', null,
   'a non-admin cannot self-grant app roles'
 );
-
--- 3. but a non-privileged self-update of the same row is allowed (proves the
---    trigger gates only the privileged columns, not the whole row)
-select lives_ok(
+select throws_ok(
   $$ update public.user_profiles set name = 'Renamed' where id = '11111111-1111-1111-1111-111111111111' $$,
-  'a user can still update non-privileged columns on their own profile'
+  '42501', null,
+  'a member cannot rename themselves — name comes from Keycloak'
 );
 
 -- 4-5. lab_status write guard (20260830100500): it's the first ordering key
@@ -54,12 +55,12 @@ select lives_ok(
 --    must pin it the same way it already pins roles/is_admin — but the write
 --    itself must not error (it's a legitimate column on an otherwise-normal
 --    profile save), so the assertion is on the STORED value, not on throws_ok.
-update public.user_profiles set lab_status = 'doctoral'
-  where id = '11111111-1111-1111-1111-111111111111';
-select is(
-  (select lab_status from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
-  NULL,
-  'a member cannot self-promote lab_status — the write "succeeds" but the stored value is unchanged'
+--    Since the column grants, the member's write is refused outright.
+select throws_ok(
+  $$ update public.user_profiles set lab_status = 'doctoral'
+      where id = '11111111-1111-1111-1111-111111111111' $$,
+  '42501', null,
+  'a member cannot self-promote lab_status'
 );
 
 -- service_role is the deliberate carve-out: the nightly Keycloak sync
@@ -125,11 +126,11 @@ select set_config(
   '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
   true
 );
-update public.user_profiles set name = 'HijackedByB' where id = '11111111-1111-1111-1111-111111111111';
+update public.user_profiles set door_greeting_suffix = '好帥！' where id = '11111111-1111-1111-1111-111111111111';
 reset role;
 select is(
-  (select name from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
-  'Renamed',
+  (select door_greeting_suffix from public.user_profiles where id = '11111111-1111-1111-1111-111111111111'),
+  NULL,
   'user B cannot update user A''s profile (ownership-scoped update policy)'
 );
 
@@ -237,12 +238,10 @@ select set_config(
   true
 );
 
-update public.user_profiles set lab_status_synced_at = now()
-  where id = '11111111-1111-1111-1111-111111111111';
-select is(
-  (select lab_status_synced_at from public.user_profiles
-   where id = '11111111-1111-1111-1111-111111111111'),
-  NULL,
+select throws_ok(
+  $$ update public.user_profiles set lab_status_synced_at = now()
+      where id = '11111111-1111-1111-1111-111111111111' $$,
+  '42501', null,
   'a member cannot backdate their own lab_status_synced_at to make a dead sync look healthy'
 );
 

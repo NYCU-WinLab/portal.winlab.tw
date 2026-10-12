@@ -90,8 +90,10 @@ select ok(
   has_table_privilege('service_role', 'public.user_profiles', 'TRUNCATE'),
   'service_role keeps TRUNCATE — the trusted backend key is deliberately untouched'
 );
+-- user_profiles is column-granted to authenticated since
+-- 20261012145616_user_profiles_column_grants, so ask about any column.
 select ok(
-  has_table_privilege('authenticated', 'public.user_profiles', 'SELECT'),
+  has_any_column_privilege('authenticated', 'public.user_profiles', 'SELECT'),
   'authenticated keeps SELECT — DML stays granted and RLS-governed'
 );
 
