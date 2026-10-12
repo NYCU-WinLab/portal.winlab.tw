@@ -22,18 +22,22 @@ export function registerIdentityTools(server: McpServer) {
       try {
         const caller = requireCaller(ctx as ToolContext)
         const supabase = createUserClient(caller.token)
-        const { data, error } = await supabase
-          .from("user_profiles")
-          .select("name, is_admin, roles")
-          .eq("id", caller.userId)
-          .maybeSingle()
-        if (error) throw new Error(error.message)
+        const [profile, access] = await Promise.all([
+          supabase
+            .from("user_profiles")
+            .select("name")
+            .eq("id", caller.userId)
+            .maybeSingle(),
+          supabase.rpc("get_my_access").maybeSingle(),
+        ])
+        if (profile.error) throw new Error(profile.error.message)
+        if (access.error) throw new Error(access.error.message)
         return json({
           id: caller.userId,
           email: caller.email,
-          name: data?.name ?? caller.name,
-          is_admin: data?.is_admin ?? false,
-          roles: data?.roles ?? {},
+          name: profile.data?.name ?? caller.name,
+          is_admin: access.data?.is_admin ?? false,
+          roles: access.data?.roles ?? {},
         })
       } catch (err) {
         return failure(err)

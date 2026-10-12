@@ -38,7 +38,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export type ReactionActionResult = { ok: true } | { ok: false; error: string }
 export type CommentActionResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? {} : { data: T }))
+  | ({ ok: true } & (T extends undefined ? unknown : { data: T }))
   | { ok: false; error: string }
 
 export async function setGalleryReaction(
@@ -236,8 +236,8 @@ export async function updateGalleryComment(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const updatedAt = new Date().toISOString()
-  let data: CreatedGalleryComment | null = null
-  let error: { code?: string; message?: string } | null = null
+  let data: CreatedGalleryComment | null
+  let error: { code?: string; message?: string } | null
 
   const withUpdatedAt = await supabase
     .from("gallery_comments")
@@ -425,10 +425,8 @@ export async function setGalleryCommentPin(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
 
   if (profileError) {
     return { ok: false, error: profileError.message }
@@ -495,10 +493,8 @@ export async function setGalleryImagesPin(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
 
   if (profileError) {
     return { ok: false, error: profileError.message }
@@ -644,10 +640,8 @@ export async function setGallerySeasonalTheme(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
 
   if (profileError) {
     return { ok: false, error: profileError.message }
