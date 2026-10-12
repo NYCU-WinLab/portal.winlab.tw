@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
 import { keycloakSubFromIdentities } from "@/lib/profile/keycloak"
 import type { Database } from "@/lib/supabase/database.types"
+import { displayNameFromMetadata } from "@/lib/user"
 
 function env() {
   return {
@@ -44,20 +45,12 @@ export async function verifySupabaseToken(
     extra: {
       userId: user.id,
       email: user.email ?? null,
-      name: displayName(user.user_metadata),
+      name: displayNameFromMetadata(user.user_metadata) ?? null,
       // createUserClient cannot call auth.getUser (accessToken mode), so the
       // identity a tool may need later is resolved here, once.
       keycloakSub: keycloakSubFromIdentities(user.identities),
     },
   }
-}
-
-function displayName(meta: Record<string, unknown> | undefined): string | null {
-  for (const key of ["full_name", "name", "preferred_username"]) {
-    const value = meta?.[key]
-    if (typeof value === "string" && value) return value
-  }
-  return null
 }
 
 // A client that acts as the caller: every query goes through RLS exactly like

@@ -15,18 +15,46 @@ export type Profile = {
   session: AuthSession | null
 }
 
+// Keycloak's OIDC name is "<given> <family>", so a Chinese name arrives as
+// "詠翔 詹". Same rule as public.member_display_name() and the door panel.
+// Like the door's, this class is a little wider than the SQL's explicit
+// ranges (it also takes 々 and 〇) and matches after trimming; neither shows
+// up in a Keycloak name.
+const HAN_GIVEN_FAMILY = /^(\p{Script=Han}+) (\p{Script=Han}+)$/u
+
+/**
+ * A member's display name from their Supabase user metadata, or undefined when
+ * it carries none. Mirrors public.member_display_name(), which fills
+ * user_profiles.name, so a member reads the same in the header as in every
+ * list: Keycloak's `chinese_name` (already family first) when set, otherwise
+ * the first non-blank name field with a Han "<given> <family>" flipped.
+ */
+export function displayNameFromMetadata(
+  meta: Record<string, unknown> | undefined
+): string | undefined {
+  const customClaims = meta?.custom_claims
+  if (customClaims && typeof customClaims === "object") {
+    const chinese = (customClaims as Record<string, unknown>).chinese_name
+    if (typeof chinese === "string" && chinese.trim()) return chinese.trim()
+  }
+  for (const key of ["full_name", "name", "preferred_username"]) {
+    const value = meta?.[key]
+    if (typeof value === "string" && value.trim()) {
+      const name = value.trim()
+      const han = HAN_GIVEN_FAMILY.exec(name)
+      return han ? `${han[2]}${han[1]}` : name
+    }
+  }
+  return undefined
+}
+
 export function normalizeUser(user: AuthUser): NormalizedUser {
   const meta = user.user_metadata
   const pick = (key: string) => {
     const value = meta[key]
     return typeof value === "string" ? value : undefined
   }
-  const name =
-    pick("full_name") ??
-    pick("name") ??
-    pick("preferred_username") ??
-    user.email ??
-    "Unknown"
+  const name = displayNameFromMetadata(meta) ?? user.email ?? "Unknown"
   const avatarUrl = pick("avatar_url") ?? pick("picture") ?? null
 
   return {
@@ -49,12 +77,7 @@ export function normalizeClaims(claims: ClaimsShape): NormalizedUser {
     const value = meta[key]
     return typeof value === "string" ? value : undefined
   }
-  const name =
-    pick("full_name") ??
-    pick("name") ??
-    pick("preferred_username") ??
-    claims.email ??
-    "Unknown"
+  const name = displayNameFromMetadata(meta) ?? claims.email ?? "Unknown"
   const avatarUrl = pick("avatar_url") ?? pick("picture") ?? null
 
   return {
