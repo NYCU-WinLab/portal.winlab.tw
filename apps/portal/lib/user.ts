@@ -17,6 +17,9 @@ export type Profile = {
 
 // Keycloak's OIDC name is "<given> <family>", so a Chinese name arrives as
 // "詠翔 詹". Same rule as public.member_display_name() and the door panel.
+// Like the door's, this class is a little wider than the SQL's explicit
+// ranges (it also takes 々 and 〇) and matches after trimming; neither shows
+// up in a Keycloak name.
 const HAN_GIVEN_FAMILY = /^(\p{Script=Han}+) (\p{Script=Han}+)$/u
 
 /**
