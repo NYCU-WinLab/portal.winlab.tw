@@ -3339,12 +3339,20 @@ export type Database = {
           user_name: string
         }[]
       }
+      get_my_access: {
+        Args: never
+        Returns: {
+          is_admin: boolean
+          roles: Json
+        }[]
+      }
       get_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       get_user_email: { Args: never; Returns: string }
       has_role: {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
       }
+      is_bento_admin: { Args: never; Returns: boolean }
       is_door_admin: { Args: never; Returns: boolean }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }

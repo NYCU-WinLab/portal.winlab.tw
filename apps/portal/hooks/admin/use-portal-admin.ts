@@ -16,10 +16,8 @@ export function usePortalAdmin() {
     queryFn: async () => {
       if (!user) return false
       const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("is_admin")
-        .eq("id", user.id)
-        .single()
+        .rpc("get_my_access")
+        .maybeSingle()
       return profile?.is_admin === true
     },
     enabled: !!user,

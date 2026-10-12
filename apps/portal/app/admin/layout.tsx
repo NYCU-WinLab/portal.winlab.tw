@@ -26,11 +26,7 @@ export default async function AdminLayout({
 
   if (!user) redirect("/auth/login")
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single()
+  const { data: profile } = await supabase.rpc("get_my_access").maybeSingle()
 
   if (!profile?.is_admin) redirect("/")
 

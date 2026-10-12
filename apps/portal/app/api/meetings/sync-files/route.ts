@@ -35,11 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("roles, is_admin")
-    .eq("id", user.id)
-    .single()
+  const { data: profile } = await supabase.rpc("get_my_access").maybeSingle()
 
   const roles = profile?.roles as Record<string, string[]> | undefined
   const isAdmin =
