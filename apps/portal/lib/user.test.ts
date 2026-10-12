@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { normalizeClaims } from "@/lib/user"
+import { displayNameFromMetadata, normalizeClaims } from "@/lib/user"
 
 type Claims = Parameters<typeof normalizeClaims>[0]
 
@@ -70,6 +70,63 @@ describe("normalizeClaims — name fallback chain", () => {
   test("missing user_metadata is treated as empty, name falls to email", () => {
     const result = normalizeClaims(claims({ email: "only@x.com" }))
     expect(result.name).toBe("only@x.com")
+  })
+})
+
+describe("normalizeClaims — Keycloak chinese_name", () => {
+  test("custom_claims.chinese_name wins over every other name field", () => {
+    const result = normalizeClaims(
+      claims({
+        user_metadata: {
+          custom_claims: { chinese_name: "詹詠翔", preferred_username: "yx" },
+          full_name: "詠翔 詹",
+          name: "詠翔 詹",
+        },
+      })
+    )
+    expect(result.name).toBe("詹詠翔")
+  })
+
+  test("chinese_name is trimmed", () => {
+    const result = normalizeClaims(
+      claims({
+        user_metadata: { custom_claims: { chinese_name: "  何承運 " } },
+      })
+    )
+    expect(result.name).toBe("何承運")
+  })
+
+  test("blank chinese_name falls back to the OIDC name", () => {
+    const result = normalizeClaims(
+      claims({
+        user_metadata: {
+          custom_claims: { chinese_name: "   " },
+          name: "Chen Yun",
+        },
+      })
+    )
+    expect(result.name).toBe("Chen Yun")
+  })
+
+  test("non-object custom_claims is ignored", () => {
+    const result = normalizeClaims(
+      claims({ user_metadata: { custom_claims: "x", name: "Name" } })
+    )
+    expect(result.name).toBe("Name")
+  })
+})
+
+describe("displayNameFromMetadata", () => {
+  test("is the chain normalizeClaims uses, minus the email fallback", () => {
+    expect(
+      displayNameFromMetadata({
+        custom_claims: { chinese_name: "詹詠翔" },
+        name: "詠翔 詹",
+      })
+    ).toBe("詹詠翔")
+    expect(displayNameFromMetadata({ preferred_username: "pref" })).toBe("pref")
+    expect(displayNameFromMetadata({})).toBeUndefined()
+    expect(displayNameFromMetadata(undefined)).toBeUndefined()
   })
 })
 

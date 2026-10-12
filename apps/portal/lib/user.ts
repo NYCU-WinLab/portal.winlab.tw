@@ -15,18 +15,39 @@ export type Profile = {
   session: AuthSession | null
 }
 
+/**
+ * A member's display name from their Supabase user metadata, or undefined when
+ * it carries none.
+ *
+ * Keycloak's `chinese_name` attribute comes first: Supabase files it under
+ * `custom_claims` and it is already family first (何承運), which the OIDC
+ * `name` ("<given> <family>") never is. This is the same first choice as
+ * public.member_display_name(), which fills user_profiles.name, so a member
+ * reads the same in the header as in every list. The rest of the chain is
+ * what the portal used before chinese_name existed.
+ */
+export function displayNameFromMetadata(
+  meta: Record<string, unknown> | undefined
+): string | undefined {
+  const customClaims = meta?.custom_claims
+  if (customClaims && typeof customClaims === "object") {
+    const chinese = (customClaims as Record<string, unknown>).chinese_name
+    if (typeof chinese === "string" && chinese.trim()) return chinese.trim()
+  }
+  for (const key of ["full_name", "name", "preferred_username"]) {
+    const value = meta?.[key]
+    if (typeof value === "string") return value
+  }
+  return undefined
+}
+
 export function normalizeUser(user: AuthUser): NormalizedUser {
   const meta = user.user_metadata
   const pick = (key: string) => {
     const value = meta[key]
     return typeof value === "string" ? value : undefined
   }
-  const name =
-    pick("full_name") ??
-    pick("name") ??
-    pick("preferred_username") ??
-    user.email ??
-    "Unknown"
+  const name = displayNameFromMetadata(meta) ?? user.email ?? "Unknown"
   const avatarUrl = pick("avatar_url") ?? pick("picture") ?? null
 
   return {
@@ -49,12 +70,7 @@ export function normalizeClaims(claims: ClaimsShape): NormalizedUser {
     const value = meta[key]
     return typeof value === "string" ? value : undefined
   }
-  const name =
-    pick("full_name") ??
-    pick("name") ??
-    pick("preferred_username") ??
-    claims.email ??
-    "Unknown"
+  const name = displayNameFromMetadata(meta) ?? claims.email ?? "Unknown"
   const avatarUrl = pick("avatar_url") ?? pick("picture") ?? null
 
   return {
