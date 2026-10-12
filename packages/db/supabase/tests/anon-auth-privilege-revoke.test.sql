@@ -94,7 +94,7 @@ select ok(
 -- 20261012145616_user_profiles_column_grants, so ask about any column.
 select ok(
   has_any_column_privilege('authenticated', 'public.user_profiles', 'SELECT'),
-  'authenticated keeps SELECT — DML stays granted and RLS-governed'
+  'authenticated keeps column-level SELECT — DML stays granted and RLS-governed'
 );
 
 -- ── 9-10. new tables do not inherit the three back ─────────────────────────

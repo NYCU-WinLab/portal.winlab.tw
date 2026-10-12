@@ -8,12 +8,14 @@
 --     username, roles, is_admin are not member-writable, and INSERT / DELETE
 --     are not granted at all;
 --   * the RLS policies on other tables that subquery is_admin / roles as the
---     caller still evaluate.
+--     caller still evaluate;
+--   * prevent_role_escalation still refuses roles / is_admin and pins
+--     lab_status when the grant is not what stops the write.
 
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(19);
+select plan(22);
 
 insert into auth.users (id) values
   ('61111111-1111-1111-1111-111111111111'),
@@ -21,6 +23,9 @@ insert into auth.users (id) values
 insert into public.user_profiles (id, email, name, username, is_admin, roles) values
   ('61111111-1111-1111-1111-111111111111', 'a@test.local', '甲', 'member-a', false, '{}'),
   ('62222222-2222-2222-2222-222222222222', 'b@test.local', '乙', 'member-b', false, '{}');
+insert into public.bento_menus (name, phone) values ('測試便當', '000');
+insert into public.gallery_albums (title, slug, created_by)
+  values ('測試相簿', 'column-grants-test', '62222222-2222-2222-2222-222222222222');
 
 -- ── 1-7. dropped columns ───────────────────────────────────────────────────
 select ok(
@@ -108,13 +113,17 @@ select throws_ok(
 );
 
 -- ── 17-18. policies elsewhere that read is_admin / roles as the caller ─────
+-- Their SELECT policies are USING (true); the user_profiles subqueries sit on
+-- the write policies. A non-admin's UPDATE matches no row, but planning the
+-- policy needs SELECT on every user_profiles column it names, so a missing
+-- grant fails here with 42501.
 select lives_ok(
-  $$ select count(*) from public.bento_menus $$,
-  'bento_menus policies still evaluate for a member'
+  $$ update public.bento_menus set name = name $$,
+  'bento_menus write policies still evaluate for a member'
 );
 select lives_ok(
-  $$ select count(*) from public.gallery_albums $$,
-  'gallery_albums policies still evaluate for a member'
+  $$ update public.gallery_albums set title = title $$,
+  'gallery_albums write policies still evaluate for a member'
 );
 
 reset role;
@@ -123,6 +132,30 @@ reset role;
 select ok(
   has_column_privilege('service_role', 'public.user_profiles', 'line_user_id', 'SELECT'),
   'service_role still reads the bot columns'
+);
+
+-- ── 20-22. prevent_role_escalation is still the second layer ──────────────
+-- The grants refuse a member before the trigger runs, so exercise it as the
+-- table owner, which holds every privilege, with the member's JWT still set.
+select throws_ok(
+  $$ update public.user_profiles set is_admin = true
+      where id = '61111111-1111-1111-1111-111111111111' $$,
+  'Direct modification of is_admin is not allowed',
+  'the trigger still refuses an is_admin change'
+);
+select throws_ok(
+  $$ update public.user_profiles set roles = '{"bento":["admin"]}'::jsonb
+      where id = '61111111-1111-1111-1111-111111111111' $$,
+  'Direct modification of roles is not allowed',
+  'the trigger still refuses a roles change'
+);
+update public.user_profiles set lab_status = 'doctoral'
+  where id = '61111111-1111-1111-1111-111111111111';
+select is(
+  (select lab_status from public.user_profiles
+    where id = '61111111-1111-1111-1111-111111111111'),
+  null,
+  'the trigger still pins lab_status for a caller with a JWT'
 );
 
 select * from finish();

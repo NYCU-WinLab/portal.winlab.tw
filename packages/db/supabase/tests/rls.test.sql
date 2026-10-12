@@ -51,11 +51,9 @@ select throws_ok(
 
 -- 4-5. lab_status write guard (20260830100500): it's the first ordering key
 --    of the presenter roster, so a member forging their own lab_status could
---    jump the queue for meetings_fill_presenters. prevent_role_escalation
---    must pin it the same way it already pins roles/is_admin — but the write
---    itself must not error (it's a legitimate column on an otherwise-normal
---    profile save), so the assertion is on the STORED value, not on throws_ok.
---    Since the column grants, the member's write is refused outright.
+--    jump the queue for meetings_fill_presenters. Since the column grants the
+--    member's write is refused outright; prevent_role_escalation's pin is
+--    exercised in user-profiles-column-grants.test.sql.
 select throws_ok(
   $$ update public.user_profiles set lab_status = 'doctoral'
       where id = '11111111-1111-1111-1111-111111111111' $$,
