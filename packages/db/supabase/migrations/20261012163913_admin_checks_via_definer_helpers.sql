@@ -6,8 +6,8 @@
 -- user_profiles.is_admin / roles directly, and two gallery functions did the
 -- same in their bodies. They now call is_portal_admin(), the new
 -- is_bento_admin(), or has_role(), all definer. The rewritten policies apply
--- to `authenticated` only: anon can never be an admin, and the helpers are not
--- anon-callable.
+-- to `authenticated` only: anon can never be an admin, and the two new
+-- helpers are not anon-callable.
 --
 -- members: "Admins can manage members" was
 --   exists (select 1 from user_profiles

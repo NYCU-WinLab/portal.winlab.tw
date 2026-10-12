@@ -11,9 +11,25 @@
 
 begin;
 create extension if not exists pgtap with schema public;
-grant execute on all functions in schema public to authenticated;
 
 select plan(12);
+
+-- ── 1-3. ACL, before the blanket grant below so the migration's own grants
+-- are what's checked ─────────────────────────────────────────────────────────────
+select ok(
+  not has_function_privilege('anon', 'public.get_my_access()', 'EXECUTE'),
+  'anon cannot call get_my_access'
+);
+select ok(
+  not has_function_privilege('anon', 'public.is_bento_admin()', 'EXECUTE'),
+  'anon cannot call is_bento_admin'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.get_my_access()', 'EXECUTE'),
+  'authenticated can call get_my_access'
+);
+
+grant execute on all functions in schema public to authenticated;
 
 insert into auth.users (id) values
   ('71111111-1111-1111-1111-111111111111'),
@@ -26,7 +42,7 @@ insert into public.user_profiles (id, email, name, is_admin, roles) values
   ('73333333-3333-3333-3333-333333333333', 'dir@test.local', '名錄', false, '{"directory":["admin"]}'),
   ('74444444-4444-4444-4444-444444444444', 'bento@test.local', '便當', false, '{"bento":["admin"]}');
 
--- ── 1-2. catalog: nothing reads is_admin / roles as the caller ─────────────
+-- ── 4-5. catalog: nothing reads is_admin / roles as the caller ─────────────
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'public' and tablename <> 'user_profiles'
@@ -44,7 +60,7 @@ select is(
   'no SECURITY INVOKER function reads is_admin / roles from user_profiles'
 );
 
--- ── 3-4. ordinary member ───────────────────────────────────────────────────
+-- ── 6-7. ordinary member ───────────────────────────────────────────────────
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"71111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
@@ -60,7 +76,7 @@ select throws_ok(
   'an ordinary member cannot add a bento menu'
 );
 
--- ── 5-6. get_my_access ─────────────────────────────────────────────────────
+-- ── 8-9. get_my_access ─────────────────────────────────────────────────────
 select is(
   (select row(is_admin, roles)::text from public.get_my_access()),
   row(false, '{}'::jsonb)::text,
@@ -75,13 +91,13 @@ select is(
   'get_my_access returns roles for another caller too'
 );
 
--- ── 7. directory admin ─────────────────────────────────────────────────────
+-- ── 10. directory admin ─────────────────────────────────────────────────────
 select lives_ok(
   $$ insert into public.members (name, email, role) values ('名錄新增', 'd@test.local', 'pending') $$,
   'a directory admin can add a directory row'
 );
 
--- ── 8. super admin ─────────────────────────────────────────────────────────
+-- ── 11. super admin ─────────────────────────────────────────────────────────
 select set_config('request.jwt.claims',
   '{"sub":"72222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 select lives_ok(
@@ -89,7 +105,7 @@ select lives_ok(
   'a super admin can add a directory row'
 );
 
--- ── 9. bento admin ────────────────────────────────────────────────────────
+-- ── 12. bento admin ────────────────────────────────────────────────────────
 select set_config('request.jwt.claims',
   '{"sub":"74444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
 select lives_ok(
@@ -98,20 +114,6 @@ select lives_ok(
 );
 
 reset role;
-
--- ── 10-12. ACL ─────────────────────────────────────────────────────────────
-select ok(
-  not has_function_privilege('anon', 'public.get_my_access()', 'EXECUTE'),
-  'anon cannot call get_my_access'
-);
-select ok(
-  not has_function_privilege('anon', 'public.is_bento_admin()', 'EXECUTE'),
-  'anon cannot call is_bento_admin'
-);
-select ok(
-  has_function_privilege('authenticated', 'public.get_my_access()', 'EXECUTE'),
-  'authenticated can call get_my_access'
-);
 
 select * from finish();
 rollback;
