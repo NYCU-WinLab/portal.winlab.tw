@@ -1,4 +1,6 @@
--- 20261012163913_admin_checks_via_definer_helpers — runs via `supabase test db`.
+-- 20261012163913_admin_checks_via_definer_helpers and the is_portal_admin()
+-- hardening in 20261012173356_revoke_member_access_columns — runs via
+-- `supabase test db`.
 --
 -- Pins:
 --   * no RLS policy outside user_profiles, and no SECURITY INVOKER function,
@@ -7,15 +9,17 @@
 --     super admin and a directory admin can;
 --   * bento: an ordinary member cannot add a menu, a bento admin can;
 --   * get_my_access() returns the caller's own is_admin / roles and is not
---     anon-callable.
+--     anon-callable;
+--   * is_portal_admin(), which most of those policies call, is not
+--     anon-callable and runs with an empty search_path.
 
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(13);
+select plan(14);
 
--- ── 1-3. ACL, before the blanket grant below so the migration's own grants
--- are what's checked ─────────────────────────────────────────────────────────────
+-- ── 1-5. ACL and config, before the blanket grant below, which would otherwise
+-- mask the migrations' own grants ────────────────────────────────────────────
 select ok(
   not has_function_privilege('anon', 'public.get_my_access()', 'EXECUTE'),
   'anon cannot call get_my_access'
@@ -26,11 +30,16 @@ select ok(
 );
 select ok(
   has_function_privilege('authenticated', 'public.get_my_access()', 'EXECUTE'),
-  'guard: authenticated keeps EXECUTE on get_my_access (default privileges grant it anyway; this catches a revoke)'
+  'authenticated keeps EXECUTE on get_my_access (default privileges grant it anyway, so this only catches a revoke)'
 );
 select ok(
   not has_function_privilege('anon', 'public.is_portal_admin()', 'EXECUTE'),
   'anon cannot call is_portal_admin (20261012173356)'
+);
+select ok(
+  (select prosecdef and proconfig @> array['search_path=""']
+     from pg_proc where oid = 'public.is_portal_admin()'::regprocedure),
+  'is_portal_admin is SECURITY DEFINER with an empty search_path'
 );
 
 grant execute on all functions in schema public to authenticated;
@@ -46,7 +55,7 @@ insert into public.user_profiles (id, email, name, is_admin, roles) values
   ('73333333-3333-3333-3333-333333333333', 'dir@test.local', '名錄', false, '{"directory":["admin"]}'),
   ('74444444-4444-4444-4444-444444444444', 'bento@test.local', '便當', false, '{"bento":["admin"]}');
 
--- ── 4-5. catalog: nothing reads is_admin / roles as the caller ─────────────
+-- ── 6-7. catalog: nothing reads is_admin / roles as the caller ─────────────
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'public' and tablename <> 'user_profiles'
@@ -64,7 +73,7 @@ select is(
   'no SECURITY INVOKER function reads is_admin / roles from user_profiles'
 );
 
--- ── 6-7. ordinary member ───────────────────────────────────────────────────
+-- ── 8-9. ordinary member ───────────────────────────────────────────────────
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"71111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
@@ -80,7 +89,7 @@ select throws_ok(
   'an ordinary member cannot add a bento menu'
 );
 
--- ── 8-9. get_my_access ─────────────────────────────────────────────────────
+-- ── 10-11. get_my_access ─────────────────────────────────────────────────────
 select is(
   (select row(is_admin, roles)::text from public.get_my_access()),
   row(false, '{}'::jsonb)::text,
@@ -95,13 +104,13 @@ select is(
   'get_my_access returns roles for another caller too'
 );
 
--- ── 10. directory admin ─────────────────────────────────────────────────────
+-- ── 12. directory admin ─────────────────────────────────────────────────────
 select lives_ok(
   $$ insert into public.members (name, email, role) values ('名錄新增', 'd@test.local', 'pending') $$,
   'a directory admin can add a directory row'
 );
 
--- ── 11. super admin ─────────────────────────────────────────────────────────
+-- ── 13. super admin ─────────────────────────────────────────────────────────
 select set_config('request.jwt.claims',
   '{"sub":"72222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 select lives_ok(
@@ -109,7 +118,7 @@ select lives_ok(
   'a super admin can add a directory row'
 );
 
--- ── 12. bento admin ────────────────────────────────────────────────────────
+-- ── 14. bento admin ────────────────────────────────────────────────────────
 select set_config('request.jwt.claims',
   '{"sub":"74444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
 select lives_ok(

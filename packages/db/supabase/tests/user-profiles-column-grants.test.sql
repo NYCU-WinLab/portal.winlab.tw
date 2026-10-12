@@ -15,7 +15,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(23);
+select plan(24);
 
 insert into auth.users (id) values
   ('61111111-1111-1111-1111-111111111111'),
@@ -68,7 +68,7 @@ select ok(
 )
 from unnest(array['name', 'email', 'username', 'roles', 'is_admin', 'lab_status']) c;
 
--- ── 12-17. as a signed-in member ──────────────────────────────────────────
+-- ── 12-18. as a signed-in member ──────────────────────────────────────────
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -89,6 +89,12 @@ select throws_ok(
   $$ select line_user_id from public.user_profiles $$,
   '42501', null,
   'a member cannot read anyone''s LINE id'
+);
+
+select throws_ok(
+  $$ select is_admin, roles from public.user_profiles $$,
+  '42501', null,
+  'a member cannot read anyone''s is_admin / roles'
 );
 
 select throws_ok(
@@ -118,7 +124,7 @@ select throws_ok(
   'a member cannot insert a profile'
 );
 
--- ── 18-19. policies elsewhere that used to read is_admin / roles ──────────
+-- ── 19-20. policies elsewhere that used to read is_admin / roles ──────────
 -- Their SELECT policies are USING (true); the admin checks sit on the write
 -- policies. A non-admin's UPDATE matches no row, but planning a policy that
 -- still named is_admin / roles would need SELECT on them, so a policy that
@@ -134,13 +140,13 @@ select lives_ok(
 
 reset role;
 
--- ── 20. the trusted backend is untouched ──────────────────────────────────
+-- ── 21. the trusted backend is untouched ──────────────────────────────────
 select ok(
   has_column_privilege('service_role', 'public.user_profiles', 'line_user_id', 'SELECT'),
   'service_role still reads the bot columns'
 );
 
--- ── 21-23. prevent_role_escalation is still the second layer ──────────────
+-- ── 22-24. prevent_role_escalation is still the second layer ──────────────
 -- The grants refuse a member before the trigger runs, so exercise it as the
 -- table owner, which holds every privilege, with the member's JWT still set.
 select throws_ok(
