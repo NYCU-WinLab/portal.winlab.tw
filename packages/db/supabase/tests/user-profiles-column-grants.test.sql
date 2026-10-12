@@ -7,15 +7,15 @@
 --   * authenticated writes only its own door_* columns — name, email,
 --     username, roles, is_admin are not member-writable, and INSERT / DELETE
 --     are not granted at all;
---   * the RLS policies on other tables that subquery is_admin / roles as the
---     caller still evaluate;
+--   * is_admin / roles are not member-readable (get_my_access() returns the
+--     caller's own), and the write policies on other tables still evaluate;
 --   * prevent_role_escalation still refuses roles / is_admin and pins
 --     lab_status when the grant is not what stops the write.
 
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(22);
+select plan(23);
 
 insert into auth.users (id) values
   ('61111111-1111-1111-1111-111111111111'),
@@ -37,16 +37,22 @@ from unnest(array[
   'active_workflow', 'last_active_platform', 'created_at'
 ]) c;
 
--- ── 8-10. what stays, and nothing table-wide ──────────────────────────────
+-- ── 8-11. what stays, and nothing table-wide ──────────────────────────────
 select ok(
   bool_and(has_column_privilege('authenticated', 'public.user_profiles', c, 'SELECT')),
   'authenticated still reads the columns the apps use'
 )
 from unnest(array[
   'id', 'name', 'email', 'username', 'lab_status', 'lab_status_synced_at',
-  'is_admin', 'roles', 'door_greeting_suffix', 'door_greeting_color',
+  'door_greeting_suffix', 'door_greeting_color',
   'door_sound_path', 'door_sound_mode'
 ]) c;
+
+select ok(
+  not has_column_privilege('authenticated', 'public.user_profiles', 'is_admin', 'SELECT')
+    and not has_column_privilege('authenticated', 'public.user_profiles', 'roles', 'SELECT'),
+  'authenticated no longer reads is_admin / roles (20261012173356; get_my_access() instead)'
+);
 
 select ok(
   not (has_table_privilege('authenticated', 'public.user_profiles', 'SELECT')
@@ -62,7 +68,7 @@ select ok(
 )
 from unnest(array['name', 'email', 'username', 'roles', 'is_admin', 'lab_status']) c;
 
--- ── 11-16. as a signed-in member ──────────────────────────────────────────
+-- ── 12-17. as a signed-in member ──────────────────────────────────────────
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -112,11 +118,11 @@ select throws_ok(
   'a member cannot insert a profile'
 );
 
--- ── 17-18. policies elsewhere that read is_admin / roles as the caller ─────
--- Their SELECT policies are USING (true); the user_profiles subqueries sit on
--- the write policies. A non-admin's UPDATE matches no row, but planning the
--- policy needs SELECT on every user_profiles column it names, so a missing
--- grant fails here with 42501.
+-- ── 18-19. policies elsewhere that used to read is_admin / roles ──────────
+-- Their SELECT policies are USING (true); the admin checks sit on the write
+-- policies. A non-admin's UPDATE matches no row, but planning a policy that
+-- still named is_admin / roles would need SELECT on them, so a policy that
+-- regressed to reading them as the caller fails here with 42501.
 select lives_ok(
   $$ update public.bento_menus set name = name $$,
   'bento_menus write policies still evaluate for a member'
@@ -128,13 +134,13 @@ select lives_ok(
 
 reset role;
 
--- ── 19. the trusted backend is untouched ──────────────────────────────────
+-- ── 20. the trusted backend is untouched ──────────────────────────────────
 select ok(
   has_column_privilege('service_role', 'public.user_profiles', 'line_user_id', 'SELECT'),
   'service_role still reads the bot columns'
 );
 
--- ── 20-22. prevent_role_escalation is still the second layer ──────────────
+-- ── 21-23. prevent_role_escalation is still the second layer ──────────────
 -- The grants refuse a member before the trigger runs, so exercise it as the
 -- table owner, which holds every privilege, with the member's JWT still set.
 select throws_ok(

@@ -12,7 +12,7 @@
 begin;
 create extension if not exists pgtap with schema public;
 
-select plan(12);
+select plan(13);
 
 -- ── 1-3. ACL, before the blanket grant below so the migration's own grants
 -- are what's checked ─────────────────────────────────────────────────────────────
@@ -26,7 +26,11 @@ select ok(
 );
 select ok(
   has_function_privilege('authenticated', 'public.get_my_access()', 'EXECUTE'),
-  'authenticated can call get_my_access'
+  'guard: authenticated keeps EXECUTE on get_my_access (default privileges grant it anyway; this catches a revoke)'
+);
+select ok(
+  not has_function_privilege('anon', 'public.is_portal_admin()', 'EXECUTE'),
+  'anon cannot call is_portal_admin (20261012173356)'
 );
 
 grant execute on all functions in schema public to authenticated;
