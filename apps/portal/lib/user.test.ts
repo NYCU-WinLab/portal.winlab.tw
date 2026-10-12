@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { displayNameFromMetadata, normalizeClaims } from "@/lib/user"
+import {
+  displayNameFromMetadata,
+  normalizeClaims,
+  normalizeUser,
+} from "@/lib/user"
 
 type Claims = Parameters<typeof normalizeClaims>[0]
 
@@ -108,11 +112,90 @@ describe("normalizeClaims — Keycloak chinese_name", () => {
     expect(result.name).toBe("Chen Yun")
   })
 
+  test("null, array and non-string chinese_name are ignored", () => {
+    for (const custom_claims of [
+      null,
+      ["詹詠翔"],
+      { chinese_name: 42 },
+      { chinese_name: null },
+    ]) {
+      const result = normalizeClaims(
+        claims({ user_metadata: { custom_claims, name: "Name" } })
+      )
+      expect(result.name).toBe("Name")
+    }
+  })
+
+  test("chinese_name wins even when full_name is blank", () => {
+    const result = normalizeClaims(
+      claims({
+        user_metadata: {
+          custom_claims: { chinese_name: "何承運" },
+          full_name: "",
+        },
+      })
+    )
+    expect(result.name).toBe("何承運")
+  })
+
   test("non-object custom_claims is ignored", () => {
     const result = normalizeClaims(
       claims({ user_metadata: { custom_claims: "x", name: "Name" } })
     )
     expect(result.name).toBe("Name")
+  })
+})
+
+describe("normalizeClaims — Han name without chinese_name", () => {
+  test("puts the family name first, like member_display_name()", () => {
+    const result = normalizeClaims(
+      claims({ user_metadata: { full_name: "詠翔 詹", name: "詠翔 詹" } })
+    )
+    expect(result.name).toBe("詹詠翔")
+  })
+
+  test("reorders whichever field the chain lands on", () => {
+    const result = normalizeClaims(
+      claims({ user_metadata: { name: "承運 何" } })
+    )
+    expect(result.name).toBe("何承運")
+  })
+
+  test("leaves non-Han and mixed names alone", () => {
+    for (const name of ["Chen Yun", "詠翔 Chan", "a 詹", "詠翔  詹 x"]) {
+      expect(normalizeClaims(claims({ user_metadata: { name } })).name).toBe(
+        name
+      )
+    }
+  })
+})
+
+describe("normalizeUser", () => {
+  test("uses the same chain as normalizeClaims", () => {
+    const user = {
+      id: "u-1",
+      email: "u1@x.com",
+      user_metadata: {
+        custom_claims: { chinese_name: "詹詠翔" },
+        full_name: "詠翔 詹",
+        avatar_url: "a.png",
+      },
+    } as unknown as Parameters<typeof normalizeUser>[0]
+    expect(normalizeUser(user)).toEqual({
+      id: "u-1",
+      email: "u1@x.com",
+      name: "詹詠翔",
+      avatarUrl: "a.png",
+    })
+  })
+
+  test("falls back to email, then Unknown", () => {
+    const base = { id: "u-2", user_metadata: { full_name: "" } }
+    const asUser = (u: object) => u as Parameters<typeof normalizeUser>[0]
+    expect(normalizeUser(asUser({ ...base, email: "e@x.com" })).name).toBe(
+      "e@x.com"
+    )
+    expect(normalizeUser(asUser(base)).name).toBe("Unknown")
   })
 })
 
@@ -159,14 +242,24 @@ describe("normalizeClaims — non-string metadata is dropped", () => {
     expect(result.name).toBe("e@x.com")
   })
 
-  test("empty string full_name is a string, so it short-circuits the chain", () => {
+  test("blank full_name is skipped, chain continues to name", () => {
     const result = normalizeClaims(
       claims({
         email: "e@x.com",
-        user_metadata: { full_name: "", name: "RealName" },
+        user_metadata: { full_name: "  ", name: "RealName" },
       })
     )
-    expect(result.name).toBe("")
+    expect(result.name).toBe("RealName")
+  })
+
+  test("every name field blank falls through to email", () => {
+    const result = normalizeClaims(
+      claims({
+        email: "e@x.com",
+        user_metadata: { full_name: "", name: " ", preferred_username: "" },
+      })
+    )
+    expect(result.name).toBe("e@x.com")
   })
 })
 

@@ -45,7 +45,7 @@ export async function verifySupabaseToken(
     extra: {
       userId: user.id,
       email: user.email ?? null,
-      name: displayNameFromMetadata(user.user_metadata) || null,
+      name: displayNameFromMetadata(user.user_metadata) ?? null,
       // createUserClient cannot call auth.getUser (accessToken mode), so the
       // identity a tool may need later is resolved here, once.
       keycloakSub: keycloakSubFromIdentities(user.identities),

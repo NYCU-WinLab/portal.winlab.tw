@@ -15,16 +15,16 @@ export type Profile = {
   session: AuthSession | null
 }
 
+// Keycloak's OIDC name is "<given> <family>", so a Chinese name arrives as
+// "詠翔 詹". Same rule as public.member_display_name() and the door panel.
+const HAN_GIVEN_FAMILY = /^(\p{Script=Han}+) (\p{Script=Han}+)$/u
+
 /**
  * A member's display name from their Supabase user metadata, or undefined when
- * it carries none.
- *
- * Keycloak's `chinese_name` attribute comes first: Supabase files it under
- * `custom_claims` and it is already family first (何承運), which the OIDC
- * `name` ("<given> <family>") never is. This is the same first choice as
- * public.member_display_name(), which fills user_profiles.name, so a member
- * reads the same in the header as in every list. The rest of the chain is
- * what the portal used before chinese_name existed.
+ * it carries none. Mirrors public.member_display_name(), which fills
+ * user_profiles.name, so a member reads the same in the header as in every
+ * list: Keycloak's `chinese_name` (already family first) when set, otherwise
+ * the first non-blank name field with a Han "<given> <family>" flipped.
  */
 export function displayNameFromMetadata(
   meta: Record<string, unknown> | undefined
@@ -36,7 +36,11 @@ export function displayNameFromMetadata(
   }
   for (const key of ["full_name", "name", "preferred_username"]) {
     const value = meta?.[key]
-    if (typeof value === "string") return value
+    if (typeof value === "string" && value.trim()) {
+      const name = value.trim()
+      const han = HAN_GIVEN_FAMILY.exec(name)
+      return han ? `${han[2]}${han[1]}` : name
+    }
   }
   return undefined
 }
