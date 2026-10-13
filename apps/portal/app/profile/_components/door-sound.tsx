@@ -125,7 +125,7 @@ export function DoorSoundForm({
   return (
     <Section
       title="開門音效"
-      description="刷卡、按 /door 或請 agent 開門時門口喇叭播的音效。有上傳音效就播你的音效，否則播實驗室預設音效。門口看板的後綴只改 LED 上的字，不影響聲音。"
+      description="刷卡、按 /door 或請 agent 開門時，門口面板會先念「Hi」加你的名字和看板後綴的文字（符號不念），再播音效：選「播我的音效」就播你上傳的音效，否則從實驗室預設音效隨機挑一首。"
     >
       <form
         className="flex flex-col gap-4 px-4 py-3"
@@ -152,8 +152,8 @@ export function DoorSoundForm({
             id="door-sound-file-help"
             className="text-xs text-muted-foreground"
           >
-            mp3、m4a、aac、wav、ogg，3 MB 以內。超過 {DOOR_SOUND_MAX_SECONDS}{" "}
-            秒會被截掉，音量會自動調成一致。
+            mp3、m4a、aac、wav、ogg，3 MB 以內（wav 檔大，約 18 秒就到上限）。
+            門口面板只播前 {DOOR_SOUND_MAX_SECONDS} 秒，音量會自動調成一致。
           </p>
           {fileError ? (
             <p className="text-xs text-destructive">{fileError}</p>
@@ -216,8 +216,8 @@ export function DoorSoundForm({
           ) : null}
           <p aria-live="polite" className="text-xs text-muted-foreground">
             {outcome === "own"
-              ? "開門時會播你的音效。"
-              : "開門時會播實驗室預設音效。"}
+              ? "開門時念完名字會播你的音效。"
+              : "開門時念完名字會從實驗室預設音效隨機播一首。"}
           </p>
         </fieldset>
 
@@ -238,7 +238,7 @@ export function DoorSoundForm({
                 <AlertDialogHeader>
                   <AlertDialogTitle>刪除開門音效？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    刪除後會播預設音效。要用自己的音效得重新上傳。
+                    刪除後會從實驗室預設音效隨機播一首。要用自己的音效得重新上傳。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
