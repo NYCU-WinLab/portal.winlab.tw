@@ -69,6 +69,29 @@ describe("portal MCP handler", () => {
     expect(res.status).toBe(401)
   })
 
+  test("registration requires explicit data-use terms before any write", async () => {
+    const res = await call(
+      rpc("tools/call", {
+        name: "register_developer_app",
+        arguments: {
+          name: "Demo",
+          description: "A lab demo",
+          contact_email: "demo@example.org",
+          privacy_url: "https://example.org/privacy",
+          client_type: "public",
+          redirect_uris: ["http://localhost:3010/callback"],
+          accept_terms: false,
+        },
+      }),
+      TOKEN
+    )
+    const body = (await readRpcResult(res)) as {
+      result?: { isError?: boolean }
+      error?: unknown
+    }
+    expect(Boolean(body.error) || body.result?.isError).toBe(true)
+  })
+
   test("hands the agent instructions and the tool list", async () => {
     const res = await call(
       rpc("initialize", {
@@ -133,6 +156,11 @@ describe("portal MCP handler", () => {
         "update_reimburse_ingress",
         "upload_receipt",
         "whoami",
+        "list_developer_apps",
+        "get_developer_app",
+        "register_developer_app",
+        "request_developer_scopes",
+        "get_developer_integration",
       ].sort()
     )
     // Every tool the server offers must be named in the instructions, so an

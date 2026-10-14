@@ -321,10 +321,8 @@ export async function adminRenameGalleryTag(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
   if (!profile?.is_admin) {
     return { ok: false, error: describeOnlyAdminsCanRenameTagsError() }
   }
@@ -369,10 +367,8 @@ export async function adminMergeGalleryTags(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
   if (!profile?.is_admin) {
     return { ok: false, error: describeOnlyAdminsCanMergeTagsError() }
   }
@@ -416,10 +412,8 @@ export async function adminDeleteUnusedGalleryTag(
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
   if (!profile?.is_admin) {
     return { ok: false, error: describeOnlyAdminsCanDeleteTagsError() }
   }

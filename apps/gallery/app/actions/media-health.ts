@@ -50,10 +50,8 @@ async function requireGalleryAdmin(): Promise<
   if (!userId) return { ok: false, error: describePleaseSignInFirst() }
 
   const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
+    .rpc("get_my_access")
+    .maybeSingle<{ is_admin: boolean }>()
 
   if (profileError) {
     return { ok: false, error: profileError.message }

@@ -34,6 +34,209 @@ export type Database = {
   }
   public: {
     Tables: {
+      developer_apps: {
+        Row: {
+          approved_scopes: string[]
+          client_type: string
+          contact_email: string
+          created_at: string
+          description: string
+          enabled: boolean
+          id: string
+          name: string
+          owner_id: string
+          privacy_url: string
+          redirect_uris: string[]
+          secret_hash: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          approved_scopes?: string[]
+          client_type: string
+          contact_email: string
+          created_at?: string
+          description: string
+          enabled?: boolean
+          id?: string
+          name: string
+          owner_id: string
+          privacy_url: string
+          redirect_uris: string[]
+          secret_hash?: string | null
+        }
+        Update: {
+          approved_scopes?: string[]
+          client_type?: string
+          contact_email?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          owner_id?: string
+          privacy_url?: string
+          redirect_uris?: string[]
+          secret_hash?: string | null
+        }
+        Relationships: []
+      }
+      developer_codes: {
+        Row: {
+          challenge: string
+          expires_at: string
+          grant_id: string
+          hash: string
+          redirect_uri: string
+          scopes: string[]
+        }
+        ComputedFields: never
+        Insert: {
+          challenge: string
+          expires_at: string
+          grant_id: string
+          hash: string
+          redirect_uri: string
+          scopes: string[]
+        }
+        Update: {
+          challenge?: string
+          expires_at?: string
+          grant_id?: string
+          hash?: string
+          redirect_uri?: string
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_codes_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "developer_grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      developer_grants: {
+        Row: {
+          app_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          scopes: string[]
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          app_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          scopes: string[]
+          user_id: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          scopes?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_grants_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "developer_apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      developer_scope_requests: {
+        Row: {
+          app_id: string
+          created_at: string
+          id: string
+          purpose: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scopes: string[]
+          status: string
+        }
+        ComputedFields: never
+        Insert: {
+          app_id: string
+          created_at?: string
+          id?: string
+          purpose: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scopes: string[]
+          status?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          id?: string
+          purpose?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scopes?: string[]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_scope_requests_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "developer_apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      developer_tokens: {
+        Row: {
+          access_expires_at: string
+          access_hash: string
+          grant_id: string
+          refresh_expires_at: string
+          refresh_hash: string
+          refresh_used: boolean
+          scopes: string[]
+        }
+        ComputedFields: never
+        Insert: {
+          access_expires_at: string
+          access_hash: string
+          grant_id: string
+          refresh_expires_at: string
+          refresh_hash: string
+          refresh_used?: boolean
+          scopes: string[]
+        }
+        Update: {
+          access_expires_at?: string
+          access_hash?: string
+          grant_id?: string
+          refresh_expires_at?: string
+          refresh_hash?: string
+          refresh_used?: boolean
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_tokens_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "developer_grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       announcements: {
         Row: {
           content: string
@@ -3080,6 +3283,14 @@ export type Database = {
       }
     }
     Functions: {
+      developer_consume_refresh: {
+        Args: { p_hash: string }
+        Returns: boolean
+      }
+      developer_review_scope: {
+        Args: { p_request: string; p_approve: boolean; p_note: string }
+        Returns: undefined
+      }
       add_bento_order_item: {
         Args: {
           p_anonymous_contact?: string
@@ -3339,12 +3550,20 @@ export type Database = {
           user_name: string
         }[]
       }
+      get_my_access: {
+        Args: never
+        Returns: {
+          is_admin: boolean
+          roles: Json
+        }[]
+      }
       get_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       get_user_email: { Args: never; Returns: string }
       has_role: {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
       }
+      is_bento_admin: { Args: never; Returns: boolean }
       is_door_admin: { Args: never; Returns: boolean }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }

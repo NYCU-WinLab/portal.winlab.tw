@@ -45,11 +45,14 @@ export async function getCurrentUser(): Promise<NormalizedUser | null> {
   if (error || !data?.claims) return null
 
   const base = normalizeClaims(data.claims)
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("name, is_admin")
-    .eq("id", base.id)
-    .maybeSingle()
+  const [{ data: profile }, { data: access }] = await Promise.all([
+    supabase
+      .from("user_profiles")
+      .select("name")
+      .eq("id", base.id)
+      .maybeSingle(),
+    supabase.rpc("get_my_access").maybeSingle<{ is_admin: boolean }>(),
+  ])
 
   const profileName =
     typeof profile?.name === "string" && profile.name.trim()
@@ -59,6 +62,6 @@ export async function getCurrentUser(): Promise<NormalizedUser | null> {
   return {
     ...base,
     name: profileName ?? base.name,
-    isAdmin: profile?.is_admin === true,
+    isAdmin: access?.is_admin === true,
   }
 }

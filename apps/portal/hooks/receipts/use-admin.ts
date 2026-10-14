@@ -16,10 +16,8 @@ export function useReceiptsAdmin() {
     queryFn: async () => {
       if (!user) return null
       const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("roles, is_admin")
-        .eq("id", user.id)
-        .single()
+        .rpc("get_my_access")
+        .maybeSingle()
       return profile
     },
     enabled: !!user,
