@@ -35,6 +35,7 @@ function BulletinBoardSkeleton() {
 }
 
 const baseApps = [
+  { href: "/developers", label: "Developers", note: "應用程式與資料授權" },
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/bento", label: "Bento", note: "便當訂購" },
   { href: "/door", label: "Door", note: "門禁開關" },
