@@ -38,6 +38,7 @@ const baseApps = [
   { href: "/developers", label: "Developers", note: "應用程式與資料授權" },
   { href: "/approve", label: "Approve", note: "文件簽核" },
   { href: "/bento", label: "Bento", note: "便當訂購" },
+  { href: "/directory", label: "Directory", note: "實驗室成員通訊錄" },
   { href: "/door", label: "Door", note: "門禁開關" },
   { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
   { href: "/games", label: "Games", note: "小遊戲" },
