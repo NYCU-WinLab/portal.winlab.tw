@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server"
 
+import { registerDeveloperTools } from "@/lib/mcp/tools/developers"
 import { registerAdminTools } from "@/lib/mcp/tools/admin"
 import {
   registerApproveTools,
@@ -24,7 +25,7 @@ import { registerReimburseTools } from "@/lib/mcp/tools/reimburse"
 import { registerRoomsTools, type RoomsHooks } from "@/lib/mcp/tools/rooms"
 import { registerTripTools } from "@/lib/mcp/tools/trip"
 
-export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.10.0" }
+export const MCP_SERVER_INFO = { name: "portal.winlab.tw", version: "0.11.0" }
 
 // Follow-ups route.ts runs after a tool call, outside the tool itself.
 export type ToolHooks = ReceiptHooks &
@@ -50,4 +51,5 @@ export function registerTools(server: McpServer, hooks: ToolHooks = {}) {
   registerGamesTools(server)
   registerDoorTools(server, hooks)
   registerAdminTools(server)
+  registerDeveloperTools(server)
 }

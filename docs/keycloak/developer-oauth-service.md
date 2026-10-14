@@ -122,3 +122,18 @@ A standalone consumer app is available alongside the repository at
 review, member consent, profile/groups reads, token refresh and grant revocation
 against the real local Portal routes and Postgres, with an isolated identity
 fixture. Screenshots and setup instructions are in the demo directory.
+
+## MCP management
+
+The existing `/api/mcp` now exposes `list_developer_apps`, `get_developer_app`,
+`register_developer_app`, `request_developer_scopes`, and
+`get_developer_integration`. Use the existing Portal/Supabase MCP login, not an
+application's opaque token. All five tools are limited to the caller's own apps,
+including for administrators. Registration and scope requests share the web's
+validation and mutation functions; reads use the caller's RLS client and exclude
+secret hashes. Only initial confidential registration returns its one-time
+secret. Approval remains on the administrator review page.
+
+MCP integration was verified through actual HTTP `/api/mcp` calls against local
+Supabase: list, register, one-time secret, pending scope request, integration
+metadata, and denial for another owner's app. No additional migration is needed.

@@ -25,6 +25,27 @@ export default function DocumentationPage() {
           PKCE（S256），在成員同意的範圍內取得資料。
         </p>
       </header>
+      <section id="mcp" className="space-y-3 rounded-lg border p-5">
+        <h2 className="text-lg font-medium">讓 AI 協助串接 / MCP</h2>
+        <p>在支援遠端 MCP 的 AI 工具新增以下網址，並透過 Portal 登入：</p>
+        <Code>{`${base}/api/mcp`}</Code>
+        <p>
+          可以請 AI
+          列出自己的應用、註冊新應用、提交資料權限申請，以及取得回呼網址與 OAuth
+          串接資訊。
+        </p>
+        <Code>{`list_developer_apps
+get_developer_app
+register_developer_app
+request_developer_scopes
+get_developer_integration`}</Code>
+        <p className="text-muted-foreground">
+          註冊前需確認用途、隱私政策與資料使用規範。Confidential secret
+          只顯示一次，請存入後端環境變數。name / groups
+          仍需管理員審核及成員同意。此 MCP 使用 Portal
+          登入，不能使用你的應用取得的 access token。
+        </p>
+      </section>
       <section className="space-y-3">
         <h2 className="text-lg font-medium">01 / 註冊你的應用</h2>
         <p>

@@ -7,6 +7,11 @@ import { developerSession, ownedApplication } from "@/lib/developers/queries"
 import { applicationInput } from "@/lib/developers/policy"
 import { hashSecret, randomSecret } from "@/lib/developers/oauth"
 import { databaseError } from "@/lib/developers/store"
+import {
+  DeveloperActionError,
+  registerApplicationFor,
+  requestScopesFor,
+} from "@/lib/developers/mutations"
 
 export type ActionResult = {
   error?: string
@@ -34,27 +39,9 @@ export async function manageApplication(
           .map((s) => s.trim())
           .filter(Boolean),
       })
-      const { count, error: countError } = await db
-        .from("developer_apps")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
-      databaseError(countError)
-      if ((count ?? 0) >= 20)
-        return { error: "每位成員最多可註冊 20 個應用程式。" }
-      const secret =
-        input.client_type === "confidential" ? randomSecret() : undefined
-      const { data, error } = await db
-        .from("developer_apps")
-        .insert({
-          ...input,
-          owner_id: user.id,
-          secret_hash: secret ? hashSecret(secret) : null,
-        })
-        .select("id")
-        .single()
-      databaseError(error)
+      const created = await registerApplicationFor(user.id, input)
       revalidatePath("/developers")
-      return { message: "應用程式已建立。", id: String(data!.id), secret }
+      return { message: "應用程式已建立。", ...created }
     }
     if (operation === "revoke-grant") {
       const id = z.uuid().parse(form.get("id"))
@@ -87,22 +74,11 @@ export async function manageApplication(
       if (operation === "request") {
         if (app.owner_id !== user.id)
           return { error: "只有應用程式擁有者可以提交申請。" }
-        const scopes = z
-          .array(z.enum(["name", "groups"]))
-          .min(1)
-          .parse(form.getAll("scopes"))
-        const purpose = z
-          .string()
-          .trim()
-          .min(10)
-          .max(2000)
-          .parse(form.get("purpose"))
-        const { error } = await db
-          .from("developer_scope_requests")
-          .insert({ app_id: id, scopes: [...new Set(scopes)], purpose })
-        if (error?.code === "23505")
-          return { error: "這個應用程式已有待審核申請。" }
-        databaseError(error)
+        await requestScopesFor(sessionDb, user.id, {
+          app_id: id,
+          scopes: form.getAll("scopes"),
+          purpose: form.get("purpose"),
+        })
       } else if (operation === "rotate") {
         if (app.client_type !== "confidential")
           return { error: "Public client 不使用 secret。" }
@@ -156,6 +132,7 @@ export async function manageApplication(
     revalidatePath("/developers", "layout")
     return { message: "已儲存。" }
   } catch (error) {
+    if (error instanceof DeveloperActionError) return { error: error.message }
     if (error instanceof z.ZodError)
       return { error: error.issues[0]?.message ?? "請檢查輸入資料。" }
     return { error: "操作未完成，請稍後重試。" }
