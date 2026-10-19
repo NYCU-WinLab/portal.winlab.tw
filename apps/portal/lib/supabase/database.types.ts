@@ -1662,6 +1662,65 @@ export type Database = {
         }
         Relationships: []
       }
+      group_managers: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          group_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          group_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          group_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      group_membership_audit: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          detail: string | null
+          group_email: string
+          group_id: string
+          id: number
+          member_email: string
+          outcome: string
+        }
+        ComputedFields: never
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          detail?: string | null
+          group_email: string
+          group_id: string
+          id?: never
+          member_email: string
+          outcome: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          detail?: string | null
+          group_email?: string
+          group_id?: string
+          id?: never
+          member_email?: string
+          outcome?: string
+        }
+        Relationships: []
+      }
       ip_user_changes: {
         Row: {
           action: string
@@ -3559,12 +3618,21 @@ export type Database = {
       }
       get_profile_stats: { Args: { p_user_id: string }; Returns: Json }
       get_user_email: { Args: never; Returns: string }
+      groups_assign_manager: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      groups_unassign_manager: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: { role_name: string; system_name: string; user_id_param: string }
         Returns: boolean
       }
       is_bento_admin: { Args: never; Returns: boolean }
       is_door_admin: { Args: never; Returns: boolean }
+      is_group_manager: { Args: { p_group_id: string }; Returns: boolean }
       is_meetings_admin: { Args: never; Returns: boolean }
       is_portal_admin: { Args: never; Returns: boolean }
       is_quiz_host: { Args: { p_session_id: string }; Returns: boolean }
