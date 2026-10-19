@@ -49,12 +49,12 @@ describe("PRESENTER_PROFILE", () => {
       .join("\n")
     expect(sql).toMatch(
       new RegExp(
-        `add constraint ${fk} foreign key \\(presenter_user_id\\) references user_profiles`,
+        `add constraint "?${fk}"? foreign key \\("?presenter_user_id"?\\) references (public\\.)?"?user_profiles`,
         "i"
       )
     )
     expect(sql).not.toMatch(
-      new RegExp(`drop constraint (if exists )?${fk}`, "i")
+      new RegExp(`drop constraint (if exists )?"?${fk}`, "i")
     )
   })
 })
@@ -108,6 +108,16 @@ describe("presenterOrder", () => {
     expect(
       presenterOrder([row("詠翔 詹", "u1", "詹詠翔"), row("詹詠翔", null)])
     ).toEqual(["詹詠翔"])
+  })
+
+  it("lets one speaker week stand for one same-name member only", () => {
+    const members = [
+      row("王小明", "u1", "王小明"),
+      row("王小明", "u2", "王小明"),
+    ]
+    const speaker = row("王小明", null)
+    expect(presenterOrder([speaker, ...members])).toEqual(["王小明", "王小明"])
+    expect(presenterOrder([...members, speaker])).toEqual(["王小明", "王小明"])
   })
 
   it("skips a row with no name on either side", () => {

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import {
   PRESENTER_PROFILE,
   presenterName,
-  presenterOrder as orderPresenters,
+  presenterOrder,
   type PresenterRow,
 } from "@/lib/meetings/presenter-name"
 import type { DbMeeting } from "@/lib/meetings/types"
@@ -163,10 +163,10 @@ export async function GET(request: NextRequest) {
   // presenter_order would look like nobody is scheduled, so leave a trace.
   if (upcomingError) {
     console.error(
-      `[meetings/schedule] upcoming presenters failed: ${upcomingError.message}`
+      `[meetings] schedule upcoming presenters read failed: ${upcomingError.message}`
     )
   }
-  const presenterOrder = orderPresenters(
+  const order = presenterOrder(
     (upcomingData ?? []) as unknown as PresenterRow[]
   )
 
@@ -187,8 +187,8 @@ export async function GET(request: NextRequest) {
       question_group: questionGroup,
       question_groups: questionGroups,
       questioners,
-      next_presenter: presenterOrder[0] ?? null,
-      presenter_order: presenterOrder,
+      next_presenter: order[0] ?? null,
+      presenter_order: order,
     },
     { headers: CORS }
   )

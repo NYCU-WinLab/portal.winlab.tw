@@ -36,23 +36,25 @@ export interface PresenterRow {
  * `/api/meetings/schedule`'s `presenter_order`. A member is one entry however
  * many weeks they hold, so identity is the user id: two members who share a
  * name stay two entries. A speaker week carries no id (CHECK), so it is known
- * by name only, and a name already listed (or listed later by a member) is
- * the same person.
+ * by name only and stands for at most one member of that name, whichever
+ * order the weeks come in.
  */
 export function presenterOrder(rows: PresenterRow[]): string[] {
   const seenIds = new Set<string>()
-  const idlessNames = new Set<string>()
+  // Names listed by an id-less row that no member has claimed yet.
+  const unclaimed = new Set<string>()
   const listed = new Set<string>()
   const order: string[] = []
   for (const row of rows) {
     const name = presenterName(row.presenter, row.presenter_profile)
     if (!name) continue
     if (row.presenter_user_id) {
-      if (seenIds.has(row.presenter_user_id) || idlessNames.has(name)) continue
+      if (seenIds.has(row.presenter_user_id)) continue
       seenIds.add(row.presenter_user_id)
+      if (unclaimed.delete(name)) continue
     } else {
       if (listed.has(name)) continue
-      idlessNames.add(name)
+      unclaimed.add(name)
     }
     listed.add(name)
     order.push(name)
