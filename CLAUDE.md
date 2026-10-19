@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/groups`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -105,7 +105,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/groups`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `packages/db`: the Supabase CLI project (`supabase/`: migrations, pgTAP tests, `config.toml`). Run CLI commands from here, e.g. `cd packages/db && supabase db start`. No app depends on it, so a migration-only commit doesn't rebuild portal or gallery on Vercel.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
@@ -239,6 +239,62 @@ Real examples of each, all under `apps/portal/app/api/`:
   neither project and silently does nothing.
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/mark-notified`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
+
+### `/groups` and Google mailing lists
+
+Google Workspace here is a set of mailing lists, not an identity directory:
+most members are outside addresses, many with no Google account at all. So
+the member list lives **only in Google**; `/groups` reads it live and writes
+it through the Admin SDK Directory API, and never stores a copy.
+
+The credential is the `portal-groups@winlab-portal` service account, reached
+only through Workload Identity Federation from Vercel's OIDC token — there is
+no key, and only **production** deployments can get a token (preview and
+local runs are refused by GCP, and have no `GOOGLE_GROUPS_*` env anyway). The
+account holds a custom admin role with just GROUPS_RETRIEVE + GROUPS_UPDATE,
+over **every group in the domain**. Google therefore draws no line between
+groups; the portal does, on every request:
+
+- **Never a `gcp-*` group, never outside `GOOGLE_GROUPS_DOMAIN`**
+  (`lib/groups/scope.ts`), checked against the address Google returns for the
+  group, not anything the caller sent. That fences off the `gcp-*` groups'
+  own member lists, not their effective membership: nested groups are
+  allowed, so if a `gcp-*` group ever held another group as a member, editing
+  that group here would change who is effectively in the `gcp-*` one. Keep
+  the `gcp-*` groups free of group members — or, if one must hold one, fence
+  that nested group off in `scope.ts` too.
+- **Only the group's managers** (`group_managers`, assigned by portal admins;
+  portal admins manage every group), checked with `is_group_manager()` before
+  any Google call.
+- **Only MEMBER rows** are added or removed, so an owner or manager can't be
+  removed and nobody can be promoted.
+
+Every attempt, refused ones too, lands in `group_membership_audit` from the
+service role: one row per address tried, one per refused or failed request.
+A request whose input the UI could never have sent (wrong types, an address
+that doesn't parse) is refused before any of that and leaves no row. The
+order of checks lives in `lib/groups/membership.ts`, tested with fakes;
+`app/groups/actions.ts` only wires in the real dependencies.
+
+Gotchas, all measured against the live API: use `domain=`, never
+`customer=my_customer` (400 as a service account); never look a member up or
+delete it by email (some outside addresses 404 while on the list) — list,
+match, delete by member id; the member list is eventually consistent, so the
+UI trusts each action's per-address result and re-reads a few seconds later.
+The first outside address added to a group makes Google switch the group to
+"external members allowed (admins only)", and removing it doesn't switch back.
+
+Accepted residual risk: whoever holds that token — anyone who can deploy the
+portal to production — can change the members **and settings** of any group
+in the domain, gcp-\* included (GROUPS_UPDATE can't be split). They can't
+create or delete groups, or touch users or GCP. This is safe from GCP
+escalation only because the organisation IAM grants nothing to `group:`
+principals; grant new GCP admins as `user:`, never through a group.
+
+Keycloak stays read-only (#416): it is only the address book the cohort
+picker reads from. Don't route mailing lists through Keycloak or AD groups —
+an AD group can't hold outside addresses without polluting the directory
+with contact objects.
 
 ### Portal ↔ GitLab boundary
 
