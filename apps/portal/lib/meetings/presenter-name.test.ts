@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test"
 
-import { PRESENTER_PROFILE, presenterName } from "./presenter-name"
+import {
+  PRESENTER_PROFILE,
+  presenterName,
+  presenterOrder,
+  type PresenterRow,
+} from "./presenter-name"
 import { toMeeting, type DbMeeting } from "./types"
 
 describe("presenterName", () => {
@@ -26,10 +31,77 @@ describe("presenterName", () => {
 })
 
 describe("PRESENTER_PROFILE", () => {
-  it("names the foreign key, so the embed can't pick another relation", () => {
+  // The FK name is checked against the generated schema; the alias, table and
+  // column are what toMeeting and the route read back, so pin those here.
+  it("embeds the profile name under presenter_profile", () => {
     expect(PRESENTER_PROFILE).toBe(
       "presenter_profile:user_profiles!meetings_presenter_user_id_fkey(name)"
     )
+  })
+})
+
+describe("presenterOrder", () => {
+  const row = (
+    presenter: string | null,
+    userId: string | null,
+    profileName?: string | null
+  ): PresenterRow => ({
+    presenter,
+    presenter_user_id: userId,
+    presenter_profile: profileName === undefined ? null : { name: profileName },
+  })
+
+  it("lists each member once, by their current name", () => {
+    expect(
+      presenterOrder([
+        row("詠翔 詹", "u1", "詹詠翔"),
+        row("Ann", "u2", "安安"),
+        row("詹詠翔", "u1", "詹詠翔"),
+      ])
+    ).toEqual(["詹詠翔", "安安"])
+  })
+
+  it("keeps a member whose stored copy is null", () => {
+    expect(presenterOrder([row(null, "u1", "詹詠翔")])).toEqual(["詹詠翔"])
+  })
+
+  it("keeps two members who share a name apart", () => {
+    expect(
+      presenterOrder([
+        row("王小明", "u1", "王小明"),
+        row("王小明", "u2", "王小明"),
+      ])
+    ).toEqual(["王小明", "王小明"])
+  })
+
+  it("lists an outside speaker once by name", () => {
+    expect(
+      presenterOrder([row("Prof. Lin", null), row("Prof. Lin", null)])
+    ).toEqual(["Prof. Lin"])
+  })
+
+  it("never merges a speaker week with a member of the same name", () => {
+    // A speaker week has no id (CHECK) and its name is free text, so a
+    // matching name is no evidence it is that member. Merging would drop a
+    // real presenter; keeping both only repeats a name.
+    const member = row("Alex", "u1", "Alex")
+    const speaker = row("Alex", null)
+    expect(
+      presenterOrder([speaker, row("Blair", "u2", "Blair"), member])
+    ).toEqual(["Alex", "Blair", "Alex"])
+    expect(presenterOrder([member, speaker])).toEqual(["Alex", "Alex"])
+  })
+
+  it("keeps a speaker apart from a member whose id reads the same", () => {
+    // Ids and names share one set of keys, so each carries its kind.
+    const member = row("Alex", "u1", "Alex")
+    const speaker = row("u1", null)
+    expect(presenterOrder([member, speaker])).toEqual(["Alex", "u1"])
+    expect(presenterOrder([speaker, member])).toEqual(["u1", "Alex"])
+  })
+
+  it("skips a row with no name on either side", () => {
+    expect(presenterOrder([row(null, "u1", "  "), row(null, null)])).toEqual([])
   })
 })
 

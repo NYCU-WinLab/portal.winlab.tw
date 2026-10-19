@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/server"
 import {
   PRESENTER_PROFILE,
   presenterName,
-  type PresenterProfile,
+  presenterOrder,
+  type PresenterRow,
 } from "@/lib/meetings/presenter-name"
 import type { DbMeeting } from "@/lib/meetings/types"
 
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
 
   const [
     { data: meetingData, error },
-    { data: upcomingData },
+    { data: upcomingData, error: upcomingError },
     { data: poolData },
   ] = await Promise.all([
     supabase
@@ -158,24 +159,16 @@ export async function GET(request: NextRequest) {
       ? null
       : { number: null, members: questioners.map((q) => q.name ?? "") }
 
-  // Deduplicate presenter_order (keep first occurrence per member; an outside
-  // speaker has no id, so their name stands in for one)
-  const upcoming = (upcomingData ?? []) as unknown as Array<{
-    presenter: string | null
-    presenter_user_id: string | null
-    scheduled_date: string
-    presenter_profile: PresenterProfile | null
-  }>
-  const seen = new Set<string>()
-  const presenterOrder: string[] = []
-  for (const row of upcoming) {
-    const name = presenterName(row.presenter, row.presenter_profile)
-    const key = row.presenter_user_id ?? name
-    if (name && key && !seen.has(key)) {
-      seen.add(key)
-      presenterOrder.push(name)
-    }
+  // The meeting itself still answers when this read fails, but an empty
+  // presenter_order would look like nobody is scheduled, so leave a trace.
+  if (upcomingError) {
+    console.error(
+      `[meetings] schedule upcoming presenters read failed: ${upcomingError.message}`
+    )
   }
+  const order = presenterOrder(
+    (upcomingData ?? []) as unknown as PresenterRow[]
+  )
 
   // Backward-compatible array-of-arrays shape: a single element wrapping the
   // full question pool (fixed groups no longer exist).
@@ -194,8 +187,8 @@ export async function GET(request: NextRequest) {
       question_group: questionGroup,
       question_groups: questionGroups,
       questioners,
-      next_presenter: presenterOrder[0] ?? null,
-      presenter_order: presenterOrder,
+      next_presenter: order[0] ?? null,
+      presenter_order: order,
     },
     { headers: CORS }
   )
