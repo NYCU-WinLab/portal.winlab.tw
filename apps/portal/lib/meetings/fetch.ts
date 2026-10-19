@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { PRESENTER_PROFILE } from "@/lib/meetings/presenter-name"
 import type { ScheduleYearBounds } from "@/lib/meetings/schedule-year"
 import {
   toMeeting,
@@ -25,12 +26,12 @@ export async function fetchMeetings(
   // 舊的頁籤上。日期是列上唯一會被編輯的東西，所以用它。
   const { data, error } = await supabase
     .from(MEETINGS)
-    .select("*")
+    .select(`*, ${PRESENTER_PROFILE}`)
     .gte("scheduled_date", `${year}-01-01`)
     .lte("scheduled_date", `${year}-12-31`)
     .order("scheduled_date", { ascending: true })
   if (error) throw new Error(error.message || "讀取排班失敗")
-  return (data as DbMeeting[]).map(toMeeting)
+  return (data as unknown as DbMeeting[]).map(toMeeting)
 }
 
 interface RawQuestionerRow {

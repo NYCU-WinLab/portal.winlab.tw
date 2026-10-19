@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/lib/supabase/server"
+import {
+  PRESENTER_PROFILE,
+  presenterName,
+  type PresenterProfile,
+} from "@/lib/meetings/presenter-name"
 import type { DbMeeting } from "@/lib/meetings/types"
 
 function createServiceClient() {
@@ -71,12 +76,12 @@ export async function GET(request: NextRequest) {
   ] = await Promise.all([
     supabase
       .from("meetings")
-      .select("*")
+      .select(`*, ${PRESENTER_PROFILE}`)
       .eq("scheduled_date", date)
       .maybeSingle(),
     supabase
       .from("meetings")
-      .select("presenter, scheduled_date")
+      .select(`presenter, scheduled_date, ${PRESENTER_PROFILE}`)
       .gt("scheduled_date", date)
       .eq("is_holiday", false)
       .not("presenter", "is", null)
@@ -101,7 +106,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const m = meetingData as DbMeeting
+  const m = meetingData as unknown as DbMeeting
 
   if (m.is_holiday) {
     return NextResponse.json(
@@ -150,16 +155,18 @@ export async function GET(request: NextRequest) {
       : { number: null, members: questioners.map((q) => q.name ?? "") }
 
   // Deduplicate presenter_order (keep first occurrence per name)
-  const upcoming = (upcomingData ?? []) as Array<{
+  const upcoming = (upcomingData ?? []) as unknown as Array<{
     presenter: string | null
     scheduled_date: string
+    presenter_profile: PresenterProfile | null
   }>
   const seen = new Set<string>()
   const presenterOrder: string[] = []
   for (const row of upcoming) {
-    if (row.presenter && !seen.has(row.presenter)) {
-      seen.add(row.presenter)
-      presenterOrder.push(row.presenter)
+    const name = presenterName(row.presenter, row.presenter_profile)
+    if (name && !seen.has(name)) {
+      seen.add(name)
+      presenterOrder.push(name)
     }
   }
 
@@ -172,7 +179,7 @@ export async function GET(request: NextRequest) {
     {
       date: m.scheduled_date,
       week: m.week_label,
-      presenter: m.presenter,
+      presenter: presenterName(m.presenter, m.presenter_profile),
       presenter_email: presenterEmail,
       paper: m.paper_title,
       location: m.location,

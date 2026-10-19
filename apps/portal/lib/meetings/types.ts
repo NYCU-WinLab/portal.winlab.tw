@@ -1,4 +1,8 @@
 import { parseLabStatus, type LabStatus } from "@/lib/meetings/lab-status"
+import {
+  presenterName,
+  type PresenterProfile,
+} from "@/lib/meetings/presenter-name"
 import type { SemesterKey } from "@/lib/meetings/semester"
 
 export interface Meeting {
@@ -102,6 +106,8 @@ export interface DbMeeting {
   location: string
   start_time: string
   created_at: string
+  /** Present only when the select embeds `PRESENTER_PROFILE`. */
+  presenter_profile?: PresenterProfile | null
 }
 
 export interface DbTeacherPaper {
@@ -175,7 +181,7 @@ export function toMeeting(row: DbMeeting): Meeting {
     isHoliday: row.is_holiday,
     isSpeaker: row.is_speaker,
     isThesis: row.is_thesis,
-    presenter: row.presenter,
+    presenter: presenterName(row.presenter, row.presenter_profile),
     presenterUserId: row.presenter_user_id,
     pptUploaded: row.ppt_uploaded,
     pptLink: row.ppt_link,
