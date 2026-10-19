@@ -11,8 +11,10 @@ import type { Database } from "@/lib/supabase/database.types"
 type MeetingRelation =
   Database["public"]["Tables"]["meetings"]["Relationships"][number]
 
-// Checked against the generated schema: a renamed or dropped constraint is a
-// typecheck failure here, not a PostgREST error on every schedule read.
+// Checked against the generated schema: once database.types.ts is
+// regenerated after a migration that renames or drops this constraint, it is
+// a typecheck failure here rather than a PostgREST error on every schedule
+// read. Nothing regenerates the types automatically.
 const PRESENTER_FK = "meetings_presenter_user_id_fkey" satisfies Extract<
   MeetingRelation,
   { columns: ["presenter_user_id"]; referencedRelation: "user_profiles" }
@@ -23,7 +25,8 @@ const PRESENTER_FK = "meetings_presenter_user_id_fkey" satisfies Extract<
  * select. The foreign key is named so the embed can never resolve through
  * another relation between the two tables.
  */
-export const PRESENTER_PROFILE = `presenter_profile:user_profiles!${PRESENTER_FK}(name)`
+export const PRESENTER_PROFILE =
+  `presenter_profile:user_profiles!${PRESENTER_FK}(name)` as const
 
 export interface PresenterProfile {
   name: string | null

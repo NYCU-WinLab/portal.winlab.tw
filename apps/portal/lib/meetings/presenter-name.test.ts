@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+  PRESENTER_PROFILE,
   presenterName,
   presenterOrder,
   type PresenterRow,
@@ -26,6 +27,16 @@ describe("presenterName", () => {
 
   it("is null when neither side has a name", () => {
     expect(presenterName(null, null)).toBeNull()
+  })
+})
+
+describe("PRESENTER_PROFILE", () => {
+  // The FK name is checked against the generated schema; the alias, table and
+  // column are what toMeeting and the route read back, so pin those here.
+  it("embeds the profile name under presenter_profile", () => {
+    expect(PRESENTER_PROFILE).toBe(
+      "presenter_profile:user_profiles!meetings_presenter_user_id_fkey(name)"
+    )
   })
 })
 
