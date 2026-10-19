@@ -81,10 +81,14 @@ export async function GET(request: NextRequest) {
       .maybeSingle(),
     supabase
       .from("meetings")
-      .select(`presenter, scheduled_date, ${PRESENTER_PROFILE}`)
+      .select(
+        `presenter, presenter_user_id, scheduled_date, ${PRESENTER_PROFILE}`
+      )
       .gt("scheduled_date", date)
       .eq("is_holiday", false)
-      .not("presenter", "is", null)
+      // A linked member can carry a null copy; their name comes from the
+      // profile, so either side having one is enough.
+      .or("presenter.not.is.null,presenter_user_id.not.is.null")
       .order("scheduled_date", { ascending: true })
       .limit(12),
     // Everyone currently in the rotation: on the roster, not switched off, and
@@ -154,9 +158,11 @@ export async function GET(request: NextRequest) {
       ? null
       : { number: null, members: questioners.map((q) => q.name ?? "") }
 
-  // Deduplicate presenter_order (keep first occurrence per name)
+  // Deduplicate presenter_order (keep first occurrence per member; an outside
+  // speaker has no id, so their name stands in for one)
   const upcoming = (upcomingData ?? []) as unknown as Array<{
     presenter: string | null
+    presenter_user_id: string | null
     scheduled_date: string
     presenter_profile: PresenterProfile | null
   }>
@@ -164,8 +170,9 @@ export async function GET(request: NextRequest) {
   const presenterOrder: string[] = []
   for (const row of upcoming) {
     const name = presenterName(row.presenter, row.presenter_profile)
-    if (name && !seen.has(name)) {
-      seen.add(name)
+    const key = row.presenter_user_id ?? name
+    if (name && key && !seen.has(key)) {
+      seen.add(key)
       presenterOrder.push(name)
     }
   }
