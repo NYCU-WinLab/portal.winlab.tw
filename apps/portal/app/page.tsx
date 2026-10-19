@@ -41,6 +41,7 @@ const baseApps = [
   { href: "/directory", label: "Directory", note: "實驗室成員通訊錄" },
   { href: "/door", label: "Door", note: "門禁開關" },
   { href: "https://gallery.winlab.tw", label: "Gallery", note: "藝術畫廊" },
+  { href: "/groups", label: "Groups", note: "郵件群組" },
   { href: "/games", label: "Games", note: "小遊戲" },
   { href: "/leave", label: "Leave", note: "請假登記" },
   { href: "/meetings", label: "Meetings", note: "組會排班" },
