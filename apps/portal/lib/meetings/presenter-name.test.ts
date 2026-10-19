@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
-import { PRESENTER_PROFILE, presenterName } from "./presenter-name"
+import {
+  PRESENTER_PROFILE,
+  presenterName,
+  presenterOrder,
+  type PresenterRow,
+} from "./presenter-name"
 import { toMeeting, type DbMeeting } from "./types"
 
 describe("presenterName", () => {
@@ -26,10 +33,85 @@ describe("presenterName", () => {
 })
 
 describe("PRESENTER_PROFILE", () => {
-  it("names the foreign key, so the embed can't pick another relation", () => {
-    expect(PRESENTER_PROFILE).toBe(
-      "presenter_profile:user_profiles!meetings_presenter_user_id_fkey(name)"
+  // A typo or a renamed constraint makes PostgREST reject the whole select,
+  // and nothing in bun test talks to PostgREST, so tie the name to the schema.
+  it("embeds through a foreign key the migrations still define", () => {
+    const fk = /!(\w+)\(/.exec(PRESENTER_PROFILE)?.[1]
+    expect(fk).toBe("meetings_presenter_user_id_fkey")
+
+    const dir = join(
+      import.meta.dir,
+      "../../../../packages/db/supabase/migrations"
     )
+    const sql = readdirSync(dir)
+      .filter((file) => file.endsWith(".sql"))
+      .map((file) => readFileSync(join(dir, file), "utf8"))
+      .join("\n")
+    expect(sql).toMatch(
+      new RegExp(
+        `add constraint ${fk} foreign key \\(presenter_user_id\\) references user_profiles`,
+        "i"
+      )
+    )
+    expect(sql).not.toMatch(
+      new RegExp(`drop constraint (if exists )?${fk}`, "i")
+    )
+  })
+})
+
+describe("presenterOrder", () => {
+  const row = (
+    presenter: string | null,
+    userId: string | null,
+    profileName?: string | null
+  ): PresenterRow => ({
+    presenter,
+    presenter_user_id: userId,
+    presenter_profile: profileName === undefined ? null : { name: profileName },
+  })
+
+  it("lists each member once, by their current name", () => {
+    expect(
+      presenterOrder([
+        row("詠翔 詹", "u1", "詹詠翔"),
+        row("Ann", "u2", "安安"),
+        row("詹詠翔", "u1", "詹詠翔"),
+      ])
+    ).toEqual(["詹詠翔", "安安"])
+  })
+
+  it("keeps a member whose stored copy is null", () => {
+    expect(presenterOrder([row(null, "u1", "詹詠翔")])).toEqual(["詹詠翔"])
+  })
+
+  it("keeps two members who share a name apart", () => {
+    expect(
+      presenterOrder([
+        row("王小明", "u1", "王小明"),
+        row("王小明", "u2", "王小明"),
+      ])
+    ).toEqual(["王小明", "王小明"])
+  })
+
+  it("lists an outside speaker once by name", () => {
+    expect(
+      presenterOrder([row("Prof. Lin", null), row("Prof. Lin", null)])
+    ).toEqual(["Prof. Lin"])
+  })
+
+  it("merges a member's speaker week with their own weeks", () => {
+    // A speaker week has no id (CHECK), so only the name can tie it to the
+    // member — in either order.
+    expect(
+      presenterOrder([row("詹詠翔", null), row("詠翔 詹", "u1", "詹詠翔")])
+    ).toEqual(["詹詠翔"])
+    expect(
+      presenterOrder([row("詠翔 詹", "u1", "詹詠翔"), row("詹詠翔", null)])
+    ).toEqual(["詹詠翔"])
+  })
+
+  it("skips a row with no name on either side", () => {
+    expect(presenterOrder([row(null, "u1", "  "), row(null, null)])).toEqual([])
   })
 })
 
