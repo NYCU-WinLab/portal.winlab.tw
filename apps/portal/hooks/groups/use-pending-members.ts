@@ -57,7 +57,8 @@ export function usePendingMembers(members: GroupMember[]): {
     latest.current = pending
   }, [pending])
 
-  // One timer at a time; leaving the page cancels it, so no refresh lands on whatever route comes next.
+  // One timer at a time; leaving the page cancels it, so no refresh lands on
+  // whatever route comes next.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
     () => () => {

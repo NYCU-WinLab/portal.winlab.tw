@@ -5,6 +5,8 @@
 // every render of a group page. Read-only, through the same view-users
 // credential (lib/keycloak/admin.ts).
 
+import "server-only"
+
 import {
   adminRealmUrl,
   adminToken,

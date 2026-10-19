@@ -116,8 +116,13 @@ export function AddMembersDialog({
       // comes back without per-address results. Re-read Google shortly, so
       // whatever did land shows up in the list and in 最近變更.
       onFailed()
+      if (res.status === "unconfigured")
+        return toast.error("Google 群組整合尚未設定")
+      // Refused before anything was sent: nothing can have landed.
+      if (res.status === "forbidden" && res.reason !== "google_permission")
+        return toast.error(res.detail)
       return toast.error(
-        res.status === "unconfigured" ? "Google 群組整合尚未設定" : res.detail
+        `${res.detail}（可能已有部分地址加入，請稍後對照名單與最近變更）`
       )
     }
     const landed = res.data
@@ -133,7 +138,7 @@ export function AddMembersDialog({
       )
     else
       toast.error(
-        `加入 ${ok} 人，失敗 ${failed.length} 人：${failed
+        `加入 ${ok} 人${already ? `，${already} 人原本就在` : ""}，失敗 ${failed.length} 人：${failed
           .map((f) => `${f.email}（${f.detail ?? "error"}）`)
           .join("、")}`
       )
