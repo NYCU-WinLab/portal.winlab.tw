@@ -26,7 +26,13 @@ export const DEFAULT_TOPIC_SUFFIX = "meeting"
 export interface TopicSource {
   /** Keycloak group name when the attendees came from a group button. */
   groupName?: string | null
-  /** Otherwise, the first attendee's Keycloak username. */
+  /**
+   * Otherwise, the Keycloak username of whoever is booking. A personal
+   * meeting is filed under its owner the way a group meeting is filed under
+   * its group, so this outranks anyone on the invite list.
+   */
+  bookerUsername?: string | null
+  /** Last resort, for a booker with no username: the first attendee's. */
   firstAttendeeUsername?: string | null
 }
 
@@ -41,15 +47,20 @@ export function sanitizeForFilename(value: string): string {
 /**
  * The bare identifier, with no brackets — this is what gets stored.
  *
- * Null when neither a group nor a named attendee is available, e.g. a room
- * booked with no attendees at all. A meeting with no prefix is better than
- * one prefixed with a guess.
+ * Group first, then the booker, then the first named attendee. Null only when
+ * none of those is known. A meeting with no prefix is better than one
+ * prefixed with a guess.
+ *
+ * Blank values fall through rather than stopping the chain: a booker whose
+ * profile has an empty username should not leave the meeting unprefixed when
+ * an attendee could have named it.
  */
 export function topicPrefix(source: TopicSource): string | null {
-  const raw = source.groupName ?? source.firstAttendeeUsername ?? null
-  if (!raw) return null
-  const clean = sanitizeForFilename(raw)
-  return clean === "" ? null : clean
+  return (
+    [source.groupName, source.bookerUsername, source.firstAttendeeUsername]
+      .map((v) => (v ? sanitizeForFilename(v) : ""))
+      .find((v) => v !== "") ?? null
+  )
 }
 
 /** `tasa` -> `[tasa]`, for display next to the suffix box. */

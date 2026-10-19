@@ -99,6 +99,12 @@ export interface ConfirmBookingInput {
 export type BookingResult = {
   /** The Portal booking that was made, when one was. */
   bookingId?: string
+  /**
+   * The Teams topic it was booked under, prefix included. Returned so a
+   * caller reporting the booking (book_room) says what was actually stored
+   * instead of re-deriving it and drifting.
+   */
+  title?: string
   inviteError?: string
   /**
    * Set on a cancellation that went through when its Teams meeting could not
@@ -121,6 +127,28 @@ export function failureText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/**
+ * The booker's Keycloak username, read on the caller's own client by the id
+ * their session proved. Null when the profile has none or can't be read: the
+ * prefix then falls back to the attendee list rather than failing the
+ * booking over a filename.
+ */
+export async function bookerUsername(
+  supabase: SupabaseClient<Database>,
+  userId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("username")
+    .eq("id", userId)
+    .maybeSingle()
+  if (error) {
+    console.error("[rooms] booker username lookup failed", error)
+    return null
+  }
+  return data?.username ?? null
+}
+
 export async function confirmBookingFor(
   supabase: SupabaseClient<Database>,
   user: BookingUser,
@@ -133,11 +161,13 @@ export async function confirmBookingFor(
   const times = validateBookingTimes(input.startTime, input.endTime, DAY_WINDOW)
   if (!times.ok) return { error: times.error }
 
-  // Derived server-side from the group and the attendee list, never taken
-  // from the client: the prefix decides which project a Teams recording
-  // files itself under, so it must not be something a caller can name.
+  // Derived server-side from the group, the signed-in booker and the
+  // attendee list, never taken from the client: the prefix decides which
+  // project a Teams recording files itself under, so it must not be
+  // something a caller can name.
   const prefix = topicPrefix({
     groupName: input.groupName,
+    bookerUsername: await bookerUsername(supabase, user.id),
     firstAttendeeUsername: input.attendees.find((a) => a.username)?.username,
   })
   const title = composeTopic(prefix, input.titleSuffix)
@@ -177,6 +207,7 @@ export async function confirmBookingFor(
     }
     return {
       bookingId: outcome.bookingId,
+      title,
       ...(outcome.inviteError ? { inviteError: outcome.inviteError } : {}),
     }
   } catch (err) {
