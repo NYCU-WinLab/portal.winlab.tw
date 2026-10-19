@@ -99,25 +99,16 @@ describe("presenterOrder", () => {
     ).toEqual(["Prof. Lin"])
   })
 
-  it("merges a member's speaker week with their own weeks", () => {
-    // A speaker week has no id (CHECK), so only the name can tie it to the
-    // member — in either order.
+  it("never merges a speaker week with a member of the same name", () => {
+    // A speaker week has no id (CHECK) and its name is free text, so a
+    // matching name is no evidence it is that member. Merging would drop a
+    // real presenter; keeping both only repeats a name.
+    const member = row("Alex", "u1", "Alex")
+    const speaker = row("Alex", null)
     expect(
-      presenterOrder([row("詹詠翔", null), row("詠翔 詹", "u1", "詹詠翔")])
-    ).toEqual(["詹詠翔"])
-    expect(
-      presenterOrder([row("詠翔 詹", "u1", "詹詠翔"), row("詹詠翔", null)])
-    ).toEqual(["詹詠翔"])
-  })
-
-  it("lets one speaker week stand for one same-name member only", () => {
-    const members = [
-      row("王小明", "u1", "王小明"),
-      row("王小明", "u2", "王小明"),
-    ]
-    const speaker = row("王小明", null)
-    expect(presenterOrder([speaker, ...members])).toEqual(["王小明", "王小明"])
-    expect(presenterOrder([...members, speaker])).toEqual(["王小明", "王小明"])
+      presenterOrder([speaker, row("Blair", "u2", "Blair"), member])
+    ).toEqual(["Alex", "Blair", "Alex"])
+    expect(presenterOrder([member, speaker])).toEqual(["Alex", "Alex"])
   })
 
   it("skips a row with no name on either side", () => {
