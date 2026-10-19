@@ -20,6 +20,7 @@ import { groupsApiFromEnv } from "@/lib/groups/google-auth"
 import {
   addToGroup,
   INVALID_INPUT,
+  malformed,
   NOT_MANAGED,
   parseGroupId,
   parseUserId,
@@ -139,6 +140,12 @@ export async function removeGroupMember(
 
 type ManagerResult = { ok: true } | { ok: false; error: string }
 
+// The manager actions validate before any login check, so a forged call has
+// no user yet; the log line still says who, when it can.
+async function currentUserId(): Promise<string> {
+  return (await getCurrentUser())?.id ?? "anonymous"
+}
+
 // The RPCs refuse anyone but a portal admin. Assigning also checks with
 // Google that the group is one the portal may manage, so a gcp-* group never
 // gets a manager row, even though every write re-checks anyway.
@@ -147,9 +154,17 @@ export async function assignGroupManager(
   userId: string
 ): Promise<ManagerResult> {
   const id = parseGroupId(groupId)
-  if (!id) return { ok: false, error: NOT_MANAGED }
+  if (!id)
+    return malformed(await currentUserId(), "group id", {
+      ok: false,
+      error: NOT_MANAGED,
+    })
   const member = parseUserId(userId)
-  if (!member) return { ok: false, error: INVALID_INPUT }
+  if (!member)
+    return malformed(await currentUserId(), "user id", {
+      ok: false,
+      error: INVALID_INPUT,
+    })
   try {
     const api = groupsApiFromEnv()
     if (!api) return { ok: false, error: "Google 群組整合尚未設定" }
@@ -179,8 +194,17 @@ export async function unassignGroupManager(
   userId: string
 ): Promise<ManagerResult> {
   const id = parseGroupId(groupId)
+  if (!id)
+    return malformed(await currentUserId(), "group id", {
+      ok: false,
+      error: INVALID_INPUT,
+    })
   const member = parseUserId(userId)
-  if (!id || !member) return { ok: false, error: INVALID_INPUT }
+  if (!member)
+    return malformed(await currentUserId(), "user id", {
+      ok: false,
+      error: INVALID_INPUT,
+    })
   try {
     const supabase = await createClient()
     const { error } = await supabase.rpc("groups_unassign_manager", {

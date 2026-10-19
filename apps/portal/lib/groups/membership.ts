@@ -80,7 +80,7 @@ function parseAddress(value: unknown): string | null {
 
 // A malformed request is not audited (it could carry anything), but a forged
 // one should still leave a trace: who, and which check it failed.
-function malformed<T>(userId: string, check: string, result: T): T {
+export function malformed<T>(userId: string, check: string, result: T): T {
   console.warn("[groups] malformed request", { userId, check })
   return result
 }
@@ -161,7 +161,7 @@ export async function readGroup(
   groupIdInput: unknown
 ): Promise<GroupsResult<{ group: ManagedGroup; members: GroupMember[] }>> {
   const groupId = parseGroupId(groupIdInput)
-  if (!groupId) return notManaged()
+  if (!groupId) return malformed(access.userId, "group id", notManaged())
   try {
     const auth = await authorize(access, groupId)
     if (!auth.ok) return auth.result

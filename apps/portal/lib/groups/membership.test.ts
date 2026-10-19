@@ -291,11 +291,13 @@ describe("removeFromGroup", () => {
   })
 
   test("forged input is refused without Google or audit", async () => {
-    for (const [groupId, email] of [
+    const forged: [unknown, unknown][] = [
       ["aaa", {}],
       ["aaa", "\u0000"],
       [123, "x@gmail.com"],
-    ] as [unknown, unknown][]) {
+    ]
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    for (const [groupId, email] of forged) {
       const h = harness()
       expect((await removeFromGroup(h.deps, groupId, email)).status).not.toBe(
         "ok"
@@ -304,6 +306,10 @@ describe("removeFromGroup", () => {
       expect(h.calls).toEqual([])
       expect(h.audits).toEqual([])
     }
+    expect(warn).toHaveBeenCalledTimes(forged.length)
+    for (const args of warn.mock.calls)
+      expect(JSON.stringify(args)).not.toContain("gmail.com")
+    warn.mockRestore()
   })
 
   test("a 403 is reported as a permission problem, and audited", async () => {
@@ -321,6 +327,27 @@ describe("removeFromGroup", () => {
 })
 
 describe("readGroup", () => {
+  test("a forged group id is refused without Google, and leaves a trace", async () => {
+    const forged: unknown[] = [123, "a-b", "x".repeat(65)]
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    for (const groupId of forged) {
+      const h = harness()
+      expect(await readGroup(h.deps, groupId)).toMatchObject({
+        status: "forbidden",
+        reason: "not_managed",
+      })
+      expect(h.managerChecks()).toBe(0)
+      expect(h.calls).toEqual([])
+    }
+    expect(warn).toHaveBeenCalledTimes(forged.length)
+    for (const args of warn.mock.calls) {
+      expect(args[1]).toMatchObject({ check: "group id" })
+      expect(JSON.stringify(args)).not.toContain("a-b")
+      expect(JSON.stringify(args)).not.toContain("xxxx")
+    }
+    warn.mockRestore()
+  })
+
   test("a non-manager never reaches Google", async () => {
     const h = harness({ manager: false })
     expect(await readGroup(h.deps, "aaa")).toMatchObject({
