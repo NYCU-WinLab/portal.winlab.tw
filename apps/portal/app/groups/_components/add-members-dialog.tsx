@@ -99,8 +99,18 @@ export function AddMembersDialog({
 
   async function submit() {
     setBusy(true)
-    const res = await addGroupMembers(groupId, plan.toAdd)
-    setBusy(false)
+    let res: Awaited<ReturnType<typeof addGroupMembers>>
+    try {
+      res = await addGroupMembers(groupId, plan.toAdd)
+    } catch (err) {
+      console.error("[groups] addGroupMembers failed", err)
+      // The batch may have reached Google before the connection dropped.
+      // Re-read shortly so whatever landed shows up.
+      onFailed()
+      return toast.error("連線中斷，請稍後確認結果")
+    } finally {
+      setBusy(false)
+    }
     if (res.status !== "ok") {
       // A permission or credential failure stops the batch part-way and
       // comes back without per-address results. Re-read Google shortly, so

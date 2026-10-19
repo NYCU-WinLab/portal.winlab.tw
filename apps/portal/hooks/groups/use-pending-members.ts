@@ -57,9 +57,14 @@ export function usePendingMembers(members: GroupMember[]): {
     latest.current = pending
   }, [pending])
 
-  // A refresh that fires after the page is left only re-renders whatever
-  // route is current, so it is not cleaned up on unmount.
+  // One timer at a time; leaving the page cancels it, so no refresh lands on whatever route comes next.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
   function schedule(attempt: number, force = false) {
     if (timer.current) clearTimeout(timer.current)
     const delay = REFRESH_DELAYS_MS[attempt]

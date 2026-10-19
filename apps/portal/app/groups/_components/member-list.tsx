@@ -36,11 +36,13 @@ export function MemberList({
   members,
   people,
   onRemoved,
+  onFailed,
 }: {
   groupId: string
   members: ShownMember[]
   people: Person[]
   onRemoved: (email: string) => void
+  onFailed: () => void
 }) {
   const [target, setTarget] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -48,9 +50,18 @@ export function MemberList({
 
   async function remove(email: string) {
     setBusy(true)
-    const res = await removeGroupMember(groupId, email)
-    setBusy(false)
-    setTarget(null)
+    let res: Awaited<ReturnType<typeof removeGroupMember>>
+    try {
+      res = await removeGroupMember(groupId, email)
+    } catch (err) {
+      console.error("[groups] removeGroupMember failed", err)
+      // The removal may have reached Google; re-read shortly.
+      onFailed()
+      return toast.error("連線中斷，請稍後確認結果")
+    } finally {
+      setBusy(false)
+      setTarget(null)
+    }
     if (res.status !== "ok")
       return toast.error(
         res.status === "unconfigured" ? "Google 群組整合尚未設定" : res.detail

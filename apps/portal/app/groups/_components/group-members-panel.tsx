@@ -52,6 +52,7 @@ export function GroupMembersPanel({
         members={shown}
         people={people}
         onRemoved={markRemoved}
+        onFailed={refreshSoon}
       />
     </section>
   )
