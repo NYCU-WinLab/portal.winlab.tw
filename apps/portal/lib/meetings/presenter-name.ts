@@ -24,3 +24,38 @@ export function presenterName(
 ): string | null {
   return profile?.name?.trim() ? profile.name : snapshot
 }
+
+export interface PresenterRow {
+  presenter: string | null
+  presenter_user_id: string | null
+  presenter_profile: PresenterProfile | null
+}
+
+/**
+ * Upcoming weeks' presenters, first appearance only, for
+ * `/api/meetings/schedule`'s `presenter_order`. A member is one entry however
+ * many weeks they hold, so identity is the user id: two members who share a
+ * name stay two entries. A speaker week carries no id (CHECK), so it is known
+ * by name only, and a name already listed (or listed later by a member) is
+ * the same person.
+ */
+export function presenterOrder(rows: PresenterRow[]): string[] {
+  const seenIds = new Set<string>()
+  const idlessNames = new Set<string>()
+  const listed = new Set<string>()
+  const order: string[] = []
+  for (const row of rows) {
+    const name = presenterName(row.presenter, row.presenter_profile)
+    if (!name) continue
+    if (row.presenter_user_id) {
+      if (seenIds.has(row.presenter_user_id) || idlessNames.has(name)) continue
+      seenIds.add(row.presenter_user_id)
+    } else {
+      if (listed.has(name)) continue
+      idlessNames.add(name)
+    }
+    listed.add(name)
+    order.push(name)
+  }
+  return order
+}
