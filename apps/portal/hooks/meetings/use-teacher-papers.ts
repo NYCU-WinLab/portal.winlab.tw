@@ -6,6 +6,11 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import type { PaperAssignment } from "@/lib/meetings/papers"
 import {
+  PRESENTER_PROFILE,
+  presenterName,
+  type PresenterProfile,
+} from "@/lib/meetings/presenter-name"
+import {
   toTag,
   toTeacherPaper,
   type DbTag,
@@ -31,22 +36,23 @@ export function usePaperAssignments() {
       const { data, error } = await supabase
         .from("meetings")
         .select(
-          "id, scheduled_date, presenter, presenter_user_id, teacher_paper_id"
+          `id, scheduled_date, presenter, presenter_user_id, teacher_paper_id, ${PRESENTER_PROFILE}`
         )
         .not("teacher_paper_id", "is", null)
       if (error) throw new Error(error.message || "讀取 paper 認領狀態失敗")
       return (
-        data as {
+        data as unknown as {
           id: string
           scheduled_date: string
           presenter: string | null
           presenter_user_id: string | null
           teacher_paper_id: string
+          presenter_profile: PresenterProfile | null
         }[]
       ).map((r) => ({
         meetingId: r.id,
         scheduledDate: r.scheduled_date,
-        presenter: r.presenter,
+        presenter: presenterName(r.presenter, r.presenter_profile),
         presenterUserId: r.presenter_user_id,
         teacherPaperId: r.teacher_paper_id,
       }))

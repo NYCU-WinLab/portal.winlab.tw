@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/lib/supabase/server"
+import {
+  PRESENTER_PROFILE,
+  presenterName,
+  type PresenterProfile,
+} from "@/lib/meetings/presenter-name"
 import type { DbMeeting } from "@/lib/meetings/types"
 
 function createServiceClient() {
@@ -71,15 +76,19 @@ export async function GET(request: NextRequest) {
   ] = await Promise.all([
     supabase
       .from("meetings")
-      .select("*")
+      .select(`*, ${PRESENTER_PROFILE}`)
       .eq("scheduled_date", date)
       .maybeSingle(),
     supabase
       .from("meetings")
-      .select("presenter, scheduled_date")
+      .select(
+        `presenter, presenter_user_id, scheduled_date, ${PRESENTER_PROFILE}`
+      )
       .gt("scheduled_date", date)
       .eq("is_holiday", false)
-      .not("presenter", "is", null)
+      // A linked member can carry a null copy; their name comes from the
+      // profile, so either side having one is enough.
+      .or("presenter.not.is.null,presenter_user_id.not.is.null")
       .order("scheduled_date", { ascending: true })
       .limit(12),
     // Everyone currently in the rotation: on the roster, not switched off, and
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const m = meetingData as DbMeeting
+  const m = meetingData as unknown as DbMeeting
 
   if (m.is_holiday) {
     return NextResponse.json(
@@ -149,17 +158,22 @@ export async function GET(request: NextRequest) {
       ? null
       : { number: null, members: questioners.map((q) => q.name ?? "") }
 
-  // Deduplicate presenter_order (keep first occurrence per name)
-  const upcoming = (upcomingData ?? []) as Array<{
+  // Deduplicate presenter_order (keep first occurrence per member; an outside
+  // speaker has no id, so their name stands in for one)
+  const upcoming = (upcomingData ?? []) as unknown as Array<{
     presenter: string | null
+    presenter_user_id: string | null
     scheduled_date: string
+    presenter_profile: PresenterProfile | null
   }>
   const seen = new Set<string>()
   const presenterOrder: string[] = []
   for (const row of upcoming) {
-    if (row.presenter && !seen.has(row.presenter)) {
-      seen.add(row.presenter)
-      presenterOrder.push(row.presenter)
+    const name = presenterName(row.presenter, row.presenter_profile)
+    const key = row.presenter_user_id ?? name
+    if (name && key && !seen.has(key)) {
+      seen.add(key)
+      presenterOrder.push(name)
     }
   }
 
@@ -172,7 +186,7 @@ export async function GET(request: NextRequest) {
     {
       date: m.scheduled_date,
       week: m.week_label,
-      presenter: m.presenter,
+      presenter: presenterName(m.presenter, m.presenter_profile),
       presenter_email: presenterEmail,
       paper: m.paper_title,
       location: m.location,
