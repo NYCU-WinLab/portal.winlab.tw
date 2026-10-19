@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 
 import { getGroupMembers } from "../actions"
 import { GroupMembersPanel } from "../_components/group-members-panel"
+import { ManagerEditor } from "../_components/manager-editor"
 import { RecentChanges } from "../_components/recent-changes"
 
 export const dynamic = "force-dynamic"
@@ -40,16 +41,19 @@ export default async function GroupPage({
     )
 
   const supabase = await createClient()
-  const [profiles, cohorts, audit] = await Promise.all([
-    supabase.from("user_profiles").select("id, name, email, lab_status"),
-    fetchCohorts(),
-    supabase
-      .from("group_membership_audit")
-      .select("id, actor_id, member_email, action, outcome, created_at")
-      .eq("group_id", id)
-      .order("created_at", { ascending: false })
-      .limit(20),
-  ])
+  const [profiles, cohorts, audit, { data: isAdmin }, managers] =
+    await Promise.all([
+      supabase.from("user_profiles").select("id, name, email, lab_status"),
+      fetchCohorts(),
+      supabase
+        .from("group_membership_audit")
+        .select("id, actor_id, member_email, action, outcome, created_at")
+        .eq("group_id", id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase.rpc("is_portal_admin"),
+      supabase.from("group_managers").select("user_id").eq("group_id", id),
+    ])
 
   const people = (profiles.data ?? [])
     .filter((p) => p.email)
@@ -75,6 +79,13 @@ export default async function GroupPage({
         people={people}
         cohorts={cohorts}
       />
+      {isAdmin === true && (
+        <ManagerEditor
+          groupId={group.id}
+          managerIds={(managers.data ?? []).map((m) => m.user_id)}
+          people={people}
+        />
+      )}
       <RecentChanges rows={audit.data ?? []} people={people} />
     </div>
   )

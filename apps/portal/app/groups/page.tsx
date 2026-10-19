@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/server"
+
 import { listMyGroups } from "./actions"
 import { GroupList } from "./_components/group-list"
 
@@ -19,5 +21,17 @@ export default async function GroupsPage() {
       </p>
     )
 
-  return <GroupList groups={result.data} />
+  const supabase = await createClient()
+  const { data: isAdmin } = await supabase.rpc("is_portal_admin")
+  let managerCounts: Record<string, number> | undefined
+  if (isAdmin === true) {
+    const { data: rows } = await supabase
+      .from("group_managers")
+      .select("group_id")
+    managerCounts = {}
+    for (const r of rows ?? [])
+      managerCounts[r.group_id] = (managerCounts[r.group_id] ?? 0) + 1
+  }
+
+  return <GroupList groups={result.data} managerCounts={managerCounts} />
 }
