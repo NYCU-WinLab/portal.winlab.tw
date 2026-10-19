@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 
 import {
-  PRESENTER_PROFILE,
   presenterName,
   presenterOrder,
   type PresenterRow,
@@ -29,33 +26,6 @@ describe("presenterName", () => {
 
   it("is null when neither side has a name", () => {
     expect(presenterName(null, null)).toBeNull()
-  })
-})
-
-describe("PRESENTER_PROFILE", () => {
-  // A typo or a renamed constraint makes PostgREST reject the whole select,
-  // and nothing in bun test talks to PostgREST, so tie the name to the schema.
-  it("embeds through a foreign key the migrations still define", () => {
-    const fk = /!(\w+)\(/.exec(PRESENTER_PROFILE)?.[1]
-    expect(fk).toBe("meetings_presenter_user_id_fkey")
-
-    const dir = join(
-      import.meta.dir,
-      "../../../../packages/db/supabase/migrations"
-    )
-    const sql = readdirSync(dir)
-      .filter((file) => file.endsWith(".sql"))
-      .map((file) => readFileSync(join(dir, file), "utf8"))
-      .join("\n")
-    expect(sql).toMatch(
-      new RegExp(
-        `add constraint "?${fk}"? foreign key \\("?presenter_user_id"?\\) references (public\\.)?"?user_profiles`,
-        "i"
-      )
-    )
-    expect(sql).not.toMatch(
-      new RegExp(`drop constraint (if exists )?"?${fk}`, "i")
-    )
   })
 })
 
@@ -109,6 +79,14 @@ describe("presenterOrder", () => {
       presenterOrder([speaker, row("Blair", "u2", "Blair"), member])
     ).toEqual(["Alex", "Blair", "Alex"])
     expect(presenterOrder([member, speaker])).toEqual(["Alex", "Alex"])
+  })
+
+  it("keeps a speaker apart from a member whose id reads the same", () => {
+    // Ids and names share one set of keys, so each carries its kind.
+    const member = row("Alex", "u1", "Alex")
+    const speaker = row("u1", null)
+    expect(presenterOrder([member, speaker])).toEqual(["Alex", "u1"])
+    expect(presenterOrder([speaker, member])).toEqual(["u1", "Alex"])
   })
 
   it("skips a row with no name on either side", () => {

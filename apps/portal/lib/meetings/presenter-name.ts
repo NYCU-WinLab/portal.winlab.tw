@@ -6,13 +6,24 @@
 // speaker week's presenter_user_id is null by CHECK) or a member whose
 // profile was deleted under ON DELETE SET NULL.
 
+import type { Database } from "@/lib/supabase/database.types"
+
+type MeetingRelation =
+  Database["public"]["Tables"]["meetings"]["Relationships"][number]
+
+// Checked against the generated schema: a renamed or dropped constraint is a
+// typecheck failure here, not a PostgREST error on every schedule read.
+const PRESENTER_FK = "meetings_presenter_user_id_fkey" satisfies Extract<
+  MeetingRelation,
+  { columns: ["presenter_user_id"]; referencedRelation: "user_profiles" }
+>["foreignKeyName"]
+
 /**
  * PostgREST embed for the presenter's profile name, to add to a `meetings`
  * select. The foreign key is named so the embed can never resolve through
  * another relation between the two tables.
  */
-export const PRESENTER_PROFILE =
-  "presenter_profile:user_profiles!meetings_presenter_user_id_fkey(name)"
+export const PRESENTER_PROFILE = `presenter_profile:user_profiles!${PRESENTER_FK}(name)`
 
 export interface PresenterProfile {
   name: string | null
