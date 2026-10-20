@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { fetchTrips } from "@/lib/trip/fetch"
+import { createTrip, setTripStatus, updateTrip } from "@/lib/trip/mutate"
 import { createClient } from "@/lib/supabase/client"
 import type { Trip, TripStatus } from "@/lib/trip/types"
 
@@ -40,18 +41,8 @@ export function useCreateTrip() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { name: string; description?: string }) => {
-      const { data, error } = await supabase
-        .from("trips")
-        .insert({
-          name: params.name,
-          description: params.description ?? null,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data as Trip
-    },
+    mutationFn: (params: { name: string; description?: string }) =>
+      createTrip(supabase, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.trips.all })
     },
@@ -63,23 +54,11 @@ export function useUpdateTrip() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: {
+    mutationFn: (params: {
       id: string
       name: string
       description?: string | null
-    }) => {
-      const { data, error } = await supabase
-        .from("trips")
-        .update({
-          name: params.name,
-          description: params.description ?? null,
-        })
-        .eq("id", params.id)
-        .select()
-        .single()
-      if (error) throw error
-      return data as Trip
-    },
+    }) => updateTrip(supabase, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.trips.all })
     },
@@ -91,20 +70,8 @@ export function useSetTripStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { id: string; status: TripStatus }) => {
-      const { data, error } = await supabase
-        .from("trips")
-        .update({
-          status: params.status,
-          closed_at:
-            params.status === "closed" ? new Date().toISOString() : null,
-        })
-        .eq("id", params.id)
-        .select()
-        .single()
-      if (error) throw error
-      return data as Trip
-    },
+    mutationFn: (params: { id: string; status: TripStatus }) =>
+      setTripStatus(supabase, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.trips.all })
     },

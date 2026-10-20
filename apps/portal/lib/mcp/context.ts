@@ -36,6 +36,7 @@ export function requireCaller(ctx: ToolContext): Caller {
 const ADMIN_CHECKS = {
   is_portal_admin: "portal admins",
   is_reimburse_admin: "reimburse admins",
+  is_trip_admin: "trip admins",
 } as const
 
 export type AdminCheck = keyof typeof ADMIN_CHECKS
