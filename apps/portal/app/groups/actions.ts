@@ -15,6 +15,7 @@ import { after } from "next/server"
 
 import { recordMembershipChanges } from "@/lib/groups/audit"
 import { visibleGroups } from "@/lib/groups/authorize"
+import { orNullAfter } from "@/lib/groups/bound"
 import { failure, UNEXPECTED_MESSAGE } from "@/lib/groups/failure"
 import { getGroup, listDomainGroups } from "@/lib/groups/google"
 import { groupsApiFromEnv } from "@/lib/groups/google-auth"
@@ -39,7 +40,11 @@ import type {
   MemberChangeResult,
 } from "@/lib/groups/types"
 import { createClient } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/user"
+import { getCurrentUser as unboundedCurrentUser } from "@/lib/user"
+
+// The user lookup has no deadline of its own; a stall reads as "not signed in",
+// which refuses (sent: false) and never grants.
+const getCurrentUser = () => orNullAfter(unboundedCurrentUser())
 
 type Context =
   | { ok: true; deps: MembershipDeps }

@@ -1,3 +1,4 @@
+import { READ_BOUND_MS } from "@/lib/groups/bound"
 import { createClient } from "@/lib/supabase/server"
 
 import { listMyGroups } from "./actions"
@@ -25,8 +26,11 @@ export default async function GroupsPage() {
     )
 
   const supabase = await createClient()
-  const { data: isAdmin, error: adminError } =
-    await supabase.rpc("is_portal_admin")
+  // Bounded: an aborted read is an error below, not "not an admin".
+  const signal = AbortSignal.timeout(READ_BOUND_MS)
+  const { data: isAdmin, error: adminError } = await supabase
+    .rpc("is_portal_admin")
+    .abortSignal(signal)
   if (adminError) console.error("[groups] is_portal_admin failed", adminError)
   let managerCounts: Record<string, number> | undefined
   let managersFailed = false
@@ -34,6 +38,7 @@ export default async function GroupsPage() {
     const { data: rows, error } = await supabase
       .from("group_managers")
       .select("group_id")
+      .abortSignal(signal)
     if (error) {
       // Not "nobody is assigned": leave the counts out rather than show 未指派.
       console.error("[groups] group_managers read failed", error)

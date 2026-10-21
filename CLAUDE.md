@@ -317,9 +317,10 @@ Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
 where the api is built in `groupsApiFromEnv`, the group listing included; both
 `/groups` pages set `maxDuration = 300`). A write needs `MIN_WRITE_BUDGET_MS`
 (3 s) of it left to start, checked again after the token arrives, rather than
-begin and be reported as unknown. The `is_group_manager()` check before it
-counts against the same deadline (aborted when it runs out, nothing sent);
-the `is_portal_admin` checks get 10 s. The Keycloak cohort lookup has its
+begin and be reported as unknown. The `is_group_manager()` check before any
+Google call (page reads too) counts against the same deadline (aborted when it
+runs out, nothing sent); a 10 s bound covers the `is_portal_admin` checks, the
+`group_managers` read, the pages' other reads and the user lookup. The Keycloak cohort lookup has its
 own 8 s one, so a hung upstream ends in a message, not a stuck page.
 
 Accepted residual risk: the token the portal mints is scope-limited to

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { READ_BOUND_MS } from "@/lib/groups/bound"
 import { fetchCohorts } from "@/lib/groups/cohorts"
 import { isValidGroupId } from "@/lib/groups/scope"
 import { createClient } from "@/lib/supabase/server"
@@ -54,9 +55,16 @@ export default async function GroupPage({
     )
 
   const supabase = await createClient()
+  // One bound for every secondary read: an aborted one takes its own error
+  // branch below, so a stalled query never blocks the render or reads as
+  // "not an admin" or "nobody assigned".
+  const signal = AbortSignal.timeout(READ_BOUND_MS)
   const [profiles, cohorts, audit, refusals, adminCheck, managers] =
     await Promise.all([
-      supabase.from("user_profiles").select("id, name, email, lab_status"),
+      supabase
+        .from("user_profiles")
+        .select("id, name, email, lab_status")
+        .abortSignal(signal),
       fetchCohorts(),
       supabase
         .from("group_membership_audit")
@@ -64,7 +72,8 @@ export default async function GroupPage({
         .eq("group_id", id)
         .neq("outcome", "denied")
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(20)
+        .abortSignal(signal),
       // Refusals are collapsed in the list: any member can write them for
       // any group, so they must not push real changes out of the window.
       supabase
@@ -75,9 +84,14 @@ export default async function GroupPage({
         .eq("group_id", id)
         .eq("outcome", "denied")
         .order("created_at", { ascending: false })
-        .limit(10),
-      supabase.rpc("is_portal_admin"),
-      supabase.from("group_managers").select("user_id").eq("group_id", id),
+        .limit(10)
+        .abortSignal(signal),
+      supabase.rpc("is_portal_admin").abortSignal(signal),
+      supabase
+        .from("group_managers")
+        .select("user_id")
+        .eq("group_id", id)
+        .abortSignal(signal),
     ])
 
   // A failed profile read is not "nobody has a profile": without it the
