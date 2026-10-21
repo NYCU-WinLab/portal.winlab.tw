@@ -47,6 +47,8 @@ const google: Reply = (method, path, body) => {
         { id: "m1", email: "x@gmail.com", role: "MEMBER", type: "USER" },
       ],
     })
+  if (method === "GET" && path === "/groups/aaa/members/m1")
+    return json({ id: "m1", email: "x@gmail.com", role: "MEMBER" })
   if (method === "DELETE" && path === "/groups/aaa/members/m1")
     return new Response(null, { status: 204 })
   return undefined
@@ -267,7 +269,147 @@ describe("addToGroup", () => {
   })
 })
 
+describe("addToGroup deadlines", () => {
+  test("a hung call is one error row; the rest still run and are audited", async () => {
+    const h = harness()
+    h.deps.api.timeoutMs = 20
+    const origFetch = h.deps.api.fetch
+    h.deps.api.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const body = typeof init?.body === "string" ? init.body : ""
+      if (body.includes("hang@"))
+        return new Promise((_res, rej) =>
+          init?.signal?.addEventListener("abort", () =>
+            rej(new DOMException("aborted", "AbortError"))
+          )
+        )
+      return origFetch(input, init)
+    }) as typeof fetch
+    const res = await addToGroup(h.deps, "aaa", [
+      "hang@gmail.com",
+      "ok@gmail.com",
+    ])
+    expect(res.status).toBe("ok")
+    if (res.status !== "ok") return
+    expect(res.data.map((r) => r.outcome)).toEqual(["error", "ok"])
+    expect(res.data[0]!.detail).toContain("結果未知")
+    expect(h.audits).toHaveLength(1)
+    expect(h.audits[0]!.map((r) => r.outcome)).toEqual(["error", "ok"])
+  })
+
+  test("past the batch budget no new address starts; what ran is audited", async () => {
+    const h = harness()
+    let t = 0
+    h.deps.api.now = () => t
+    h.deps.batchBudgetMs = 100
+    const origFetch = h.deps.api.fetch
+    h.deps.api.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") t += 60
+      return origFetch(input, init)
+    }) as typeof fetch
+    const res = await addToGroup(h.deps, "aaa", addresses(12))
+    expect(res.status).toBe("error")
+    if (res.status !== "error") return
+    expect(res.detail).toContain("可能已套用")
+    const sent = h.calls.filter((c) => c.startsWith("POST")).length
+    expect(sent).toBeLessThan(12)
+    expect(h.audits).toHaveLength(1)
+    expect(h.audits[0]).toHaveLength(sent)
+  })
+
+  test("a throttled address does not stop the others", async () => {
+    const h = harness({
+      reply: (method, _p, body) =>
+        method === "POST" && body.includes("slow@")
+          ? json(
+              {
+                error: {
+                  message: "limit",
+                  errors: [{ reason: "rateLimitExceeded" }],
+                },
+              },
+              403
+            )
+          : undefined,
+    })
+    h.deps.api.sleep = async () => {}
+    const res = await addToGroup(h.deps, "aaa", [
+      "slow@gmail.com",
+      "ok@gmail.com",
+    ])
+    expect(res.status).toBe("ok")
+    if (res.status !== "ok") return
+    expect(res.data.map((r) => r.outcome)).toEqual(["error", "ok"])
+  })
+})
+
 describe("removeFromGroup", () => {
+  test("authorisation failing part-way is audited once, as error", async () => {
+    const cases = [
+      harness({ manager: new Error("is_group_manager failed: timeout") }),
+      harness({
+        reply: (method, path) =>
+          method === "GET" && path === "/groups/aaa"
+            ? json({}, 503)
+            : undefined,
+      }),
+      harness({
+        token: async () => {
+          throw new GroupsCredentialError("無法取得 Google 權杖")
+        },
+      }),
+    ]
+    for (const h of cases) {
+      const res = await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+      expect(res.status).not.toBe("ok")
+      expect(h.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+      expect(h.audits).toEqual([
+        [
+          expect.objectContaining({
+            group_id: "aaa",
+            group_email: "(unknown)",
+            member_email: "x@gmail.com",
+            action: "remove",
+            outcome: "error",
+          }),
+        ],
+      ])
+    }
+  })
+
+  test("a forged removal of an OWNER is protected, never deleted, audited once", async () => {
+    const h = harness({
+      reply: (method, path) => {
+        if (method === "GET" && path === "/groups/aaa/members")
+          return json({
+            members: [
+              {
+                id: "o1",
+                email: "owner@winlab.tw",
+                role: "OWNER",
+                type: "USER",
+              },
+            ],
+          })
+        return undefined
+      },
+    })
+    const res = await removeFromGroup(h.deps, "aaa", "owner@winlab.tw")
+    expect(res).toEqual({
+      status: "ok",
+      data: { email: "owner@winlab.tw", outcome: "protected" },
+    })
+    expect(h.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+    expect(h.audits).toEqual([
+      [
+        expect.objectContaining({
+          action: "remove",
+          outcome: "protected",
+          member_email: "owner@winlab.tw",
+        }),
+      ],
+    ])
+  })
+
   test("deletes by member id and audits it", async () => {
     const h = harness()
     expect(await removeFromGroup(h.deps, "aaa", "X@gmail.com")).toEqual({

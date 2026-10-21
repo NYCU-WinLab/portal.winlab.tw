@@ -25,16 +25,61 @@ export type GroupsApi = {
   token: () => Promise<string>
   /** The Workspace domain, e.g. "winlab.tw". */
   domain: string
+  /** Per-request deadline in ms. Default CALL_TIMEOUT_MS. */
+  timeoutMs?: number
+  /** Clock and sleep, injectable so tests need no real timers. */
+  now?: () => number
+  sleep?: (ms: number) => Promise<void>
+  /**
+   * Absolute time (per `now`) after which no retry is started. A retry that
+   * would sleep past it is not made; the rate-limit error is returned.
+   */
+  deadline?: number
 }
+
+/** One Directory call gets this long before it is abandoned. */
+export const CALL_TIMEOUT_MS = 15_000
+/** Attempts at a rate-limited call, the first included. */
+const MAX_ATTEMPTS = 3
+const BACKOFF_MS = 1000
+const RATE_LIMIT_REASONS = new Set([
+  "userRateLimitExceeded",
+  "rateLimitExceeded",
+  "quotaExceeded",
+])
 
 /** Google answered with a status this module does not treat as an outcome. */
 export class GoogleGroupsError extends Error {
   constructor(
     readonly status: number,
-    readonly detail?: string
+    readonly detail?: string,
+    /** Google's `error.errors[0].reason`, e.g. "rateLimitExceeded". */
+    readonly reason?: string
   ) {
     super(`google groups failed: ${status}${detail ? ` — ${detail}` : ""}`)
     this.name = "GoogleGroupsError"
+  }
+}
+
+/**
+ * Google's retryable throttling. It answers 403 (or 429) with a rate-limit
+ * reason; that is not a broken credential and must not stop a batch.
+ */
+export function isRateLimited(err: unknown): boolean {
+  return (
+    err instanceof GoogleGroupsError &&
+    (err.status === 429 ||
+      (err.status === 403 &&
+        err.reason !== undefined &&
+        RATE_LIMIT_REASONS.has(err.reason)))
+  )
+}
+
+/** A call got no answer in time: whether Google applied it is unknown. */
+export class GoogleTimeoutError extends Error {
+  constructor() {
+    super("Google 沒有在時限內回應，結果未知（可能已經套用），請重新整理確認")
+    this.name = "GoogleTimeoutError"
   }
 }
 
@@ -55,35 +100,88 @@ type RawMember = {
   status?: string
 }
 
+async function attempt(
+  api: GroupsApi,
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const deadline = AbortSignal.timeout(api.timeoutMs ?? CALL_TIMEOUT_MS)
+  const signal = init?.signal
+    ? AbortSignal.any([init.signal, deadline])
+    : deadline
+  try {
+    return await api.fetch(`${BASE}/${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${await api.token()}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      signal,
+    })
+  } catch (err) {
+    if (deadline.aborted) throw new GoogleTimeoutError()
+    throw err
+  }
+}
+
+/** Google's reason for an error reply, read from a copy of the response. */
+async function reasonOf(res: Response): Promise<string | undefined> {
+  try {
+    const parsed = (await res.clone().json()) as {
+      error?: { errors?: { reason?: string }[] }
+    }
+    return parsed.error?.errors?.[0]?.reason
+  } catch {
+    return undefined
+  }
+}
+
+// Throttled calls (403/429 with a rate-limit reason) are retried with
+// backoff and jitter, never past api.deadline. GET and DELETE are plain
+// idempotent; a repeated member POST answers 409, which addMember reads as
+// "already". Once attempts run out the throttled reply is returned for the
+// caller's fail() like any other.
 async function call(
   api: GroupsApi,
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  return api.fetch(`${BASE}/${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${await api.token()}`,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-  })
+  const now = api.now ?? Date.now
+  const sleep =
+    api.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  for (let n = 1; ; n++) {
+    const res = await attempt(api, path, init)
+    if (res.status !== 403 && res.status !== 429) return res
+    const reason = await reasonOf(res)
+    const limited =
+      res.status === 429 ||
+      (reason !== undefined && RATE_LIMIT_REASONS.has(reason))
+    if (!limited || n >= MAX_ATTEMPTS) return res
+    const wait = BACKOFF_MS * 2 ** (n - 1) * (0.5 + Math.random() / 2)
+    if (api.deadline !== undefined && now() + wait >= api.deadline) return res
+    await sleep(wait)
+  }
 }
 
 async function fail(res: Response): Promise<never> {
   let detail: string | undefined
+  let reason: string | undefined
   try {
     const text = await res.text()
     try {
-      const parsed = JSON.parse(text) as { error?: { message?: string } }
+      const parsed = JSON.parse(text) as {
+        error?: { message?: string; errors?: { reason?: string }[] }
+      }
       detail = parsed.error?.message || text.slice(0, 500) || undefined
+      reason = parsed.error?.errors?.[0]?.reason
     } catch {
       detail = text.slice(0, 500) || undefined
     }
   } catch {
     detail = undefined
   }
-  throw new GoogleGroupsError(res.status, detail)
+  throw new GoogleGroupsError(res.status, detail, reason)
 }
 
 function toGroup(g: RawGroup): ManagedGroup | null {
@@ -211,11 +309,18 @@ export async function removeMember(
       "Google did not return this member's id, so it can't be removed"
     )
 
-  const res = await call(
-    api,
-    `${groupPath(groupId)}/members/${encodeURIComponent(member.id)}`,
-    { method: "DELETE" }
-  )
+  // The list can be stale, and a promotion can land after it. Re-read this
+  // one member by id (never by email, see the header) right before DELETE.
+  // Residual: a promotion in the milliseconds between this read and the
+  // DELETE is still possible; Google offers no precondition on a delete.
+  const memberPath = `${groupPath(groupId)}/members/${encodeURIComponent(member.id)}`
+  const fresh = await call(api, memberPath)
+  if (fresh.status === 404) return "not_found"
+  if (!fresh.ok) await fail(fresh)
+  const current = (await fresh.json().catch(() => null)) as RawMember | null
+  if (!isPlainMember(current?.role ?? "")) return "protected"
+
+  const res = await call(api, memberPath, { method: "DELETE" })
   if (res.status === 404) return "not_found"
   if (!res.ok) await fail(res)
   return "ok"

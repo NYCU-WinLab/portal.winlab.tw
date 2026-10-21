@@ -5,7 +5,11 @@
 // at all. Those stop a batch and are shown as such, never as an empty list
 // or as N separate per-address errors.
 
-import { GoogleGroupsError, GroupsCredentialError } from "@/lib/groups/google"
+import {
+  GoogleGroupsError,
+  GroupsCredentialError,
+  isRateLimited,
+} from "@/lib/groups/google"
 import type { GroupsResult } from "@/lib/groups/types"
 
 export const PERMISSION_MESSAGE =
@@ -15,11 +19,15 @@ export function isFatal(err: unknown): boolean {
   return (
     err instanceof GroupsCredentialError ||
     (err instanceof GoogleGroupsError &&
-      (err.status === 401 || err.status === 403))
+      (err.status === 401 || err.status === 403) &&
+      !isRateLimited(err))
   )
 }
 
+export const RATE_LIMIT_MESSAGE = "Google 暫時限流，請稍後再試"
+
 export function describeError(err: unknown): string {
+  if (isRateLimited(err)) return RATE_LIMIT_MESSAGE
   if (err instanceof GoogleGroupsError)
     return `Google ${err.status}${err.detail ? `：${err.detail}` : ""}`
   return err instanceof Error ? err.message : "unknown"
@@ -28,10 +36,7 @@ export function describeError(err: unknown): string {
 export function failure(err: unknown): GroupsResult<never> {
   if (err instanceof GroupsCredentialError)
     return { status: "error", detail: err.message }
-  if (
-    err instanceof GoogleGroupsError &&
-    (err.status === 401 || err.status === 403)
-  )
+  if (isFatal(err))
     return {
       status: "forbidden",
       reason: "google_permission",

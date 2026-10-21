@@ -38,6 +38,8 @@ import type {
 export const MAX_BATCH = 200
 // Small on purpose: Directory API quotas are per project.
 const CONCURRENCY = 4
+/** No new address is started this long after an add began. */
+export const BATCH_BUDGET_MS = 60_000
 
 export const DENIED = "你不是這個群組的管理者"
 export const NOT_MANAGED = "這個群組不存在，或不開放給 portal 管理"
@@ -54,6 +56,8 @@ export type GroupAccess = {
 export type MembershipDeps = GroupAccess & {
   /** Gets each request's audit rows once. Must not throw. */
   audit: (rows: AuditInsert[]) => void
+  /** Overrides BATCH_BUDGET_MS (tests). */
+  batchBudgetMs?: number
 }
 
 const notManaged = (): GroupsResult<never> => ({
@@ -209,6 +213,9 @@ export async function addToGroup(
       return auth.result
     }
     const group = auth.group
+    const now = deps.api.now ?? Date.now
+    const deadline = now() + (deps.batchBudgetMs ?? BATCH_BUDGET_MS)
+    const api: GroupsApi = { ...deps.api, deadline }
     // A credential or permission failure is the same for every address:
     // stop sending the rest and report it once.
     const abort: { cause: unknown } = { cause: null }
@@ -218,7 +225,7 @@ export async function addToGroup(
       async (email): Promise<MemberChangeResult> => {
         // All of it inside the try: mapLimited must never reject (batch.ts).
         try {
-          const added = await addMember(deps.api, group.id, email)
+          const added = await addMember(api, group.id, email)
           return added.email === email
             ? { email, outcome: added.outcome }
             : { email, outcome: added.outcome, listedAs: added.email }
@@ -227,13 +234,21 @@ export async function addToGroup(
           return { email, outcome: "error", detail: describeError(err) }
         }
       },
-      () => abort.cause !== null
+      () => abort.cause !== null || now() >= deadline
     )
     for (const r of results)
       rows.push(buildAuditRow(deps.userId, group, "add", r))
     if (abort.cause !== null) {
       console.error("[groups] add stopped", abort.cause)
       return failure(abort.cause)
+    }
+    if (results.length < emails.length) {
+      // Out of time: the rest were never sent. What did run is audited.
+      console.error("[groups] add stopped at the batch deadline")
+      return {
+        status: "error",
+        detail: `處理太久，已停止：${emails.length} 個地址中只送出 ${results.length} 個，其餘沒有送出。已送出的結果可能已套用，請重新整理確認後再試。`,
+      }
     }
     return { status: "ok", data: results }
   } catch (err) {

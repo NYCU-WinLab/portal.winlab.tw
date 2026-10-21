@@ -4,11 +4,14 @@ import {
   addMember,
   getGroup,
   GoogleGroupsError,
+  GoogleTimeoutError,
   listDomainGroups,
   listMembers,
   removeMember,
+  isRateLimited,
   type GroupsApi,
 } from "@/lib/groups/google"
+import { failure, isFatal, RATE_LIMIT_MESSAGE } from "@/lib/groups/failure"
 
 type Route = (url: URL, init?: RequestInit) => Response | undefined
 
@@ -273,9 +276,21 @@ describe("addMember", () => {
 describe("removeMember", () => {
   const deleted: Route = (u, init) =>
     init?.method === "DELETE" ? new Response(null, { status: 204 }) : undefined
+  // The by-id re-read made right before DELETE; roles as the lists above say.
+  const roles: Record<string, string> = {
+    "100": "MEMBER",
+    "200": "OWNER",
+    "201": "MANAGER",
+    "202": "MEMBER",
+  }
+  const byId: Route = (u, init) => {
+    const m = u.pathname.match(/\/groups\/aaa\/members\/(\w+)$/)
+    if (!m || !isGet(init)) return undefined
+    return json({ id: m[1], role: roles[m[1]!] })
+  }
 
   test("finds the member on any page and deletes by member id", async () => {
-    const api = fakeApi([membersOfAaa, deleted])
+    const api = fakeApi([membersOfAaa, byId, deleted])
     expect(await removeMember(api, "aaa", " LATE@gmail.com ")).toBe("ok")
     expect(api.calls.filter((c) => c.startsWith("DELETE"))).toEqual([
       `DELETE ${DIR}/groups/aaa/members/202`,
@@ -283,7 +298,7 @@ describe("removeMember", () => {
   })
 
   test("never addresses a single member by email", async () => {
-    const api = fakeApi([membersOfAaa, deleted])
+    const api = fakeApi([membersOfAaa, byId, deleted])
     await removeMember(api, "aaa", "x@gmail.com")
     expect(api.calls.some((c) => c.includes("@") || c.includes("%40"))).toBe(
       false
@@ -293,14 +308,14 @@ describe("removeMember", () => {
 
   test("refuses an OWNER or MANAGER and never sends DELETE", async () => {
     for (const email of ["owner@winlab.tw", "MGR@winlab.tw"]) {
-      const api = fakeApi([membersOfAaa, deleted])
+      const api = fakeApi([membersOfAaa, byId, deleted])
       expect(await removeMember(api, "aaa", email)).toBe("protected")
       expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
     }
   })
 
   test("someone not in the list is not_found, without a DELETE", async () => {
-    const api = fakeApi([membersOfAaa, deleted])
+    const api = fakeApi([membersOfAaa, byId, deleted])
     expect(await removeMember(api, "aaa", "nobody@gmail.com")).toBe("not_found")
     expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
   })
@@ -308,6 +323,7 @@ describe("removeMember", () => {
   test("a DELETE that finds nothing is not_found", async () => {
     const api = fakeApi([
       membersOfAaa,
+      byId,
       (u, init) =>
         init?.method === "DELETE"
           ? json(
@@ -338,10 +354,128 @@ describe("removeMember", () => {
   test("a 403 on DELETE throws", async () => {
     const api = fakeApi([
       membersOfAaa,
+      byId,
       (u, init) => (init?.method === "DELETE" ? notAuthorized() : undefined),
     ])
     const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
     expect(err).toBeInstanceOf(GoogleGroupsError)
     expect((err as GoogleGroupsError).status).toBe(403)
+  })
+
+  test("a promotion after the list is caught by the by-id re-read", async () => {
+    const api = fakeApi([
+      membersOfAaa,
+      (u, init) =>
+        isGet(init) && u.pathname.endsWith("/members/100")
+          ? json({ id: "100", role: "OWNER" })
+          : undefined,
+      deleted,
+    ])
+    expect(await removeMember(api, "aaa", "x@gmail.com")).toBe("protected")
+    expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("the member vanishing before the re-read is not_found", async () => {
+    const api = fakeApi([
+      membersOfAaa,
+      (u, init) =>
+        isGet(init) && u.pathname.endsWith("/members/100")
+          ? json({ error: { message: "Resource Not Found" } }, 404)
+          : undefined,
+      deleted,
+    ])
+    expect(await removeMember(api, "aaa", "x@gmail.com")).toBe("not_found")
+    expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+})
+
+const rateLimited = (reason = "rateLimitExceeded") =>
+  json(
+    {
+      error: {
+        code: 403,
+        message: "Rate Limit Exceeded",
+        errors: [{ reason }],
+      },
+    },
+    403
+  )
+
+describe("throttling and deadlines", () => {
+  const withClock = (api: GroupsApi & { calls: string[] }) => {
+    const sleeps: number[] = []
+    return Object.assign(api, {
+      sleeps,
+      sleep: async (ms: number) => {
+        sleeps.push(ms)
+      },
+    })
+  }
+
+  test("a rate-limit 403 is retried with backoff and then succeeds", async () => {
+    let n = 0
+    const api = withClock(
+      fakeApi([
+        (u, init) => {
+          if (init?.method !== "POST") return undefined
+          return ++n < 3 ? rateLimited("userRateLimitExceeded") : json({})
+        },
+      ])
+    )
+    expect(await addMember(api, "aaa", "x@gmail.com")).toEqual({
+      outcome: "ok",
+      email: "x@gmail.com",
+    })
+    expect(api.calls).toHaveLength(3)
+    expect(api.sleeps).toHaveLength(2)
+    expect(api.sleeps[1]!).toBeGreaterThan(api.sleeps[0]!)
+  })
+
+  test("still limited after the attempts is a non-permission error", async () => {
+    const api = withClock(fakeApi([() => rateLimited("quotaExceeded")]))
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleGroupsError)
+    expect(isRateLimited(err)).toBe(true)
+    expect(isFatal(err)).toBe(false)
+    expect(failure(err)).toEqual({
+      status: "error",
+      detail: RATE_LIMIT_MESSAGE,
+    })
+    expect(api.calls).toHaveLength(3)
+  })
+
+  test("no retry is started past the batch deadline", async () => {
+    const api = withClock(fakeApi([() => rateLimited()]))
+    api.now = () => 1000
+    api.deadline = 1001
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(isRateLimited(err)).toBe(true)
+    expect(api.calls).toHaveLength(1)
+  })
+
+  test("a plain 403 is not retried and stays a permission failure", async () => {
+    const api = withClock(fakeApi([notAuthorized]))
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(api.calls).toHaveLength(1)
+    expect(isFatal(err)).toBe(true)
+    expect(failure(err)).toMatchObject({
+      status: "forbidden",
+      reason: "google_permission",
+    })
+  })
+
+  test("a call that never answers is abandoned, result unknown", async () => {
+    const api = fakeApi([])
+    api.timeoutMs = 20
+    api.fetch = ((_: RequestInfo | URL, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError"))
+        )
+      })) as typeof fetch
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleTimeoutError)
+    expect(isFatal(err)).toBe(false)
+    expect((err as Error).message).toContain("結果未知")
   })
 })
