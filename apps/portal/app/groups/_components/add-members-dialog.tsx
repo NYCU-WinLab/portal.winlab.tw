@@ -169,7 +169,14 @@ export function AddMembersDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      // Closing mid-flight would let a reopen start a second edit session
+      // while the first batch is still being sent.
+      onOpenChange={(next) => {
+        if (!busy) setOpen(next)
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm">加入成員</Button>
       </DialogTrigger>
@@ -178,7 +185,12 @@ export function AddMembersDialog({
           <DialogTitle>加入成員</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 text-sm">
+        {/* Nothing may change while a batch is in flight: input typed after the
+            submit was never sent, and a full success would wipe it. */}
+        <fieldset
+          disabled={busy}
+          className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0 text-sm"
+        >
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground">從實驗室成員挑選</span>
             <Input
@@ -275,7 +287,7 @@ export function AddMembersDialog({
               </p>
             )}
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter>
           {overLimit && (
