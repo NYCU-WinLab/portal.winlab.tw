@@ -97,7 +97,14 @@ select throws_ok($$select public.groups_assign_manager('groups/aaa', '9a9a9a9a-0
 select throws_ok($$select public.groups_assign_manager('', '9a9a9a9a-0000-0000-0000-000000000002')$$,
   '22023', null, 'an empty group id is rejected');
 select ok(public.is_group_manager('zzz'), 'portal admin manages every group id');
-select is((select count(*)::integer from public.group_managers), 1, 'portal admin reads all manager rows');
+-- Give the admin rows of its own, one in the manager's group and one in
+-- another, so "exactly my own row" below can't pass if the read policy were
+-- widened to co-managers or to everyone.
+select lives_ok($$select public.groups_assign_manager('aaa', '9a9a9a9a-0000-0000-0000-000000000001')$$,
+  'portal admin can also be a co-manager of aaa');
+select lives_ok($$select public.groups_assign_manager('ccc', '9a9a9a9a-0000-0000-0000-000000000001')$$,
+  'portal admin can also be a manager of ccc');
+select is((select count(*)::integer from public.group_managers), 3, 'portal admin reads all manager rows');
 reset role;
 
 -- ═══ manager ═══════════════════════════════════════════════════════════════
@@ -106,7 +113,7 @@ select set_config('request.jwt.claims', '{"sub":"9a9a9a9a-0000-0000-0000-0000000
 select ok(public.is_group_manager('aaa'), 'manager manages their group');
 select ok(not public.is_group_manager('bbb'), 'manager does not manage another group');
 select is((select count(*)::integer from public.group_managers), 1,
-  'a manager reads exactly their own manager row');
+  'a manager reads exactly their own manager row, not a co-manager row or another group row');
 select throws_ok($$select public.groups_assign_manager('bbb', '9a9a9a9a-0000-0000-0000-000000000002')$$,
   '42501', null, 'a manager cannot assign themselves elsewhere');
 select throws_ok($$select public.groups_unassign_manager('aaa', '9a9a9a9a-0000-0000-0000-000000000002')$$,
