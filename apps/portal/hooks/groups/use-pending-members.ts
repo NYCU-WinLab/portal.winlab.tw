@@ -7,7 +7,11 @@
 // away — again, backing off, while the two still disagree. An overlay entry
 // drops off once a re-read agrees with it, or when the retries run out:
 // then Google's list is shown as it is. Without that bound, an address
-// Google lists under another spelling would read "同步中" forever.
+// Google lists under another spelling would read "同步中" forever. If the
+// latest read failed when the retries run out, the list on screen is the
+// last good one and proves nothing, so the overlay stays (no more polling)
+// and the first successful read after that settles it. The decisions live
+// in lib/groups/plan.ts.
 
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
@@ -15,7 +19,8 @@ import { useEffect, useRef, useState } from "react"
 import {
   applyPending,
   NO_PENDING,
-  prunePending,
+  onFreshList,
+  onRetriesExhausted,
   withAdded,
   withRemoved,
   type PendingChanges,
@@ -33,7 +38,11 @@ const GIVE_UP_AFTER_MS = 10000
 const settled = (p: PendingChanges) =>
   p.added.length === 0 && p.removed.length === 0
 
-export function usePendingMembers(members: GroupMember[]): {
+export function usePendingMembers(
+  members: GroupMember[],
+  /** The latest read of Google failed; `members` is the last good one. */
+  stale: boolean
+): {
   shown: ShownMember[]
   markAdded: (emails: string[]) => void
   markRemoved: (email: string) => void
@@ -46,6 +55,10 @@ export function usePendingMembers(members: GroupMember[]): {
 } {
   const router = useRouter()
   const [pending, setPending] = useState<PendingChanges>(NO_PENDING)
+  // The retries ran out while the list was stale: the overlay was kept, and
+  // the next good read settles it.
+  const [giveUpDeferred, setGiveUpDeferred] = useState(false)
+  const latestStale = useRef(stale)
 
   // A fresh list from the server (router.refresh) settles whatever it now
   // agrees with. Adjusting state while rendering, React's documented
@@ -53,7 +66,8 @@ export function usePendingMembers(members: GroupMember[]): {
   const [seen, setSeen] = useState(members)
   if (seen !== members) {
     setSeen(members)
-    setPending((p) => prunePending(members, p))
+    if (!stale) setGiveUpDeferred(false)
+    setPending((p) => onFreshList(members, p, { giveUpDeferred, stale }))
   }
 
   // The timers fire long after the render that set them, so they read the
@@ -61,7 +75,8 @@ export function usePendingMembers(members: GroupMember[]): {
   const latest = useRef(pending)
   useEffect(() => {
     latest.current = pending
-  }, [pending])
+    latestStale.current = stale
+  }, [pending, stale])
 
   // One timer at a time; leaving the page cancels it, so no refresh lands on
   // whatever route comes next.
@@ -89,7 +104,9 @@ export function usePendingMembers(members: GroupMember[]): {
       if (forcedReads.current <= 0 && settled(latest.current)) return
       if (delay === undefined) {
         forcedReads.current = 0
-        setPending(NO_PENDING)
+        if (onRetriesExhausted(latestStale.current) === "clear")
+          setPending(NO_PENDING)
+        else setGiveUpDeferred(true)
         return
       }
       if (forcedReads.current > 0) forcedReads.current--

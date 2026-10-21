@@ -56,6 +56,7 @@ export function GroupMembersPanel({
       groupId={groupId}
       data={shownData}
       note={notice.kind === "stale" ? notice.text : null}
+      stale={notice.kind === "stale"}
     />
   )
 }
@@ -64,15 +65,20 @@ function Loaded({
   groupId,
   data,
   note,
+  stale,
 }: {
   groupId: string
   data: PanelData
   note: string | null
+  /** The latest read failed; `data` is the last good one. */
+  stale: boolean
 }) {
   const { group, members, people, cohorts, profilesLoaded } = data
   const domain = group.email.slice(group.email.lastIndexOf("@") + 1)
-  const { shown, markAdded, markRemoved, refreshSoon } =
-    usePendingMembers(members)
+  const { shown, markAdded, markRemoved, refreshSoon } = usePendingMembers(
+    members,
+    stale
+  )
 
   return (
     <section className="flex flex-col gap-2">

@@ -165,3 +165,31 @@ export function prunePending(
     ? p
     : { added, removed }
 }
+
+/**
+ * The re-reads have run out and the overlay is still there. With a good
+ * list on screen Google has had its window, so the overlay goes ("clear").
+ * With the latest read failed, the list is the last good one and says
+ * nothing about the changes since: clearing would make a confirmed removal
+ * reappear and a confirmed add vanish, so the overlay stays ("defer") until
+ * a read succeeds.
+ */
+export function onRetriesExhausted(stale: boolean): "clear" | "defer" {
+  return stale ? "defer" : "clear"
+}
+
+/**
+ * A new list arrived from the server. Normally it settles what it agrees
+ * with. If the give-up was deferred, this is the first good read since: it
+ * has had its window, so whatever it still disagrees with is dropped too
+ * (an address Google lists under another spelling must not read "同步中"
+ * forever). A list that is itself stale settles nothing beyond pruning.
+ */
+export function onFreshList(
+  members: GroupMember[],
+  p: PendingChanges,
+  state: { giveUpDeferred: boolean; stale: boolean }
+): PendingChanges {
+  if (state.giveUpDeferred && !state.stale) return NO_PENDING
+  return prunePending(members, p)
+}

@@ -973,7 +973,7 @@ describe("one deadline for the whole action", () => {
     const h = harness({
       api: { now: () => t, sleep: async () => {} },
       budgetMs: MIN_WRITE_BUDGET_MS + 100,
-      reply: (m, path) => {
+      reply: (m) => {
         if (m !== "POST") return undefined
         t += 200
         return json({ error: { message: "slow" } }, 429)

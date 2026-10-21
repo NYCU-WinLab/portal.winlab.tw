@@ -7,6 +7,8 @@ import {
   externalAddresses,
   isPlainMember,
   NO_PENDING,
+  onFreshList,
+  onRetriesExhausted,
   planAdditions,
   prunePending,
   withAdded,
@@ -149,6 +151,37 @@ describe("pending changes (Google's list is eventually consistent)", () => {
   test("prunePending returns the same object when nothing settled", () => {
     const p = { added: ["slow@x.com"], removed: [] }
     expect(prunePending([member("a@x.com")], p)).toBe(p)
+  })
+})
+
+describe("giving up on the overlay", () => {
+  test("a good list on screen: the overlay is cleared when retries run out", () => {
+    expect(onRetriesExhausted(false)).toBe("clear")
+  })
+
+  test("a stale list on screen: the give-up is deferred, not applied", () => {
+    expect(onRetriesExhausted(true)).toBe("defer")
+  })
+
+  const p = { added: ["slow@x.com", "new@x.com"], removed: ["lag@x.com"] }
+  const list = [member("new@x.com"), member("lag@x.com")]
+
+  test("without a deferral a fresh list only prunes what it agrees with", () => {
+    expect(
+      onFreshList(list, p, { giveUpDeferred: false, stale: false })
+    ).toEqual({ added: ["slow@x.com"], removed: ["lag@x.com"] })
+  })
+
+  test("after a deferral the first good list drops the rest as well", () => {
+    expect(onFreshList(list, p, { giveUpDeferred: true, stale: false })).toBe(
+      NO_PENDING
+    )
+  })
+
+  test("after a deferral a list that is still stale only prunes", () => {
+    expect(onFreshList(list, p, { giveUpDeferred: true, stale: true })).toEqual(
+      { added: ["slow@x.com"], removed: ["lag@x.com"] }
+    )
   })
 })
 
