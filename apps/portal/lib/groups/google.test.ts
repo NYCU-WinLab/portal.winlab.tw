@@ -526,14 +526,24 @@ describe("throttling and deadlines", () => {
     expect(api.calls).toHaveLength(3)
   })
 
-  test("no retry is started past the batch deadline", async () => {
+  test("a throttled POST is not retried once less than the minimum is left", async () => {
     const api = withClock(fakeApi([() => rateLimited()]))
-    // Enough left to start the POST, none by the time it is throttled.
-    let calls = 0
-    api.now = () => (calls++ === 0 ? 1000 : 1000 + MIN_WRITE_BUDGET_MS)
-    api.deadline = 1001 + MIN_WRITE_BUDGET_MS
+    // Enough left to start the POST, less than the minimum by the time it
+    // is throttled: the retry is refused by the write minimum.
+    let t = 1000
+    api.now = () => t
+    api.deadline = 1000 + MIN_WRITE_BUDGET_MS + 100
+    const inner = api.fetch
+    api.fetch = ((i: RequestInfo | URL, init?: RequestInit) => {
+      t += 200
+      return inner(i, init)
+    }) as typeof fetch
     const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
-    expect(isRateLimited(err)).toBe(true)
+    // The backoff gate in call() lets it through (wait is far below the
+    // minimum), so it is attempt()'s minimum that refuses the second POST:
+    // a deadline error, not the throttling one. Reads, which have no
+    // minimum, end as the throttling error instead (the remove test below).
+    expect(err).toBeInstanceOf(GoogleDeadlineError)
     expect(api.calls).toHaveLength(1)
   })
 
@@ -801,6 +811,31 @@ describe("the action deadline bounds every call", () => {
     api.advance(10_000 - (MIN_WRITE_BUDGET_MS + 1000))
     await removeMember(api, "aaa", "x@gmail.com")
     expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(true)
+  })
+
+  test("a slow token that eats the write margin stops the POST before fetch", async () => {
+    const api = clocked([() => json({ id: "m", role: "MEMBER" })])
+    api.deadline = 10_000
+    api.advance(10_000 - (MIN_WRITE_BUDGET_MS + 1000))
+    api.token = async () => {
+      api.advance(2000)
+      return "t"
+    }
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleDeadlineError)
+    expect(api.calls).toHaveLength(0)
+  })
+
+  test("a slow token that stays inside the margin still sends the write", async () => {
+    const api = clocked([() => json({ id: "m", role: "MEMBER" })])
+    api.deadline = 10_000
+    api.advance(10_000 - (MIN_WRITE_BUDGET_MS + 3000))
+    api.token = async () => {
+      api.advance(2000)
+      return "t"
+    }
+    await addMember(api, "aaa", "x@gmail.com")
+    expect(api.calls).toHaveLength(1)
   })
 
   test("each call's timeout shrinks to the time left", async () => {

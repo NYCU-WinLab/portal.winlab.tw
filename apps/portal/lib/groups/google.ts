@@ -160,9 +160,9 @@ async function attempt(
   // The deadline bounds everything: past it nothing starts (not even the
   // token), and a call gets the shorter of its own timeout and what is left.
   let timeoutMs = api.timeoutMs ?? CALL_TIMEOUT_MS
+  const writes = init?.method === "POST" || init?.method === "DELETE"
   if (api.deadline !== undefined) {
     const left = api.deadline - (api.now ?? Date.now)()
-    const writes = init?.method === "POST" || init?.method === "DELETE"
     // A write that starts with almost nothing left would near-certainly
     // abort and then read as "result unknown"; refuse it before anything is
     // sent instead. Reads keep the plain rule.
@@ -172,7 +172,6 @@ async function attempt(
   }
   const timer = AbortSignal.timeout(timeoutMs)
   const signal = init?.signal ? AbortSignal.any([init.signal, timer]) : timer
-  const writes = init?.method === "POST" || init?.method === "DELETE"
   // Getting the token counts against the same deadline: a stalled STS / IAM
   // exchange must not hang the action. Nothing has been sent yet, so a
   // timeout here cannot have changed anything. Whichever settles first
@@ -184,6 +183,12 @@ async function attempt(
   } catch (err) {
     if (timer.aborted) throw new GoogleTimeoutError(false)
     throw err
+  }
+  // A slow token can eat the margin checked above: look again before the
+  // write goes out. Nothing has been sent, so this is a plain deadline.
+  if (writes && api.deadline !== undefined) {
+    const left = api.deadline - (api.now ?? Date.now)()
+    if (left < MIN_WRITE_BUDGET_MS) throw new GoogleDeadlineError()
   }
   try {
     return await api.fetch(`${BASE}/${path}`, {
