@@ -44,6 +44,7 @@ import {
   getGroup,
   GoogleDeadlineError,
   listMembers,
+  MIN_WRITE_BUDGET_MS,
   listParentGroups,
   removeMember,
   type GroupsApi,
@@ -444,7 +445,10 @@ export async function addToGroup(
           return { email, outcome: "error", detail: clientMessage(err) }
         }
       },
-      () => abort.cause !== null || now() >= deadline
+      // Stop at the write floor, not the deadline: attempt() refuses a write
+      // with under MIN_WRITE_BUDGET_MS left, so starting more would only
+      // log instant failures for every remaining address.
+      () => abort.cause !== null || now() >= deadline - MIN_WRITE_BUDGET_MS
     )
     for (const r of results)
       rows.push(buildAuditRow(deps.userId, group, "add", r))

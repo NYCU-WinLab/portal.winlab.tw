@@ -378,6 +378,29 @@ describe("addToGroup deadlines", () => {
       expect(row.detail).toBe("處理太久，已停止，這個步驟沒有送出")
   })
 
+  test("a batch stops at the write floor, before the deadline itself", async () => {
+    const h = harness()
+    let t = 0
+    h.deps.api.now = () => t
+    h.deps.batchBudgetMs = MIN_WRITE_BUDGET_MS + 100
+    const origFetch = h.deps.api.fetch
+    h.deps.api.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      // Lands inside [deadline - floor, deadline): not past the deadline.
+      if (init?.method === "POST") t += 200
+      return origFetch(input, init)
+    }) as typeof fetch
+    const res = await addToGroup(h.deps, "aaa", addresses(12))
+    expect(res.status).toBe("error")
+    if (res.status !== "error") return
+    expect(res.detail).toContain("只處理了")
+    expect(res.sent).toBe(true)
+    expect(res.results?.filter((r) => r.outcome === "ok")).toHaveLength(1)
+    expect(res.results!.length).toBeLessThan(12)
+    expect(h.calls.filter((c) => c.startsWith("POST"))).toHaveLength(1)
+    // Only addresses that had started (at most the concurrency) are audited.
+    expect(h.audits[0]!.length).toBeLessThanOrEqual(4)
+  })
+
   test("the deadline after one ok carries that result on the error", async () => {
     const h = harness()
     let t = 0
