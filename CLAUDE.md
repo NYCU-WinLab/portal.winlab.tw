@@ -295,15 +295,22 @@ order of checks lives in `lib/groups/membership.ts`, tested with fakes;
 `app/groups/actions.ts` only wires in the real dependencies.
 
 Gotchas, all measured against the live API: use `domain=`, never
-`customer=my_customer` (400 as a service account); never look a member up or
+`customer=my_customer` (400 as a service account; the one exception is the
+parent-group lookup, which sends `userKey` alone); never look a member up or
 delete it by email (some outside addresses 404 while on the list) — list,
 match, delete by member id; the member list is eventually consistent, so the
 UI trusts each action's per-address result and re-reads a few seconds later.
 The first outside address added to a group makes Google switch the group to
 "external members allowed (admins only)", and removing it doesn't switch back.
 
-Accepted residual risk: whoever holds that token — anyone who can deploy the
-portal to production — can change the members **and settings** of any group
+Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`; both
+`/groups` pages set `maxDuration = 300`), and the Keycloak cohort lookup has
+its own 8 s one, so a hung upstream ends in a message, not a stuck page.
+
+Accepted residual risk: the token the portal mints is scope-limited to
+membership (`lib/groups/scopes.ts`), but whoever can deploy the portal to
+production can mint the credential with any scope, and so can change the
+members **and settings** of any group
 in the domain, gcp-\* included (GROUPS_UPDATE can't be split). They can't
 create or delete groups, or touch users or GCP. This is safe from GCP
 escalation only because the organisation IAM grants nothing to `group:`
