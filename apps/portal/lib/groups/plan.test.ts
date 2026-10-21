@@ -6,13 +6,26 @@ import {
   cohortContribution,
   externalAddresses,
   isPlainMember,
+  nextPollStep,
+  NO_OVERLAY,
   NO_PENDING,
   onFreshList,
   onRetriesExhausted,
+  overlayAdded,
+  overlayGiveUp,
+  overlayOnList,
+  overlayRemoved,
+  overlayRetry,
   planAdditions,
+  POLL_IDLE,
+  pollCompleted,
+  pollGaveUp,
+  pollIssued,
+  pollNewWindow,
   prunePending,
   withAdded,
   withRemoved,
+  type PollState,
 } from "@/lib/groups/plan"
 import type { GroupMember } from "@/lib/groups/types"
 
@@ -215,5 +228,122 @@ describe("cohortContribution", () => {
         profilesLoaded: true,
       }).emails
     ).toEqual([])
+  })
+})
+
+describe("the overlay across actions", () => {
+  test("a new add after a deferred give-up stays pending through the next good read", () => {
+    // Retries ran out while the list was stale: the overlay was kept.
+    let o = overlayAdded(NO_OVERLAY, ["old@x.com"])
+    o = overlayGiveUp(o, true)
+    expect(o.giveUpDeferred).toBe(true)
+    // A new add starts a fresh window...
+    o = overlayAdded(o, ["new@x.com"])
+    expect(o.giveUpDeferred).toBe(false)
+    // ...so a good read that doesn't list it yet only prunes.
+    o = overlayOnList(o, [member("old@x.com")], false)
+    expect(o.pending).toEqual({ added: ["new@x.com"], removed: [] })
+  })
+
+  test("a removal or an uncertain outcome also resets a deferral", () => {
+    const deferred = overlayGiveUp(overlayAdded(NO_OVERLAY, ["a@x.com"]), true)
+    expect(overlayRemoved(deferred, "b@x.com").giveUpDeferred).toBe(false)
+    expect(overlayRetry(deferred)).toEqual({
+      pending: deferred.pending,
+      giveUpDeferred: false,
+    })
+  })
+
+  test("without a new action the first good read after a deferral clears the rest", () => {
+    const deferred = overlayGiveUp(overlayAdded(NO_OVERLAY, ["a@x.com"]), true)
+    expect(overlayOnList(deferred, [], false)).toEqual(NO_OVERLAY)
+  })
+
+  test("a stale read keeps the deferral and only prunes", () => {
+    const deferred = overlayGiveUp(
+      overlayAdded(NO_OVERLAY, ["a@x.com", "b@x.com"]),
+      true
+    )
+    expect(overlayOnList(deferred, [member("a@x.com")], true)).toEqual({
+      pending: { added: ["b@x.com"], removed: [] },
+      giveUpDeferred: true,
+    })
+  })
+
+  test("giving up on a good list clears the overlay", () => {
+    const o = overlayAdded(NO_OVERLAY, ["a@x.com"])
+    expect(overlayGiveUp(o, false)).toEqual(NO_OVERLAY)
+  })
+})
+
+describe("re-read polling", () => {
+  const READS = 3
+  const at = (s: PollState, settled: boolean, stale = false) =>
+    nextPollStep(s, { settled, stale, reads: READS })
+  // n reads issued and completed in the current window.
+  const afterReads = (s: PollState, n: number) => {
+    for (let i = 0; i < n; i++) s = pollCompleted(pollIssued(s))
+    return s
+  }
+  const started = pollNewWindow(POLL_IDLE, { forcedReads: 0 })
+
+  test("re-reads while the overlay is unsettled", () => {
+    expect(at(started, false)).toBe("refresh")
+    expect(at(afterReads(started, 2), false)).toBe("refresh")
+  })
+
+  test("all reads good: gives up and clears after the last one completed", () => {
+    expect(at(afterReads(started, 3), false)).toBe("give-up-clear")
+  })
+
+  test("last read stale: gives up by deferring", () => {
+    expect(at(afterReads(started, 3), false, true)).toBe("give-up-defer")
+  })
+
+  test("a read still in flight is waited for, never counted or given up on", () => {
+    const issued = pollIssued(afterReads(started, 2))
+    expect(issued.readsDone).toBe(2)
+    expect(at(issued, false)).toBe("wait")
+    expect(at(issued, false, true)).toBe("wait")
+    expect(at(issued, true)).toBe("wait")
+    // Only its completion counts, and only then is the give-up decided.
+    expect(at(pollCompleted(issued), false)).toBe("give-up-clear")
+  })
+
+  test("settled early: stops without reading or giving up", () => {
+    expect(at(afterReads(started, 1), true)).toBe("stop")
+  })
+
+  test("an uncertain outcome keeps reading while settled, then stops", () => {
+    const forced = pollNewWindow(POLL_IDLE, { forcedReads: 3 })
+    expect(at(forced, true)).toBe("refresh")
+    expect(at(afterReads(forced, 2), true)).toBe("refresh")
+    expect(at(afterReads(forced, 3), true)).toBe("stop")
+  })
+
+  test("a new action restarts the count", () => {
+    const again = pollNewWindow(afterReads(started, 3), { forcedReads: 0 })
+    expect(again.readsDone).toBe(0)
+    expect(at(again, false)).toBe("refresh")
+  })
+
+  test("a read issued before a new action doesn't count toward the new window", () => {
+    const inFlight = pollIssued(afterReads(started, 2))
+    const again = pollNewWindow(inFlight, { forcedReads: 0 })
+    expect(at(again, false)).toBe("wait")
+    const done = pollCompleted(again)
+    expect(done.readsDone).toBe(0)
+    expect(done.inFlight).toBeNull()
+    expect(at(done, false)).toBe("refresh")
+  })
+
+  test("a new action keeps reads still owed to an uncertain outcome", () => {
+    const owed = pollNewWindow(POLL_IDLE, { forcedReads: 3 })
+    expect(pollNewWindow(owed, { forcedReads: 0 }).forcedReads).toBe(3)
+  })
+
+  test("giving up drops reads still owed", () => {
+    const owed = pollNewWindow(POLL_IDLE, { forcedReads: 3 })
+    expect(pollGaveUp(owed).forcedReads).toBe(0)
   })
 })

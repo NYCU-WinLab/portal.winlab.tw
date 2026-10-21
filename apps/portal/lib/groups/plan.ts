@@ -193,3 +193,132 @@ export function onFreshList(
   if (state.giveUpDeferred && !state.stale) return NO_PENDING
   return prunePending(members, p)
 }
+
+/** The overlay, and whether its give-up is waiting for a good read. */
+export type Overlay = { pending: PendingChanges; giveUpDeferred: boolean }
+
+export const NO_OVERLAY: Overlay = {
+  pending: NO_PENDING,
+  giveUpDeferred: false,
+}
+
+// A new action starts a fresh consistency window, so it also cancels a
+// deferred give-up: otherwise the next good read would clear the new change
+// along with the old ones, while Google may still be catching up on it.
+
+export function overlayAdded(o: Overlay, emails: string[]): Overlay {
+  return { pending: withAdded(o.pending, emails), giveUpDeferred: false }
+}
+
+export function overlayRemoved(o: Overlay, email: string): Overlay {
+  return { pending: withRemoved(o.pending, email), giveUpDeferred: false }
+}
+
+/** An uncertain outcome (timeout, a batch stopped part-way): re-read afresh. */
+export function overlayRetry(o: Overlay): Overlay {
+  return { pending: o.pending, giveUpDeferred: false }
+}
+
+/** A list arrived from the server; a good one ends any deferral. */
+export function overlayOnList(
+  o: Overlay,
+  members: GroupMember[],
+  stale: boolean
+): Overlay {
+  return {
+    pending: onFreshList(members, o.pending, {
+      giveUpDeferred: o.giveUpDeferred,
+      stale,
+    }),
+    giveUpDeferred: stale && o.giveUpDeferred,
+  }
+}
+
+/** The re-reads ran out; see onRetriesExhausted. */
+export function overlayGiveUp(o: Overlay, stale: boolean): Overlay {
+  return onRetriesExhausted(stale) === "clear"
+    ? NO_OVERLAY
+    : { pending: o.pending, giveUpDeferred: true }
+}
+
+// ── Re-read polling ─────────────────────────────────────────────────────────
+// The page re-reads Google a bounded number of times after a change, then
+// gives up. Only reads that finished rendering count, and the give-up is
+// decided from the last one's result, never while a read is still in flight:
+// a slow page render must not let a confirmed change vanish unread.
+
+export type PollState = {
+  /** Bumped by every new action; a read counts only toward its own window. */
+  window: number
+  /** Re-reads of this window that completed. */
+  readsDone: number
+  /** Re-reads still owed to an uncertain outcome, settled or not. */
+  forcedReads: number
+  /** The window of the read in flight, or null. */
+  inFlight: number | null
+}
+
+export const POLL_IDLE: PollState = {
+  window: 0,
+  readsDone: 0,
+  forcedReads: 0,
+  inFlight: null,
+}
+
+/** A new action: count reads from zero again. A read in flight stays so. */
+export function pollNewWindow(
+  s: PollState,
+  opts: { forcedReads: number }
+): PollState {
+  return {
+    window: s.window + 1,
+    readsDone: 0,
+    forcedReads: Math.max(s.forcedReads, opts.forcedReads),
+    inFlight: s.inFlight,
+  }
+}
+
+export function pollIssued(s: PollState): PollState {
+  return { ...s, inFlight: s.window }
+}
+
+/** The read in flight finished rendering. One from an older window doesn't count. */
+export function pollCompleted(s: PollState): PollState {
+  if (s.inFlight === null) return s
+  if (s.inFlight !== s.window) return { ...s, inFlight: null }
+  return {
+    ...s,
+    inFlight: null,
+    readsDone: s.readsDone + 1,
+    forcedReads: Math.max(0, s.forcedReads - 1),
+  }
+}
+
+export function pollGaveUp(s: PollState): PollState {
+  return { ...s, forcedReads: 0 }
+}
+
+export type PollStep =
+  | "refresh"
+  | "wait"
+  | "give-up-clear"
+  | "give-up-defer"
+  | "stop"
+
+/**
+ * What to do when the poll timer fires: wait for a read still in flight
+ * (its completion asks again), stop once the overlay is settled and nothing
+ * is owed, re-read while this window has reads left, and otherwise give up
+ * on the overlay according to the last completed read.
+ */
+export function nextPollStep(
+  s: PollState,
+  now: { settled: boolean; stale: boolean; reads: number }
+): PollStep {
+  if (s.inFlight !== null) return "wait"
+  if (now.settled && s.forcedReads <= 0) return "stop"
+  if (s.readsDone < now.reads) return "refresh"
+  return onRetriesExhausted(now.stale) === "clear"
+    ? "give-up-clear"
+    : "give-up-defer"
+}
