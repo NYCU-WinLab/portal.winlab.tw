@@ -359,6 +359,9 @@ describe("addToGroup deadlines", () => {
     expect(h.audits[0]!.map((r) => r.outcome)).toEqual(
       Array(h.audits[0]!.length).fill("error").fill("ok", 0, 1)
     )
+    // The stopped ones say nothing was sent for them, not "unknown".
+    for (const row of h.audits[0]!.slice(1))
+      expect(row.detail).toBe("處理太久，已停止，這個步驟沒有送出")
   })
 
   test("a throttled address does not stop the others", async () => {
@@ -999,6 +1002,38 @@ describe("one deadline for the whole action", () => {
           email: "a@gmail.com",
           outcome: "error",
           detail: "處理太久，已停止，這個步驟沒有送出",
+        },
+      ],
+    })
+  })
+
+  test("a 429 on a POST whose backoff doesn't fit: call()'s gate, read as throttling", async () => {
+    const e = spyOn(console, "error").mockImplementation(() => {})
+    // The POST starts with the minimum in hand; the 429 arrives with 400 ms
+    // left, under any first backoff (500..1000 ms) but above zero. call()
+    // returns the throttled reply instead of sleeping, so the address reads
+    // as throttled. Were the retry left to the minimum-budget rule instead,
+    // it would read as the deadline ("沒有送出").
+    let t = 1000
+    const h = harness({
+      api: { now: () => t, sleep: async () => {} },
+      budgetMs: MIN_WRITE_BUDGET_MS + 100,
+      reply: (m) => {
+        if (m !== "POST") return undefined
+        t = 1000 + MIN_WRITE_BUDGET_MS + 100 - 400
+        return json({ error: { message: "slow" } }, 429)
+      },
+    })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    e.mockRestore()
+    expect(h.calls.filter((c) => c.startsWith("POST"))).toHaveLength(1)
+    expect(res).toMatchObject({
+      status: "ok",
+      data: [
+        {
+          email: "a@gmail.com",
+          outcome: "error",
+          detail: "Google 暫時限流，請稍後再試",
         },
       ],
     })
