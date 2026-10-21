@@ -1,17 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { z } from "zod"
 
+import { requireCaller, type ToolContext } from "@/lib/mcp/context"
 import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
-import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
+import { MCP_SERVER_OPTIONS, registerTools } from "@/lib/mcp/server"
 
 const ENDPOINT = "https://portal.example/api/mcp"
 const TOKEN = "test-token"
 
 const handler = withMcpAuth(
-  createMcpHandler((server) => registerTools(server), {
-    serverInfo: MCP_SERVER_INFO,
-    instructions: MCP_INSTRUCTIONS,
-  }),
+  createMcpHandler((server) => registerTools(server), MCP_SERVER_OPTIONS),
   async (_req, bearer) =>
     bearer === TOKEN
       ? { token: bearer, clientId: "u1", scopes: [], extra: { userId: "u1" } }
@@ -23,8 +22,12 @@ function rpc(method: string, params: unknown = {}, id = 1) {
   return { jsonrpc: "2.0", id, method, params }
 }
 
-async function call(body: unknown, token?: string): Promise<Response> {
-  return handler(
+async function call(
+  body: unknown,
+  token?: string,
+  via: (req: Request) => Promise<Response> = handler
+): Promise<Response> {
+  return via(
     new Request(ENDPOINT, {
       method: "POST",
       headers: {
@@ -90,6 +93,69 @@ describe("portal MCP handler", () => {
       error?: unknown
     }
     expect(Boolean(body.error) || body.result?.isError).toBe(true)
+  })
+
+  // GHSA-46jr-4wx8-v453. The array's own .max(20) can't stand in for the
+  // cap: the SDK walks every element before the schema gets a say.
+  test("refuses tool arguments past the element cap before validating them", async () => {
+    const res = await call(
+      rpc("tools/call", {
+        name: "update_member_roles",
+        arguments: {
+          user_id: "00000000-0000-0000-0000-000000000000",
+          grant_admin: Array.from({ length: 1001 }, () => "trip"),
+        },
+      }),
+      TOKEN
+    )
+    const body = (await readRpcResult(res)) as {
+      result?: { isError?: boolean; content?: { text?: string }[] }
+      error?: { message?: string }
+    }
+    const message = body.error?.message ?? body.result?.content?.[0]?.text
+    expect(message).toContain("more than the maximum of 1000 elements")
+  })
+
+  // Every tool learns who is calling from ctx.http.authInfo. If an SDK
+  // upgrade moved it, every tool would answer "Unauthorized" while the list
+  // and auth tests above stayed green; and a shared server would hand one
+  // member another's identity (GHSA-jm63-cq47-j5jp).
+  test("each concurrent tool call sees its own caller", async () => {
+    const whoHandler = withMcpAuth(
+      createMcpHandler((server) => {
+        server.registerTool(
+          "echo_caller",
+          { description: "test only", inputSchema: z.object({}) },
+          async (_args, ctx) => ({
+            content: [
+              { type: "text", text: requireCaller(ctx as ToolContext).userId },
+            ],
+          })
+        )
+      }, MCP_SERVER_OPTIONS),
+      async (_req, bearer) => ({
+        token: bearer!,
+        clientId: bearer!,
+        scopes: [],
+        extra: { userId: `user-${bearer}` },
+      }),
+      { required: true }
+    )
+    const tokens = Array.from({ length: 10 }, (_, i) => (i % 2 ? "a" : "b"))
+    const seen = await Promise.all(
+      tokens.map(async (token, i) => {
+        const res = await call(
+          rpc("tools/call", { name: "echo_caller", arguments: {} }, i + 1),
+          token,
+          whoHandler
+        )
+        const body = (await readRpcResult(res)) as {
+          result: { content: { text: string }[] }
+        }
+        return body.result.content[0]!.text
+      })
+    )
+    expect(seen).toEqual(tokens.map((t) => `user-${t}`))
   })
 
   test("hands the agent instructions and the tool list", async () => {
