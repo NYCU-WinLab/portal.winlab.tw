@@ -312,8 +312,9 @@ The first outside address added to a group makes Google switch the group to
 Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
 where the api is built in `groupsApiFromEnv`, the group listing included; both
 `/groups` pages set `maxDuration = 300`). A write needs `MIN_WRITE_BUDGET_MS`
-(3 s) of it left to start, rather than begin and be reported as unknown. The Keycloak cohort lookup has
-its own 8 s one, so a hung upstream ends in a message, not a stuck page.
+(3 s) of it left to start, checked again after the token arrives, rather than
+begin and be reported as unknown. The Keycloak cohort lookup has its own 8 s
+one, so a hung upstream ends in a message, not a stuck page.
 
 Accepted residual risk: the token the portal mints is scope-limited to
 membership (`lib/groups/scopes.ts`), but whoever can deploy the portal to
