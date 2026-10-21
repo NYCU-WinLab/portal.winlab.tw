@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  clientMessage,
   describeError,
   failure,
   isFatal,
@@ -59,6 +60,22 @@ describe("failure", () => {
 })
 
 describe("isFatal", () => {
+  test("only a plain-word reason from Google reaches the message", () => {
+    const msg = (reason?: string) =>
+      clientMessage(new GoogleGroupsError(503, "secret", reason))
+    expect(msg("backendError")).toBe("Google 503（backendError）")
+    for (const bad of [
+      "has space",
+      "with-dash",
+      "x".repeat(65),
+      "../etc/passwd",
+      "<b>hi</b>",
+      "",
+    ])
+      expect(msg(bad)).toBe("Google 503（error）")
+    expect(msg(undefined)).toBe("Google 503（error）")
+  })
+
   test("only credential and permission failures stop a batch", () => {
     expect(isFatal(new GroupsCredentialError("x"))).toBe(true)
     expect(isFatal(new GoogleGroupsError(403))).toBe(true)

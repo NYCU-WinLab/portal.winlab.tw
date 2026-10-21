@@ -25,7 +25,7 @@ export function readGroupsConfig(
  * The service account trusts only production deployments' OIDC tokens, so a
  * preview or local run that has the env vars set still cannot get a token.
  * Say that, instead of surfacing a bare STS error. The STS error itself
- * stays in the server log (and the audit row); it is not sent to the browser.
+ * stays in the server log only; neither the browser nor the audit row gets it.
  */
 export function credentialErrorMessage(vercelEnv: string | undefined): string {
   const where = vercelEnv || "本機"

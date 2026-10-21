@@ -16,12 +16,13 @@
 //      a gcp-* group (or one outside the domain) is refused, because editing
 //      it would change that group's effective membership.
 //      One deadline is taken when the action starts and covers all of it:
-//      authorisation, the ancestor walk and the writes. It stops retries
-//      and, for an add, new addresses; each Directory call has its own
-//      timeout besides.
+//      authorisation, the ancestor walk and the writes. Past it no Google
+//      call starts (token included), no retry is made and, for an add, no
+//      new address; each call's timeout is also cut to what is left.
 //   4. Every write attempt past (1) is audited, handed to the sink once, in
 //      `finally`: a row per address tried, one row for a refusal however
-//      many addresses it carried, one row when authorisation itself failed.
+//      many addresses it carried, one row when authorisation itself failed
+//      or the ancestor walk failed (those land in the same catch).
 
 import { buildAuditRow, type AuditInsert } from "@/lib/groups/audit"
 import { authorizeGroup } from "@/lib/groups/authorize"
@@ -40,6 +41,7 @@ import {
 import {
   addMember,
   getGroup,
+  GoogleDeadlineError,
   listMembers,
   listParentGroups,
   removeMember,
@@ -66,6 +68,10 @@ export const BATCH_BUDGET_MS = 60_000
 
 export const DENIED = "你不是這個群組的管理者"
 export const NOT_MANAGED = "這個群組不存在，或不開放給 portal 管理"
+// A group that is on screen, so "doesn't exist" would be false. Does not name
+// the ancestor: it may be a gcp-* group.
+export const NESTED_MESSAGE =
+  "此群組是其他受保護群組的成員，無法在 portal 修改成員"
 export { INVALID_INPUT }
 const UNKNOWN_GROUP = "(unknown)"
 
@@ -93,6 +99,7 @@ const notManaged = (detail = NOT_MANAGED): GroupsResult<never> => ({
 export const TOO_DEEP = "此群組位於過深的巢狀結構中，無法在 portal 管理"
 export const ANCESTORS_UNVERIFIED =
   "portal 無法確認這個群組的上層群組，請稍後再試"
+const NESTED = "nested in a group the portal may not manage"
 
 export function parseGroupId(value: unknown): string | null {
   return typeof value === "string" && isValidGroupId(value) ? value : null
@@ -162,7 +169,9 @@ async function authorize(
       detail: denied ? DENIED : NOT_MANAGED,
       sent: false,
     },
-    groupEmail: group?.email ?? null,
+    // Only a group whose id is the one asked about: otherwise the address
+    // belongs to some other group and must not land in this one's row.
+    groupEmail: group && group.id === groupId ? group.email : null,
     why: denied ? "not a manager" : "not manageable",
   }
 }
@@ -204,7 +213,7 @@ async function checkNesting(
       group: group.id,
       ancestor,
     })
-    return { ok: false, result: notManaged(), why: NESTED }
+    return { ok: false, result: notManaged(NESTED_MESSAGE), why: NESTED }
   } catch (err) {
     if (err instanceof NestingTooDeepError)
       return { ok: false, result: notManaged(TOO_DEEP), why: TOO_DEEP }
@@ -212,8 +221,6 @@ async function checkNesting(
     throw new AncestorLookupError(err)
   }
 }
-
-const NESTED = "nested in a group the portal may not manage"
 
 /**
  * Wraps the api so it notes whether a write request (POST / DELETE) was
@@ -285,10 +292,16 @@ export async function readGroup(
 ): Promise<GroupsResult<{ group: ManagedGroup; members: GroupMember[] }>> {
   const groupId = parseGroupId(groupIdInput)
   if (!groupId) return malformed(access.userId, "group id", notManaged())
+  // Same bound as a write: a page render must not outlive the budget.
+  const now = access.api.now ?? Date.now
+  const api: GroupsApi = {
+    ...access.api,
+    deadline: access.api.deadline ?? now() + BATCH_BUDGET_MS,
+  }
   try {
-    const auth = await authorize(access, groupId)
+    const auth = await authorize({ ...access, api }, groupId)
     if (!auth.ok) return auth.result
-    const members = await listMembers(access.api, auth.group.id)
+    const members = await listMembers(api, auth.group.id)
     return { status: "ok", data: { group: auth.group, members } }
   } catch (err) {
     console.error("[groups] read failed", err)
@@ -384,7 +397,7 @@ export async function addToGroup(
           if (isFatal(err) && abort.cause === null) abort.cause = err
           console.error(
             "[groups] add failed for an address",
-            { actor: deps.userId, group: group.id },
+            { actor: deps.userId, group: group.id, address: email },
             describeError(err)
           )
           return { email, outcome: "error", detail: clientMessage(err) }
@@ -395,16 +408,33 @@ export async function addToGroup(
     for (const r of results)
       rows.push(buildAuditRow(deps.userId, group, "add", r))
     if (abort.cause !== null) {
-      console.error("[groups] add stopped", abort.cause)
+      console.error("[groups] add stopped", {
+        actor: deps.userId,
+        group: group.id,
+        started: results.length,
+        total: emails.length,
+        cause: describeError(abort.cause),
+      })
       return failure(abort.cause, tracked.sent())
     }
     if (results.length < emails.length) {
       // Out of time: the rest were never sent. What did run is audited.
-      console.error("[groups] add stopped at the deadline")
+      const sent = tracked.sent()
+      console.error("[groups] add stopped at the deadline", {
+        actor: deps.userId,
+        group: group.id,
+        started: results.length,
+        total: emails.length,
+        sent,
+      })
       return {
         status: "error",
-        detail: `處理太久，已停止：${emails.length} 個地址中只送出 ${results.length} 個，其餘沒有送出。已送出的結果可能已套用，請重新整理確認後再試。`,
-        sent: tracked.sent(),
+        detail:
+          `處理太久，已停止：${emails.length} 個地址中只處理了 ${results.length} 個，其餘沒有送出。` +
+          (sent
+            ? "已送出的結果可能已套用，請重新整理確認後再試。"
+            : "沒有任何變更送出，可以直接再試。"),
+        sent,
       }
     }
     return { status: "ok", data: results }
@@ -494,10 +524,12 @@ export async function removeFromGroup(
         outcome: await removeMember(tracked.api, auth.group.id, email),
       }
     } catch (err) {
-      if (isFatal(err)) fatal = err
+      // Fatal, or the deadline stopped it before the DELETE: a failure of the
+      // request, not of the address, and told to the UI with `sent`.
+      if (isFatal(err) || err instanceof GoogleDeadlineError) fatal = err
       console.error(
         "[groups] remove failed for an address",
-        { actor: deps.userId, group: auth.group.id },
+        { actor: deps.userId, group: auth.group.id, address: email },
         describeError(err)
       )
       result = { email, outcome: "error", detail: clientMessage(err) }

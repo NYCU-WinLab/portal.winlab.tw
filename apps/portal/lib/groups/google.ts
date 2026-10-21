@@ -31,8 +31,9 @@ export type GroupsApi = {
   now?: () => number
   sleep?: (ms: number) => Promise<void>
   /**
-   * Absolute time (per `now`) after which no retry is started. A retry that
-   * would sleep past it is not made; the rate-limit error is returned.
+   * Absolute time (per `now`) that bounds the whole action. No Google call
+   * (token acquisition included) starts after it, a retry that would sleep
+   * past it is not made, and each call's timeout is cut to what is left.
    */
   deadline?: number
 }
@@ -91,11 +92,22 @@ export class GoogleTimeoutError extends Error {
   }
 }
 
+/**
+ * The action's deadline had passed, so this call was not started. Nothing
+ * was sent for it, which makes it a pre-send failure like a token timeout.
+ */
+export class GoogleDeadlineError extends Error {
+  constructor() {
+    super("處理太久，已停止，這個步驟沒有送出")
+    this.name = "GoogleDeadlineError"
+  }
+}
+
 /** No Google access token could be had (WIF, STS or impersonation failed). */
 export class GroupsCredentialError extends Error {
   /**
    * `message` is safe to show a manager; `cause` (the STS / IAM error) is
-   * for the log and the audit row only.
+   * for the server log only.
    */
   constructor(
     message: string,
@@ -143,18 +155,26 @@ async function attempt(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const timer = AbortSignal.timeout(api.timeoutMs ?? CALL_TIMEOUT_MS)
+  // The deadline bounds everything: past it nothing starts (not even the
+  // token), and a call gets the shorter of its own timeout and what is left.
+  let timeoutMs = api.timeoutMs ?? CALL_TIMEOUT_MS
+  if (api.deadline !== undefined) {
+    const left = api.deadline - (api.now ?? Date.now)()
+    if (left <= 0) throw new GoogleDeadlineError()
+    timeoutMs = Math.min(timeoutMs, left)
+  }
+  const timer = AbortSignal.timeout(timeoutMs)
   const signal = init?.signal ? AbortSignal.any([init.signal, timer]) : timer
   const writes = init?.method === "POST" || init?.method === "DELETE"
   // Getting the token counts against the same deadline: a stalled STS / IAM
   // exchange must not hang the action. Nothing has been sent yet, so a
-  // timeout here cannot have changed anything. A credential failure keeps
-  // its own outcome even when it surfaces after the timer fired.
+  // timeout here cannot have changed anything. Whichever settles first
+  // wins: a credential error that arrives after the timer fired is dropped
+  // and the call reads as the timeout.
   let token: string
   try {
     token = await raceAbort(api.token(), timer)
   } catch (err) {
-    if (err instanceof GroupsCredentialError) throw err
     if (timer.aborted) throw new GoogleTimeoutError(false)
     throw err
   }
@@ -169,8 +189,25 @@ async function attempt(
       signal,
     })
   } catch (err) {
-    if (err instanceof GroupsCredentialError) throw err
     if (timer.aborted) throw new GoogleTimeoutError(writes)
+    throw err
+  }
+}
+
+/**
+ * A reply's JSON. The call's timer also covers reading the body, and an
+ * abort there surfaces as a DOMException; it is the read timeout, not an
+ * unexpected error. (Only used for reads, so nothing may have changed.)
+ */
+async function readJson<T>(res: Response): Promise<T> {
+  try {
+    return (await res.json()) as T
+  } catch (err) {
+    if (
+      err instanceof DOMException &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    )
+      throw new GoogleTimeoutError(false)
     throw err
   }
 }
@@ -255,10 +292,10 @@ export async function listDomainGroups(
     if (pageToken) q.set("pageToken", pageToken)
     const res = await call(api, `groups?${q}`)
     if (!res.ok) await fail(res)
-    const data = (await res.json()) as {
+    const data = await readJson<{
       groups?: RawGroup[]
       nextPageToken?: string
-    }
+    }>(res)
     for (const g of data.groups ?? []) {
       const group = toGroup(g)
       if (group) out.push(group)
@@ -278,7 +315,7 @@ export async function getGroup(
   // mean "no such group".
   if (res.status === 404 || res.status === 400) return null
   if (!res.ok) await fail(res)
-  return toGroup((await res.json()) as RawGroup)
+  return toGroup(await readJson<RawGroup>(res))
 }
 
 /**
@@ -310,12 +347,16 @@ export async function listParentGroups(
     if (pageToken) q.set("pageToken", pageToken)
     const res = await call(api, `groups?${q}`)
     if (!res.ok) await fail(res)
-    const data = (await res.json()) as {
+    const data = await readJson<{
       groups?: RawGroup[]
       nextPageToken?: string
+    }>(res)
+    for (const g of data.groups ?? []) {
+      // Skipping a nameless parent would let the fence miss it: fail closed.
+      if (!g.email)
+        throw new Error("Google returned a parent group with no address")
+      out.push(g.email.toLowerCase())
     }
-    for (const g of data.groups ?? [])
-      if (g.email) out.push(g.email.toLowerCase())
     pageToken = data.nextPageToken ?? ""
   } while (pageToken)
   return out
@@ -332,10 +373,10 @@ export async function listMembers(
     if (pageToken) q.set("pageToken", pageToken)
     const res = await call(api, `${groupPath(groupId)}/members?${q}`)
     if (!res.ok) await fail(res)
-    const data = (await res.json()) as {
+    const data = await readJson<{
       members?: RawMember[]
       nextPageToken?: string
-    }
+    }>(res)
     for (const m of data.members ?? []) {
       out.push({
         id: m.id ?? null,
@@ -410,7 +451,10 @@ export async function removeMember(
   const fresh = await call(api, memberPath)
   if (fresh.status === 404) return "not_found"
   if (!fresh.ok) await fail(fresh)
-  const current = (await fresh.json().catch(() => null)) as RawMember | null
+  const current = await readJson<RawMember | null>(fresh).catch((err) => {
+    if (err instanceof GoogleTimeoutError) throw err
+    return null
+  })
   // An unreadable reply says nothing about the role: that is a failure, not
   // a "protected" member. Only an explicit MEMBER passes.
   if (!current || typeof current.role !== "string" || current.role === "")

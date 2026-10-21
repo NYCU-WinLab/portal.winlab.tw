@@ -6,6 +6,7 @@
 // or as N separate per-address errors.
 
 import {
+  GoogleDeadlineError,
   GoogleGroupsError,
   GoogleTimeoutError,
   GroupsCredentialError,
@@ -44,6 +45,14 @@ export function describeError(err: unknown): string {
 
 export const UNEXPECTED_MESSAGE = "發生未預期的錯誤，請稍後再試"
 
+// Google's `reason` is a short camelCase word ("notFound"); anything else is
+// upstream text that doesn't belong in a toast.
+function safeReason(reason: string | undefined): string {
+  return reason !== undefined && /^[A-Za-z]{1,64}$/.test(reason)
+    ? reason
+    : "error"
+}
+
 /**
  * What a manager is shown: a status and a stable reason, never upstream
  * text. The full detail is logged by whoever caught the error.
@@ -52,8 +61,9 @@ export function clientMessage(err: unknown): string {
   if (isRateLimited(err)) return RATE_LIMIT_MESSAGE
   if (err instanceof GroupsCredentialError) return err.message
   if (err instanceof GoogleTimeoutError) return err.message
+  if (err instanceof GoogleDeadlineError) return err.message
   if (err instanceof GoogleGroupsError)
-    return `Google ${err.status}（${err.reason ?? "error"}）`
+    return `Google ${err.status}（${safeReason(err.reason)}）`
   return UNEXPECTED_MESSAGE
 }
 

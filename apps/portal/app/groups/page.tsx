@@ -4,6 +4,9 @@ import { listMyGroups } from "./actions"
 import { GroupList } from "./_components/group-list"
 
 export const dynamic = "force-dynamic"
+// Vercel Fluid's default and the Hobby ceiling. An action's 60 s budget
+// (BATCH_BUDGET_MS) plus one call's tail and the after() audit fit well in it.
+export const maxDuration = 300
 
 export default async function GroupsPage() {
   const result = await listMyGroups()

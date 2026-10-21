@@ -9,6 +9,8 @@ import {
   readGroup,
   removeFromGroup,
   ANCESTORS_UNVERIFIED,
+  NESTED_MESSAGE,
+  NOT_MANAGED,
   TOO_DEEP,
   type MembershipDeps,
 } from "@/lib/groups/membership"
@@ -331,6 +333,8 @@ describe("addToGroup deadlines", () => {
     expect(res.status).toBe("error")
     if (res.status !== "error") return
     expect(res.detail).toContain("可能已套用")
+    // A POST reached fetch, so the UI is told a write may have landed.
+    expect(res.sent).toBe(true)
     const sent = h.calls.filter((c) => c.startsWith("POST")).length
     expect(sent).toBeLessThan(12)
     expect(h.audits).toHaveLength(1)
@@ -564,6 +568,8 @@ describe("the group id Google returns", () => {
     expect(add.audits[0]![0]).toMatchObject({
       outcome: "denied",
       detail: "not manageable",
+      // Google's answer was about another group: its address stays out.
+      group_email: "(unknown)",
     })
     const rm = harness({ reply })
     expect(await removeFromGroup(rm.deps, "aaa", "x@gmail.com")).toMatchObject({
@@ -589,10 +595,15 @@ describe("the nesting fence", () => {
 
   test("a group nested in a gcp-* group is refused for add and remove: no write, one denied row", async () => {
     const add = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
-    expect(await addToGroup(add.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+    const nested = await addToGroup(add.deps, "aaa", ["a@gmail.com"])
+    expect(nested).toMatchObject({
       status: "forbidden",
       reason: "not_managed",
+      detail: NESTED_MESSAGE,
     })
+    // Not the "doesn't exist" text, and not the ancestor's name.
+    expect(NESTED_MESSAGE).not.toBe(NOT_MANAGED)
+    expect(JSON.stringify(nested)).not.toContain("gcp-billing")
     expect(add.calls.some((c) => c.startsWith("POST"))).toBe(false)
     expect(add.audits).toHaveLength(1)
     expect(add.audits[0]![0]).toMatchObject({
@@ -784,6 +795,10 @@ describe("what the browser is told", () => {
       },
     })
     const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    // The STS text survives only here, with who asked.
+    const logged = JSON.stringify(log.mock.calls)
+    expect(logged).toContain("STS said: secret")
+    expect(logged).toContain('"actor":"u1"')
     log.mockRestore()
     expect(res).toEqual({
       status: "error",
@@ -970,5 +985,209 @@ describe("one deadline for the whole action", () => {
     expect(h.calls.filter((c) => c === "GET /groups/aaa/members")).toHaveLength(
       1
     )
+  })
+})
+
+describe("the deadline bounds the whole action", () => {
+  const quiet = () => spyOn(console, "error").mockImplementation(() => {})
+  /** A fake clock the harness's fetch advances by `step` on matching calls. */
+  function timed(
+    step: (method: string, path: string) => number,
+    opts: Parameters<typeof harness>[0] = {}
+  ) {
+    let t = 0
+    const h = harness({ ...opts, api: { ...opts.api, now: () => t } })
+    const inner = h.deps.api.fetch
+    h.deps.api.fetch = ((i: RequestInfo | URL, init?: RequestInit) => {
+      t += step(
+        init?.method ?? "GET",
+        new URL(String(i)).pathname.slice(DIR.length)
+      )
+      return inner(i, init)
+    }) as typeof fetch
+    return h
+  }
+
+  test("remove whose deadline passes after the by-id read: no DELETE, error, sent: false", async () => {
+    const e = quiet()
+    const h = timed((m, p) => (p === "/groups/aaa/members/m1" ? 500 : 0), {
+      budgetMs: 100,
+    })
+    const res = await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+    e.mockRestore()
+    expect(res).toMatchObject({ status: "error", sent: false })
+    expect(h.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+    expect(h.audits[0]![0]).toMatchObject({
+      action: "remove",
+      outcome: "error",
+    })
+  })
+
+  test("a deadline that passes during the ancestor walk stops before any POST, and says nothing was sent", async () => {
+    const e = quiet()
+    const h = timed((m, p) => (m === "GET" && p === "/groups" ? 500 : 0), {
+      budgetMs: 100,
+    })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com", "b@gmail.com"])
+    e.mockRestore()
+    expect(res.status).toBe("error")
+    expect(h.calls.some((c) => c.startsWith("POST"))).toBe(false)
+    if (res.status === "error") expect(res.sent).toBe(false)
+  })
+
+  test("a batch stopped by the deadline before any POST does not claim a write may have landed", async () => {
+    const e = quiet()
+    // The walk's reply (the last pre-write call) is the one that uses the
+    // budget up, but is itself fine: pagination is not in play for an empty
+    // parent list, so the next thing is the batch loop.
+    let used = false
+    const h = timed(
+      (m, p) => {
+        if (m === "GET" && p === "/groups" && !used) {
+          used = true
+          return 100
+        }
+        return 0
+      },
+      { budgetMs: 100 }
+    )
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    e.mockRestore()
+    expect(res.status).toBe("error")
+    if (res.status !== "error") return
+    // Either the walk or the loop stopped it; in both nothing was sent.
+    expect(res.sent).toBe(false)
+    expect(res.detail).not.toContain("可能已套用")
+  })
+
+  test("a long ancestor chain stops at the deadline: no call starts after it", async () => {
+    const e = quiet()
+    let n = 0
+    const h = timed(() => 30, {
+      budgetMs: 100,
+      reply: (m, p) =>
+        m === "GET" && p === "/groups"
+          ? json({ groups: [{ id: "p", email: `g${n++}@winlab.tw` }] })
+          : undefined,
+    })
+    const res = await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+    e.mockRestore()
+    expect(res.status).toBe("error")
+    // aaa (30) + at most the walk calls that began before 100.
+    expect(h.calls.length).toBeLessThanOrEqual(4)
+    expect(h.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("authorisation and the walk use the deadline for remove too", async () => {
+    const e = quiet()
+    const clock = { now: () => 1000, sleep: async () => {} }
+    const throttled =
+      (match: (m: string, p: string) => boolean): Reply =>
+      (m, p) =>
+        match(m, p)
+          ? json({ error: { errors: [{ reason: "rateLimitExceeded" }] } }, 403)
+          : undefined
+    const auth = harness({
+      api: clock,
+      budgetMs: 1,
+      reply: throttled((m, p) => m === "GET" && p === "/groups/aaa"),
+    })
+    await removeFromGroup(auth.deps, "aaa", "x@gmail.com")
+    expect(auth.calls.filter((c) => c === "GET /groups/aaa")).toHaveLength(1)
+    const walk = harness({
+      api: clock,
+      budgetMs: 1,
+      reply: throttled((m, p) => m === "GET" && p === "/groups"),
+    })
+    await removeFromGroup(walk.deps, "aaa", "x@gmail.com")
+    expect(walk.calls.filter((c) => c === "GET /groups")).toHaveLength(1)
+    e.mockRestore()
+  })
+
+  test("remove records the group's address when the walk fails, and cuts a hung call", async () => {
+    const e = quiet()
+    const failing = harness({
+      reply: (m, p) =>
+        m === "GET" && p === "/groups" ? json({}, 500) : undefined,
+    })
+    const res = await removeFromGroup(failing.deps, "aaa", "x@gmail.com")
+    expect(res).toEqual({
+      status: "error",
+      detail: ANCESTORS_UNVERIFIED,
+      sent: false,
+    })
+    expect(failing.audits[0]![0]).toMatchObject({
+      outcome: "error",
+      group_email: "lab-all@winlab.tw",
+    })
+    const hung = harness({
+      reply: (m, p) =>
+        m === "DELETE" && p === "/groups/aaa/members/m1" ? "hang" : undefined,
+    })
+    hung.deps.api.timeoutMs = 20
+    const out = await removeFromGroup(hung.deps, "aaa", "x@gmail.com")
+    e.mockRestore()
+    expect(out).toMatchObject({
+      status: "ok",
+      data: { outcome: "error" },
+    })
+    if (out.status === "ok") expect(out.data.detail).toContain("結果未知")
+  })
+
+  test("a fatal 403 in the parent lookup is a permission failure, nothing sent", async () => {
+    const e = quiet()
+    const reply: Reply = (m, p) =>
+      m === "GET" && p === "/groups" ? notAuthorized() : undefined
+    const add = harness({ reply })
+    expect(await addToGroup(add.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      status: "forbidden",
+      reason: "google_permission",
+      sent: false,
+    })
+    const rm = harness({ reply })
+    expect(await removeFromGroup(rm.deps, "aaa", "x@gmail.com")).toMatchObject({
+      status: "forbidden",
+      reason: "google_permission",
+      sent: false,
+    })
+    e.mockRestore()
+    expect(add.calls.some((c) => /^(POST|DELETE)/.test(c))).toBe(false)
+    expect(rm.calls.some((c) => /^(POST|DELETE)/.test(c))).toBe(false)
+  })
+
+  test("per-address failure logs carry actor, group and the address", async () => {
+    const e = quiet()
+    const add = harness({
+      reply: (m) => (m === "POST" ? json({}, 503) : undefined),
+    })
+    await addToGroup(add.deps, "aaa", ["a@gmail.com"])
+    const rm = harness({
+      reply: (m) => (m === "DELETE" ? json({}, 503) : undefined),
+    })
+    await removeFromGroup(rm.deps, "aaa", "x@gmail.com")
+    const lines = JSON.stringify(e.mock.calls)
+    e.mockRestore()
+    expect(lines).toContain('"address":"a@gmail.com"')
+    expect(lines).toContain('"address":"x@gmail.com"')
+    expect(lines).toContain('"actor":"u1"')
+    expect(lines).toContain('"group":"aaa"')
+  })
+
+  test("the deadline log carries actor, group and counts", async () => {
+    const e = quiet()
+    let t = 0
+    const h = harness({ api: { now: () => t }, budgetMs: 100 })
+    const inner = h.deps.api.fetch
+    h.deps.api.fetch = ((i: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") t += 60
+      return inner(i, init)
+    }) as typeof fetch
+    await addToGroup(h.deps, "aaa", addresses(12))
+    const logged = JSON.stringify(e.mock.calls)
+    e.mockRestore()
+    expect(logged).toContain("stopped at the deadline")
+    expect(logged).toContain('"actor":"u1"')
+    expect(logged).toContain('"group":"aaa"')
+    expect(logged).toContain('"total":12')
   })
 })
