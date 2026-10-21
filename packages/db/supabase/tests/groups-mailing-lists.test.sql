@@ -105,6 +105,8 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"9a9a9a9a-0000-0000-0000-000000000002","role":"authenticated"}', true);
 select ok(public.is_group_manager('aaa'), 'manager manages their group');
 select ok(not public.is_group_manager('bbb'), 'manager does not manage another group');
+select is((select count(*)::integer from public.group_managers), 1,
+  'a manager reads exactly their own manager row');
 select throws_ok($$select public.groups_assign_manager('bbb', '9a9a9a9a-0000-0000-0000-000000000002')$$,
   '42501', null, 'a manager cannot assign themselves elsewhere');
 select throws_ok($$select public.groups_unassign_manager('aaa', '9a9a9a9a-0000-0000-0000-000000000002')$$,
@@ -121,7 +123,9 @@ set local role service_role;
 insert into public.group_membership_audit (actor_id, group_id, group_email, member_email, action, outcome)
 values
   ('9a9a9a9a-0000-0000-0000-000000000002', 'aaa', 'a@winlab.tw', 'x@gmail.com', 'add', 'ok'),
-  ('9a9a9a9a-0000-0000-0000-000000000001', 'bbb', 'b@winlab.tw', 'y@gmail.com', 'remove', 'protected');
+  ('9a9a9a9a-0000-0000-0000-000000000001', 'bbb', 'b@winlab.tw', 'y@gmail.com', 'remove', 'protected'),
+  -- same group, other actor: told apart from "actor_id = auth.uid()"
+  ('9a9a9a9a-0000-0000-0000-000000000001', 'aaa', 'a@winlab.tw', 'w@gmail.com', 'add', 'ok');
 -- 2026-10-19: the `unsupported` outcome was dropped; anything unexpected is `error`.
 select throws_ok($$insert into public.group_membership_audit (actor_id, group_id, group_email, member_email, action, outcome)
   values ('9a9a9a9a-0000-0000-0000-000000000001', 'aaa', 'a@winlab.tw', 'z@gmail.com', 'add', 'unsupported')$$,
@@ -133,8 +137,8 @@ reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"9a9a9a9a-0000-0000-0000-000000000002","role":"authenticated"}', true);
-select is((select count(*)::integer from public.group_membership_audit), 1,
-  'a manager reads only their group''s audit');
+select is((select count(*)::integer from public.group_membership_audit), 2,
+  'a manager reads their group''s audit, whoever wrote the row, and no other group''s');
 reset role;
 
 set local role authenticated;
