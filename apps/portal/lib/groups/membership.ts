@@ -69,6 +69,7 @@ export const BATCH_BUDGET_MS = 60_000
 /** Bound on a role check that runs outside an action's deadline (is_portal_admin). */
 export const ROLE_CHECK_TIMEOUT_MS = 10_000
 
+export const READ_TIMEOUT_MESSAGE = "讀取逾時，請稍後重新整理"
 export const DENIED = "你不是這個群組的管理者"
 export const NOT_MANAGED = "這個群組不存在，或不開放給 portal 管理"
 // A group that is on screen, so "doesn't exist" would be false. Does not name
@@ -342,6 +343,9 @@ export async function readGroup(
     return { status: "ok", data: { group: auth.group, members } }
   } catch (err) {
     console.error("[groups] read failed", err)
+    // A read has nothing to "send"; the write wording would mislead.
+    if (err instanceof GoogleDeadlineError)
+      return { status: "error", detail: READ_TIMEOUT_MESSAGE, sent: false }
     return failure(err, false)
   }
 }
@@ -452,7 +456,10 @@ export async function addToGroup(
         total: emails.length,
         cause: describeError(abort.cause),
       })
-      return failure(abort.cause, tracked.sent())
+      return {
+        ...failure(abort.cause, tracked.sent()),
+        results,
+      } as GroupsResult<never>
     }
     if (results.length < emails.length) {
       // Out of time: the rest were never sent. What did run is audited.
@@ -472,6 +479,7 @@ export async function addToGroup(
             ? "已送出的結果可能已套用，請重新整理確認後再試。"
             : "沒有任何變更送出，可以直接再試。"),
         sent,
+        results,
       }
     }
     return { status: "ok", data: results }

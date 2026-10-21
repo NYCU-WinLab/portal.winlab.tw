@@ -215,6 +215,20 @@ describe("addToGroup", () => {
     expect(h.audits[0]!.map((r) => r.outcome)).toEqual(posts.map(() => "error"))
   })
 
+  test("a 403 after one ok hands back the confirmed result with the error", async () => {
+    let posts = 0
+    const h = harness({
+      reply: (method) =>
+        method === "POST" && posts++ > 0 ? notAuthorized() : undefined,
+    })
+    const res = await addToGroup(h.deps, "aaa", addresses(6))
+    expect(res).toMatchObject({ status: "forbidden", sent: true })
+    if (res.status !== "forbidden") return
+    expect(res.results?.[0]).toMatchObject({ outcome: "ok" })
+    expect(res.results!.filter((r) => r.outcome === "ok")).toHaveLength(1)
+    expect(res.results!.length).toBeLessThan(6)
+  })
+
   test("one address failing on its own doesn't stop the rest", async () => {
     const h = harness({
       reply: (method, path, body) =>
@@ -362,6 +376,23 @@ describe("addToGroup deadlines", () => {
     // The stopped ones say nothing was sent for them, not "unknown".
     for (const row of h.audits[0]!.slice(1))
       expect(row.detail).toBe("處理太久，已停止，這個步驟沒有送出")
+  })
+
+  test("the deadline after one ok carries that result on the error", async () => {
+    const h = harness()
+    let t = 0
+    h.deps.api.now = () => t
+    h.deps.batchBudgetMs = MIN_WRITE_BUDGET_MS + 100
+    const origFetch = h.deps.api.fetch
+    h.deps.api.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") t += MIN_WRITE_BUDGET_MS + 100
+      return origFetch(input, init)
+    }) as typeof fetch
+    const res = await addToGroup(h.deps, "aaa", addresses(12))
+    expect(res).toMatchObject({ status: "error", sent: true })
+    if (res.status !== "error") return
+    expect(res.results?.filter((r) => r.outcome === "ok")).toHaveLength(1)
+    expect(res.results!.length).toBeLessThan(12)
   })
 
   test("a throttled address does not stop the others", async () => {
@@ -1336,7 +1367,11 @@ describe("the manager check is bounded by the action deadline", () => {
       api: { deadline: Date.now() + BUDGET },
     })
     const res = await readGroup(h.deps, "aaa")
-    expect(res).toMatchObject({ status: "error", sent: false })
+    expect(res).toMatchObject({
+      status: "error",
+      sent: false,
+      detail: "讀取逾時，請稍後重新整理",
+    })
     expect(h.calls).toEqual([])
     expect(h.managerSignals[0]!.aborted).toBe(true)
   })

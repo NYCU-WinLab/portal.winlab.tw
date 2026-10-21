@@ -128,6 +128,15 @@ export function AddMembersDialog({
       setBusy(false)
     }
     if (res.status !== "ok") {
+      // A batch that stopped part-way still says what came back for the
+      // addresses it tried: show the ones that landed, as the success path
+      // does. The input stays so the rest can be retried.
+      if ("results" in res && res.results)
+        onAdded(
+          res.results
+            .filter((r) => r.outcome === "ok" || r.outcome === "already")
+            .map((r) => r.listedAs ?? r.email)
+        )
       // Refused before anything was sent (unconfigured, the portal's own
       // refusals, malformed input): nothing landed, so no re-read and no
       // "partly added" hint. Anything else may have stopped part-way, so

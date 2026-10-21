@@ -45,8 +45,20 @@ export type GroupsResult<T> =
       reason: ForbiddenReason
       detail: string
       sent?: boolean
+      results?: MemberChangeResult[]
     }
-  | { status: "error"; detail: string; sent?: boolean }
+  | {
+      status: "error"
+      detail: string
+      sent?: boolean
+      /**
+       * Set only by an add batch that stopped part-way (a fatal Google error
+       * or the deadline): what came back for the addresses that were tried,
+       * so the UI can show the ones that landed. Addresses with no entry
+       * were never attempted.
+       */
+      results?: MemberChangeResult[]
+    }
 
 export type MembershipOutcome =
   | "ok"
