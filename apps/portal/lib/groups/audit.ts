@@ -63,8 +63,8 @@ export async function recordMembershipChanges(
     const { error } = await createAdminClient()
       .from("group_membership_audit")
       .insert(rows)
-    if (error) console.error("[groups] audit insert failed", error)
+    if (error) console.error("[groups] audit insert failed", error, rows)
   } catch (err) {
-    console.error("[groups] audit insert failed", err)
+    console.error("[groups] audit insert failed", err, rows)
   }
 }
