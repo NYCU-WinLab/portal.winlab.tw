@@ -267,7 +267,11 @@ groups; the portal does, on every request:
   ancestors at distance 1..3 (cycle-safe) and refuses if any is `gcp-*` or
   outside the domain; deeper ancestry is refused, and a failed lookup
   fails closed. Still keep the `gcp-*` groups free of group
-  members — the check is the net, not the plan.
+  members — the check is the net, not the plan. Delegation is inherited
+  too: if group A is a member of group B, A's managers changing A's
+  members also change who B reaches, without being B's managers. The
+  fence only stops `gcp-*` and out-of-domain ancestors, so assign a nested
+  group's managers as if they managed its parents as well.
 - **Only the group's managers** (`group_managers`, assigned by portal admins;
   portal admins manage every group), checked with `is_group_manager()` before
   any Google call.
@@ -313,8 +317,10 @@ Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
 where the api is built in `groupsApiFromEnv`, the group listing included; both
 `/groups` pages set `maxDuration = 300`). A write needs `MIN_WRITE_BUDGET_MS`
 (3 s) of it left to start, checked again after the token arrives, rather than
-begin and be reported as unknown. The Keycloak cohort lookup has its own 8 s
-one, so a hung upstream ends in a message, not a stuck page.
+begin and be reported as unknown. The `is_group_manager()` check before it
+counts against the same deadline (aborted when it runs out, nothing sent);
+the `is_portal_admin` checks get 10 s. The Keycloak cohort lookup has its
+own 8 s one, so a hung upstream ends in a message, not a stuck page.
 
 Accepted residual risk: the token the portal mints is scope-limited to
 membership (`lib/groups/scopes.ts`), but whoever can deploy the portal to

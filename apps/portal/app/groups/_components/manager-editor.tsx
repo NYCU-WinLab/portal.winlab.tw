@@ -78,6 +78,9 @@ export function ManagerEditor({
       <h2 className="text-sm text-muted-foreground">
         群組管理者（portal 管理員可編輯）
       </h2>
+      <p className="text-xs text-muted-foreground">
+        若此群組是其他群組的成員，管理者改動成員時也會改變上層群組的收件對象。
+      </p>
       <ul className="flex flex-col gap-1 text-sm">
         {managerIds.map((id) => (
           <li key={id} className="flex items-center justify-between">
