@@ -67,7 +67,7 @@ export function cohortCandidates(
     }
     if (!emails.includes(email)) {
       emails.push(email)
-      if (!status) unknownStatus++
+      if (!status) unknownStatus++ // no profile, or a null lab_status
     }
   }
   return { emails, skippedNoEmail, skippedAlumni, unknownStatus }

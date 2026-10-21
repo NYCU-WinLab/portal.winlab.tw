@@ -107,8 +107,6 @@ export async function fetchCohorts(
     return null
   } finally {
     clearTimeout(timer)
-    // Settles `expired` for good if it never fired; nothing awaits it.
-    expired.catch(() => {})
   }
 }
 

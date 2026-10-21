@@ -15,6 +15,7 @@ import { ExternalAccountClient } from "google-auth-library"
 
 import { credentialErrorMessage, readGroupsConfig } from "@/lib/groups/config"
 import { GroupsCredentialError, type GroupsApi } from "@/lib/groups/google"
+import { BATCH_BUDGET_MS } from "@/lib/groups/membership"
 import { SCOPES } from "@/lib/groups/scopes"
 
 export function groupsApiFromEnv(): GroupsApi | null {
@@ -42,6 +43,9 @@ export function groupsApiFromEnv(): GroupsApi | null {
   return {
     fetch,
     domain: config.domain,
+    // Every read made with this api (the group list included) is bounded by
+    // the action budget; callers that set their own deadline override it.
+    deadline: Date.now() + BATCH_BUDGET_MS,
     token: async () => {
       try {
         if (!client) throw new Error("WIF client could not be built")

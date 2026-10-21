@@ -40,6 +40,8 @@ export type GroupsApi = {
 
 /** One Directory call gets this long before it is abandoned. */
 export const CALL_TIMEOUT_MS = 15_000
+/** A POST/DELETE is not started with less than this left of the deadline. */
+export const MIN_WRITE_BUDGET_MS = 3_000
 /** Attempts at a rate-limited call, the first included. */
 const MAX_ATTEMPTS = 3
 const BACKOFF_MS = 1000
@@ -160,7 +162,12 @@ async function attempt(
   let timeoutMs = api.timeoutMs ?? CALL_TIMEOUT_MS
   if (api.deadline !== undefined) {
     const left = api.deadline - (api.now ?? Date.now)()
-    if (left <= 0) throw new GoogleDeadlineError()
+    const writes = init?.method === "POST" || init?.method === "DELETE"
+    // A write that starts with almost nothing left would near-certainly
+    // abort and then read as "result unknown"; refuse it before anything is
+    // sent instead. Reads keep the plain rule.
+    if (left <= 0 || (writes && left < MIN_WRITE_BUDGET_MS))
+      throw new GoogleDeadlineError()
     timeoutMs = Math.min(timeoutMs, left)
   }
   const timer = AbortSignal.timeout(timeoutMs)

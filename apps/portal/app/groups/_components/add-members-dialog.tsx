@@ -257,8 +257,9 @@ export function AddMembersDialog({
               ` · 格式錯誤 ${typed.invalid.length} 筆（${typed.invalid.join(", ")}）`}
             {cohortPick.skippedAlumni > 0 &&
               ` · 排除已畢業 ${cohortPick.skippedAlumni} 人`}
-            {cohortPick.unknownStatus > 0 &&
-              ` · 在學狀態未知 ${cohortPick.unknownStatus} 人（沒有 portal 帳號，不會被排除）`}
+            {excludeAlumni &&
+              cohortPick.unknownStatus > 0 &&
+              ` · 在學狀態未知 ${cohortPick.unknownStatus} 人（不會被排除）`}
             {cohortPick.skippedNoEmail > 0 &&
               ` · 無 email ${cohortPick.skippedNoEmail} 人`}
             {plan.toAdd.length > 0 && (

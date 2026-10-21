@@ -10,6 +10,7 @@ import {
   listDomainGroups,
   listMembers,
   listParentGroups,
+  MIN_WRITE_BUDGET_MS,
   removeMember,
   isRateLimited,
   type GroupsApi,
@@ -527,8 +528,10 @@ describe("throttling and deadlines", () => {
 
   test("no retry is started past the batch deadline", async () => {
     const api = withClock(fakeApi([() => rateLimited()]))
-    api.now = () => 1000
-    api.deadline = 1001
+    // Enough left to start the POST, none by the time it is throttled.
+    let calls = 0
+    api.now = () => (calls++ === 0 ? 1000 : 1000 + MIN_WRITE_BUDGET_MS)
+    api.deadline = 1001 + MIN_WRITE_BUDGET_MS
     const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
     expect(isRateLimited(err)).toBe(true)
     expect(api.calls).toHaveLength(1)
@@ -739,6 +742,65 @@ describe("the action deadline bounds every call", () => {
     const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
     expect(err).toBeInstanceOf(GoogleDeadlineError)
     expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("listing the domain's groups stops at the deadline, with an error", async () => {
+    const api = clocked(
+      [
+        (u) =>
+          u.pathname === `${DIR}/groups`
+            ? json({
+                groups: [{ id: "g", email: "g@winlab.tw" }],
+                nextPageToken: `p${api.calls.length}`,
+              })
+            : undefined,
+      ],
+      40
+    )
+    api.deadline = 100
+    const err = await listDomainGroups(api).catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleDeadlineError)
+    expect(api.calls).toHaveLength(3)
+  })
+
+  const removeRoutes: Route[] = [
+    (u, init) => {
+      if (u.pathname === `${DIR}/groups/aaa/members` && isGet(init))
+        return json({
+          members: [{ id: "m1", email: "x@gmail.com", role: "MEMBER" }],
+        })
+      if (u.pathname === `${DIR}/groups/aaa/members/m1` && isGet(init))
+        return json({ id: "m1", role: "MEMBER" })
+      if (u.pathname === `${DIR}/groups/aaa/members/m1`)
+        return new Response(null, { status: 204 })
+      return undefined
+    },
+  ]
+
+  test("a DELETE with less than the minimum budget left is not sent", async () => {
+    const api = clocked(removeRoutes)
+    api.deadline = 10_000
+    api.advance(10_000 - (MIN_WRITE_BUDGET_MS - 1000))
+    const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleDeadlineError)
+    expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("a POST with less than the minimum budget left is not sent", async () => {
+    const api = clocked([() => json({ id: "m", role: "MEMBER" })])
+    api.deadline = 10_000
+    api.advance(10_000 - (MIN_WRITE_BUDGET_MS - 1000))
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleDeadlineError)
+    expect(api.calls).toHaveLength(0)
+  })
+
+  test("a DELETE with enough budget left is sent", async () => {
+    const api = clocked(removeRoutes)
+    api.deadline = 10_000
+    api.advance(10_000 - (MIN_WRITE_BUDGET_MS + 1000))
+    await removeMember(api, "aaa", "x@gmail.com")
+    expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(true)
   })
 
   test("each call's timeout shrinks to the time left", async () => {

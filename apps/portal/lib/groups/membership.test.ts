@@ -1,7 +1,11 @@
 import { describe, expect, spyOn, test } from "bun:test"
 
 import type { AuditInsert } from "@/lib/groups/audit"
-import { GroupsCredentialError, type GroupsApi } from "@/lib/groups/google"
+import {
+  GroupsCredentialError,
+  MIN_WRITE_BUDGET_MS,
+  type GroupsApi,
+} from "@/lib/groups/google"
 import {
   addToGroup,
   MAX_BATCH,
@@ -323,10 +327,10 @@ describe("addToGroup deadlines", () => {
     const h = harness()
     let t = 0
     h.deps.api.now = () => t
-    h.deps.batchBudgetMs = 100
+    h.deps.batchBudgetMs = MIN_WRITE_BUDGET_MS + 100
     const origFetch = h.deps.api.fetch
     h.deps.api.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST") t += 60
+      if (init?.method === "POST") t += MIN_WRITE_BUDGET_MS + 100
       return origFetch(input, init)
     }) as typeof fetch
     const res = await addToGroup(h.deps, "aaa", addresses(12))
@@ -939,10 +943,17 @@ describe("one deadline for the whole action", () => {
 
   test("a retry stops at the deadline for the batch's own writes", async () => {
     const e = spyOn(console, "error").mockImplementation(() => {})
+    // Enough budget to start the POST; the throttled reply arrives with
+    // none left, so no retry is made.
+    let t = 1000
     const h = harness({
-      api: clock(),
-      budgetMs: 1,
-      reply: throttled((m) => m === "POST"),
+      api: { now: () => t, sleep: async () => {} },
+      budgetMs: MIN_WRITE_BUDGET_MS + 1,
+      reply: (m, path, body) => {
+        if (m !== "POST") return undefined
+        t = 1000 + MIN_WRITE_BUDGET_MS
+        return throttled((x) => x === "POST")(m, path, body)
+      },
     })
     await addToGroup(h.deps, "aaa", ["a@gmail.com"])
     e.mockRestore()
@@ -1176,10 +1187,13 @@ describe("the deadline bounds the whole action", () => {
   test("the deadline log carries actor, group and counts", async () => {
     const e = quiet()
     let t = 0
-    const h = harness({ api: { now: () => t }, budgetMs: 100 })
+    const h = harness({
+      api: { now: () => t },
+      budgetMs: MIN_WRITE_BUDGET_MS + 100,
+    })
     const inner = h.deps.api.fetch
     h.deps.api.fetch = ((i: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST") t += 60
+      if (init?.method === "POST") t += MIN_WRITE_BUDGET_MS + 100
       return inner(i, init)
     }) as typeof fetch
     await addToGroup(h.deps, "aaa", addresses(12))

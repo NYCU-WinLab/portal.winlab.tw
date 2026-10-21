@@ -70,6 +70,16 @@ describe("cohortCandidates", () => {
     expect(r.unknownStatus).toBe(1) // d@x.com has no profile
   })
 
+  test("a profile with a null lab_status counts as unknown too", () => {
+    const withNull = new Map<string, string | null>([
+      ...status,
+      ["d@x.com", null],
+    ])
+    const r = cohortCandidates(members, withNull, { excludeAlumni: true })
+    expect(r.emails).toContain("d@x.com")
+    expect(r.unknownStatus).toBe(1)
+  })
+
   test("keeps alumni when asked to", () => {
     expect(
       cohortCandidates(members, status, { excludeAlumni: false }).emails
