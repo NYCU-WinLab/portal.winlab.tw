@@ -4,11 +4,13 @@ import { z } from "zod"
 import {
   failure,
   json,
+  requireAdmin,
   requireCaller,
   type ToolContext,
 } from "@/lib/mcp/context"
 import { createUserClient } from "@/lib/mcp/supabase"
 import { fetchTripFiles, fetchTrips } from "@/lib/trip/fetch"
+import { createTrip, setTripStatus, updateTrip } from "@/lib/trip/mutate"
 import type { Trip } from "@/lib/trip/types"
 
 const UUID_RE =
@@ -16,7 +18,7 @@ const UUID_RE =
 
 // A trip can be named by id or by its display name (case-insensitive). Names
 // are what members say ("KubeSummit"), ids are what list_trips returns.
-function resolveTrip(trips: Trip[], ref: string): Trip {
+export function resolveTrip(trips: Trip[], ref: string): Trip {
   const wanted = ref.trim()
   if (UUID_RE.test(wanted)) {
     const byId = trips.find((t) => t.id === wanted)
@@ -41,6 +43,18 @@ function resolveTrip(trips: Trip[], ref: string): Trip {
       ? `no trip named "${wanted}"; call list_trips to see the names`
       : `"${wanted}" matches ${partial.length} trips: ${partial.map((t) => t.name).join(", ")}`
   )
+}
+
+function tripSummary(t: Trip) {
+  return {
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    status: t.status,
+    created_at: t.created_at,
+    closed_at: t.closed_at,
+    url: `https://portal.winlab.tw/trip/${t.id}`,
+  }
 }
 
 export function registerTripTools(server: McpServer) {
@@ -153,6 +167,109 @@ export function registerTripTools(server: McpServer) {
             uploaded_at: f.created_at,
           })),
         })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "create_trip",
+    {
+      title: "Create trip",
+      description:
+        "Open a new travel-document folder on /trip, the same as the page's 新增 Trip button. Trip admins only. The trip starts open, so members can upload to it right away. Put the date and any notes (subsidy cap, special instructions) in description, e.g. '2026/10/16'.",
+      inputSchema: z.object({
+        name: z.string().trim().min(1).max(200).describe("Trip name"),
+        description: z
+          .string()
+          .trim()
+          .max(2000)
+          .optional()
+          .describe("Date and notes, shown under the name"),
+      }),
+    },
+    async ({ name, description }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        const supabase = createUserClient(caller.token)
+        await requireAdmin(supabase, "is_trip_admin", "create trips")
+        const trip = await createTrip(supabase, {
+          name,
+          description: description || null,
+        })
+        return json({ created: tripSummary(trip) })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "update_trip",
+    {
+      title: "Update trip",
+      description:
+        "Rename a trip or change its description, the same as the page's edit dialog. Trip admins only. trip accepts the trip id or its name. A field left out keeps its current value; an empty description clears it.",
+      inputSchema: z.object({
+        trip: z.string().trim().min(1).describe("Trip id or name"),
+        name: z.string().trim().min(1).max(200).optional().describe("New name"),
+        description: z
+          .string()
+          .trim()
+          .max(2000)
+          .optional()
+          .describe("New description; empty clears it"),
+      }),
+    },
+    async ({ trip: ref, name, description }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        const supabase = createUserClient(caller.token)
+        await requireAdmin(supabase, "is_trip_admin", "edit trips")
+        if (name === undefined && description === undefined) {
+          throw new Error("pass name, description or both")
+        }
+        const trip = resolveTrip(await fetchTrips(supabase), ref)
+        const updated = await updateTrip(supabase, {
+          id: trip.id,
+          name: name ?? trip.name,
+          description:
+            description === undefined ? trip.description : description || null,
+        })
+        return json({ updated: tripSummary(updated) })
+      } catch (err) {
+        return failure(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    "set_trip_status",
+    {
+      title: "Close or reopen trip",
+      description:
+        "Close a trip so it stops taking uploads, or reopen a closed one, the same as the page's close and reopen actions. Trip admins only. Files already uploaded stay. trip accepts the trip id or its name.",
+      inputSchema: z.object({
+        trip: z.string().trim().min(1).describe("Trip id or name"),
+        status: z.enum(["open", "closed"]).describe("New status"),
+      }),
+    },
+    async ({ trip: ref, status }, ctx) => {
+      try {
+        const caller = requireCaller(ctx as ToolContext)
+        const supabase = createUserClient(caller.token)
+        await requireAdmin(
+          supabase,
+          "is_trip_admin",
+          status === "closed" ? "close trips" : "reopen trips"
+        )
+        const trip = resolveTrip(await fetchTrips(supabase), ref)
+        if (trip.status === status) {
+          return json({ unchanged: tripSummary(trip) })
+        }
+        const updated = await setTripStatus(supabase, { id: trip.id, status })
+        return json({ updated: tripSummary(updated) })
       } catch (err) {
         return failure(err)
       }

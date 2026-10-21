@@ -7,8 +7,7 @@ import { doorConfigured } from "@/lib/door/client"
 import { pressDoor } from "@/lib/door/open"
 import { reloadPanelGreetings } from "@/lib/door/panel"
 import { callerAsUser } from "@/lib/mcp/context"
-import { MCP_INSTRUCTIONS } from "@/lib/mcp/instructions"
-import { MCP_SERVER_INFO, registerTools } from "@/lib/mcp/server"
+import { MCP_SERVER_OPTIONS, registerTools } from "@/lib/mcp/server"
 import { createUserClient, verifySupabaseToken } from "@/lib/mcp/supabase"
 import { cancelBookingFor, confirmBookingFor } from "@/lib/rooms/confirm"
 import { removeStaleDoorSounds } from "@/lib/profile/door-sound"
@@ -90,10 +89,7 @@ const handler = withMcpAuth(
           })
         },
       }),
-    {
-      serverInfo: MCP_SERVER_INFO,
-      instructions: MCP_INSTRUCTIONS,
-    }
+    MCP_SERVER_OPTIONS
   ),
   (_req, bearer) => verifySupabaseToken(bearer),
   { required: true }
