@@ -4,7 +4,7 @@ This file briefs Claude Code (claude.ai/code) when working in this repository.
 
 ## Product
 
-**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
+**portal.winlab.tw** — WinLab's internal portal. The root domain hosts business apps (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/groups`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`), each owned by different people but sharing:
 
 - **Auth** — Supabase Auth, Keycloak as the OIDC provider
 - **Profile / session** — one user state across the portal
@@ -105,7 +105,7 @@ Never open a PR without a linked issue. Exceptions: typo fixes, dependency bumps
 
 ### Monorepo topology
 
-- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
+- `apps/portal` — the main Next.js app on `portal.winlab.tw` (workspace name `portal`, runs on :3000). Most business routes (`/admin`, `/approve`, `/bento`, `/bulletin`, `/door`, `/games`, `/groups`, `/leave`, `/meetings`, `/profile`, `/receipts`, `/reimburse`, `/rooms`, `/trip`) live here.
 - `apps/gallery` — `gallery.winlab.tw`, an independent subdomain workspace (runs on :3005). Instrument Serif polaroid layout with custom `<GalleryShell>` chrome.
 - `packages/db`: the Supabase CLI project (`supabase/`: migrations, pgTAP tests, `config.toml`). Run CLI commands from here, e.g. `cd packages/db && supabase db start`. No app depends on it, so a migration-only commit doesn't rebuild portal or gallery on Vercel.
 - `packages/ui` — the single source of truth for the design system and shadcn primitives. `<PortalShell>` lives here; portal and gallery (via its own shell) import from it.
@@ -240,6 +240,103 @@ Real examples of each, all under `apps/portal/app/api/`:
 - **External bot integration** (bearer token via `Authorization` header, CORS-open, service-role Supabase client) — `bulletin/unnotified`, `bulletin/mark-notified`.
 - **File streaming / third-party service calls** — `meetings/upload`, `meetings/sync-files`, `meetings/check-video`, `meetings/schedule`.
 
+### `/groups` and Google mailing lists
+
+Google Workspace here is a set of mailing lists, not an identity directory:
+most members are outside addresses, many with no Google account at all. So
+the member list lives **only in Google**; `/groups` reads it live and writes
+it through the Admin SDK Directory API, and never stores a copy.
+
+The credential is the `portal-groups@winlab-portal` service account, reached
+only through Workload Identity Federation from Vercel's OIDC token — there is
+no key, and only **production** deployments can get a token (preview and
+local runs are refused by GCP, and have no `GOOGLE_GROUPS_*` env anyway). The
+account holds a custom admin role with just GROUPS_RETRIEVE + GROUPS_UPDATE,
+over **every group in the domain**. Google therefore draws no line between
+groups; the portal does, on every request:
+
+- **Never a `gcp-*` group, never outside `GOOGLE_GROUPS_DOMAIN`**
+  (`lib/groups/scope.ts`), checked against the address Google returns for the
+  group, not anything the caller sent (and the id Google returns must be
+  the one the manager check was made for). Nested groups are allowed in
+  Google, so a group that is a member of a `gcp-*` group would change who is
+  effectively in it. Before any membership **write** (not reads),
+  `lib/groups/nesting.ts` walks the target's parent groups (`groups.list`
+  with `userKey` alone: no domain filter, and `userKey` = a group's address
+  is per Google's guide but not yet verified against the live API), checks
+  ancestors at distance 1..3 (cycle-safe) and refuses if any is `gcp-*` or
+  outside the domain; deeper ancestry is refused, and a failed lookup
+  fails closed. Still keep the `gcp-*` groups free of group
+  members — the check is the net, not the plan. Delegation is inherited
+  too: if group A is a member of group B, A's managers changing A's
+  members also change who B reaches, without being B's managers. The
+  fence only stops `gcp-*` and out-of-domain ancestors, so assign a nested
+  group's managers as if they managed its parents as well.
+- **Only the group's managers** (`group_managers`, assigned by portal admins;
+  portal admins manage every group), checked with `is_group_manager()` before
+  any Google call.
+- **Only MEMBER rows** are added or removed, so nobody can be promoted. The
+  role is re-read by id right before each DELETE, but Google has no
+  precondition on a delete, so a promotion landing between that read and the
+  DELETE is still removed (accepted residual).
+
+Every attempt, refused ones too, lands in `group_membership_audit` from the
+service role: one row per address tried, one per refused or failed request.
+Refusals are capped, because any signed-in member can send any group id and
+each `denied` row would show up in that group's 最近變更: past 30 `denied`
+rows per actor in the last hour the sink only `console.warn`s them. The cap
+is best-effort (concurrent requests can exceed it; every row still names its
+actor), so 最近變更 lists real changes first and collapses `denied` rows
+behind a toggle, where they can't push real changes out. `ok` and `error`
+rows are never dropped. (The count filters on `actor_id`, which has no
+index; fine at lab scale.) Audit is best-effort too: a failed insert leaves
+the rows only in the server log, with no retry. The audit is written in
+`after()` once the action finishes, so a process killed between Google's
+write and that hand-off leaves the change with neither an audit row nor the
+fallback log (accepted residual; Google's own admin audit log still records
+it). Errors shown to managers are
+a status and a stable reason (`Google 403（forbidden）`). Google's and
+PostgREST's own text goes to the server log only; the audit `detail` holds
+just that short message, because managers can read their group's audit rows
+through RLS.
+A request whose input the UI could never have sent (wrong types, an address
+that doesn't parse) is refused before any of that and leaves no row. The
+order of checks lives in `lib/groups/membership.ts`, tested with fakes;
+`app/groups/actions.ts` only wires in the real dependencies.
+
+Gotchas, all measured against the live API: use `domain=`, never
+`customer=my_customer` (400 as a service account; the one exception is the
+parent-group lookup, which sends `userKey` alone); never look a member up or
+delete it by email (some outside addresses 404 while on the list) — list,
+match, delete by member id; the member list is eventually consistent, so the
+UI trusts each action's per-address result and re-reads a few seconds later.
+The first outside address added to a group makes Google switch the group to
+"external members allowed (admins only)", and removing it doesn't switch back.
+
+Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
+where the api is built in `groupsApiFromEnv`, the group listing included; both
+`/groups` pages set `maxDuration = 300`). A write needs `MIN_WRITE_BUDGET_MS`
+(3 s) of it left to start, checked again after the token arrives, rather than
+begin and be reported as unknown. The `is_group_manager()` check before any
+Google call (page reads too) counts against the same deadline (aborted when it
+runs out, nothing sent); a 10 s bound covers the `is_portal_admin` checks, the
+`group_managers` read, the pages' other reads and the user lookup. The Keycloak cohort lookup has its
+own 8 s one, so a hung upstream ends in a message, not a stuck page.
+
+Accepted residual risk: the token the portal mints is scope-limited to
+membership (`lib/groups/scopes.ts`), but whoever can deploy the portal to
+production can mint the credential with any scope, and so can change the
+members **and settings** of any group
+in the domain, gcp-\* included (GROUPS_UPDATE can't be split). They can't
+create or delete groups, or touch users or GCP. This is safe from GCP
+escalation only because the organisation IAM grants nothing to `group:`
+principals; grant new GCP admins as `user:`, never through a group.
+
+Keycloak stays read-only (#416): it is only the address book the cohort
+picker reads from. Don't route mailing lists through Keycloak or AD groups —
+an AD group can't hold outside addresses without polluting the directory
+with contact objects.
+
 ### Portal ↔ GitLab boundary
 
 The lab runs a GitLab-side automation (`winlab-helper`) alongside this portal.
@@ -323,7 +420,7 @@ apps/portal/
 ```
 
 - **TanStack Query is per-app, not root** — `admin`, `approve`, `bento`, `games`, `leave`, `meetings`, `receipts`, `rooms`, `trip` each mount their own `_components/query-provider.tsx` + `QueryProvider` inside that app's `layout.tsx` (`bulletin` and `reimburse` don't use it). The provider file is copy-pasted identically across apps (bento's and receipts's are byte-for-byte the same) — that's the established pattern here, not an oversight to "fix" by deduping.
-- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `leave`, `meetings`, `receipts`, `reimburse`, `rooms`, `trip`). Don't double-mount within one layout tree.
+- **`<Toaster />` is mounted per-app**, same reasoning — it's in the root `page.tsx` plus almost every app layout (`admin`, `approve`, `bento`, `bulletin`, `games`, `groups`, `leave`, `meetings`, `receipts`, `reimburse`, `rooms`, `trip`). Don't double-mount within one layout tree.
 - **`AuthProvider` lives in root layout** because user state is shared. Bento hooks consume `@/hooks/use-auth`.
 - **Admin is app-scoped** — `useAdmin()` checks the caller's own `roles.bento` contains `"admin"`, read through `get_my_access()`. Other apps follow the same pattern with their own hook: `useReceiptsAdmin()`, `useMeetingsAdmin()`, `useTripAdmin()`, `usePortalAdmin()` (for `/admin` itself). Not every app has a dedicated hook (e.g. games, leave, approve, bulletin gate purely via RLS + `has_role()`).
 
