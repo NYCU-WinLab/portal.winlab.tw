@@ -28,6 +28,7 @@ import {
   parseUserId,
   readGroup,
   removeFromGroup,
+  ROLE_CHECK_TIMEOUT_MS,
   type MembershipDeps,
 } from "@/lib/groups/membership"
 import { isManageableGroup } from "@/lib/groups/scope"
@@ -59,10 +60,10 @@ async function requestContext(): Promise<Context> {
     deps: {
       userId: user.id,
       api,
-      async isManager(groupId) {
-        const { data, error } = await supabase.rpc("is_group_manager", {
-          p_group_id: groupId,
-        })
+      async isManager(groupId, signal) {
+        const { data, error } = await supabase
+          .rpc("is_group_manager", { p_group_id: groupId })
+          .abortSignal(signal)
         if (error) throw new Error(`is_group_manager failed: ${error.message}`)
         return data === true
       },
@@ -80,13 +81,16 @@ export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
     const api = groupsApiFromEnv()
     if (!api) return { status: "unconfigured" }
     const supabase = await createClient()
+    // Both run before any Google call; a stalled one ends as an error.
+    const signal = AbortSignal.timeout(ROLE_CHECK_TIMEOUT_MS)
     const [{ data: isAdmin, error: adminError }, { data: rows, error }] =
       await Promise.all([
-        supabase.rpc("is_portal_admin"),
+        supabase.rpc("is_portal_admin").abortSignal(signal),
         supabase
           .from("group_managers")
           .select("group_id")
-          .eq("user_id", user.id),
+          .eq("user_id", user.id)
+          .abortSignal(signal),
       ])
     // An admin must not be told they manage nothing because a check failed.
     if (adminError) {
@@ -186,8 +190,9 @@ export async function assignGroupManager(
     const api = groupsApiFromEnv()
     if (!api) return { ok: false, error: "Google 群組整合尚未設定" }
     const supabase = await createClient()
-    const { data: isAdmin, error: adminError } =
-      await supabase.rpc("is_portal_admin")
+    const { data: isAdmin, error: adminError } = await supabase
+      .rpc("is_portal_admin")
+      .abortSignal(AbortSignal.timeout(ROLE_CHECK_TIMEOUT_MS))
     if (adminError) {
       console.error("[groups] is_portal_admin failed", adminError)
       return { ok: false, error: "無法確認管理員身分，請稍後再試" }

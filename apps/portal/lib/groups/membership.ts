@@ -16,7 +16,8 @@
 //      a gcp-* group (or one outside the domain) is refused, because editing
 //      it would change that group's effective membership.
 //      One deadline is taken when the action starts and covers all of it:
-//      authorisation, the ancestor walk and the writes. Past it no Google
+//      authorisation (is_group_manager() too: it is aborted and abandoned
+//      at the deadline), the ancestor walk and the writes. Past it no Google
 //      call starts (token included), no retry is made and, for an add, no
 //      new address; each call's timeout is also cut to what is left.
 //   4. Every write attempt past (1) is audited, handed to the sink once, in
@@ -65,6 +66,8 @@ export { MAX_BATCH }
 const CONCURRENCY = 4
 /** The action's whole budget: no retry or new address starts after it. */
 export const BATCH_BUDGET_MS = 60_000
+/** Bound on a role check that runs outside an action's deadline (is_portal_admin). */
+export const ROLE_CHECK_TIMEOUT_MS = 10_000
 
 export const DENIED = "你不是這個群組的管理者"
 export const NOT_MANAGED = "這個群組不存在，或不開放給 portal 管理"
@@ -78,8 +81,12 @@ const UNKNOWN_GROUP = "(unknown)"
 export type GroupAccess = {
   userId: string
   api: GroupsApi
-  /** is_group_manager() with the member's own client. Throws if the RPC fails. */
-  isManager: (groupId: string) => Promise<boolean>
+  /**
+   * is_group_manager() with the member's own client. Throws if the RPC
+   * fails. `signal` aborts at the action's deadline; the check is abandoned
+   * then whether or not the RPC honours it.
+   */
+  isManager: (groupId: string, signal: AbortSignal) => Promise<boolean>
 }
 
 export type MembershipDeps = GroupAccess & {
@@ -145,11 +152,41 @@ type Verdict =
       why: string
     }
 
+/**
+ * is_group_manager() within what is left of the action's deadline. A check
+ * that can't finish in time is a pre-send failure (GoogleDeadlineError):
+ * nothing has gone to Google yet.
+ */
+async function checkManager(
+  access: GroupAccess,
+  groupId: string
+): Promise<boolean> {
+  const now = access.api.now ?? Date.now
+  const left = (access.api.deadline ?? now() + BATCH_BUDGET_MS) - now()
+  if (left <= 0) throw new GoogleDeadlineError()
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new GoogleDeadlineError())
+    }, left)
+  })
+  try {
+    return await Promise.race([
+      access.isManager(groupId, controller.signal),
+      expired,
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function authorize(
   access: GroupAccess,
   groupId: string
 ): Promise<Verdict> {
-  const isManager = await access.isManager(groupId)
+  const isManager = await checkManager(access, groupId)
   // Only a manager makes the portal ask Google about the group.
   const group = isManager ? await getGroup(access.api, groupId) : null
   // The manager check was made for the id the caller sent; every write uses

@@ -67,7 +67,8 @@ const google: Reply = (method, path, body) => {
 
 function harness(
   opts: {
-    manager?: boolean | Error
+    /** "hang": the RPC never answers and ignores its abort signal. */
+    manager?: boolean | Error | "hang"
     reply?: Reply
     token?: () => Promise<string>
     /** Extra api fields: clock, sleep, timeouts. */
@@ -78,6 +79,7 @@ function harness(
   const calls: string[] = []
   const audits: AuditInsert[][] = []
   let managerChecks = 0
+  const managerSignals: AbortSignal[] = []
   const api: GroupsApi = {
     domain: "winlab.tw",
     token: opts.token ?? (async () => "t"),
@@ -103,8 +105,10 @@ function harness(
   const deps: MembershipDeps = {
     userId: "u1",
     api,
-    isManager: async () => {
+    isManager: async (_groupId, signal) => {
       managerChecks++
+      managerSignals.push(signal)
+      if (opts.manager === "hang") return new Promise<boolean>(() => {})
       if (opts.manager instanceof Error) throw opts.manager
       return opts.manager ?? true
     },
@@ -113,7 +117,13 @@ function harness(
     },
     batchBudgetMs: opts.budgetMs,
   }
-  return { deps, calls, audits, managerChecks: () => managerChecks }
+  return {
+    deps,
+    calls,
+    audits,
+    managerChecks: () => managerChecks,
+    managerSignals,
+  }
 }
 
 const addresses = (n: number) =>
@@ -1258,5 +1268,60 @@ describe("the deadline bounds the whole action", () => {
     expect(logged).toContain('"actor":"u1"')
     expect(logged).toContain('"group":"aaa"')
     expect(logged).toContain('"total":12')
+  })
+})
+
+describe("the manager check is bounded by the action deadline", () => {
+  const BUDGET = 50
+  const flows = [
+    ["add", (d: MembershipDeps) => addToGroup(d, "aaa", ["n@gmail.com"])],
+    ["remove", (d: MembershipDeps) => removeFromGroup(d, "aaa", "x@gmail.com")],
+  ] as const
+
+  for (const [name, run] of flows)
+    test(`${name}: a stalled is_group_manager ends as a pre-send error, no Google call`, async () => {
+      const h = harness({ manager: "hang", budgetMs: BUDGET })
+      const started = Date.now()
+      const res = await run(h.deps)
+      expect(Date.now() - started).toBeLessThan(BUDGET + 1000)
+      expect(res).toMatchObject({ status: "error", sent: false })
+      if (res.status !== "error") return
+      expect(res.detail).toContain("沒有送出")
+      expect(h.calls).toEqual([])
+      // The RPC was told to stop.
+      expect(h.managerSignals[0]!.aborted).toBe(true)
+      // A real attempt, recorded once.
+      expect(h.audits).toHaveLength(1)
+      expect(h.audits[0]![0]!.outcome).toBe("error")
+    })
+
+  test("read: a stalled is_group_manager ends as an error, no Google call", async () => {
+    const h = harness({
+      manager: "hang",
+      api: { deadline: Date.now() + BUDGET },
+    })
+    const res = await readGroup(h.deps, "aaa")
+    expect(res).toMatchObject({ status: "error", sent: false })
+    expect(h.calls).toEqual([])
+    expect(h.managerSignals[0]!.aborted).toBe(true)
+  })
+
+  test("the RPC gets what is left of the action's budget, not a fresh one", async () => {
+    let t = 1000
+    const h = harness({ manager: "hang", api: { now: () => t } })
+    h.deps.batchBudgetMs = 60_000
+    // Already past the deadline by the time authorisation starts.
+    h.deps.api.now = () => (t += 60_000)
+    const res = await addToGroup(h.deps, "aaa", ["n@gmail.com"])
+    expect(res).toMatchObject({ status: "error", sent: false })
+    expect(h.managerChecks()).toBe(0)
+    expect(h.calls).toEqual([])
+  })
+
+  test("an answer in time is unaffected and its signal is not aborted", async () => {
+    const h = harness({ budgetMs: 5_000 })
+    const res = await addToGroup(h.deps, "aaa", ["n@gmail.com"])
+    expect(res.status).toBe("ok")
+    expect(h.managerSignals[0]!.aborted).toBe(false)
   })
 })
