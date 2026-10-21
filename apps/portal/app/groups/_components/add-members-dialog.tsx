@@ -211,7 +211,7 @@ export function AddMembersDialog({
 
           {cohorts && !profilesLoaded && (
             <p className="text-xs text-destructive">
-              無法讀取成員在學狀態，暫時不能依屆別加入（否則「排除已畢業」不會生效）。
+              無法讀取成員在學狀態，暫時不能依屆別加入（否則「排除已知畢業生」不會生效）。
             </p>
           )}
           {cohorts && profilesLoaded && (
@@ -234,7 +234,7 @@ export function AddMembersDialog({
                   checked={excludeAlumni}
                   onCheckedChange={(v) => setExcludeAlumni(v === true)}
                 />
-                排除已畢業
+                排除已知畢業生
               </span>
             </label>
           )}
@@ -257,6 +257,8 @@ export function AddMembersDialog({
               ` · 格式錯誤 ${typed.invalid.length} 筆（${typed.invalid.join(", ")}）`}
             {cohortPick.skippedAlumni > 0 &&
               ` · 排除已畢業 ${cohortPick.skippedAlumni} 人`}
+            {cohortPick.unknownStatus > 0 &&
+              ` · 在學狀態未知 ${cohortPick.unknownStatus} 人（沒有 portal 帳號，不會被排除）`}
             {cohortPick.skippedNoEmail > 0 &&
               ` · 無 email ${cohortPick.skippedNoEmail} 人`}
             {plan.toAdd.length > 0 && (

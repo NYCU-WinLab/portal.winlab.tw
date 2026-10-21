@@ -61,7 +61,13 @@ describe("cohortCandidates", () => {
       emails: ["a@x.com", "d@x.com"],
       skippedNoEmail: 1,
       skippedAlumni: 1,
+      unknownStatus: 1,
     })
+  })
+
+  test("counts kept members whose status is unknown", () => {
+    const r = cohortCandidates(members, status, { excludeAlumni: true })
+    expect(r.unknownStatus).toBe(1) // d@x.com has no profile
   })
 
   test("keeps alumni when asked to", () => {

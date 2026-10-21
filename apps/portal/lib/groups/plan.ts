@@ -31,6 +31,14 @@ export function externalAddresses(emails: string[], domain: string): string[] {
   return emails.filter((e) => !e.trim().toLowerCase().endsWith(suffix))
 }
 
+export type CohortCandidates = {
+  emails: string[]
+  skippedNoEmail: number
+  skippedAlumni: number
+  /** Kept, but with no portal profile (or no status): "exclude alumni" could not judge them. */
+  unknownStatus: number
+}
+
 /**
  * Addresses to offer from a /lab-member/<year> cohort. Lab status comes from
  * user_profiles (mirrored from Keycloak by the kc-lab-status cron); someone
@@ -41,26 +49,36 @@ export function cohortCandidates(
   members: KeycloakGroupMember[],
   statusByEmail: ReadonlyMap<string, string | null>,
   opts: { excludeAlumni: boolean }
-): { emails: string[]; skippedNoEmail: number; skippedAlumni: number } {
+): CohortCandidates {
   const emails: string[] = []
   let skippedNoEmail = 0
   let skippedAlumni = 0
+  let unknownStatus = 0
   for (const m of members) {
     const email = m.email ? normalizeEmail(m.email) : null
     if (!email) {
       skippedNoEmail++
       continue
     }
-    if (opts.excludeAlumni && statusByEmail.get(email) === "alumni") {
+    const status = statusByEmail.get(email)
+    if (opts.excludeAlumni && status === "alumni") {
       skippedAlumni++
       continue
     }
-    if (!emails.includes(email)) emails.push(email)
+    if (!emails.includes(email)) {
+      emails.push(email)
+      if (!status) unknownStatus++
+    }
   }
-  return { emails, skippedNoEmail, skippedAlumni }
+  return { emails, skippedNoEmail, skippedAlumni, unknownStatus }
 }
 
-const NO_COHORT = { emails: [], skippedNoEmail: 0, skippedAlumni: 0 }
+const NO_COHORT: CohortCandidates = {
+  emails: [],
+  skippedNoEmail: 0,
+  skippedAlumni: 0,
+  unknownStatus: 0,
+}
 
 /**
  * What the cohort picker contributes to a batch. Without lab statuses
@@ -71,7 +89,7 @@ export function cohortContribution(
   members: KeycloakGroupMember[] | undefined,
   statusByEmail: ReadonlyMap<string, string | null>,
   opts: { excludeAlumni: boolean; profilesLoaded: boolean }
-): { emails: string[]; skippedNoEmail: number; skippedAlumni: number } {
+): CohortCandidates {
   if (!opts.profilesLoaded || !members) return NO_COHORT
   return cohortCandidates(members, statusByEmail, opts)
 }

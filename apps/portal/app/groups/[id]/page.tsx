@@ -33,18 +33,28 @@ export default async function GroupPage({
     membersResult.reason !== "google_permission"
   )
     notFound()
+  // A failed read still renders the panel: this page is also what the
+  // scheduled router.refresh() re-reads land on, and the panel keeps the last
+  // good list (and the open add dialog) through a failure. Nothing else is
+  // read then — an error can come from before the authorisation check.
   if (membersResult.status !== "ok")
     return (
-      <p className="text-destructive">
-        讀取成員失敗：
-        {membersResult.status === "unconfigured"
-          ? "Google 群組整合尚未設定"
-          : membersResult.detail}
-      </p>
+      <div className="flex flex-col gap-8">
+        <GroupMembersPanel
+          key="panel"
+          groupId={id}
+          data={null}
+          error={
+            membersResult.status === "unconfigured"
+              ? "Google 群組整合尚未設定"
+              : membersResult.detail
+          }
+        />
+      </div>
     )
 
   const supabase = await createClient()
-  const [profiles, cohorts, audit, deniedCount, adminCheck, managers] =
+  const [profiles, cohorts, audit, refusals, adminCheck, managers] =
     await Promise.all([
       supabase.from("user_profiles").select("id, name, email, lab_status"),
       fetchCohorts(),
@@ -78,8 +88,8 @@ export default async function GroupPage({
   const isAdmin = adminCheck.data
   if (adminCheck.error)
     console.error("[groups] is_portal_admin failed", adminCheck.error)
-  if (deniedCount.error)
-    console.error("[groups] denied count failed", deniedCount.error)
+  if (refusals.error)
+    console.error("[groups] refusals read failed", refusals.error)
   if (audit.error) console.error("[groups] audit read failed", audit.error)
   if (managers.error)
     console.error("[groups] managers read failed", managers.error)
@@ -93,26 +103,25 @@ export default async function GroupPage({
       labStatus: p.lab_status,
     }))
   const { group, members } = membersResult.data
-  const domain = group.email.slice(group.email.lastIndexOf("@") + 1)
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-lg">{group.name}</h1>
-        <p className="text-xs text-muted-foreground">{group.email}</p>
-      </header>
       {profilesFailed && (
         <p className="text-xs text-destructive">
           無法讀取成員姓名與在學狀態，名單只顯示 email，也暫時不能依屆別加入。
         </p>
       )}
       <GroupMembersPanel
+        key="panel"
         groupId={group.id}
-        domain={domain}
-        members={members}
-        people={people}
-        cohorts={cohorts}
-        profilesLoaded={!profilesFailed}
+        error={null}
+        data={{
+          group,
+          members,
+          people,
+          cohorts,
+          profilesLoaded: !profilesFailed,
+        }}
       />
       {adminCheck.error && (
         <p className="text-xs text-destructive">
@@ -134,8 +143,9 @@ export default async function GroupPage({
       <RecentChanges
         rows={audit.data ?? []}
         people={people}
-        denied={deniedCount.data ?? []}
-        deniedCount={deniedCount.count ?? 0}
+        denied={refusals.data ?? []}
+        deniedCount={refusals.count ?? 0}
+        deniedFailed={refusals.error !== null}
         failed={audit.error !== null}
       />
     </div>

@@ -21,6 +21,7 @@ export function RecentChanges({
   rows,
   denied = [],
   deniedCount = 0,
+  deniedFailed = false,
   people,
   failed = false,
 }: {
@@ -30,6 +31,8 @@ export function RecentChanges({
   denied?: Row[]
   /** How many refused requests there are in all. */
   deniedCount?: number
+  /** The refusals query failed: say so rather than drop the toggle. */
+  deniedFailed?: boolean
   people: Person[]
   /** The audit query failed: say so rather than show nothing. */
   failed?: boolean
@@ -43,7 +46,7 @@ export function RecentChanges({
         </p>
       </section>
     )
-  if (rows.length === 0 && deniedCount === 0) return null
+  if (rows.length === 0 && deniedCount === 0 && !deniedFailed) return null
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
   const line = (r: Row) => (
     <li key={r.id}>
@@ -60,6 +63,11 @@ export function RecentChanges({
     <section className="flex flex-col gap-2">
       <h2 className="text-sm text-muted-foreground">最近變更</h2>
       <ul className="flex flex-col gap-1 text-xs">{rows.map(line)}</ul>
+      {deniedFailed && (
+        <p className="text-xs text-destructive">
+          無法讀取被拒絕的請求，請稍後重新整理。
+        </p>
+      )}
       {deniedCount > 0 && (
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer">
