@@ -60,6 +60,39 @@ describe("findForbiddenAncestor", () => {
     ).toBeNull()
   })
 
+  test("exactly three clean levels are allowed", async () => {
+    expect(
+      await findForbiddenAncestor(
+        tree({
+          "a@winlab.tw": ["g1@winlab.tw"],
+          "g1@winlab.tw": ["g2@winlab.tw"],
+          "g2@winlab.tw": ["g3@winlab.tw"],
+        }),
+        "a@winlab.tw",
+        "winlab.tw"
+      )
+    ).toBeNull()
+  })
+
+  test("a fourth level is refused as too deep, but a forbidden one there is named", async () => {
+    const four = {
+      "a@winlab.tw": ["g1@winlab.tw"],
+      "g1@winlab.tw": ["g2@winlab.tw"],
+      "g2@winlab.tw": ["g3@winlab.tw"],
+      "g3@winlab.tw": ["g4@winlab.tw"],
+    }
+    await expect(
+      findForbiddenAncestor(tree(four), "a@winlab.tw", "winlab.tw")
+    ).rejects.toBeInstanceOf(NestingTooDeepError)
+    expect(
+      await findForbiddenAncestor(
+        tree({ ...four, "g3@winlab.tw": ["gcp-x@winlab.tw"] }),
+        "a@winlab.tw",
+        "winlab.tw"
+      )
+    ).toBe("gcp-x@winlab.tw")
+  })
+
   test("a cycle terminates", async () => {
     let calls = 0
     const parentsOf = async (email: string) => {

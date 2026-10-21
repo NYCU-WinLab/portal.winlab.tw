@@ -31,7 +31,10 @@ export async function findForbiddenAncestor(
 ): Promise<string | null> {
   const visited = new Set([groupEmail.trim().toLowerCase()])
   let level = [...visited]
-  for (let depth = 0; depth < maxDepth; depth++) {
+  // Ancestors at distance 1..maxDepth are all checked. The extra pass asks
+  // for the parents of the farthest level only to learn whether the ancestry
+  // goes on: if it does, it is deeper than we look and can't be vouched for.
+  for (let depth = 0; depth <= maxDepth; depth++) {
     const next: string[] = []
     for (const email of level) {
       for (const raw of await parentsOf(email)) {
@@ -43,7 +46,8 @@ export async function findForbiddenAncestor(
       }
     }
     if (next.length === 0) return null
+    if (depth === maxDepth) throw new NestingTooDeepError()
     level = next
   }
-  throw new NestingTooDeepError()
+  return null
 }

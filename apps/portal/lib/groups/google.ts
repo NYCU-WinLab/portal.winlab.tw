@@ -75,10 +75,18 @@ export function isRateLimited(err: unknown): boolean {
   )
 }
 
-/** A call got no answer in time: whether Google applied it is unknown. */
+/**
+ * A call got no answer in time. For a write (`mayHaveLanded`) whether Google
+ * applied it is unknown; for a read, or while still getting a token (nothing
+ * was sent yet), nothing can have changed and the message says so.
+ */
 export class GoogleTimeoutError extends Error {
-  constructor() {
-    super("Google 沒有在時限內回應，結果未知（可能已經套用），請重新整理確認")
+  constructor(readonly mayHaveLanded = true) {
+    super(
+      mayHaveLanded
+        ? "Google 沒有在時限內回應，結果未知（可能已經套用），請重新整理確認"
+        : "Google 沒有在時限內回應，請稍後再試"
+    )
     this.name = "GoogleTimeoutError"
   }
 }
@@ -107,27 +115,62 @@ type RawMember = {
   status?: string
 }
 
+/** `promise`, or a rejection as soon as `signal` aborts. */
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      // Nobody will read the late result; keep it from being unhandled.
+      promise.catch(() => {})
+      return reject(signal.reason)
+    }
+    const onAbort = () => reject(signal.reason)
+    signal.addEventListener("abort", onAbort, { once: true })
+    promise.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort)
+        resolve(v)
+      },
+      (e: unknown) => {
+        signal.removeEventListener("abort", onAbort)
+        reject(e)
+      }
+    )
+  })
+}
+
 async function attempt(
   api: GroupsApi,
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const deadline = AbortSignal.timeout(api.timeoutMs ?? CALL_TIMEOUT_MS)
-  const signal = init?.signal
-    ? AbortSignal.any([init.signal, deadline])
-    : deadline
+  const timer = AbortSignal.timeout(api.timeoutMs ?? CALL_TIMEOUT_MS)
+  const signal = init?.signal ? AbortSignal.any([init.signal, timer]) : timer
+  const writes = init?.method === "POST" || init?.method === "DELETE"
+  // Getting the token counts against the same deadline: a stalled STS / IAM
+  // exchange must not hang the action. Nothing has been sent yet, so a
+  // timeout here cannot have changed anything. A credential failure keeps
+  // its own outcome even when it surfaces after the timer fired.
+  let token: string
+  try {
+    token = await raceAbort(api.token(), timer)
+  } catch (err) {
+    if (err instanceof GroupsCredentialError) throw err
+    if (timer.aborted) throw new GoogleTimeoutError(false)
+    throw err
+  }
   try {
     return await api.fetch(`${BASE}/${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${await api.token()}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       cache: "no-store",
       signal,
     })
   } catch (err) {
-    if (deadline.aborted) throw new GoogleTimeoutError()
+    if (err instanceof GroupsCredentialError) throw err
+    if (timer.aborted) throw new GoogleTimeoutError(writes)
     throw err
   }
 }
@@ -145,10 +188,13 @@ async function reasonOf(res: Response): Promise<string | undefined> {
 }
 
 // Throttled calls (403/429 with a rate-limit reason) are retried with
-// backoff and jitter, never past api.deadline. GET and DELETE are plain
-// idempotent; a repeated member POST answers 409, which addMember reads as
-// "already". Once attempts run out the throttled reply is returned for the
-// caller's fail() like any other.
+// backoff and jitter, never past api.deadline. GET is plain idempotent; a
+// repeated member POST answers 409, which addMember reads as "already".
+// DELETE is never retried here: removeMember checked the member's role just
+// before it, and a promotion during the backoff would make the retry delete
+// an OWNER. A throttled DELETE was not applied, so it surfaces as the
+// throttling error and the caller decides. Once attempts run out the
+// throttled reply is returned for the caller's fail() like any other.
 async function call(
   api: GroupsApi,
   path: string,
@@ -164,7 +210,7 @@ async function call(
     const limited =
       res.status === 429 ||
       (reason !== undefined && RATE_LIMIT_REASONS.has(reason))
-    if (!limited || n >= MAX_ATTEMPTS) return res
+    if (!limited || n >= MAX_ATTEMPTS || init?.method === "DELETE") return res
     const wait = BACKOFF_MS * 2 ** (n - 1) * (0.5 + Math.random() / 2)
     if (api.deadline !== undefined && now() + wait >= api.deadline) return res
     await sleep(wait)
@@ -239,10 +285,16 @@ export async function getGroup(
  * The addresses of the groups `groupEmail` is a direct member of
  * (lower-cased). Used by the nesting fence in membership.ts.
  *
- * Google documents `userKey` as a user's email or id; that a group's address
- * works there too is how the lookup is used, not something the reference
- * promises. `domain` is sent as well: the reference only forbids `customer`
- * together with `userKey`, and asks for one of `customer` / `domain`.
+ * The "retrieve all groups for a member" guide shows `userKey` (a user's or
+ * group's primary or alias email, or an id) with `pageToken` / `maxResults`
+ * and no `domain`; the guide says the user or group "must belong to your
+ * domain". That it works for this service account has not been verified live
+ * yet (see the PR's post-deploy checklist).
+ *
+ * No `domain`: a filter would hide a parent in another domain, which is
+ * exactly what the fence has to see. (The groups.list reference does not say
+ * whether `userKey` may be combined with `domain`, and asks for `customer` or
+ * `domain` otherwise.)
  */
 export async function listParentGroups(
   api: GroupsApi,
@@ -253,7 +305,6 @@ export async function listParentGroups(
   do {
     const q = new URLSearchParams({
       userKey: groupEmail,
-      domain: api.domain,
       maxResults: PAGE_SIZE,
     })
     if (pageToken) q.set("pageToken", pageToken)
@@ -360,7 +411,11 @@ export async function removeMember(
   if (fresh.status === 404) return "not_found"
   if (!fresh.ok) await fail(fresh)
   const current = (await fresh.json().catch(() => null)) as RawMember | null
-  if (!isPlainMember(current?.role ?? "")) return "protected"
+  // An unreadable reply says nothing about the role: that is a failure, not
+  // a "protected" member. Only an explicit MEMBER passes.
+  if (!current || typeof current.role !== "string" || current.role === "")
+    throw new Error("Google's re-read of the member had no readable role")
+  if (!isPlainMember(current.role)) return "protected"
 
   const res = await call(api, memberPath, { method: "DELETE" })
   if (res.status === 404) return "not_found"

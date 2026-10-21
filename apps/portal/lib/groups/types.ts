@@ -31,11 +31,22 @@ export type GroupMember = {
  */
 export type ForbiddenReason = "denied" | "not_managed" | "google_permission"
 
+/**
+ * `sent` on a failed result is the server's word on whether a write request
+ * (an add POST or a remove DELETE) may have reached Google: false when the
+ * failure came before any was sent, true when at least one was. Absent means
+ * unknown, which the UI treats like true.
+ */
 export type GroupsResult<T> =
   | { status: "ok"; data: T }
   | { status: "unconfigured" }
-  | { status: "forbidden"; reason: ForbiddenReason; detail: string }
-  | { status: "error"; detail: string }
+  | {
+      status: "forbidden"
+      reason: ForbiddenReason
+      detail: string
+      sent?: boolean
+    }
+  | { status: "error"; detail: string; sent?: boolean }
 
 export type MembershipOutcome =
   | "ok"

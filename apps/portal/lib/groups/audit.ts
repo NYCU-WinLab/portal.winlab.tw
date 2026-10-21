@@ -11,9 +11,8 @@ const MAX_DETAIL_LENGTH = 500
 
 // Postgres text can't hold U+0000, and one bad row fails the whole insert,
 // taking every other row of that request with it. So control characters and
-// lone surrogates go,
-// and lengths are cut by code point — the way char_length() counts them, and
-// without splitting a surrogate pair.
+// lone surrogates go, and lengths are cut by code point — the way
+// char_length() counts them, and without splitting a surrogate pair.
 const CONTROL = /[\p{Cc}\p{Cs}]+/gu
 
 function clip(text: string, max: number): string {
@@ -84,11 +83,12 @@ export function splitDenied(
 // (group_id, created_at) does); at lab scale that is a small scan, and it
 // runs only for requests that were refused.
 export async function recordMembershipChanges(
-  rows: AuditInsert[]
+  rows: AuditInsert[],
+  makeAdmin: typeof createAdminClient = createAdminClient
 ): Promise<void> {
   if (rows.length === 0) return
   try {
-    const admin = createAdminClient()
+    const admin = makeAdmin()
     let toInsert = rows
     const denied = rows.filter((r) => r.outcome === "denied")
     if (denied.length > 0) {

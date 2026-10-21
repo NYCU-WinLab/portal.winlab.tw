@@ -5,6 +5,7 @@ import {
   getGroup,
   GoogleGroupsError,
   GoogleTimeoutError,
+  GroupsCredentialError,
   listDomainGroups,
   listMembers,
   listParentGroups,
@@ -363,6 +364,51 @@ describe("removeMember", () => {
     expect((err as GoogleGroupsError).status).toBe(403)
   })
 
+  test("a throttled DELETE is not retried: a promotion during the backoff must not be deleted", async () => {
+    let reads = 0
+    let deletes = 0
+    const sleeps: number[] = []
+    const api = fakeApi([
+      membersOfAaa,
+      (u, init) => {
+        if (!isGet(init) || !u.pathname.endsWith("/members/100"))
+          return undefined
+        // MEMBER on the first re-read, OWNER on any later one.
+        return json({ id: "100", role: ++reads === 1 ? "MEMBER" : "OWNER" })
+      },
+      (u, init) => {
+        if (init?.method !== "DELETE") return undefined
+        deletes++
+        return rateLimited()
+      },
+    ])
+    api.sleep = async (ms) => {
+      sleeps.push(ms)
+    }
+    const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(isRateLimited(err)).toBe(true)
+    // Definitely not applied: the throttling error, not a timeout.
+    expect(err).not.toBeInstanceOf(GoogleTimeoutError)
+    expect(deletes).toBe(1)
+    expect(sleeps).toEqual([])
+  })
+
+  test("a by-id re-read with no readable role fails, and nothing is deleted", async () => {
+    for (const reply of [json({}), new Response("not json", { status: 200 })]) {
+      const api = fakeApi([
+        membersOfAaa,
+        (u, init) =>
+          isGet(init) && u.pathname.endsWith("/members/100")
+            ? reply.clone()
+            : undefined,
+        deleted,
+      ])
+      const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
+      expect(err).toBeInstanceOf(Error)
+      expect(api.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+    }
+  })
+
   test("a promotion after the list is caught by the by-id re-read", async () => {
     const api = fakeApi([
       membersOfAaa,
@@ -432,6 +478,23 @@ describe("throttling and deadlines", () => {
     expect(api.sleeps[1]!).toBeGreaterThan(api.sleeps[0]!)
   })
 
+  test("429 is retried like a rate-limit 403", async () => {
+    let n = 0
+    const api = withClock(
+      fakeApi([
+        (u) =>
+          u.pathname.endsWith("/members")
+            ? ++n < 3
+              ? json({ error: { message: "slow down" } }, 429)
+              : json({ members: [] })
+            : undefined,
+      ])
+    )
+    expect(await listMembers(api, "aaa")).toEqual([])
+    expect(api.calls).toHaveLength(3)
+    expect(api.sleeps).toHaveLength(2)
+  })
+
   test("still limited after the attempts is a non-permission error", async () => {
     const api = withClock(fakeApi([() => rateLimited("quotaExceeded")]))
     const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
@@ -465,6 +528,54 @@ describe("throttling and deadlines", () => {
     })
   })
 
+  test("a throttled remove stops retrying its reads at the deadline", async () => {
+    const api = withClock(fakeApi([() => rateLimited()]))
+    api.now = () => 1000
+    api.deadline = 1001
+    const err = await removeMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(isRateLimited(err)).toBe(true)
+    expect(api.calls).toHaveLength(1)
+  })
+
+  test("a token that never arrives is cut at the call timeout, before anything is sent", async () => {
+    const api = fakeApi([])
+    api.timeoutMs = 20
+    api.token = () => new Promise<string>(() => {})
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleTimeoutError)
+    expect((err as GoogleTimeoutError).mayHaveLanded).toBe(false)
+    expect((err as Error).message).not.toContain("結果未知")
+    expect(api.calls).toHaveLength(0)
+  })
+
+  test("a credential failure surfacing after the timer fired keeps its own outcome", async () => {
+    const api = fakeApi([])
+    api.timeoutMs = 10
+    api.fetch = ((_: RequestInfo | URL, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new GroupsCredentialError("no token"))
+        )
+      })) as typeof fetch
+    const err = await addMember(api, "aaa", "x@gmail.com").catch((e) => e)
+    expect(err).toBeInstanceOf(GroupsCredentialError)
+  })
+
+  test("a read that never answers does not claim the result is unknown", async () => {
+    const api = fakeApi([])
+    api.timeoutMs = 20
+    api.fetch = ((_: RequestInfo | URL, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError"))
+        )
+      })) as typeof fetch
+    const err = await getGroup(api, "aaa").catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleTimeoutError)
+    expect((err as GoogleTimeoutError).mayHaveLanded).toBe(false)
+    expect((err as Error).message).not.toContain("可能已經套用")
+  })
+
   test("a call that never answers is abandoned, result unknown", async () => {
     const api = fakeApi([])
     api.timeoutMs = 20
@@ -482,7 +593,7 @@ describe("throttling and deadlines", () => {
 })
 
 describe("listParentGroups", () => {
-  test("asks by userKey and domain, pages, and lower-cases", async () => {
+  test("asks by userKey alone, pages, and lower-cases", async () => {
     const api = fakeApi([
       (u) => {
         if (u.pathname !== `${DIR}/groups`) return undefined
@@ -500,7 +611,8 @@ describe("listParentGroups", () => {
     ])
     const first = new URL(`https://x/${api.calls[0]!.split(" ")[1]}`)
     expect(first.searchParams.get("userKey")).toBe("lab@winlab.tw")
-    expect(first.searchParams.get("domain")).toBe("winlab.tw")
+    // No domain filter: a parent in another domain must still come back.
+    expect(first.searchParams.get("domain")).toBeNull()
     expect(first.searchParams.get("customer")).toBeNull()
     expect(first.searchParams.get("maxResults")).toBe("200")
   })

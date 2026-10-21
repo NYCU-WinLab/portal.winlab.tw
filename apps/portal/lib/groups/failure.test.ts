@@ -79,3 +79,15 @@ describe("describeError", () => {
     expect(describeError(new GoogleGroupsError(500))).toBe("Google 500")
   })
 })
+
+describe("failure's sent flag", () => {
+  test("is passed through, and left out when unknown", () => {
+    expect(failure(new Error("x"), false)).toMatchObject({ sent: false })
+    expect(failure(new Error("x"), true)).toMatchObject({ sent: true })
+    expect("sent" in failure(new Error("x"))).toBe(false)
+    expect(failure(new GoogleGroupsError(403, "d"), false)).toMatchObject({
+      reason: "google_permission",
+      sent: false,
+    })
+  })
+})

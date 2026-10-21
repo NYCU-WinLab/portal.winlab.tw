@@ -15,6 +15,10 @@
 //   3b. Before a write, the group's ancestors are walked: a group nested in
 //      a gcp-* group (or one outside the domain) is refused, because editing
 //      it would change that group's effective membership.
+//      One deadline is taken when the action starts and covers all of it:
+//      authorisation, the ancestor walk and the writes. It stops retries
+//      and, for an add, new addresses; each Directory call has its own
+//      timeout besides.
 //   4. Every write attempt past (1) is audited, handed to the sink once, in
 //      `finally`: a row per address tried, one row for a refusal however
 //      many addresses it carried, one row when authorisation itself failed.
@@ -42,7 +46,10 @@ import {
   type GroupsApi,
 } from "@/lib/groups/google"
 import { INVALID_INPUT, MAX_BATCH } from "@/lib/groups/messages"
-import { findForbiddenAncestor } from "@/lib/groups/nesting"
+import {
+  findForbiddenAncestor,
+  NestingTooDeepError,
+} from "@/lib/groups/nesting"
 import { isValidGroupId } from "@/lib/groups/scope"
 import type {
   GroupMember,
@@ -54,7 +61,7 @@ import type {
 export { MAX_BATCH }
 // Small on purpose: Directory API quotas are per project.
 const CONCURRENCY = 4
-/** No new address is started this long after an add began. */
+/** The action's whole budget: no retry or new address starts after it. */
 export const BATCH_BUDGET_MS = 60_000
 
 export const DENIED = "你不是這個群組的管理者"
@@ -72,25 +79,20 @@ export type GroupAccess = {
 export type MembershipDeps = GroupAccess & {
   /** Gets each request's audit rows once. Must not throw. */
   audit: (rows: AuditInsert[]) => void
-  /** Overrides BATCH_BUDGET_MS (tests). */
+  /** Overrides BATCH_BUDGET_MS, the action-wide deadline (tests). */
   batchBudgetMs?: number
 }
 
-// A per-address result as the audit sees it: `detail` is the full error text,
-// `clientDetail` the short message the browser gets instead (toClient).
-type Internal = MemberChangeResult & { clientDetail?: string }
-
-function toClient({ clientDetail, ...result }: Internal): MemberChangeResult {
-  return clientDetail === undefined
-    ? result
-    : { ...result, detail: clientDetail }
-}
-
-const notManaged = (): GroupsResult<never> => ({
+const notManaged = (detail = NOT_MANAGED): GroupsResult<never> => ({
   status: "forbidden",
   reason: "not_managed",
-  detail: NOT_MANAGED,
+  detail,
+  sent: false,
 })
+
+export const TOO_DEEP = "此群組位於過深的巢狀結構中，無法在 portal 管理"
+export const ANCESTORS_UNVERIFIED =
+  "portal 無法確認這個群組的上層群組，請稍後再試"
 
 export function parseGroupId(value: unknown): string | null {
   return typeof value === "string" && isValidGroupId(value) ? value : null
@@ -158,30 +160,100 @@ async function authorize(
       status: "forbidden",
       reason: verdict.reason,
       detail: denied ? DENIED : NOT_MANAGED,
+      sent: false,
     },
     groupEmail: group?.email ?? null,
     why: denied ? "not a manager" : "not manageable",
   }
 }
 
-/**
- * Before a write: is the group nested (up to a few levels) in a group the
- * portal may not touch? Returns that ancestor's address. A failing lookup
- * throws, and the caller treats it like any failed authorisation: an error,
- * audited, nothing written.
- */
-async function forbiddenAncestor(
-  api: GroupsApi,
-  group: ManagedGroup
-): Promise<string | null> {
-  return findForbiddenAncestor(
-    (email) => listParentGroups(api, email),
-    group.email,
-    api.domain
-  )
+/** The ancestor walk failed for a reason other than "too deep" or a fatal one. */
+class AncestorLookupError extends Error {
+  constructor(readonly underlying: unknown) {
+    super(ANCESTORS_UNVERIFIED)
+    this.name = "AncestorLookupError"
+  }
 }
 
-const NESTED = "nested in a gcp-* group"
+type Fence =
+  | { ok: true }
+  | { ok: false; result: GroupsResult<never>; why: string }
+
+/**
+ * Before a write: is the group nested (up to a few levels) in a group the
+ * portal may not touch, or too deep to tell? Either refuses the write. A
+ * failing lookup is thrown (a fatal Google or credential failure as it is,
+ * anything else as an AncestorLookupError) and the caller treats it like any
+ * failed authorisation: an error, audited, nothing written. The offending
+ * ancestor's address goes to the log, not to the audit row or the browser:
+ * managers can read the audit table and the ancestor may be a gcp-* group.
+ */
+async function checkNesting(
+  access: GroupAccess,
+  group: ManagedGroup
+): Promise<Fence> {
+  try {
+    const ancestor = await findForbiddenAncestor(
+      (email) => listParentGroups(access.api, email),
+      group.email,
+      access.api.domain
+    )
+    if (ancestor === null) return { ok: true }
+    console.warn("[groups] write refused, nested in a forbidden group", {
+      actor: access.userId,
+      group: group.id,
+      ancestor,
+    })
+    return { ok: false, result: notManaged(), why: NESTED }
+  } catch (err) {
+    if (err instanceof NestingTooDeepError)
+      return { ok: false, result: notManaged(TOO_DEEP), why: TOO_DEEP }
+    if (isFatal(err)) throw err
+    throw new AncestorLookupError(err)
+  }
+}
+
+const NESTED = "nested in a group the portal may not manage"
+
+/**
+ * Wraps the api so it notes whether a write request (POST / DELETE) was
+ * handed to fetch. A failure before that cannot have changed anything, and
+ * the UI is told so (GroupsResult.sent).
+ */
+function trackWrites(api: GroupsApi): { api: GroupsApi; sent: () => boolean } {
+  let sent = false
+  return {
+    api: {
+      ...api,
+      fetch: ((input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST" || init?.method === "DELETE") sent = true
+        return api.fetch(input, init)
+      }) as typeof fetch,
+    },
+    sent: () => sent,
+  }
+}
+
+/**
+ * The result and the audit detail for a request that threw. Both carry the
+ * short client message; the full text goes to the log with who and which
+ * group, so the log line and the row can be matched.
+ */
+function failedRequest(
+  err: unknown,
+  sent: boolean,
+  ctx: { actor: string; group: string; action: "add" | "remove" }
+): { result: GroupsResult<never>; detail: string } {
+  console.error(`[groups] ${ctx.action} failed`, ctx, describeError(err), err)
+  if (err instanceof AncestorLookupError) {
+    console.error("[groups] ancestor lookup failed", err.underlying)
+    return {
+      result: { status: "error", detail: ANCESTORS_UNVERIFIED, sent: false },
+      detail: ANCESTORS_UNVERIFIED,
+    }
+  }
+  return { result: failure(err, sent), detail: clientMessage(err) }
+}
 
 /** One row for a whole request, however many addresses it carried. */
 function requestRow(
@@ -220,7 +292,7 @@ export async function readGroup(
     return { status: "ok", data: { group: auth.group, members } }
   } catch (err) {
     console.error("[groups] read failed", err)
-    return failure(err)
+    return failure(err, false)
   }
 }
 
@@ -235,17 +307,28 @@ export async function addToGroup(
     return malformed(deps.userId, "batch size", {
       status: "error",
       detail: `一次最多加入 ${MAX_BATCH} 個地址`,
+      sent: false,
     })
   const emails = parseAddresses(emailsInput)
   if (!emails)
     return malformed(deps.userId, "addresses", {
       status: "error",
       detail: INVALID_INPUT,
+      sent: false,
     })
 
+  // One deadline for the whole action, taken before the first Google call.
+  const now = deps.api.now ?? Date.now
+  const deadline = now() + (deps.batchBudgetMs ?? BATCH_BUDGET_MS)
+  const tracked = trackWrites({ ...deps.api, deadline })
+  const api = tracked.api
+  const access: GroupAccess = { ...deps, api }
+
   const rows: AuditInsert[] = []
+  // The group's address once Google has told us, for the audit row.
+  let knownEmail: string | null = null
   try {
-    const auth = await authorize(deps, groupId)
+    const auth = await authorize(access, groupId)
     if (!auth.ok) {
       rows.push(
         requestRow(
@@ -260,23 +343,14 @@ export async function addToGroup(
       return auth.result
     }
     const group = auth.group
-    const ancestor = await forbiddenAncestor(deps.api, group)
-    if (ancestor !== null) {
+    knownEmail = group.email
+    const fence = await checkNesting(access, group)
+    if (!fence.ok) {
       rows.push(
-        requestRow(
-          deps.userId,
-          group,
-          "add",
-          emails,
-          "denied",
-          `${NESTED} (${ancestor})`
-        )
+        requestRow(deps.userId, group, "add", emails, "denied", fence.why)
       )
-      return notManaged()
+      return fence.result
     }
-    const now = deps.api.now ?? Date.now
-    const deadline = now() + (deps.batchBudgetMs ?? BATCH_BUDGET_MS)
-    const api: GroupsApi = { ...deps.api, deadline }
     // A credential or permission failure is the same for every address:
     // stop sending the rest and report it once.
     const abort: { cause: unknown } = { cause: null }
@@ -291,7 +365,7 @@ export async function addToGroup(
     const results = await mapLimited(
       emails,
       CONCURRENCY,
-      async (email): Promise<Internal> => {
+      async (email): Promise<MemberChangeResult> => {
         // All of it inside the try: mapLimited must never reject (batch.ts).
         try {
           const added = await addMember(api, group.id, email)
@@ -308,12 +382,12 @@ export async function addToGroup(
             : { email, outcome: added.outcome, listedAs }
         } catch (err) {
           if (isFatal(err) && abort.cause === null) abort.cause = err
-          return {
-            email,
-            outcome: "error",
-            detail: describeError(err),
-            clientDetail: clientMessage(err),
-          }
+          console.error(
+            "[groups] add failed for an address",
+            { actor: deps.userId, group: group.id },
+            describeError(err)
+          )
+          return { email, outcome: "error", detail: clientMessage(err) }
         }
       },
       () => abort.cause !== null || now() >= deadline
@@ -322,33 +396,37 @@ export async function addToGroup(
       rows.push(buildAuditRow(deps.userId, group, "add", r))
     if (abort.cause !== null) {
       console.error("[groups] add stopped", abort.cause)
-      return failure(abort.cause)
+      return failure(abort.cause, tracked.sent())
     }
     if (results.length < emails.length) {
       // Out of time: the rest were never sent. What did run is audited.
-      console.error("[groups] add stopped at the batch deadline")
+      console.error("[groups] add stopped at the deadline")
       return {
         status: "error",
         detail: `處理太久，已停止：${emails.length} 個地址中只送出 ${results.length} 個，其餘沒有送出。已送出的結果可能已套用，請重新整理確認後再試。`,
+        sent: tracked.sent(),
       }
     }
-    return { status: "ok", data: results.map(toClient) }
+    return { status: "ok", data: results }
   } catch (err) {
-    // Authorisation itself failed: the token, is_group_manager() or
-    // getGroup. Unlike a malformed request this was a real attempt, so it
-    // is recorded — once.
-    console.error("[groups] add failed", err)
+    // Authorisation, the ancestor walk or anything after them failed. Unlike
+    // a malformed request this was a real attempt, so it is recorded — once.
+    const failed = failedRequest(err, tracked.sent(), {
+      actor: deps.userId,
+      group: groupId,
+      action: "add",
+    })
     rows.push(
       requestRow(
         deps.userId,
-        { id: groupId, email: null },
+        { id: groupId, email: knownEmail },
         "add",
         emails,
         "error",
-        describeError(err)
+        failed.detail
       )
     )
-    return failure(err)
+    return failed.result
   } finally {
     if (rows.length > 0) deps.audit(rows)
   }
@@ -366,11 +444,20 @@ export async function removeFromGroup(
     return malformed(deps.userId, "address", {
       status: "error",
       detail: INVALID_INPUT,
+      sent: false,
     })
 
+  const now = deps.api.now ?? Date.now
+  const tracked = trackWrites({
+    ...deps.api,
+    deadline: now() + (deps.batchBudgetMs ?? BATCH_BUDGET_MS),
+  })
+  const access: GroupAccess = { ...deps, api: tracked.api }
+
   const rows: AuditInsert[] = []
+  let knownEmail: string | null = null
   try {
-    const auth = await authorize(deps, groupId)
+    const auth = await authorize(access, groupId)
     if (!auth.ok) {
       rows.push(
         requestRow(
@@ -384,8 +471,9 @@ export async function removeFromGroup(
       )
       return auth.result
     }
-    const ancestor = await forbiddenAncestor(deps.api, auth.group)
-    if (ancestor !== null) {
+    knownEmail = auth.group.email
+    const fence = await checkNesting(access, auth.group)
+    if (!fence.ok) {
       rows.push(
         requestRow(
           deps.userId,
@@ -393,43 +481,47 @@ export async function removeFromGroup(
           "remove",
           [email],
           "denied",
-          `${NESTED} (${ancestor})`
+          fence.why
         )
       )
-      return notManaged()
+      return fence.result
     }
-    let result: Internal
+    let result: MemberChangeResult
     let fatal: unknown = null
     try {
       result = {
         email,
-        outcome: await removeMember(deps.api, auth.group.id, email),
+        outcome: await removeMember(tracked.api, auth.group.id, email),
       }
     } catch (err) {
       if (isFatal(err)) fatal = err
-      result = {
-        email,
-        outcome: "error",
-        detail: describeError(err),
-        clientDetail: clientMessage(err),
-      }
+      console.error(
+        "[groups] remove failed for an address",
+        { actor: deps.userId, group: auth.group.id },
+        describeError(err)
+      )
+      result = { email, outcome: "error", detail: clientMessage(err) }
     }
     rows.push(buildAuditRow(deps.userId, auth.group, "remove", result))
-    if (fatal !== null) return failure(fatal)
-    return { status: "ok", data: toClient(result) }
+    if (fatal !== null) return failure(fatal, tracked.sent())
+    return { status: "ok", data: result }
   } catch (err) {
-    console.error("[groups] remove failed", err)
+    const failed = failedRequest(err, tracked.sent(), {
+      actor: deps.userId,
+      group: groupId,
+      action: "remove",
+    })
     rows.push(
       requestRow(
         deps.userId,
-        { id: groupId, email: null },
+        { id: groupId, email: knownEmail },
         "remove",
         [email],
         "error",
-        describeError(err)
+        failed.detail
       )
     )
-    return failure(err)
+    return failed.result
   } finally {
     if (rows.length > 0) deps.audit(rows)
   }

@@ -8,14 +8,17 @@ import {
   parseUserId,
   readGroup,
   removeFromGroup,
+  ANCESTORS_UNVERIFIED,
+  TOO_DEEP,
   type MembershipDeps,
 } from "@/lib/groups/membership"
 
+/** "hang" never answers; the call's own timeout has to end it. */
 type Reply = (
   method: string,
   path: string,
   body: string
-) => Response | undefined
+) => Response | "hang" | undefined
 
 const DIR = "/admin/directory/v1"
 
@@ -61,6 +64,9 @@ function harness(
     manager?: boolean | Error
     reply?: Reply
     token?: () => Promise<string>
+    /** Extra api fields: clock, sleep, timeouts. */
+    api?: Partial<GroupsApi>
+    budgetMs?: number
   } = {}
 ) {
   const calls: string[] = []
@@ -69,16 +75,22 @@ function harness(
   const api: GroupsApi = {
     domain: "winlab.tw",
     token: opts.token ?? (async () => "t"),
+    ...opts.api,
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input))
       const method = init?.method ?? "GET"
       const path = url.pathname.slice(DIR.length)
       const body = typeof init?.body === "string" ? init.body : ""
       calls.push(`${method} ${path}`)
-      return (
+      const reply =
         opts.reply?.(method, path, body) ??
         google(method, path, body) ??
         new Response("unrouted", { status: 599 })
+      if (reply !== "hang") return reply
+      return new Promise<Response>((_resolve, reject) =>
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError"))
+        )
       )
     }) as typeof fetch,
   }
@@ -93,6 +105,7 @@ function harness(
     audit: (rows) => {
       audits.push(rows)
     },
+    batchBudgetMs: opts.budgetMs,
   }
   return { deps, calls, audits, managerChecks: () => managerChecks }
 }
@@ -586,7 +599,11 @@ describe("the nesting fence", () => {
       outcome: "denied",
       group_email: "lab-all@winlab.tw",
     })
-    expect(add.audits[0]![0]!.detail).toContain("nested in a gcp-* group")
+    // The ancestor's address stays out of the row managers can read.
+    expect(add.audits[0]![0]!.detail).toBe(
+      "nested in a group the portal may not manage"
+    )
+    expect(add.audits[0]![0]!.detail).not.toContain("gcp-billing")
 
     const rm = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
     expect(await removeFromGroup(rm.deps, "aaa", "x@gmail.com")).toMatchObject({
@@ -601,15 +618,56 @@ describe("the nesting fence", () => {
     expect((await addToGroup(h.deps, "aaa", ["a@gmail.com"])).status).toBe("ok")
     const r = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
     expect((await readGroup(r.deps, "aaa")).status).toBe("ok")
-    expect(r.calls.some((c) => c.startsWith("GET /groups?"))).toBe(false)
+    // The harness records paths without the query string: "GET /groups" is
+    // the parent lookup (the group itself is "GET /groups/aaa").
+    expect(r.calls).not.toContain("GET /groups")
+    expect(h.calls).toContain("GET /groups")
   })
 
   test("a failing lookup fails closed: error, audited, no write", async () => {
     const h = harness({ reply: parents(json({}, 500)) })
+    const err = spyOn(console, "error").mockImplementation(() => {})
     const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
-    expect(res.status).toBe("error")
+    err.mockRestore()
+    expect(res).toEqual({
+      status: "error",
+      detail: ANCESTORS_UNVERIFIED,
+      sent: false,
+    })
     expect(h.calls.some((c) => c.startsWith("POST"))).toBe(false)
-    expect(h.audits[0]![0]).toMatchObject({ outcome: "error" })
+    // The group is known by then, so the row names it.
+    expect(h.audits[0]![0]).toMatchObject({
+      outcome: "error",
+      group_email: "lab-all@winlab.tw",
+      detail: ANCESTORS_UNVERIFIED,
+    })
+  })
+
+  test("ancestry too deep to check is a refusal with its own reason, audited as denied", async () => {
+    let n = 0
+    const chain: Reply = (method, path) =>
+      method === "GET" && path === "/groups"
+        ? json({ groups: [{ id: "p", email: `g${n++}@winlab.tw` }] })
+        : undefined
+    for (const action of ["add", "remove"] as const) {
+      n = 0
+      const h = harness({ reply: chain })
+      const res =
+        action === "add"
+          ? await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+          : await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+      expect(res).toEqual({
+        status: "forbidden",
+        reason: "not_managed",
+        detail: TOO_DEEP,
+        sent: false,
+      })
+      expect(h.audits[0]![0]).toMatchObject({
+        outcome: "denied",
+        detail: TOO_DEEP,
+      })
+      expect(h.calls.some((c) => /^(POST|DELETE)/.test(c))).toBe(false)
+    }
   })
 })
 
@@ -677,7 +735,8 @@ describe("a 409 reports Google's spelling", () => {
 })
 
 describe("what the browser is told", () => {
-  test("a per-address failure carries a short message; the audit keeps the detail", async () => {
+  test("a per-address failure carries the same short message to the browser and the audit", async () => {
+    const log = spyOn(console, "error").mockImplementation(() => {})
     const h = harness({
       reply: (method) =>
         method === "POST"
@@ -703,6 +762,213 @@ describe("what the browser is told", () => {
         },
       ],
     })
-    expect(h.audits[0]![0]!.detail).toContain("backend secret")
+    // The audit is readable by managers: same short text, no upstream words.
+    expect(h.audits[0]![0]!.detail).toBe("Google 503（backendError）")
+    expect(JSON.stringify(h.audits)).not.toContain("backend secret")
+    expect(JSON.stringify(res)).not.toContain("backend secret")
+    // The full text is in the log, with who and which group.
+    expect(
+      log.mock.calls.some((c) => JSON.stringify(c).includes("backend secret"))
+    ).toBe(true)
+    expect(
+      log.mock.calls.some((c) => JSON.stringify(c).includes('"actor":"u1"'))
+    ).toBe(true)
+    log.mockRestore()
+  })
+
+  test("a failed request's audit row carries the client message, not the cause", async () => {
+    const log = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      token: async () => {
+        throw new GroupsCredentialError("沒有取得 token", "STS said: secret")
+      },
+    })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    log.mockRestore()
+    expect(res).toEqual({
+      status: "error",
+      detail: "沒有取得 token",
+      sent: false,
+    })
+    expect(h.audits[0]![0]!.detail).toBe("沒有取得 token")
+    expect(JSON.stringify(h.audits)).not.toContain("secret")
+  })
+
+  test("a remove failure shows the browser a short message only", async () => {
+    const log = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      reply: (method) =>
+        method === "DELETE"
+          ? json(
+              {
+                error: {
+                  message: "remove secret",
+                  errors: [{ reason: "backendError" }],
+                },
+              },
+              503
+            )
+          : undefined,
+    })
+    const res = await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+    log.mockRestore()
+    expect(res).toEqual({
+      status: "ok",
+      data: {
+        email: "x@gmail.com",
+        outcome: "error",
+        detail: "Google 503（backendError）",
+      },
+    })
+    expect(JSON.stringify(h.audits)).not.toContain("remove secret")
+  })
+})
+
+describe("sent: did a write reach Google", () => {
+  const quiet = () => spyOn(console, "error").mockImplementation(() => {})
+
+  test("failures before any write say sent: false, whatever their text", async () => {
+    const e = quiet()
+    // Credential failure.
+    const cred = harness({
+      token: async () => {
+        throw new GroupsCredentialError("no token")
+      },
+    })
+    expect(await addToGroup(cred.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      sent: false,
+    })
+    // is_group_manager failing.
+    const mgr = harness({ manager: new Error("rpc down") })
+    expect(await addToGroup(mgr.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      sent: false,
+    })
+    expect(await removeFromGroup(mgr.deps, "aaa", "x@gmail.com")).toMatchObject(
+      { sent: false }
+    )
+    // getGroup timing out.
+    const slow = harness({
+      api: { timeoutMs: 10 },
+      reply: (method, path) =>
+        method === "GET" && path === "/groups/aaa" ? "hang" : undefined,
+    })
+    const res = await addToGroup(slow.deps, "aaa", ["a@gmail.com"])
+    expect(res).toMatchObject({ status: "error", sent: false })
+    // A token that stalls.
+    const stall = harness({
+      api: { timeoutMs: 10 },
+      token: () => new Promise<string>(() => {}),
+    })
+    expect(await addToGroup(stall.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      sent: false,
+    })
+    // Malformed input and reads.
+    expect(await addToGroup(cred.deps, "aaa", [])).toMatchObject({
+      sent: false,
+    })
+    expect(await readGroup(cred.deps, "aaa")).toMatchObject({ sent: false })
+    e.mockRestore()
+  })
+
+  test("a batch stopped by Google refusing the account after a POST says sent: true", async () => {
+    const e = quiet()
+    const h = harness({
+      reply: (method) => (method === "POST" ? notAuthorized() : undefined),
+    })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com", "b@gmail.com"])
+    e.mockRestore()
+    expect(res).toMatchObject({
+      status: "forbidden",
+      reason: "google_permission",
+      sent: true,
+    })
+  })
+
+  test("a remove that fails on its DELETE says sent: true; on its read, false", async () => {
+    const e = quiet()
+    const del = harness({
+      reply: (method) => (method === "DELETE" ? notAuthorized() : undefined),
+    })
+    expect(await removeFromGroup(del.deps, "aaa", "x@gmail.com")).toMatchObject(
+      { status: "forbidden", sent: true }
+    )
+    const read = harness({
+      reply: (method, path) =>
+        method === "GET" && path === "/groups/aaa/members"
+          ? notAuthorized()
+          : undefined,
+    })
+    expect(
+      await removeFromGroup(read.deps, "aaa", "x@gmail.com")
+    ).toMatchObject({ status: "forbidden", sent: false })
+    e.mockRestore()
+  })
+})
+
+describe("one deadline for the whole action", () => {
+  const throttled =
+    (match: (method: string, path: string) => boolean): Reply =>
+    (method, path) =>
+      match(method, path)
+        ? json(
+            {
+              error: {
+                message: "slow",
+                errors: [{ reason: "rateLimitExceeded" }],
+              },
+            },
+            403
+          )
+        : undefined
+  const clock = () => ({ now: () => 1000, sleep: async () => {} })
+
+  test("a retry stops at the deadline for the batch's own writes", async () => {
+    const e = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      api: clock(),
+      budgetMs: 1,
+      reply: throttled((m) => m === "POST"),
+    })
+    await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    e.mockRestore()
+    expect(h.calls.filter((c) => c.startsWith("POST"))).toHaveLength(1)
+  })
+
+  test("authorisation is inside the same deadline", async () => {
+    const e = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      api: clock(),
+      budgetMs: 1,
+      reply: throttled((m, p) => m === "GET" && p === "/groups/aaa"),
+    })
+    await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    e.mockRestore()
+    expect(h.calls.filter((c) => c === "GET /groups/aaa")).toHaveLength(1)
+  })
+
+  test("the ancestor walk is inside it too", async () => {
+    const e = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      api: clock(),
+      budgetMs: 1,
+      reply: throttled((m, p) => m === "GET" && p === "/groups"),
+    })
+    await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    e.mockRestore()
+    expect(h.calls.filter((c) => c === "GET /groups")).toHaveLength(1)
+  })
+
+  test("remove respects it", async () => {
+    const e = spyOn(console, "error").mockImplementation(() => {})
+    const h = harness({
+      api: clock(),
+      budgetMs: 1,
+      reply: throttled((m, p) => m === "GET" && p === "/groups/aaa/members"),
+    })
+    await removeFromGroup(h.deps, "aaa", "x@gmail.com")
+    e.mockRestore()
+    expect(h.calls.filter((c) => c === "GET /groups/aaa/members")).toHaveLength(
+      1
+    )
   })
 })

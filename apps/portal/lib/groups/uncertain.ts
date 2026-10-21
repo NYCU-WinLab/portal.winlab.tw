@@ -2,16 +2,13 @@
 // back clean. The UI uses it to decide when to re-read the member list and
 // whether to keep the addresses in the input for another try.
 
-import { INVALID_INPUT, UNAUTHORIZED } from "@/lib/groups/messages"
 import type { GroupsResult, MembershipOutcome } from "@/lib/groups/types"
 
-/** Refused before anything was sent; nothing can have landed. */
-const REFUSED_BEFORE_SENDING: ReadonlySet<string> = new Set([
-  INVALID_INPUT,
-  UNAUTHORIZED,
-])
-
-/** A whole-request result that leaves open whether a write landed. */
+/**
+ * A whole-request result that leaves open whether a write landed. The server
+ * says so in `sent` (see GroupsResult); a failure that doesn't say is treated
+ * as uncertain.
+ */
 export function mayHaveLanded(res: GroupsResult<unknown>): boolean {
   switch (res.status) {
     case "ok":
@@ -20,9 +17,9 @@ export function mayHaveLanded(res: GroupsResult<unknown>): boolean {
     case "forbidden":
       // The portal's own refusals come before any Google call; Google
       // refusing the service account can happen part-way through a batch.
-      return res.reason === "google_permission"
+      return res.reason === "google_permission" && res.sent !== false
     case "error":
-      return !REFUSED_BEFORE_SENDING.has(res.detail)
+      return res.sent !== false
   }
 }
 

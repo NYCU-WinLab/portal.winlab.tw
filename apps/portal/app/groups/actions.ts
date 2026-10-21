@@ -3,10 +3,11 @@
 // /groups reads and writes. The browser never sees the Google credential:
 // these run on the server. The order of checks — input, is_group_manager()
 // before any Google call, then Google's own address for the group against
-// the gcp-* and domain fence, then the group's ancestors — lives in lib/groups/membership.ts, where it
-// is tested with fakes. This file only wires in the real dependencies: the
-// member's own Supabase client, the Directory API from env, and after() so
-// the audit is written once the response is out.
+// the gcp-* and domain fence, then the group's ancestors — lives in
+// lib/groups/membership.ts, where it is tested with fakes. This file only
+// wires in the real dependencies: the member's own Supabase client, the
+// Directory API from env, and after() so the audit is written once the
+// response is out.
 //
 // Only async functions may be exported from a "use server" file.
 
@@ -48,7 +49,7 @@ async function requestContext(): Promise<Context> {
   if (!user)
     return {
       ok: false,
-      result: { status: "error", detail: UNAUTHORIZED },
+      result: { status: "error", detail: UNAUTHORIZED, sent: false },
     }
   const api = groupsApiFromEnv()
   if (!api) return { ok: false, result: { status: "unconfigured" } }
@@ -75,7 +76,7 @@ async function requestContext(): Promise<Context> {
 export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
   try {
     const user = await getCurrentUser()
-    if (!user) return { status: "error", detail: UNAUTHORIZED }
+    if (!user) return { status: "error", detail: UNAUTHORIZED, sent: false }
     const api = groupsApiFromEnv()
     if (!api) return { status: "unconfigured" }
     const supabase = await createClient()
@@ -107,7 +108,7 @@ export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
     return { status: "ok", data }
   } catch (err) {
     console.error("[groups] listMyGroups failed", err)
-    return failure(err)
+    return failure(err, false)
   }
 }
 
@@ -120,7 +121,7 @@ export async function getGroupMembers(
     return await readGroup(ctx.deps, groupId)
   } catch (err) {
     console.error("[groups] getGroupMembers failed", err)
-    return failure(err)
+    return failure(err, false)
   }
 }
 

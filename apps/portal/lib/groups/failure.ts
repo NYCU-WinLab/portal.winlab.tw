@@ -28,9 +28,10 @@ export function isFatal(err: unknown): boolean {
 export const RATE_LIMIT_MESSAGE = "Google 暫時限流，請稍後再試"
 
 /**
- * Everything we know, for the audit row and the server log. Never sent to
- * the browser: it can hold STS errors, up to 500 characters of Google's
- * reply and PostgREST messages. See clientMessage.
+ * Everything we know, for the server log only. Neither the browser nor the
+ * audit row gets it: it can hold STS errors, up to 500 characters of
+ * Google's reply, PostgREST messages and a gcp-* group's address, and
+ * managers can read the audit table. Both get clientMessage.
  */
 export function describeError(err: unknown): string {
   if (isRateLimited(err)) return RATE_LIMIT_MESSAGE
@@ -56,14 +57,20 @@ export function clientMessage(err: unknown): string {
   return UNEXPECTED_MESSAGE
 }
 
-export function failure(err: unknown): GroupsResult<never> {
+/**
+ * `sent`: whether a write may have reached Google before this failed (see
+ * GroupsResult). Leave it out when the caller can't tell.
+ */
+export function failure(err: unknown, sent?: boolean): GroupsResult<never> {
+  const tail = sent === undefined ? {} : { sent }
   if (err instanceof GroupsCredentialError)
-    return { status: "error", detail: clientMessage(err) }
+    return { status: "error", detail: clientMessage(err), ...tail }
   if (isFatal(err))
     return {
       status: "forbidden",
       reason: "google_permission",
       detail: `${PERMISSION_MESSAGE}（${clientMessage(err)}）`,
+      ...tail,
     }
-  return { status: "error", detail: clientMessage(err) }
+  return { status: "error", detail: clientMessage(err), ...tail }
 }
