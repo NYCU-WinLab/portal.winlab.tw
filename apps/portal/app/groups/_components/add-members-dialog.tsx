@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
@@ -18,7 +18,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { parseEmailList } from "@/lib/groups/email"
 import {
-  cohortCandidates,
+  cohortContribution,
   externalAddresses,
   planAdditions,
 } from "@/lib/groups/plan"
@@ -74,6 +74,10 @@ export function AddMembersDialog({
   const [freeText, setFreeText] = useState("")
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    if (!profilesLoaded) setCohort("")
+  }, [profilesLoaded])
+
   const statusByEmail = useMemo(
     () => new Map(people.map((p) => [p.email, p.labStatus])),
     [people]
@@ -88,9 +92,12 @@ export function AddMembersDialog({
         .slice(0, 8)
     : []
   const fromCohort = cohorts?.find((c) => c.name === cohort)
-  const cohortPick = fromCohort
-    ? cohortCandidates(fromCohort.members, statusByEmail, { excludeAlumni })
-    : { emails: [], skippedNoEmail: 0, skippedAlumni: 0 }
+  // A cohort chosen before the profile read failed must not keep feeding
+  // the batch: without statuses it would include alumni.
+  const cohortPick = cohortContribution(fromCohort?.members, statusByEmail, {
+    excludeAlumni,
+    profilesLoaded,
+  })
   const typed = parseEmailList(freeText)
   const plan = planAdditions(
     [...picked, ...cohortPick.emails, ...typed.valid],

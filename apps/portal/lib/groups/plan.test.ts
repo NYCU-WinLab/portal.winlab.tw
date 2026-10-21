@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   applyPending,
   cohortCandidates,
+  cohortContribution,
   externalAddresses,
   isPlainMember,
   NO_PENDING,
@@ -132,5 +133,38 @@ describe("pending changes (Google's list is eventually consistent)", () => {
   test("prunePending returns the same object when nothing settled", () => {
     const p = { added: ["slow@x.com"], removed: [] }
     expect(prunePending([member("a@x.com")], p)).toBe(p)
+  })
+})
+
+describe("cohortContribution", () => {
+  const members = [
+    { id: "1", email: "a@x.org" },
+    { id: "2", email: "old@x.org" },
+  ] as unknown as Parameters<typeof cohortCandidates>[0]
+  const status = new Map([["old@x.org", "alumni"]])
+
+  test("contributes nothing when profiles could not be read", () => {
+    expect(
+      cohortContribution(members, new Map(), {
+        excludeAlumni: true,
+        profilesLoaded: false,
+      }).emails
+    ).toEqual([])
+  })
+  test("excludes alumni when profiles loaded", () => {
+    expect(
+      cohortContribution(members, status, {
+        excludeAlumni: true,
+        profilesLoaded: true,
+      }).emails
+    ).toEqual(["a@x.org"])
+  })
+  test("no cohort selected contributes nothing", () => {
+    expect(
+      cohortContribution(undefined, status, {
+        excludeAlumni: true,
+        profilesLoaded: true,
+      }).emails
+    ).toEqual([])
   })
 })

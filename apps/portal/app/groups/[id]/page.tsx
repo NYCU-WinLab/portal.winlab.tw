@@ -41,7 +41,7 @@ export default async function GroupPage({
     )
 
   const supabase = await createClient()
-  const [profiles, cohorts, audit, { data: isAdmin }, managers] =
+  const [profiles, cohorts, audit, deniedCount, adminCheck, managers] =
     await Promise.all([
       supabase.from("user_profiles").select("id, name, email, lab_status"),
       fetchCohorts(),
@@ -49,8 +49,20 @@ export default async function GroupPage({
         .from("group_membership_audit")
         .select("id, actor_id, member_email, action, outcome, created_at")
         .eq("group_id", id)
+        .neq("outcome", "denied")
         .order("created_at", { ascending: false })
         .limit(20),
+      // Refusals are collapsed in the list: any member can write them for
+      // any group, so they must not push real changes out of the window.
+      supabase
+        .from("group_membership_audit")
+        .select("id, actor_id, member_email, action, outcome, created_at", {
+          count: "exact",
+        })
+        .eq("group_id", id)
+        .eq("outcome", "denied")
+        .order("created_at", { ascending: false })
+        .limit(10),
       supabase.rpc("is_portal_admin"),
       supabase.from("group_managers").select("user_id").eq("group_id", id),
     ])
@@ -60,6 +72,11 @@ export default async function GroupPage({
   const profilesFailed = profiles.error !== null
   if (profilesFailed)
     console.error("[groups] profiles read failed", profiles.error)
+  const isAdmin = adminCheck.data
+  if (adminCheck.error)
+    console.error("[groups] is_portal_admin failed", adminCheck.error)
+  if (deniedCount.error)
+    console.error("[groups] denied count failed", deniedCount.error)
   if (audit.error) console.error("[groups] audit read failed", audit.error)
   if (managers.error)
     console.error("[groups] managers read failed", managers.error)
@@ -94,6 +111,11 @@ export default async function GroupPage({
         cohorts={cohorts}
         profilesLoaded={!profilesFailed}
       />
+      {adminCheck.error && (
+        <p className="text-xs text-destructive">
+          無法確認管理員身分，管理者編輯暫時不顯示，請稍後重新整理。
+        </p>
+      )}
       {isAdmin === true && managers.error && (
         <p className="text-xs text-destructive">
           無法讀取這個群組的管理者名單，請稍後重新整理。
@@ -109,6 +131,8 @@ export default async function GroupPage({
       <RecentChanges
         rows={audit.data ?? []}
         people={people}
+        denied={deniedCount.data ?? []}
+        deniedCount={deniedCount.count ?? 0}
         failed={audit.error !== null}
       />
     </div>

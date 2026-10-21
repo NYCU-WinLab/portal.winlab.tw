@@ -262,9 +262,11 @@ groups; the portal does, on every request:
   Google, so a group that is a member of a `gcp-*` group would change who is
   effectively in it. Before any membership **write** (not reads),
   `lib/groups/nesting.ts` walks the target's parent groups (`groups.list`
-  with `userKey`, up to 3 levels, cycle-safe) and refuses if any ancestor is
-  `gcp-*` or outside the domain; a failed lookup, or ancestry deeper than
-  the bound, fails closed. Still keep the `gcp-*` groups free of group
+  with `userKey` alone: no domain filter, and `userKey` = a group's address
+  is per Google's guide but not yet verified against the live API), checks
+  ancestors at distance 1..3 (cycle-safe) and refuses if any is `gcp-*` or
+  outside the domain; deeper ancestry is refused, and a failed lookup
+  fails closed. Still keep the `gcp-*` groups free of group
   members — the check is the net, not the plan.
 - **Only the group's managers** (`group_managers`, assigned by portal admins;
   portal admins manage every group), checked with `is_group_manager()` before
@@ -275,12 +277,18 @@ groups; the portal does, on every request:
 Every attempt, refused ones too, lands in `group_membership_audit` from the
 service role: one row per address tried, one per refused or failed request.
 Refusals are capped, because any signed-in member can send any group id and
-each `denied` row shows up in that group's 最近變更: past 30 `denied` rows
-per actor in the last hour the sink only `console.warn`s them. `ok` and
-`error` rows are never dropped. (The count filters on `actor_id`, which has
-no index; fine at lab scale.) Errors shown to managers are a status and a
-stable reason (`Google 403（forbidden）`); Google's and PostgREST's own text
-goes to the server log and the audit row, never to the browser.
+each `denied` row would show up in that group's 最近變更: past 30 `denied`
+rows per actor in the last hour the sink only `console.warn`s them. The cap
+is best-effort (concurrent requests can exceed it; every row still names its
+actor), so 最近變更 lists real changes first and collapses `denied` rows
+behind a toggle, where they can't push real changes out. `ok` and `error`
+rows are never dropped. (The count filters on `actor_id`, which has no
+index; fine at lab scale.) Audit is best-effort too: a failed insert leaves
+the rows only in the server log, with no retry. Errors shown to managers are
+a status and a stable reason (`Google 403（forbidden）`). Google's and
+PostgREST's own text goes to the server log only; the audit `detail` holds
+just that short message, because managers can read their group's audit rows
+through RLS.
 A request whose input the UI could never have sent (wrong types, an address
 that doesn't parse) is refused before any of that and leaves no row. The
 order of checks lives in `lib/groups/membership.ts`, tested with fakes;

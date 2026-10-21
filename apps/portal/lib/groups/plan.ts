@@ -60,6 +60,22 @@ export function cohortCandidates(
   return { emails, skippedNoEmail, skippedAlumni }
 }
 
+const NO_COHORT = { emails: [], skippedNoEmail: 0, skippedAlumni: 0 }
+
+/**
+ * What the cohort picker contributes to a batch. Without lab statuses
+ * (`profilesLoaded` false) "exclude alumni" would exclude no one, so the
+ * cohort contributes nothing, whatever was selected before the read failed.
+ */
+export function cohortContribution(
+  members: KeycloakGroupMember[] | undefined,
+  statusByEmail: ReadonlyMap<string, string | null>,
+  opts: { excludeAlumni: boolean; profilesLoaded: boolean }
+): { emails: string[]; skippedNoEmail: number; skippedAlumni: number } {
+  if (!opts.profilesLoaded || !members) return NO_COHORT
+  return cohortCandidates(members, statusByEmail, opts)
+}
+
 /**
  * The only memberships /groups may create or delete. OWNER and MANAGER are
  * out of reach, so the portal can neither strip a group of its owners nor

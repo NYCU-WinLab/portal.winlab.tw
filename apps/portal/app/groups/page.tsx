@@ -22,16 +22,36 @@ export default async function GroupsPage() {
     )
 
   const supabase = await createClient()
-  const { data: isAdmin } = await supabase.rpc("is_portal_admin")
+  const { data: isAdmin, error: adminError } =
+    await supabase.rpc("is_portal_admin")
+  if (adminError) console.error("[groups] is_portal_admin failed", adminError)
   let managerCounts: Record<string, number> | undefined
+  let managersFailed = false
   if (isAdmin === true) {
-    const { data: rows } = await supabase
+    const { data: rows, error } = await supabase
       .from("group_managers")
       .select("group_id")
-    managerCounts = {}
-    for (const r of rows ?? [])
-      managerCounts[r.group_id] = (managerCounts[r.group_id] ?? 0) + 1
+    if (error) {
+      // Not "nobody is assigned": leave the counts out rather than show 未指派.
+      console.error("[groups] group_managers read failed", error)
+      managersFailed = true
+    } else {
+      managerCounts = {}
+      for (const r of rows ?? [])
+        managerCounts[r.group_id] = (managerCounts[r.group_id] ?? 0) + 1
+    }
   }
 
-  return <GroupList groups={result.data} managerCounts={managerCounts} />
+  return (
+    <>
+      {(adminError || managersFailed) && (
+        <p className="mb-4 text-xs text-destructive">
+          {adminError
+            ? "無法確認管理員身分，請稍後重新整理。"
+            : "無法讀取各群組的管理者名單，請稍後重新整理。"}
+        </p>
+      )}
+      <GroupList groups={result.data} managerCounts={managerCounts} />
+    </>
+  )
 }

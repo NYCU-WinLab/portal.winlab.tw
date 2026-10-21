@@ -66,19 +66,26 @@ export function usePendingMembers(members: GroupMember[]): {
   // One timer at a time; leaving the page cancels it, so no refresh lands on
   // whatever route comes next.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
+  // A result can arrive after the page is gone and ask for a refresh; once
+  // unmounted nothing may be scheduled again. (Set on every mount, so React
+  // strict mode's mount/unmount/mount leaves it live.)
+  const unmounted = useRef(false)
+  useEffect(() => {
+    unmounted.current = false
+    return () => {
+      unmounted.current = true
       if (timer.current) clearTimeout(timer.current)
-    },
-    []
-  )
+    }
+  }, [])
   // Reads still owed after an uncertain outcome, whatever the overlay says.
   const forcedReads = useRef(0)
   function schedule(attempt: number) {
+    if (unmounted.current) return
     if (timer.current) clearTimeout(timer.current)
     const delay = REFRESH_DELAYS_MS[attempt]
     timer.current = setTimeout(() => {
       timer.current = null
+      if (unmounted.current) return
       if (forcedReads.current <= 0 && settled(latest.current)) return
       if (delay === undefined) {
         forcedReads.current = 0

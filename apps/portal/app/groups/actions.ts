@@ -89,8 +89,10 @@ export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
           .eq("user_id", user.id),
       ])
     // An admin must not be told they manage nothing because a check failed.
-    if (adminError)
+    if (adminError) {
+      console.error("[groups] is_portal_admin failed", adminError)
       return { status: "error", detail: "無法確認管理員身分，請稍後再試" }
+    }
     if (error) {
       console.error("[groups] group_managers read failed", error)
       return { status: "error", detail: "無法讀取群組管理者，請稍後再試" }
