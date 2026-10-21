@@ -271,8 +271,10 @@ groups; the portal does, on every request:
 - **Only the group's managers** (`group_managers`, assigned by portal admins;
   portal admins manage every group), checked with `is_group_manager()` before
   any Google call.
-- **Only MEMBER rows** are added or removed, so an owner or manager can't be
-  removed and nobody can be promoted.
+- **Only MEMBER rows** are added or removed, so nobody can be promoted. The
+  role is re-read by id right before each DELETE, but Google has no
+  precondition on a delete, so a promotion landing between that read and the
+  DELETE is still removed (accepted residual).
 
 Every attempt, refused ones too, lands in `group_membership_audit` from the
 service role: one row per address tried, one per refused or failed request.
@@ -284,7 +286,11 @@ actor), so 最近變更 lists real changes first and collapses `denied` rows
 behind a toggle, where they can't push real changes out. `ok` and `error`
 rows are never dropped. (The count filters on `actor_id`, which has no
 index; fine at lab scale.) Audit is best-effort too: a failed insert leaves
-the rows only in the server log, with no retry. Errors shown to managers are
+the rows only in the server log, with no retry. The audit is written in
+`after()` once the action finishes, so a process killed between Google's
+write and that hand-off leaves the change with neither an audit row nor the
+fallback log (accepted residual; Google's own admin audit log still records
+it). Errors shown to managers are
 a status and a stable reason (`Google 403（forbidden）`). Google's and
 PostgREST's own text goes to the server log only; the audit `detail` holds
 just that short message, because managers can read their group's audit rows
@@ -303,8 +309,10 @@ UI trusts each action's per-address result and re-reads a few seconds later.
 The first outside address added to a group makes Google switch the group to
 "external members allowed (admins only)", and removing it doesn't switch back.
 
-Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`; both
-`/groups` pages set `maxDuration = 300`), and the Keycloak cohort lookup has
+Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
+where the api is built in `groupsApiFromEnv`, the group listing included; both
+`/groups` pages set `maxDuration = 300`). A write needs `MIN_WRITE_BUDGET_MS`
+(3 s) of it left to start, rather than begin and be reported as unknown. The Keycloak cohort lookup has
 its own 8 s one, so a hung upstream ends in a message, not a stuck page.
 
 Accepted residual risk: the token the portal mints is scope-limited to
