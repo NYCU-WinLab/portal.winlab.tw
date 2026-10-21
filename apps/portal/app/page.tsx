@@ -23,6 +23,13 @@ const externalServices = [
   { href: "https://harbor.winlab.tw", label: "Harbor", note: "Harbor" },
   { href: "https://gitlab.winlab.tw", label: "GitLab", note: "Gitlab" },
   { href: "https://wiki.winlab.tw", label: "Wiki", note: "Wiki" },
+  {
+    href: "https://transcribe.winlab.tw",
+    label: "Transcribe",
+    note: "Transcribe",
+  },
+  { href: "https://carrel.winlab.tw", label: "Carrel", note: "Carrel" },
+  { href: "https://llm.winlab.tw", label: "LLM", note: "LLM" },
 ]
 
 function BulletinBoardSkeleton() {
