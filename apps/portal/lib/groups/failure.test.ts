@@ -5,6 +5,7 @@ import {
   failure,
   isFatal,
   PERMISSION_MESSAGE,
+  UNEXPECTED_MESSAGE,
 } from "@/lib/groups/failure"
 import { GoogleGroupsError, GroupsCredentialError } from "@/lib/groups/google"
 
@@ -21,31 +22,39 @@ describe("failure", () => {
       if (res.status !== "forbidden") return
       expect(res.reason).toBe("google_permission")
       expect(res.detail).toContain(PERMISSION_MESSAGE)
-      expect(res.detail).toContain("Not Authorized")
+      expect(res.detail).toContain(`Google ${status}`)
+      expect(res.detail).not.toContain("Not Authorized")
     }
   })
 
-  test("no token is an error that keeps its explanation", () => {
-    expect(
-      failure(
-        new GroupsCredentialError("無法取得 Google 權杖（目前環境：preview）")
-      )
-    ).toEqual({
+  test("no token is an error that keeps its explanation but not the STS cause", () => {
+    const err = new GroupsCredentialError(
+      "無法取得 Google 權杖（目前環境：preview）",
+      "STS 403 invalid_grant"
+    )
+    expect(failure(err)).toEqual({
       status: "error",
       detail: "無法取得 Google 權杖（目前環境：preview）",
     })
+    expect(describeError(err)).toContain("STS 403 invalid_grant")
   })
 
   test("any other Google status, and anything else, is error", () => {
     expect(failure(new GoogleGroupsError(503, "backend"))).toEqual({
       status: "error",
-      detail: "Google 503：backend",
+      detail: "Google 503（error）",
     })
-    expect(failure(new Error("boom"))).toEqual({
+    expect(
+      failure(new GoogleGroupsError(400, "secret upstream text", "invalid"))
+    ).toEqual({ status: "error", detail: "Google 400（invalid）" })
+    expect(failure(new Error("PostgREST: relation x"))).toEqual({
       status: "error",
-      detail: "boom",
+      detail: UNEXPECTED_MESSAGE,
     })
-    expect(failure("weird")).toEqual({ status: "error", detail: "unknown" })
+    expect(failure("weird")).toEqual({
+      status: "error",
+      detail: UNEXPECTED_MESSAGE,
+    })
   })
 })
 
@@ -63,7 +72,7 @@ describe("isFatal", () => {
 })
 
 describe("describeError", () => {
-  test("keeps Google's own words for the audit detail", () => {
+  test("keeps Google's own words for the audit detail (never shown)", () => {
     expect(
       describeError(new GoogleGroupsError(400, "Invalid Input: memberKey"))
     ).toBe("Google 400：Invalid Input: memberKey")

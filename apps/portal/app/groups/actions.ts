@@ -3,7 +3,7 @@
 // /groups reads and writes. The browser never sees the Google credential:
 // these run on the server. The order of checks — input, is_group_manager()
 // before any Google call, then Google's own address for the group against
-// the gcp-* and domain fence — lives in lib/groups/membership.ts, where it
+// the gcp-* and domain fence, then the group's ancestors — lives in lib/groups/membership.ts, where it
 // is tested with fakes. This file only wires in the real dependencies: the
 // member's own Supabase client, the Directory API from env, and after() so
 // the audit is written once the response is out.
@@ -14,7 +14,7 @@ import { after } from "next/server"
 
 import { recordMembershipChanges } from "@/lib/groups/audit"
 import { visibleGroups } from "@/lib/groups/authorize"
-import { failure } from "@/lib/groups/failure"
+import { failure, UNEXPECTED_MESSAGE } from "@/lib/groups/failure"
 import { getGroup, listDomainGroups } from "@/lib/groups/google"
 import { groupsApiFromEnv } from "@/lib/groups/google-auth"
 import { UNAUTHORIZED } from "@/lib/groups/messages"
@@ -90,7 +90,10 @@ export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
     // An admin must not be told they manage nothing because a check failed.
     if (adminError)
       return { status: "error", detail: "無法確認管理員身分，請稍後再試" }
-    if (error) return { status: "error", detail: error.message }
+    if (error) {
+      console.error("[groups] group_managers read failed", error)
+      return { status: "error", detail: "無法讀取群組管理者，請稍後再試" }
+    }
     const managed = new Set((rows ?? []).map((r) => r.group_id))
     // Someone who manages nothing never causes a Google call.
     if (isAdmin !== true && managed.size === 0)
@@ -182,8 +185,10 @@ export async function assignGroupManager(
     const supabase = await createClient()
     const { data: isAdmin, error: adminError } =
       await supabase.rpc("is_portal_admin")
-    if (adminError)
-      return { ok: false, error: `無法確認管理員身分：${adminError.message}` }
+    if (adminError) {
+      console.error("[groups] is_portal_admin failed", adminError)
+      return { ok: false, error: "無法確認管理員身分，請稍後再試" }
+    }
     if (isAdmin !== true)
       return { ok: false, error: "只有 portal 管理員可以指派" }
     const group = await getGroup(api, id)
@@ -195,16 +200,23 @@ export async function assignGroupManager(
     })
     if (!error) return { ok: true }
     // 42501 is the RPC's own "not a portal admin"; anything else is a real
-    // failure the admin should see as it is.
+    // failure, logged in full and reported without PostgREST's wording.
+    if (error.code !== "42501")
+      console.error("[groups] groups_assign_manager failed", error)
     return {
       ok: false,
       error:
-        error.code === "42501" ? "只有 portal 管理員可以指派" : error.message,
+        error.code === "42501"
+          ? "只有 portal 管理員可以指派"
+          : "指派失敗，請稍後再試",
     }
   } catch (err) {
     console.error("[groups] assignGroupManager failed", err)
     const res = failure(err)
-    return { ok: false, error: "detail" in res ? res.detail : "unknown" }
+    return {
+      ok: false,
+      error: "detail" in res ? res.detail : UNEXPECTED_MESSAGE,
+    }
   }
 }
 
@@ -232,9 +244,13 @@ export async function unassignGroupManager(
       p_group_id: id,
       p_user_id: member,
     })
-    return error ? { ok: false, error: error.message } : { ok: true }
+    if (error) {
+      console.error("[groups] groups_unassign_manager failed", error)
+      return { ok: false, error: "移除失敗，請稍後再試" }
+    }
+    return { ok: true }
   } catch (err) {
     console.error("[groups] unassignGroupManager failed", err)
-    return { ok: false, error: err instanceof Error ? err.message : "unknown" }
+    return { ok: false, error: UNEXPECTED_MESSAGE }
   }
 }

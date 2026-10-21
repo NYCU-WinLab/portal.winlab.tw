@@ -18,11 +18,9 @@ export function isValidGroupId(id: string): boolean {
  * GCP organisation roles; those grants now go to users directly, but the
  * groups stay off-limits so that never quietly becomes a way back in.
  *
- * This fences off the gcp-* groups' own member lists only. Nested groups are
- * allowed, so if a gcp-* group ever held another group as a member, editing
- * that group here would change who is effectively in the gcp-* group. The
- * fence is complete only while neither gcp-* group has a GROUP member
- * (checked at rollout, and written down in CLAUDE.md).
+ * This fences off the gcp-* groups' own member lists only; groups nested
+ * inside one are caught by nesting.ts, which applies this same rule to every
+ * ancestor before a write.
  */
 export function isManageableGroup(email: string, domain: string): boolean {
   const address = email.trim().toLowerCase()

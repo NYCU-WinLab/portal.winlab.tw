@@ -4,6 +4,7 @@ import {
   MAX_EMAIL_LENGTH,
   normalizeEmail,
   parseEmailList,
+  sameMailbox,
 } from "@/lib/groups/email"
 
 describe("normalizeEmail", () => {
@@ -57,5 +58,15 @@ describe("parseEmailList", () => {
 
   test("empty input gives empty lists", () => {
     expect(parseEmailList(" \n ")).toEqual({ valid: [], invalid: [] })
+  })
+})
+
+describe("sameMailbox", () => {
+  test("Gmail ignores dots, and only Gmail", () => {
+    expect(sameMailbox("a.b@gmail.com", "ab@gmail.com")).toBe(true)
+    expect(sameMailbox("a.b@gmail.com", "ab@googlemail.com")).toBe(true)
+    expect(sameMailbox("a.b@winlab.tw", "ab@winlab.tw")).toBe(false)
+    expect(sameMailbox("a@gmail.com", "b@gmail.com")).toBe(false)
+    expect(sameMailbox("x@winlab.tw", "x@winlab.tw")).toBe(true)
   })
 })

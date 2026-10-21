@@ -15,11 +15,7 @@ import { ExternalAccountClient } from "google-auth-library"
 
 import { credentialErrorMessage, readGroupsConfig } from "@/lib/groups/config"
 import { GroupsCredentialError, type GroupsApi } from "@/lib/groups/google"
-
-const SCOPES = [
-  "https://www.googleapis.com/auth/admin.directory.group.readonly",
-  "https://www.googleapis.com/auth/admin.directory.group.member",
-]
+import { SCOPES } from "@/lib/groups/scopes"
 
 export function groupsApiFromEnv(): GroupsApi | null {
   const config = readGroupsConfig(process.env)
@@ -53,11 +49,11 @@ export function groupsApiFromEnv(): GroupsApi | null {
         if (!token) throw new Error("empty access token")
         return token
       } catch (err) {
+        const cause = err instanceof Error ? err.message : String(err)
+        console.error("[groups] could not get a Google token", err)
         throw new GroupsCredentialError(
-          credentialErrorMessage(
-            process.env.VERCEL_ENV,
-            err instanceof Error ? err.message : String(err)
-          )
+          credentialErrorMessage(process.env.VERCEL_ENV),
+          cause
         )
       }
     },

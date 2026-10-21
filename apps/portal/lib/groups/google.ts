@@ -85,7 +85,14 @@ export class GoogleTimeoutError extends Error {
 
 /** No Google access token could be had (WIF, STS or impersonation failed). */
 export class GroupsCredentialError extends Error {
-  constructor(message: string) {
+  /**
+   * `message` is safe to show a manager; `cause` (the STS / IAM error) is
+   * for the log and the audit row only.
+   */
+  constructor(
+    message: string,
+    readonly cause?: string
+  ) {
     super(message)
     this.name = "GroupsCredentialError"
   }
@@ -226,6 +233,41 @@ export async function getGroup(
   if (res.status === 404 || res.status === 400) return null
   if (!res.ok) await fail(res)
   return toGroup((await res.json()) as RawGroup)
+}
+
+/**
+ * The addresses of the groups `groupEmail` is a direct member of
+ * (lower-cased). Used by the nesting fence in membership.ts.
+ *
+ * Google documents `userKey` as a user's email or id; that a group's address
+ * works there too is how the lookup is used, not something the reference
+ * promises. `domain` is sent as well: the reference only forbids `customer`
+ * together with `userKey`, and asks for one of `customer` / `domain`.
+ */
+export async function listParentGroups(
+  api: GroupsApi,
+  groupEmail: string
+): Promise<string[]> {
+  const out: string[] = []
+  let pageToken = ""
+  do {
+    const q = new URLSearchParams({
+      userKey: groupEmail,
+      domain: api.domain,
+      maxResults: PAGE_SIZE,
+    })
+    if (pageToken) q.set("pageToken", pageToken)
+    const res = await call(api, `groups?${q}`)
+    if (!res.ok) await fail(res)
+    const data = (await res.json()) as {
+      groups?: RawGroup[]
+      nextPageToken?: string
+    }
+    for (const g of data.groups ?? [])
+      if (g.email) out.push(g.email.toLowerCase())
+    pageToken = data.nextPageToken ?? ""
+  } while (pageToken)
+  return out
 }
 
 export async function listMembers(

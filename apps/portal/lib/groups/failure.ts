@@ -7,6 +7,7 @@
 
 import {
   GoogleGroupsError,
+  GoogleTimeoutError,
   GroupsCredentialError,
   isRateLimited,
 } from "@/lib/groups/google"
@@ -26,21 +27,43 @@ export function isFatal(err: unknown): boolean {
 
 export const RATE_LIMIT_MESSAGE = "Google 暫時限流，請稍後再試"
 
+/**
+ * Everything we know, for the audit row and the server log. Never sent to
+ * the browser: it can hold STS errors, up to 500 characters of Google's
+ * reply and PostgREST messages. See clientMessage.
+ */
 export function describeError(err: unknown): string {
   if (isRateLimited(err)) return RATE_LIMIT_MESSAGE
+  if (err instanceof GroupsCredentialError)
+    return err.cause ? `${err.message}（${err.cause}）` : err.message
   if (err instanceof GoogleGroupsError)
     return `Google ${err.status}${err.detail ? `：${err.detail}` : ""}`
   return err instanceof Error ? err.message : "unknown"
 }
 
+export const UNEXPECTED_MESSAGE = "發生未預期的錯誤，請稍後再試"
+
+/**
+ * What a manager is shown: a status and a stable reason, never upstream
+ * text. The full detail is logged by whoever caught the error.
+ */
+export function clientMessage(err: unknown): string {
+  if (isRateLimited(err)) return RATE_LIMIT_MESSAGE
+  if (err instanceof GroupsCredentialError) return err.message
+  if (err instanceof GoogleTimeoutError) return err.message
+  if (err instanceof GoogleGroupsError)
+    return `Google ${err.status}（${err.reason ?? "error"}）`
+  return UNEXPECTED_MESSAGE
+}
+
 export function failure(err: unknown): GroupsResult<never> {
   if (err instanceof GroupsCredentialError)
-    return { status: "error", detail: err.message }
+    return { status: "error", detail: clientMessage(err) }
   if (isFatal(err))
     return {
       status: "forbidden",
       reason: "google_permission",
-      detail: `${PERMISSION_MESSAGE}（${describeError(err)}）`,
+      detail: `${PERMISSION_MESSAGE}（${clientMessage(err)}）`,
     }
-  return { status: "error", detail: describeError(err) }
+  return { status: "error", detail: clientMessage(err) }
 }

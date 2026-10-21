@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { buildAuditRow } from "@/lib/groups/audit"
+import {
+  buildAuditRow,
+  splitDenied,
+  type AuditInsert,
+} from "@/lib/groups/audit"
 
 describe("buildAuditRow", () => {
   test("maps a change result to a row keyed by the group id", () => {
@@ -65,5 +69,36 @@ describe("buildAuditRow", () => {
         listedAs: "firstlast@gmail.com",
       }).detail
     ).toBe("listed by Google as firstlast@gmail.com")
+  })
+})
+
+describe("splitDenied", () => {
+  const row = (outcome: AuditInsert["outcome"], n = 0): AuditInsert => ({
+    actor_id: "u1",
+    group_id: "aaa",
+    group_email: "a@winlab.tw",
+    member_email: `m${n}@gmail.com`,
+    action: "add",
+    outcome,
+    detail: null,
+  })
+
+  test("under the cap everything is kept", () => {
+    const rows = [row("denied"), row("ok")]
+    expect(splitDenied(rows, 0, 30)).toEqual({ keep: rows, dropped: [] })
+  })
+
+  test("at the cap denied rows are dropped, ok and error rows never", () => {
+    const rows = [row("denied"), row("ok", 1), row("error", 2)]
+    const { keep, dropped } = splitDenied(rows, 30, 30)
+    expect(keep.map((r) => r.outcome)).toEqual(["ok", "error"])
+    expect(dropped.map((r) => r.outcome)).toEqual(["denied"])
+  })
+
+  test("a request straddling the cap keeps only the room that is left", () => {
+    const rows = [row("denied", 1), row("denied", 2), row("denied", 3)]
+    const { keep, dropped } = splitDenied(rows, 28, 30)
+    expect(keep).toHaveLength(2)
+    expect(dropped).toHaveLength(1)
   })
 })

@@ -10,7 +10,11 @@
 //      Google call and no audit row, as a malformed group id does. It is
 //      logged instead: who sent it and which check failed, never the content.
 //   2. is_group_manager() before Google: a non-manager never causes a call.
-//   3. Google's own address for the group decides gcp-* and the domain.
+//   3. Google's own address for the group decides gcp-* and the domain, and
+//      the id Google returns must be the id the manager check was made for.
+//   3b. Before a write, the group's ancestors are walked: a group nested in
+//      a gcp-* group (or one outside the domain) is refused, because editing
+//      it would change that group's effective membership.
 //   4. Every write attempt past (1) is audited, handed to the sink once, in
 //      `finally`: a row per address tried, one row for a refusal however
 //      many addresses it carried, one row when authorisation itself failed.
@@ -18,16 +22,27 @@
 import { buildAuditRow, type AuditInsert } from "@/lib/groups/audit"
 import { authorizeGroup } from "@/lib/groups/authorize"
 import { mapLimited } from "@/lib/groups/batch"
-import { MAX_EMAIL_LENGTH, normalizeEmail } from "@/lib/groups/email"
-import { describeError, failure, isFatal } from "@/lib/groups/failure"
+import {
+  MAX_EMAIL_LENGTH,
+  normalizeEmail,
+  sameMailbox,
+} from "@/lib/groups/email"
+import {
+  clientMessage,
+  describeError,
+  failure,
+  isFatal,
+} from "@/lib/groups/failure"
 import {
   addMember,
   getGroup,
   listMembers,
+  listParentGroups,
   removeMember,
   type GroupsApi,
 } from "@/lib/groups/google"
 import { INVALID_INPUT, MAX_BATCH } from "@/lib/groups/messages"
+import { findForbiddenAncestor } from "@/lib/groups/nesting"
 import { isValidGroupId } from "@/lib/groups/scope"
 import type {
   GroupMember,
@@ -59,6 +74,16 @@ export type MembershipDeps = GroupAccess & {
   audit: (rows: AuditInsert[]) => void
   /** Overrides BATCH_BUDGET_MS (tests). */
   batchBudgetMs?: number
+}
+
+// A per-address result as the audit sees it: `detail` is the full error text,
+// `clientDetail` the short message the browser gets instead (toClient).
+type Internal = MemberChangeResult & { clientDetail?: string }
+
+function toClient({ clientDetail, ...result }: Internal): MemberChangeResult {
+  return clientDetail === undefined
+    ? result
+    : { ...result, detail: clientDetail }
 }
 
 const notManaged = (): GroupsResult<never> => ({
@@ -118,9 +143,11 @@ async function authorize(
   const isManager = await access.isManager(groupId)
   // Only a manager makes the portal ask Google about the group.
   const group = isManager ? await getGroup(access.api, groupId) : null
+  // The manager check was made for the id the caller sent; every write uses
+  // the id Google returned. They must be the same group.
   const verdict = authorizeGroup({
     isManager,
-    group,
+    group: group && group.id === groupId ? group : null,
     domain: access.api.domain,
   })
   if (verdict.ok) return verdict
@@ -136,6 +163,25 @@ async function authorize(
     why: denied ? "not a manager" : "not manageable",
   }
 }
+
+/**
+ * Before a write: is the group nested (up to a few levels) in a group the
+ * portal may not touch? Returns that ancestor's address. A failing lookup
+ * throws, and the caller treats it like any failed authorisation: an error,
+ * audited, nothing written.
+ */
+async function forbiddenAncestor(
+  api: GroupsApi,
+  group: ManagedGroup
+): Promise<string | null> {
+  return findForbiddenAncestor(
+    (email) => listParentGroups(api, email),
+    group.email,
+    api.domain
+  )
+}
+
+const NESTED = "nested in a gcp-* group"
 
 /** One row for a whole request, however many addresses it carried. */
 function requestRow(
@@ -214,25 +260,60 @@ export async function addToGroup(
       return auth.result
     }
     const group = auth.group
+    const ancestor = await forbiddenAncestor(deps.api, group)
+    if (ancestor !== null) {
+      rows.push(
+        requestRow(
+          deps.userId,
+          group,
+          "add",
+          emails,
+          "denied",
+          `${NESTED} (${ancestor})`
+        )
+      )
+      return notManaged()
+    }
     const now = deps.api.now ?? Date.now
     const deadline = now() + (deps.batchBudgetMs ?? BATCH_BUDGET_MS)
     const api: GroupsApi = { ...deps.api, deadline }
     // A credential or permission failure is the same for every address:
     // stop sending the rest and report it once.
     const abort: { cause: unknown } = { cause: null }
+    // A 409 doesn't say how Google spells the existing member; the member
+    // list does. Read it at most once per batch, and only if a 409 happens.
+    let listing: Promise<GroupMember[] | null> | null = null
+    const listed = () =>
+      (listing ??= listMembers(api, group.id).catch((err: unknown) => {
+        console.error("[groups] member list for a 409 failed", err)
+        return null
+      }))
     const results = await mapLimited(
       emails,
       CONCURRENCY,
-      async (email): Promise<MemberChangeResult> => {
+      async (email): Promise<Internal> => {
         // All of it inside the try: mapLimited must never reject (batch.ts).
         try {
           const added = await addMember(api, group.id, email)
-          return added.email === email
+          let listedAs = added.email
+          if (added.outcome === "already") {
+            const members = await listed()
+            const hit =
+              members?.find((m) => m.email === email) ??
+              members?.find((m) => m.email && sameMailbox(m.email, email))
+            if (hit?.email) listedAs = hit.email
+          }
+          return listedAs === email
             ? { email, outcome: added.outcome }
-            : { email, outcome: added.outcome, listedAs: added.email }
+            : { email, outcome: added.outcome, listedAs }
         } catch (err) {
           if (isFatal(err) && abort.cause === null) abort.cause = err
-          return { email, outcome: "error", detail: describeError(err) }
+          return {
+            email,
+            outcome: "error",
+            detail: describeError(err),
+            clientDetail: clientMessage(err),
+          }
         }
       },
       () => abort.cause !== null || now() >= deadline
@@ -251,7 +332,7 @@ export async function addToGroup(
         detail: `處理太久，已停止：${emails.length} 個地址中只送出 ${results.length} 個，其餘沒有送出。已送出的結果可能已套用，請重新整理確認後再試。`,
       }
     }
-    return { status: "ok", data: results }
+    return { status: "ok", data: results.map(toClient) }
   } catch (err) {
     // Authorisation itself failed: the token, is_group_manager() or
     // getGroup. Unlike a malformed request this was a real attempt, so it
@@ -303,7 +384,21 @@ export async function removeFromGroup(
       )
       return auth.result
     }
-    let result: MemberChangeResult
+    const ancestor = await forbiddenAncestor(deps.api, auth.group)
+    if (ancestor !== null) {
+      rows.push(
+        requestRow(
+          deps.userId,
+          auth.group,
+          "remove",
+          [email],
+          "denied",
+          `${NESTED} (${ancestor})`
+        )
+      )
+      return notManaged()
+    }
+    let result: Internal
     let fatal: unknown = null
     try {
       result = {
@@ -312,11 +407,16 @@ export async function removeFromGroup(
       }
     } catch (err) {
       if (isFatal(err)) fatal = err
-      result = { email, outcome: "error", detail: describeError(err) }
+      result = {
+        email,
+        outcome: "error",
+        detail: describeError(err),
+        clientDetail: clientMessage(err),
+      }
     }
     rows.push(buildAuditRow(deps.userId, auth.group, "remove", result))
     if (fatal !== null) return failure(fatal)
-    return { status: "ok", data: result }
+    return { status: "ok", data: toClient(result) }
   } catch (err) {
     console.error("[groups] remove failed", err)
     rows.push(

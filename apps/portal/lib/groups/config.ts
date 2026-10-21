@@ -24,12 +24,10 @@ export function readGroupsConfig(
 /**
  * The service account trusts only production deployments' OIDC tokens, so a
  * preview or local run that has the env vars set still cannot get a token.
- * Say that, instead of surfacing a bare STS error.
+ * Say that, instead of surfacing a bare STS error. The STS error itself
+ * stays in the server log (and the audit row); it is not sent to the browser.
  */
-export function credentialErrorMessage(
-  vercelEnv: string | undefined,
-  cause: string
-): string {
+export function credentialErrorMessage(vercelEnv: string | undefined): string {
   const where = vercelEnv || "本機"
-  return `無法取得 Google 權杖（目前環境：${where}）。只有 production 部署能透過 Workload Identity Federation 換到權杖，preview 與本機一定會被拒絕。原始錯誤：${cause}`
+  return `無法取得 Google 權杖（目前環境：${where}）。只有 production 部署能透過 Workload Identity Federation 換到權杖，preview 與本機一定會被拒絕。請通知 portal 管理員。`
 }

@@ -37,6 +37,8 @@ const notAuthorized = () =>
 const google: Reply = (method, path, body) => {
   if (method === "GET" && path === "/groups/aaa")
     return json({ id: "aaa", email: "lab-all@winlab.tw", name: "Lab" })
+  // Parent groups (the nesting fence): nobody is nested in anything.
+  if (method === "GET" && path === "/groups") return json({})
   if (method === "GET" && path === "/groups/ggg")
     return json({ id: "ggg", email: "gcp-billing@winlab.tw", name: "Billing" })
   if (method === "POST" && path === "/groups/aaa/members")
@@ -254,6 +256,12 @@ describe("addToGroup", () => {
         "b@gmail.com",
       ])
       expect(res.status).not.toBe("ok")
+      // Google refusing the service account is its own reason, not a bare error.
+      if (h === cases[2])
+        expect(res).toMatchObject({
+          status: "forbidden",
+          reason: "google_permission",
+        })
       expect(h.calls.some((c) => c.startsWith("POST"))).toBe(false)
       expect(h.audits).toEqual([
         [
@@ -525,5 +533,176 @@ describe("parseUserId", () => {
     )
     for (const bad of ["", "u1", {}, 1, null])
       expect(parseUserId(bad)).toBeNull()
+  })
+})
+
+describe("the group id Google returns", () => {
+  test("a different id than the one the manager check covered is refused, no write", async () => {
+    const reply: Reply = (method, path) =>
+      method === "GET" && path === "/groups/aaa"
+        ? json({ id: "zzz", email: "lab-all@winlab.tw" })
+        : undefined
+    const add = harness({ reply })
+    expect(await addToGroup(add.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      status: "forbidden",
+      reason: "not_managed",
+    })
+    expect(add.calls.some((c) => c.startsWith("POST"))).toBe(false)
+    expect(add.audits[0]![0]).toMatchObject({
+      outcome: "denied",
+      detail: "not manageable",
+    })
+    const rm = harness({ reply })
+    expect(await removeFromGroup(rm.deps, "aaa", "x@gmail.com")).toMatchObject({
+      status: "forbidden",
+      reason: "not_managed",
+    })
+    expect(rm.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+    expect((await readGroup(harness({ reply }).deps, "aaa")).status).toBe(
+      "forbidden"
+    )
+  })
+})
+
+describe("the nesting fence", () => {
+  const parents =
+    (list: string[] | Response): Reply =>
+    (method, path) =>
+      method === "GET" && path === "/groups"
+        ? list instanceof Response
+          ? list
+          : json({ groups: list.map((email) => ({ id: "p", email })) })
+        : undefined
+
+  test("a group nested in a gcp-* group is refused for add and remove: no write, one denied row", async () => {
+    const add = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
+    expect(await addToGroup(add.deps, "aaa", ["a@gmail.com"])).toMatchObject({
+      status: "forbidden",
+      reason: "not_managed",
+    })
+    expect(add.calls.some((c) => c.startsWith("POST"))).toBe(false)
+    expect(add.audits).toHaveLength(1)
+    expect(add.audits[0]![0]).toMatchObject({
+      outcome: "denied",
+      group_email: "lab-all@winlab.tw",
+    })
+    expect(add.audits[0]![0]!.detail).toContain("nested in a gcp-* group")
+
+    const rm = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
+    expect(await removeFromGroup(rm.deps, "aaa", "x@gmail.com")).toMatchObject({
+      status: "forbidden",
+      reason: "not_managed",
+    })
+    expect(rm.calls.some((c) => c.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("a clean ancestry writes; reads don't look at ancestors at all", async () => {
+    const h = harness({ reply: parents(["staff@winlab.tw"]) })
+    expect((await addToGroup(h.deps, "aaa", ["a@gmail.com"])).status).toBe("ok")
+    const r = harness({ reply: parents(["gcp-billing@winlab.tw"]) })
+    expect((await readGroup(r.deps, "aaa")).status).toBe("ok")
+    expect(r.calls.some((c) => c.startsWith("GET /groups?"))).toBe(false)
+  })
+
+  test("a failing lookup fails closed: error, audited, no write", async () => {
+    const h = harness({ reply: parents(json({}, 500)) })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    expect(res.status).toBe("error")
+    expect(h.calls.some((c) => c.startsWith("POST"))).toBe(false)
+    expect(h.audits[0]![0]).toMatchObject({ outcome: "error" })
+  })
+})
+
+describe("a 409 reports Google's spelling", () => {
+  const conflict: Reply = (method, path, body) => {
+    if (method === "POST") return json({ error: { message: "exists" } }, 409)
+    if (method === "GET" && path === "/groups/aaa/members")
+      return json({
+        members: [
+          { id: "1", email: "firstlast@gmail.com", role: "MEMBER" },
+          { id: "2", email: "a.b@winlab.tw", role: "MEMBER" },
+        ],
+      })
+    void body
+    return undefined
+  }
+
+  test("a dotted Gmail resolves to the dotless address Google lists, with one list per batch", async () => {
+    const h = harness({ reply: conflict })
+    const res = await addToGroup(h.deps, "aaa", [
+      "first.last@gmail.com",
+      "First.Last@googlemail.com",
+      "ab@winlab.tw",
+    ])
+    expect(res).toEqual({
+      status: "ok",
+      data: [
+        {
+          email: "first.last@gmail.com",
+          outcome: "already",
+          listedAs: "firstlast@gmail.com",
+        },
+        // Equivalent only within the Gmail hosts' own spelling rules.
+        {
+          email: "first.last@googlemail.com",
+          outcome: "already",
+          listedAs: "firstlast@gmail.com",
+        },
+        // Not Gmail: dots matter, so no match, and the asked spelling stays.
+        { email: "ab@winlab.tw", outcome: "already" },
+      ],
+    })
+    expect(h.calls.filter((c) => c === "GET /groups/aaa/members")).toHaveLength(
+      1
+    )
+  })
+
+  test("if the member list can't be read, the asked spelling stays", async () => {
+    const h = harness({
+      reply: (method, path) =>
+        method === "POST"
+          ? json({}, 409)
+          : path === "/groups/aaa/members"
+            ? json({}, 500)
+            : undefined,
+    })
+    const err = spyOn(console, "error").mockImplementation(() => {})
+    const res = await addToGroup(h.deps, "aaa", ["first.last@gmail.com"])
+    err.mockRestore()
+    expect(res).toEqual({
+      status: "ok",
+      data: [{ email: "first.last@gmail.com", outcome: "already" }],
+    })
+  })
+})
+
+describe("what the browser is told", () => {
+  test("a per-address failure carries a short message; the audit keeps the detail", async () => {
+    const h = harness({
+      reply: (method) =>
+        method === "POST"
+          ? json(
+              {
+                error: {
+                  message: "backend secret",
+                  errors: [{ reason: "backendError" }],
+                },
+              },
+              503
+            )
+          : undefined,
+    })
+    const res = await addToGroup(h.deps, "aaa", ["a@gmail.com"])
+    expect(res).toEqual({
+      status: "ok",
+      data: [
+        {
+          email: "a@gmail.com",
+          outcome: "error",
+          detail: "Google 503（backendError）",
+        },
+      ],
+    })
+    expect(h.audits[0]![0]!.detail).toContain("backend secret")
   })
 })

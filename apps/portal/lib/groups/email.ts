@@ -32,3 +32,22 @@ export function parseEmailList(text: string): {
   }
   return { valid, invalid }
 }
+
+const GMAIL_HOSTS = new Set(["gmail.com", "googlemail.com"])
+
+/**
+ * Whether two normalised addresses are one mailbox as Google lists it. Equal
+ * strings always are. Gmail ignores dots in the local part, and only Gmail:
+ * on any other domain `a.b@` and `ab@` are different people.
+ */
+export function sameMailbox(a: string, b: string): boolean {
+  if (a === b) return true
+  const at = a.lastIndexOf("@")
+  const bt = b.lastIndexOf("@")
+  if (at <= 0 || bt <= 0) return false
+  const hostA = a.slice(at + 1)
+  const hostB = b.slice(bt + 1)
+  if (!GMAIL_HOSTS.has(hostA) || !GMAIL_HOSTS.has(hostB)) return false
+  const dotless = (s: string) => s.replaceAll(".", "")
+  return dotless(a.slice(0, at)) === dotless(b.slice(0, bt))
+}

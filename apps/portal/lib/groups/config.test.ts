@@ -28,13 +28,13 @@ describe("readGroupsConfig", () => {
 
 describe("credentialErrorMessage", () => {
   test("names the environment, and says only production can get a token", () => {
-    const msg = credentialErrorMessage("preview", "STS 403")
+    const msg = credentialErrorMessage("preview")
     expect(msg).toContain("preview")
     expect(msg).toContain("production")
-    expect(msg).toContain("STS 403")
+    expect(msg).not.toContain("STS")
   })
 
   test("outside Vercel it says local", () => {
-    expect(credentialErrorMessage(undefined, "x")).toContain("本機")
+    expect(credentialErrorMessage(undefined)).toContain("本機")
   })
 })

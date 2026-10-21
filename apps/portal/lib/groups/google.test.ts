@@ -7,6 +7,7 @@ import {
   GoogleTimeoutError,
   listDomainGroups,
   listMembers,
+  listParentGroups,
   removeMember,
   isRateLimited,
   type GroupsApi,
@@ -477,5 +478,41 @@ describe("throttling and deadlines", () => {
     expect(err).toBeInstanceOf(GoogleTimeoutError)
     expect(isFatal(err)).toBe(false)
     expect((err as Error).message).toContain("結果未知")
+  })
+})
+
+describe("listParentGroups", () => {
+  test("asks by userKey and domain, pages, and lower-cases", async () => {
+    const api = fakeApi([
+      (u) => {
+        if (u.pathname !== `${DIR}/groups`) return undefined
+        return u.searchParams.get("pageToken") === "p2"
+          ? json({ groups: [{ id: "2", email: "GCP-Org@winlab.tw" }] })
+          : json({
+              groups: [{ id: "1", email: "Staff@winlab.tw" }],
+              nextPageToken: "p2",
+            })
+      },
+    ])
+    expect(await listParentGroups(api, "lab@winlab.tw")).toEqual([
+      "staff@winlab.tw",
+      "gcp-org@winlab.tw",
+    ])
+    const first = new URL(`https://x/${api.calls[0]!.split(" ")[1]}`)
+    expect(first.searchParams.get("userKey")).toBe("lab@winlab.tw")
+    expect(first.searchParams.get("domain")).toBe("winlab.tw")
+    expect(first.searchParams.get("customer")).toBeNull()
+    expect(first.searchParams.get("maxResults")).toBe("200")
+  })
+
+  test("a group with no parents is an empty list; an error throws", async () => {
+    expect(
+      await listParentGroups(fakeApi([() => json({})]), "a@winlab.tw")
+    ).toEqual([])
+    const err = await listParentGroups(
+      fakeApi([() => json({}, 500)]),
+      "a@winlab.tw"
+    ).catch((e) => e)
+    expect(err).toBeInstanceOf(GoogleGroupsError)
   })
 })

@@ -61,6 +61,8 @@ export default async function GroupPage({
   if (profilesFailed)
     console.error("[groups] profiles read failed", profiles.error)
   if (audit.error) console.error("[groups] audit read failed", audit.error)
+  if (managers.error)
+    console.error("[groups] managers read failed", managers.error)
 
   const people = (profiles.data ?? [])
     .filter((p) => p.email)
@@ -92,7 +94,12 @@ export default async function GroupPage({
         cohorts={cohorts}
         profilesLoaded={!profilesFailed}
       />
-      {isAdmin === true && (
+      {isAdmin === true && managers.error && (
+        <p className="text-xs text-destructive">
+          無法讀取這個群組的管理者名單，請稍後重新整理。
+        </p>
+      )}
+      {isAdmin === true && !managers.error && (
         <ManagerEditor
           groupId={group.id}
           managerIds={(managers.data ?? []).map((m) => m.user_id)}

@@ -257,12 +257,15 @@ groups; the portal does, on every request:
 
 - **Never a `gcp-*` group, never outside `GOOGLE_GROUPS_DOMAIN`**
   (`lib/groups/scope.ts`), checked against the address Google returns for the
-  group, not anything the caller sent. That fences off the `gcp-*` groups'
-  own member lists, not their effective membership: nested groups are
-  allowed, so if a `gcp-*` group ever held another group as a member, editing
-  that group here would change who is effectively in the `gcp-*` one. Keep
-  the `gcp-*` groups free of group members — or, if one must hold one, fence
-  that nested group off in `scope.ts` too.
+  group, not anything the caller sent (and the id Google returns must be
+  the one the manager check was made for). Nested groups are allowed in
+  Google, so a group that is a member of a `gcp-*` group would change who is
+  effectively in it. Before any membership **write** (not reads),
+  `lib/groups/nesting.ts` walks the target's parent groups (`groups.list`
+  with `userKey`, up to 3 levels, cycle-safe) and refuses if any ancestor is
+  `gcp-*` or outside the domain; a failed lookup, or ancestry deeper than
+  the bound, fails closed. Still keep the `gcp-*` groups free of group
+  members — the check is the net, not the plan.
 - **Only the group's managers** (`group_managers`, assigned by portal admins;
   portal admins manage every group), checked with `is_group_manager()` before
   any Google call.
@@ -271,6 +274,13 @@ groups; the portal does, on every request:
 
 Every attempt, refused ones too, lands in `group_membership_audit` from the
 service role: one row per address tried, one per refused or failed request.
+Refusals are capped, because any signed-in member can send any group id and
+each `denied` row shows up in that group's 最近變更: past 30 `denied` rows
+per actor in the last hour the sink only `console.warn`s them. `ok` and
+`error` rows are never dropped. (The count filters on `actor_id`, which has
+no index; fine at lab scale.) Errors shown to managers are a status and a
+stable reason (`Google 403（forbidden）`); Google's and PostgREST's own text
+goes to the server log and the audit row, never to the browser.
 A request whose input the UI could never have sent (wrong types, an address
 that doesn't parse) is refused before any of that and leaves no row. The
 order of checks lives in `lib/groups/membership.ts`, tested with fakes;
