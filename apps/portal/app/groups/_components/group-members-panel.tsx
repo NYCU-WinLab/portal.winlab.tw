@@ -21,12 +21,15 @@ export function GroupMembersPanel({
   members,
   people,
   cohorts,
+  profilesLoaded,
 }: {
   groupId: string
   domain: string
   members: GroupMember[]
   people: Person[]
   cohorts: Cohort[] | null
+  /** false when user_profiles could not be read: statuses and names are unknown. */
+  profilesLoaded: boolean
 }) {
   const { shown, markAdded, markRemoved, refreshSoon } =
     usePendingMembers(members)
@@ -43,6 +46,7 @@ export function GroupMembersPanel({
           currentEmails={shown.flatMap((m) => (m.email ? [m.email] : []))}
           people={people}
           cohorts={cohorts}
+          profilesLoaded={profilesLoaded}
           onAdded={markAdded}
           onFailed={refreshSoon}
         />
@@ -51,6 +55,7 @@ export function GroupMembersPanel({
         groupId={groupId}
         members={shown}
         people={people}
+        profilesLoaded={profilesLoaded}
         onRemoved={markRemoved}
         onFailed={refreshSoon}
       />

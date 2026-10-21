@@ -16,15 +16,16 @@ import {
 import { Button } from "@workspace/ui/components/button"
 
 import { isPlainMember, type ShownMember } from "@/lib/groups/plan"
+import { mayHaveLanded } from "@/lib/groups/uncertain"
 
 import { removeGroupMember } from "../actions"
 
 type Person = { name: string | null; email: string; labStatus: string | null }
 
-function tags(m: ShownMember, known: boolean): string {
+function tags(m: ShownMember, known: boolean, profilesLoaded: boolean): string {
   const parts: string[] = []
   if (!m.email) parts.push(m.type === "CUSTOMER" ? "整個網域" : "（無地址）")
-  else if (!known) parts.push("外部")
+  else if (profilesLoaded && !known) parts.push("外部")
   if (m.type === "GROUP") parts.push("群組")
   if (!isPlainMember(m.role)) parts.push(m.role)
   if (m.pending) parts.push("同步中")
@@ -35,21 +36,28 @@ export function MemberList({
   groupId,
   members,
   people,
+  profilesLoaded,
   onRemoved,
   onFailed,
 }: {
   groupId: string
   members: ShownMember[]
   people: Person[]
+  /** false when profiles could not be read: don't tag every member 外部. */
+  profilesLoaded: boolean
   onRemoved: (email: string) => void
+  /** The removal may have landed, or the list is stale: re-read soon. */
   onFailed: () => void
 }) {
   const [target, setTarget] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  // Addresses with a removal in flight. A second dialog can open while the
+  // first request is still running, so each request only clears its own.
+  const [inflight, setInflight] = useState<string[]>([])
+  const busy = target !== null && inflight.includes(target)
   const byEmail = new Map(people.map((p) => [p.email, p]))
 
   async function remove(email: string) {
-    setBusy(true)
+    setInflight((xs) => [...xs, email])
     let res: Awaited<ReturnType<typeof removeGroupMember>>
     try {
       res = await removeGroupMember(groupId, email)
@@ -59,23 +67,29 @@ export function MemberList({
       onFailed()
       return toast.error("連線中斷，請稍後確認結果")
     } finally {
-      setBusy(false)
-      setTarget(null)
+      setInflight((xs) => xs.filter((x) => x !== email))
+      setTarget((t) => (t === email ? null : t))
     }
-    if (res.status !== "ok")
+    if (res.status !== "ok") {
+      if (mayHaveLanded(res)) onFailed()
       return toast.error(
         res.status === "unconfigured" ? "Google 群組整合尚未設定" : res.detail
       )
+    }
     const outcome = res.data.outcome
     if (outcome === "ok") {
       toast.success(`已移除 ${email}`)
       onRemoved(email)
     } else if (outcome === "not_found") {
-      toast.success(`${email} 已不在群組`)
-      onRemoved(email)
+      // Our list was stale. Nothing was removed by this click, so say so and
+      // re-read instead of reporting a success.
+      toast(`${email} 已不在群組中`)
+      onFailed()
     } else if (outcome === "protected") {
       toast.error("不能移除群組擁有者或管理者")
     } else {
+      // An error outcome may have landed (a timeout says "result unknown").
+      onFailed()
       toast.error(`移除失敗：${res.data.detail ?? outcome}`)
     }
   }
@@ -85,7 +99,7 @@ export function MemberList({
       <ul className="flex flex-col divide-y">
         {members.map((m, i) => {
           const person = m.email ? byEmail.get(m.email) : undefined
-          const extra = tags(m, Boolean(person))
+          const extra = tags(m, Boolean(person), profilesLoaded)
           return (
             <li
               key={m.id ?? m.email ?? `row-${i}`}

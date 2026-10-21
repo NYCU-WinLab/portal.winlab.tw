@@ -22,6 +22,8 @@ import {
   externalAddresses,
   planAdditions,
 } from "@/lib/groups/plan"
+import { MAX_BATCH } from "@/lib/groups/messages"
+import { mayHaveLanded, outcomeUncertain } from "@/lib/groups/uncertain"
 import type { KeycloakGroupMember } from "@/lib/rooms/keycloak-groups"
 
 import { addGroupMembers } from "../actions"
@@ -40,6 +42,7 @@ export function AddMembersDialog({
   currentEmails,
   people,
   cohorts,
+  profilesLoaded,
   onAdded,
   onFailed,
 }: {
@@ -51,11 +54,16 @@ export function AddMembersDialog({
   /** null when Keycloak could not be read: the cohort picker is hidden. */
   cohorts: Cohort[] | null
   /**
+   * false when user_profiles could not be read. Without lab statuses
+   * "exclude alumni" would exclude no one, so adding by cohort is off.
+   */
+  profilesLoaded: boolean
+  /**
    * Addresses Google confirmed (ok or already), spelled the way Google will
    * list them, for the "同步中" overlay.
    */
   onAdded: (emails: string[]) => void
-  /** The batch failed as a whole; some of it may still have landed. */
+  /** Something may have landed without being confirmed: re-read Google soon. */
   onFailed: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -88,6 +96,7 @@ export function AddMembersDialog({
     [...picked, ...cohortPick.emails, ...typed.valid],
     currentEmails
   )
+  const overLimit = plan.toAdd.length > MAX_BATCH
   const outside = externalAddresses(plan.toAdd, domain)
 
   function reset() {
@@ -107,20 +116,20 @@ export function AddMembersDialog({
       // The batch may have reached Google before the connection dropped.
       // Re-read shortly so whatever landed shows up.
       onFailed()
-      return toast.error("連線中斷，請稍後確認結果")
+      return toast.error("連線中斷，請稍後確認結果；地址已保留，可重試")
     } finally {
       setBusy(false)
     }
     if (res.status !== "ok") {
-      // A permission or credential failure stops the batch part-way and
-      // comes back without per-address results. Re-read Google shortly, so
-      // whatever did land shows up in the list and in 最近變更.
-      onFailed()
+      // Refused before anything was sent (unconfigured, the portal's own
+      // refusals, malformed input): nothing landed, so no re-read and no
+      // "partly added" hint. Anything else may have stopped part-way, so
+      // re-read Google shortly for the list and 最近變更. The input stays
+      // either way, so the batch can be retried.
       if (res.status === "unconfigured")
         return toast.error("Google 群組整合尚未設定")
-      // Refused before anything was sent: nothing can have landed.
-      if (res.status === "forbidden" && res.reason !== "google_permission")
-        return toast.error(res.detail)
+      if (!mayHaveLanded(res)) return toast.error(res.detail)
+      onFailed()
       return toast.error(
         `${res.detail}（可能已有部分地址加入，請稍後對照名單與最近變更）`
       )
@@ -132,16 +141,22 @@ export function AddMembersDialog({
     const ok = res.data.filter((r) => r.outcome === "ok").length
     const already = res.data.filter((r) => r.outcome === "already").length
     const failed = res.data.filter((r) => r.outcome === "error")
+    // A failed address may still have landed (a timeout says "result
+    // unknown"): schedule the bounded re-read, and keep the input so those
+    // addresses can be retried. Those that did land show up as 已在群組.
+    if (res.data.some((r) => outcomeUncertain(r.outcome))) onFailed()
     if (failed.length === 0)
       toast.success(
         `已加入 ${ok} 人${already ? `，${already} 人原本就在` : ""}`
       )
-    else
+    else {
       toast.error(
         `加入 ${ok} 人${already ? `，${already} 人原本就在` : ""}，失敗 ${failed.length} 人：${failed
           .map((f) => `${f.email}（${f.detail ?? "error"}）`)
           .join("、")}`
       )
+      return
+    }
     setOpen(false)
     reset()
   }
@@ -187,7 +202,12 @@ export function AddMembersDialog({
             )}
           </label>
 
-          {cohorts && (
+          {cohorts && !profilesLoaded && (
+            <p className="text-xs text-destructive">
+              無法讀取成員在學狀態，暫時不能依屆別加入（否則「排除已畢業」不會生效）。
+            </p>
+          )}
+          {cohorts && profilesLoaded && (
             <label className="flex flex-col gap-1">
               <span className="text-muted-foreground">依屆別加入</span>
               <select
@@ -248,7 +268,15 @@ export function AddMembersDialog({
         </div>
 
         <DialogFooter>
-          <Button disabled={busy || plan.toAdd.length === 0} onClick={submit}>
+          {overLimit && (
+            <p className="mr-auto text-xs text-destructive">
+              一次最多加入 {MAX_BATCH} 人，請分批加入。
+            </p>
+          )}
+          <Button
+            disabled={busy || plan.toAdd.length === 0 || overLimit}
+            onClick={submit}
+          >
             確認加入 {plan.toAdd.length} 人
           </Button>
         </DialogFooter>

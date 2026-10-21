@@ -6,8 +6,6 @@ import { Toaster } from "@workspace/ui/components/sonner"
 
 import { PortalShell } from "@/components/portal-shell"
 
-import { QueryProvider } from "./_components/query-provider"
-
 export const metadata: Metadata = {
   title: "Groups | Portal",
   description: "管理 Google 郵件群組成員。",
@@ -15,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function GroupsLayout({ children }: { children: ReactNode }) {
   return (
-    <QueryProvider>
+    <>
       <PortalShell
         appName="Groups"
         appHref="/groups"
@@ -24,6 +22,6 @@ export default function GroupsLayout({ children }: { children: ReactNode }) {
         {children}
       </PortalShell>
       <Toaster />
-    </QueryProvider>
+    </>
   )
 }

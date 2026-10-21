@@ -55,6 +55,13 @@ export default async function GroupPage({
       supabase.from("group_managers").select("user_id").eq("group_id", id),
     ])
 
+  // A failed profile read is not "nobody has a profile": without it the
+  // picker could not tell alumni apart and every member would read as 外部.
+  const profilesFailed = profiles.error !== null
+  if (profilesFailed)
+    console.error("[groups] profiles read failed", profiles.error)
+  if (audit.error) console.error("[groups] audit read failed", audit.error)
+
   const people = (profiles.data ?? [])
     .filter((p) => p.email)
     .map((p) => ({
@@ -72,12 +79,18 @@ export default async function GroupPage({
         <h1 className="text-lg">{group.name}</h1>
         <p className="text-xs text-muted-foreground">{group.email}</p>
       </header>
+      {profilesFailed && (
+        <p className="text-xs text-destructive">
+          無法讀取成員姓名與在學狀態，名單只顯示 email，也暫時不能依屆別加入。
+        </p>
+      )}
       <GroupMembersPanel
         groupId={group.id}
         domain={domain}
         members={members}
         people={people}
         cohorts={cohorts}
+        profilesLoaded={!profilesFailed}
       />
       {isAdmin === true && (
         <ManagerEditor
@@ -86,7 +99,11 @@ export default async function GroupPage({
           people={people}
         />
       )}
-      <RecentChanges rows={audit.data ?? []} people={people} />
+      <RecentChanges
+        rows={audit.data ?? []}
+        people={people}
+        failed={audit.error !== null}
+      />
     </div>
   )
 }

@@ -27,6 +27,7 @@ import {
   removeMember,
   type GroupsApi,
 } from "@/lib/groups/google"
+import { INVALID_INPUT, MAX_BATCH } from "@/lib/groups/messages"
 import { isValidGroupId } from "@/lib/groups/scope"
 import type {
   GroupMember,
@@ -35,7 +36,7 @@ import type {
   MemberChangeResult,
 } from "@/lib/groups/types"
 
-export const MAX_BATCH = 200
+export { MAX_BATCH }
 // Small on purpose: Directory API quotas are per project.
 const CONCURRENCY = 4
 /** No new address is started this long after an add began. */
@@ -43,7 +44,7 @@ export const BATCH_BUDGET_MS = 60_000
 
 export const DENIED = "你不是這個群組的管理者"
 export const NOT_MANAGED = "這個群組不存在，或不開放給 portal 管理"
-export const INVALID_INPUT = "請求內容格式不正確"
+export { INVALID_INPUT }
 const UNKNOWN_GROUP = "(unknown)"
 
 export type GroupAccess = {

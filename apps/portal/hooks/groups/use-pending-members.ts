@@ -25,6 +25,8 @@ import type { GroupMember } from "@/lib/groups/types"
 
 /** Re-reads at 5 s, 15 s and 35 s after a change. */
 const REFRESH_DELAYS_MS = [5000, 10000, 20000]
+/** Re-reads an uncertain outcome gets, out of the three in the window above. */
+const FORCED_READS = 3
 /** After the last re-read, how long its answer gets before the overlay goes. */
 const GIVE_UP_AFTER_MS = 10000
 
@@ -35,7 +37,11 @@ export function usePendingMembers(members: GroupMember[]): {
   shown: ShownMember[]
   markAdded: (emails: string[]) => void
   markRemoved: (email: string) => void
-  /** Re-read soon even with nothing pending, e.g. after a batch that stopped part-way. */
+  /**
+   * Re-read soon even with nothing pending, after an outcome that may have
+   * landed (a timeout, a batch that stopped part-way). Reads a bounded
+   * number of times over the consistency window, then stops.
+   */
   refreshSoon: () => void
 } {
   const router = useRouter()
@@ -66,16 +72,20 @@ export function usePendingMembers(members: GroupMember[]): {
     },
     []
   )
-  function schedule(attempt: number, force = false) {
+  // Reads still owed after an uncertain outcome, whatever the overlay says.
+  const forcedReads = useRef(0)
+  function schedule(attempt: number) {
     if (timer.current) clearTimeout(timer.current)
     const delay = REFRESH_DELAYS_MS[attempt]
     timer.current = setTimeout(() => {
       timer.current = null
-      if (!force && settled(latest.current)) return
+      if (forcedReads.current <= 0 && settled(latest.current)) return
       if (delay === undefined) {
+        forcedReads.current = 0
         setPending(NO_PENDING)
         return
       }
+      if (forcedReads.current > 0) forcedReads.current--
       router.refresh()
       schedule(attempt + 1)
     }, delay ?? GIVE_UP_AFTER_MS)
@@ -93,7 +103,8 @@ export function usePendingMembers(members: GroupMember[]): {
       schedule(0)
     },
     refreshSoon() {
-      schedule(0, true)
+      forcedReads.current = FORCED_READS
+      schedule(0)
     },
   }
 }

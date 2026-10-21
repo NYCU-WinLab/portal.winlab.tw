@@ -17,6 +17,7 @@ import { visibleGroups } from "@/lib/groups/authorize"
 import { failure } from "@/lib/groups/failure"
 import { getGroup, listDomainGroups } from "@/lib/groups/google"
 import { groupsApiFromEnv } from "@/lib/groups/google-auth"
+import { UNAUTHORIZED } from "@/lib/groups/messages"
 import {
   addToGroup,
   INVALID_INPUT,
@@ -45,7 +46,10 @@ type Context =
 async function requestContext(): Promise<Context> {
   const user = await getCurrentUser()
   if (!user)
-    return { ok: false, result: { status: "error", detail: "Unauthorized" } }
+    return {
+      ok: false,
+      result: { status: "error", detail: UNAUTHORIZED },
+    }
   const api = groupsApiFromEnv()
   if (!api) return { ok: false, result: { status: "unconfigured" } }
   const supabase = await createClient()
@@ -71,14 +75,21 @@ async function requestContext(): Promise<Context> {
 export async function listMyGroups(): Promise<GroupsResult<ManagedGroup[]>> {
   try {
     const user = await getCurrentUser()
-    if (!user) return { status: "error", detail: "Unauthorized" }
+    if (!user) return { status: "error", detail: UNAUTHORIZED }
     const api = groupsApiFromEnv()
     if (!api) return { status: "unconfigured" }
     const supabase = await createClient()
-    const [{ data: isAdmin }, { data: rows, error }] = await Promise.all([
-      supabase.rpc("is_portal_admin"),
-      supabase.from("group_managers").select("group_id").eq("user_id", user.id),
-    ])
+    const [{ data: isAdmin, error: adminError }, { data: rows, error }] =
+      await Promise.all([
+        supabase.rpc("is_portal_admin"),
+        supabase
+          .from("group_managers")
+          .select("group_id")
+          .eq("user_id", user.id),
+      ])
+    // An admin must not be told they manage nothing because a check failed.
+    if (adminError)
+      return { status: "error", detail: "無法確認管理員身分，請稍後再試" }
     if (error) return { status: "error", detail: error.message }
     const managed = new Set((rows ?? []).map((r) => r.group_id))
     // Someone who manages nothing never causes a Google call.
@@ -169,7 +180,10 @@ export async function assignGroupManager(
     const api = groupsApiFromEnv()
     if (!api) return { ok: false, error: "Google 群組整合尚未設定" }
     const supabase = await createClient()
-    const { data: isAdmin } = await supabase.rpc("is_portal_admin")
+    const { data: isAdmin, error: adminError } =
+      await supabase.rpc("is_portal_admin")
+    if (adminError)
+      return { ok: false, error: `無法確認管理員身分：${adminError.message}` }
     if (isAdmin !== true)
       return { ok: false, error: "只有 portal 管理員可以指派" }
     const group = await getGroup(api, id)
@@ -179,7 +193,14 @@ export async function assignGroupManager(
       p_group_id: group.id,
       p_user_id: member,
     })
-    return error ? { ok: false, error: error.message } : { ok: true }
+    if (!error) return { ok: true }
+    // 42501 is the RPC's own "not a portal admin"; anything else is a real
+    // failure the admin should see as it is.
+    return {
+      ok: false,
+      error:
+        error.code === "42501" ? "只有 portal 管理員可以指派" : error.message,
+    }
   } catch (err) {
     console.error("[groups] assignGroupManager failed", err)
     const res = failure(err)

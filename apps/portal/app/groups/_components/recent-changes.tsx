@@ -20,10 +20,22 @@ const OUTCOME: Record<string, string> = {
 export function RecentChanges({
   rows,
   people,
+  failed = false,
 }: {
   rows: Row[]
   people: Person[]
+  /** The audit query failed: say so rather than show nothing. */
+  failed?: boolean
 }) {
+  if (failed)
+    return (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm text-muted-foreground">最近變更</h2>
+        <p className="text-xs text-destructive">
+          無法讀取最近變更，請稍後重新整理。
+        </p>
+      </section>
+    )
   if (rows.length === 0) return null
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
   return (
