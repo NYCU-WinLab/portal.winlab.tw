@@ -123,7 +123,12 @@ describe("recordMembershipChanges", () => {
   }) {
     const inserted: AuditInsert[][] = []
     const chain: Record<string, unknown> = {}
-    for (const k of ["select", "eq", "gte"]) chain[k] = () => chain
+    const filters: [string, ...unknown[]][] = []
+    for (const k of ["select", "eq", "gte"])
+      chain[k] = (...args: unknown[]) => {
+        filters.push([k, ...args])
+        return chain
+      }
     chain.then = (resolve: (v: unknown) => void) =>
       resolve({ count: opts.count ?? 0, error: opts.countError ?? null })
     const admin = {
@@ -135,7 +140,7 @@ describe("recordMembershipChanges", () => {
         },
       }),
     }
-    return { make: (() => admin) as never, inserted }
+    return { make: (() => admin) as never, inserted, filters }
   }
 
   const quiet = () => {
@@ -173,12 +178,30 @@ describe("recordMembershipChanges", () => {
   test("at the cap denied rows are dropped and ok / error rows kept", async () => {
     const f = fakeAdmin({ count: 30 })
     const q = quiet()
-    await recordMembershipChanges(
-      [mk("denied"), mk("ok", 1), mk("error", 2)],
-      f.make
-    )
+    const rows = [mk("denied"), mk("ok", 1), mk("error", 2)]
+    await recordMembershipChanges(rows, f.make)
     expect(f.inserted[0]!.map((r) => r.outcome)).toEqual(["ok", "error"])
+    // The drop is logged, with the actor and the rows that were lost.
+    expect(q.warn).toHaveBeenCalledTimes(1)
+    expect(q.warn.mock.calls[0]![1]).toMatchObject({
+      actor: rows[0]!.actor_id,
+      dropped: [rows[0]],
+    })
     q.done()
+  })
+
+  test("the denied count is this actor's refusals from the last hour", async () => {
+    const f = fakeAdmin({})
+    const rows = [mk("denied")]
+    const before = Date.now()
+    await recordMembershipChanges(rows, f.make)
+    const eq = f.filters.filter(([k]) => k === "eq").map(([, c, v]) => [c, v])
+    expect(eq).toContainEqual(["actor_id", rows[0]!.actor_id])
+    expect(eq).toContainEqual(["outcome", "denied"])
+    const gte = f.filters.find(([k]) => k === "gte")!
+    expect(gte[1]).toBe("created_at")
+    const since = new Date(String(gte[2])).getTime()
+    expect(Math.abs(before - 3600_000 - since)).toBeLessThan(5000)
   })
 
   test("nothing left to insert means no insert", async () => {

@@ -59,6 +59,13 @@ select is(
 )
 from pg_class c where c.oid = 'public.group_membership_audit'::regclass;
 
+-- The audit is append-only: neither the members nor the service role that
+-- writes it can change or remove a row.
+select is(has_table_privilege(r, 'public.group_membership_audit', p), false,
+  r || ' has no ' || p || ' on the audit')
+from unnest(array['authenticated', 'service_role']) r,
+     unnest(array['UPDATE', 'DELETE']) p;
+
 select ok(p.prosecdef and p.proconfig @> array['search_path=""'],
   p.proname || ' is SECURITY DEFINER with an empty search path')
 from pg_proc p where p.oid in (
