@@ -262,8 +262,8 @@ groups; the portal does, on every request:
   Google, so a group that is a member of a `gcp-*` group would change who is
   effectively in it. Before any membership **write** (not reads),
   `lib/groups/nesting.ts` walks the target's parent groups (`groups.list`
-  with `userKey` alone: no domain filter, and `userKey` = a group's address
-  is per Google's guide but not yet verified against the live API), checks
+  with `userKey` = the group's address plus `domain=`; the Workspace has
+  only the one domain, so that filter hides no parent), checks
   ancestors at distance 1..3 (cycle-safe) and refuses if any is `gcp-*` or
   outside the domain; deeper ancestry is refused, and a failed lookup
   fails closed. Still keep the `gcp-*` groups free of group
@@ -305,8 +305,10 @@ order of checks lives in `lib/groups/membership.ts`, tested with fakes;
 `app/groups/actions.ts` only wires in the real dependencies.
 
 Gotchas, all measured against the live API: use `domain=`, never
-`customer=my_customer` (400 as a service account; the one exception is the
-parent-group lookup, which sends `userKey` alone); never look a member up or
+`customer=my_customer` (400 as a service account), and that includes the
+parent-group lookup (`userKey` alone is a 404 "Domain not found."; #1315
+found that in production, where it made the fence refuse every write);
+never look a member up or
 delete it by email (some outside addresses 404 while on the list) — list,
 match, delete by member id; the member list is eventually consistent, so the
 UI trusts each action's per-address result and re-reads a few seconds later.

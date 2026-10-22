@@ -334,16 +334,12 @@ export async function getGroup(
  * The addresses of the groups `groupEmail` is a direct member of
  * (lower-cased). Used by the nesting fence in membership.ts.
  *
- * The "retrieve all groups for a member" guide shows `userKey` (a user's or
- * group's primary or alias email, or an id) with `pageToken` / `maxResults`
- * and no `domain`; the guide says the user or group "must belong to your
- * domain". That it works for this service account has not been verified live
- * yet (see the PR's post-deploy checklist).
- *
- * No `domain`: a filter would hide a parent in another domain, which is
- * exactly what the fence has to see. (The groups.list reference does not say
- * whether `userKey` may be combined with `domain`, and asks for `customer` or
- * `domain` otherwise.)
+ * `userKey` takes a group's address (or id) as well as a user's. Google's
+ * guide sends it alone, but measured as this service account (2026-10-22)
+ * that is a 404 "Domain not found.", `userKey` + `customer` is a 400, and
+ * only `userKey` + `domain` returns the parents. The Workspace has one
+ * domain, and the Directory API can't see another organisation's groups
+ * anyway, so the filter hides no parent the fence could have seen.
  */
 export async function listParentGroups(
   api: GroupsApi,
@@ -354,6 +350,7 @@ export async function listParentGroups(
   do {
     const q = new URLSearchParams({
       userKey: groupEmail,
+      domain: api.domain,
       maxResults: PAGE_SIZE,
     })
     if (pageToken) q.set("pageToken", pageToken)

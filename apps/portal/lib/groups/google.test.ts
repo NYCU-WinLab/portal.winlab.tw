@@ -632,7 +632,7 @@ describe("throttling and deadlines", () => {
 })
 
 describe("listParentGroups", () => {
-  test("asks by userKey alone, pages, and lower-cases", async () => {
+  test("asks by userKey within the domain, pages, and lower-cases", async () => {
     const api = fakeApi([
       (u) => {
         if (u.pathname !== `${DIR}/groups`) return undefined
@@ -650,8 +650,11 @@ describe("listParentGroups", () => {
     ])
     const first = new URL(`https://x/${api.calls[0]!.split(" ")[1]}`)
     expect(first.searchParams.get("userKey")).toBe("lab@winlab.tw")
-    // No domain filter: a parent in another domain must still come back.
-    expect(first.searchParams.get("domain")).toBeNull()
+    // Measured 2026-10-22 as the service account: userKey alone is a 404
+    // "Domain not found.", userKey + customer a 400; only userKey + domain
+    // answers. The Workspace has one domain, so the filter hides no parent
+    // the Directory API could have returned.
+    expect(first.searchParams.get("domain")).toBe("winlab.tw")
     expect(first.searchParams.get("customer")).toBeNull()
     expect(first.searchParams.get("maxResults")).toBe("200")
   })
