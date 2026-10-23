@@ -1,12 +1,12 @@
 // A member's door sound: a short audio file the panel service plays when they
 // open the door, uploaded on /profile. The same rules are the bucket limits,
 // the storage INSERT policy and the checks on user_profiles.door_sound_path /
-// door_sound_mode (20260923140000). The service trims past 10 seconds and
+// door_sound_mode (20260923140000). The service trims past 30 seconds and
 // levels the loudness, so Portal only checks type and size.
 
 export const DOOR_SOUND_BUCKET = "door-sounds"
 export const DOOR_SOUND_MAX_BYTES = 3 * 1024 * 1024
-export const DOOR_SOUND_MAX_SECONDS = 10
+export const DOOR_SOUND_MAX_SECONDS = 30
 
 // One content type per extension, stamped on the upload itself
 // (doorSoundUploadBody) so the bucket's allowed_mime_types can be an exact
