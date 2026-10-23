@@ -47,14 +47,43 @@ describe("topicPrefix", () => {
     ).toBe("winlab-projects-ai")
   })
 
+  test("prefers the group over the booker", () => {
+    expect(
+      topicPrefix({ groupName: "tasa-satsim", bookerUsername: "frank" })
+    ).toBe("tasa-satsim")
+  })
+
+  // A personal meeting is filed under whoever booked it, the way a group
+  // meeting is filed under its group. Reported 2026-10-19: a thesis meeting
+  // with only the advisor invited went out with no prefix at all.
+  test("files a personal meeting under the booker", () => {
+    expect(topicPrefix({ bookerUsername: "frank" })).toBe("frank")
+  })
+
+  test("prefers the booker over whoever they invited", () => {
+    expect(
+      topicPrefix({ bookerUsername: "frank", firstAttendeeUsername: "cctseng" })
+    ).toBe("frank")
+  })
+
   test("falls back to the first attendee's username", () => {
     expect(topicPrefix({ firstAttendeeUsername: "n0ball" })).toBe("n0ball")
+  })
+
+  test("skips a booker whose username sanitises to nothing", () => {
+    expect(
+      topicPrefix({ bookerUsername: "  ", firstAttendeeUsername: "n0ball" })
+    ).toBe("n0ball")
   })
 
   test("is null when there's nothing to identify the meeting by", () => {
     expect(topicPrefix({})).toBeNull()
     expect(
-      topicPrefix({ groupName: null, firstAttendeeUsername: null })
+      topicPrefix({
+        groupName: null,
+        bookerUsername: null,
+        firstAttendeeUsername: null,
+      })
     ).toBeNull()
   })
 

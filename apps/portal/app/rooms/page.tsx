@@ -52,6 +52,7 @@ import { OnlineMeetings } from "./_components/online-meetings"
 import { RecurringTab } from "./_components/recurring-tab"
 import { TopicField } from "./_components/topic-field"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
+import { useAuth } from "@/hooks/use-auth"
 import { useRoomAvailabilityRange } from "@/hooks/rooms/use-room-availability"
 import {
   slotTier,
@@ -286,6 +287,7 @@ function BookingSuggestion({
     : null
   const confirmBooking = useConfirmBooking()
   const { data: labUsers } = useLabUsers()
+  const { user } = useAuth()
   const attendeeGroupsQuery = useAttendeeGroups()
   const attendeeGroups = attendeeGroupsQuery.data
 
@@ -339,6 +341,7 @@ function BookingSuggestion({
   // anything sent from here.
   const prefix = topicPrefix({
     groupName,
+    bookerUsername: labUsers?.find((u) => u.id === user?.id)?.username,
     firstAttendeeUsername: finalAttendees.find((a) => a.username)?.username,
   })
 
