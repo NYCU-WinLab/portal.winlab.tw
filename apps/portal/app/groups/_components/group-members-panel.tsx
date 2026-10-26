@@ -3,6 +3,7 @@
 import { useState } from "react"
 
 import { usePendingMembers } from "@/hooks/groups/use-pending-members"
+import { waitingRows } from "@/lib/groups/progress"
 import type { GroupMember, ManagedGroup } from "@/lib/groups/types"
 import { readFailureNotice, retainLastGood } from "@/lib/groups/view"
 import type { KeycloakGroupMember } from "@/lib/rooms/keycloak-groups"
@@ -77,7 +78,10 @@ function Loaded({
   const { group, members, people, cohorts, profilesLoaded } = data
   const domain = group.email.slice(group.email.lastIndexOf("@") + 1)
   const { shown } = usePendingMembers(groupId, members, stale)
-  const { noteAdded, noteRemoved, noteUncertain } = useGroupsBatch()
+  const { noteRemoved, noteUncertain, jobs } = useGroupsBatch()
+  // Addresses of this group's batches with no result yet: listed under the
+  // members, and counted as present so the dialog won't queue them twice.
+  const waiting = waitingRows(jobs, groupId)
 
   return (
     <section className="flex flex-col gap-2">
@@ -92,18 +96,21 @@ function Loaded({
         </h2>
         <AddMembersDialog
           groupId={groupId}
+          groupEmail={group.email}
           domain={domain}
-          currentEmails={shown.flatMap((m) => (m.email ? [m.email] : []))}
+          currentEmails={[
+            ...shown.flatMap((m) => (m.email ? [m.email] : [])),
+            ...waiting.map((w) => w.email),
+          ]}
           people={people}
           cohorts={cohorts}
           profilesLoaded={profilesLoaded}
-          onAdded={(emails) => noteAdded(groupId, emails)}
-          onFailed={() => noteUncertain(groupId)}
         />
       </div>
       <MemberList
         groupId={groupId}
         members={shown}
+        waiting={waiting}
         people={people}
         profilesLoaded={profilesLoaded}
         onRemoved={(email) => noteRemoved(groupId, email)}

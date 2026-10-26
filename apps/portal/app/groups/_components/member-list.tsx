@@ -35,6 +35,7 @@ function tags(m: ShownMember, known: boolean, profilesLoaded: boolean): string {
 export function MemberList({
   groupId,
   members,
+  waiting,
   people,
   profilesLoaded,
   onRemoved,
@@ -42,6 +43,8 @@ export function MemberList({
 }: {
   groupId: string
   members: ShownMember[]
+  /** Addresses of a batch still being sent: no result yet, so no 移除. */
+  waiting: { email: string; sending: boolean }[]
   people: Person[]
   /** false when profiles could not be read: don't tag every member 外部. */
   profilesLoaded: boolean
@@ -123,6 +126,23 @@ export function MemberList({
                   移除
                 </Button>
               )}
+            </li>
+          )
+        })}
+        {waiting.map((w, i) => {
+          const person = byEmail.get(w.email)
+          const label = w.sending ? "送出中" : "等待送出"
+          return (
+            <li
+              key={`waiting-${i}-${w.email}`}
+              className="flex items-center justify-between py-2 opacity-60"
+            >
+              <div className="flex flex-col">
+                <span>{person?.name ?? w.email}</span>
+                <span className="text-xs text-muted-foreground">
+                  {person ? `${w.email} · ${label}` : label}
+                </span>
+              </div>
             </li>
           )
         })}

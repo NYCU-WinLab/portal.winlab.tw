@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -23,10 +22,9 @@ import {
   planAdditions,
 } from "@/lib/groups/plan"
 import { MAX_BATCH } from "@/lib/groups/messages"
-import { mayHaveLanded, outcomeUncertain } from "@/lib/groups/uncertain"
 import type { KeycloakGroupMember } from "@/lib/rooms/keycloak-groups"
 
-import { addGroupMembers } from "../actions"
+import { useGroupsBatch } from "./batch-provider"
 
 type Person = {
   id: string
@@ -38,17 +36,20 @@ type Cohort = { name: string; members: KeycloakGroupMember[] }
 
 export function AddMembersDialog({
   groupId,
+  groupEmail,
   domain,
   currentEmails,
   people,
   cohorts,
   profilesLoaded,
-  onAdded,
-  onFailed,
 }: {
   groupId: string
+  groupEmail: string
   domain: string
-  /** Google's list plus what this page just added, minus what it just removed. */
+  /**
+   * Google's list plus what this page just added, minus what it just
+   * removed, plus what is still waiting to be sent.
+   */
   currentEmails: string[]
   people: Person[]
   /** null when Keycloak could not be read: the cohort picker is hidden. */
@@ -58,21 +59,32 @@ export function AddMembersDialog({
    * "exclude alumni" would exclude no one, so adding by cohort is off.
    */
   profilesLoaded: boolean
-  /**
-   * Addresses Google confirmed (ok or already), spelled the way Google will
-   * list them, for the "同步中" overlay.
-   */
-  onAdded: (emails: string[]) => void
-  /** Something may have landed without being confirmed: re-read Google soon. */
-  onFailed: () => void
 }) {
+  const { enqueue, prefillOf, clearPrefill } = useGroupsBatch()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [picked, setPicked] = useState<string[]>([])
   const [cohort, setCohort] = useState("")
   const [excludeAlumni, setExcludeAlumni] = useState(true)
   const [freeText, setFreeText] = useState("")
-  const [busy, setBusy] = useState(false)
+
+  // A failed batch's 重新加入 brings its addresses back here, in place of
+  // whatever was being edited, for the member to look over and send again.
+  // Adjusting state while rendering, React's pattern for derived state; the
+  // provider's copy is cleared after commit so it opens only once.
+  const prefill = prefillOf(groupId)
+  const [seenPrefill, setSeenPrefill] = useState<string[] | null>(null)
+  if (prefill && prefill !== seenPrefill) {
+    setSeenPrefill(prefill)
+    setPicked([])
+    setCohort("")
+    setSearch("")
+    setFreeText(prefill.join("\n"))
+    setOpen(true)
+  }
+  useEffect(() => {
+    if (prefill) clearPrefill(groupId)
+  }, [prefill, groupId, clearPrefill])
 
   useEffect(() => {
     if (!profilesLoaded) setCohort("")
@@ -113,79 +125,18 @@ export function AddMembersDialog({
     setSearch("")
   }
 
-  async function submit() {
-    setBusy(true)
-    let res: Awaited<ReturnType<typeof addGroupMembers>>
-    try {
-      res = await addGroupMembers(groupId, plan.toAdd)
-    } catch (err) {
-      console.error("[groups] addGroupMembers failed", err)
-      // The batch may have reached Google before the connection dropped.
-      // Re-read shortly so whatever landed shows up.
-      onFailed()
-      return toast.error("連線中斷，請稍後確認結果；地址已保留，可重試")
-    } finally {
-      setBusy(false)
-    }
-    if (res.status !== "ok") {
-      // A batch that stopped part-way still says what came back for the
-      // addresses it tried: show the ones that landed, as the success path
-      // does. The input stays so the rest can be retried.
-      if ("results" in res && res.results)
-        onAdded(
-          res.results
-            .filter((r) => r.outcome === "ok" || r.outcome === "already")
-            .map((r) => r.listedAs ?? r.email)
-        )
-      // Refused before anything was sent (unconfigured, the portal's own
-      // refusals, malformed input): nothing landed, so no re-read and no
-      // "partly added" hint. Anything else may have stopped part-way, so
-      // re-read Google shortly for the list and 最近變更. The input stays
-      // either way, so the batch can be retried.
-      if (res.status === "unconfigured")
-        return toast.error("Google 群組整合尚未設定")
-      if (!mayHaveLanded(res)) return toast.error(res.detail)
-      onFailed()
-      return toast.error(
-        `${res.detail}（可能已有部分地址加入，請稍後對照名單與最近變更）`
-      )
-    }
-    const landed = res.data
-      .filter((r) => r.outcome === "ok" || r.outcome === "already")
-      .map((r) => r.listedAs ?? r.email)
-    onAdded(landed)
-    const ok = res.data.filter((r) => r.outcome === "ok").length
-    const already = res.data.filter((r) => r.outcome === "already").length
-    const failed = res.data.filter((r) => r.outcome === "error")
-    // A failed address may still have landed (a timeout says "result
-    // unknown"): schedule the bounded re-read, and keep the input so those
-    // addresses can be retried. Those that did land show up as 已在群組.
-    if (res.data.some((r) => outcomeUncertain(r.outcome))) onFailed()
-    if (failed.length === 0)
-      toast.success(
-        `已加入 ${ok} 人${already ? `，${already} 人原本就在` : ""}`
-      )
-    else {
-      toast.error(
-        `加入 ${ok} 人${already ? `，${already} 人原本就在` : ""}，失敗 ${failed.length} 人：${failed
-          .map((f) => `${f.email}（${f.detail ?? "error"}）`)
-          .join("、")}`
-      )
-      return
-    }
+  // The batch goes to the background runner, which sends it in chunks and
+  // reports in a toast; the dialog is free for the next one right away.
+  // Addresses still waiting count as present (currentEmails), so sending the
+  // same ones again before they land adds nothing twice.
+  function submit() {
+    enqueue({ groupId, groupEmail, emails: plan.toAdd })
     setOpen(false)
     reset()
   }
 
   return (
-    <Dialog
-      open={open}
-      // Closing mid-flight would let a reopen start a second edit session
-      // while the first batch is still being sent.
-      onOpenChange={(next) => {
-        if (!busy) setOpen(next)
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">加入成員</Button>
       </DialogTrigger>
@@ -194,12 +145,7 @@ export function AddMembersDialog({
           <DialogTitle>加入成員</DialogTitle>
         </DialogHeader>
 
-        {/* Nothing may change while a batch is in flight: input typed after the
-            submit was never sent, and a full success would wipe it. */}
-        <fieldset
-          disabled={busy}
-          className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0 text-sm"
-        >
+        <div className="flex min-w-0 flex-col gap-4 text-sm">
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground">從實驗室成員挑選</span>
             <Input
@@ -296,7 +242,7 @@ export function AddMembersDialog({
               </p>
             )}
           </div>
-        </fieldset>
+        </div>
 
         <DialogFooter>
           {overLimit && (
@@ -305,7 +251,7 @@ export function AddMembersDialog({
             </p>
           )}
           <Button
-            disabled={busy || plan.toAdd.length === 0 || overLimit}
+            disabled={plan.toAdd.length === 0 || overLimit}
             onClick={submit}
           >
             確認加入 {plan.toAdd.length} 人
