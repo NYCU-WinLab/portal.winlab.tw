@@ -78,7 +78,7 @@ function Loaded({
   const { group, members, people, cohorts, profilesLoaded } = data
   const domain = group.email.slice(group.email.lastIndexOf("@") + 1)
   const { shown } = usePendingMembers(groupId, members, stale)
-  const { noteRemoved, noteUncertain, jobs } = useGroupsBatch()
+  const { jobs } = useGroupsBatch()
   // Addresses of this group's batches with no result yet: listed under the
   // members, and counted as present so the dialog won't queue them twice.
   const waiting = waitingRows(jobs, groupId)
@@ -109,12 +109,11 @@ function Loaded({
       </div>
       <MemberList
         groupId={groupId}
+        groupEmail={group.email}
         members={shown}
         waiting={waiting}
         people={people}
         profilesLoaded={profilesLoaded}
-        onRemoved={(email) => noteRemoved(groupId, email)}
-        onFailed={() => noteUncertain(groupId)}
       />
     </section>
   )

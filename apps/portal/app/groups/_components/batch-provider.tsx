@@ -30,7 +30,7 @@ import {
 import type { BatchJob, NewBatch } from "@/lib/groups/progress"
 import type { Dispatch } from "@/lib/groups/runner"
 
-import { addGroupMembers } from "../actions"
+import { addGroupMembers, removeGroupMember } from "../actions"
 
 type Listener = (forced: boolean) => void
 
@@ -48,6 +48,7 @@ export type GroupsBatch = {
   /** Addresses a failed batch's 重新加入 put back into the add dialog. */
   prefillOf: (groupId: string) => string[] | null
   clearPrefill: (groupId: string) => void
+  remove: typeof removeGroupMember
 }
 
 const GroupsBatchContext = createContext<GroupsBatch | null>(null)
@@ -55,10 +56,13 @@ const GroupsBatchContext = createContext<GroupsBatch | null>(null)
 export function GroupsBatchProvider({
   children,
   dispatch = addGroupMembers,
+  remove = removeGroupMember,
 }: {
   children: ReactNode
   /** Sends one chunk; a stand-in only for previewing the UI. */
   dispatch?: Dispatch
+  /** Removes one member; a stand-in only for previewing the UI. */
+  remove?: typeof removeGroupMember
 }) {
   const router = useRouter()
   const [overlays, setOverlays] = useState<Record<string, Overlay>>({})
@@ -137,8 +141,9 @@ export function GroupsBatchProvider({
       jobs,
       prefillOf: (groupId) => prefill[groupId] ?? null,
       clearPrefill,
+      remove,
     }),
-    [actions, overlays, enqueue, jobs, prefill, clearPrefill]
+    [actions, overlays, enqueue, jobs, prefill, clearPrefill, remove]
   )
 
   return (
