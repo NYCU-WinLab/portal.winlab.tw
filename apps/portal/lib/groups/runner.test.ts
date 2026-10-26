@@ -168,4 +168,21 @@ describe("createBatchRunner", () => {
     expect(h.changes).toEqual([])
     expect(h.calls).toEqual([])
   })
+
+  // A batch's toast is keyed by its id, and sonner keeps every toast it has
+  // seen for the life of the page: leaving /groups and coming back builds a
+  // new runner, whose first batch must not update the last visit's toast.
+  test("a second runner never reuses a job id", async () => {
+    const ids = async () => {
+      const h = harness()
+      h.runner.enqueue(batch("A", 3))
+      await h.runner.idle()
+      h.runner.stop()
+      return h.changes.flat().map((j) => j.id)
+    }
+    const first = new Set(await ids())
+    const second = await ids()
+    expect(second.length).toBeGreaterThan(0)
+    expect(second.filter((id) => first.has(id))).toEqual([])
+  })
 })

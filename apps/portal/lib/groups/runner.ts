@@ -36,12 +36,16 @@ export type BatchRunner = {
   idle: () => Promise<void>
 }
 
+// Ids count up across runners, not per runner: a batch's toast is keyed by
+// its id and sonner keeps every toast for the life of the page, so a runner
+// built on a later visit to /groups must not reuse an earlier one's ids.
+let nextId = 1
+
 export function createBatchRunner(
   dispatch: Dispatch,
   events: RunnerEvents
 ): BatchRunner {
   let jobs: BatchJob[] = []
-  let nextId = 1
   let seq = 0
   const served = new Map<string, number>()
   let pumping: Promise<void> = Promise.resolve()
