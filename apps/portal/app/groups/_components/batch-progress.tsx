@@ -7,10 +7,13 @@ import type { BatchJob, JobView } from "@/lib/groups/progress"
 // sonner paints a toast from these variables (its close and action buttons
 // too), so a tone sets them on the toast itself rather than fighting its
 // stylesheet: orange while a batch is being sent, green when it's done.
+// Dark orange-950 reads as red next to a failure, so dark mode tints the
+// popover colour instead; mixed, not transparent, so the list behind
+// doesn't show through.
 export const TONE_CLASS: Record<JobView["tone"], string> = {
   queued: "[--normal-text:var(--muted-foreground)]",
   running:
-    "[--normal-bg:var(--color-orange-50)] [--normal-border:var(--color-orange-300)] [--normal-text:var(--color-orange-950)] dark:[--normal-bg:var(--color-orange-950)] dark:[--normal-border:var(--color-orange-800)] dark:[--normal-text:var(--color-orange-100)]",
+    "[--normal-bg:var(--color-orange-50)] [--normal-border:var(--color-orange-300)] [--normal-text:var(--color-orange-950)] dark:[--normal-bg:color-mix(in_oklab,var(--color-orange-500)_15%,var(--popover))] dark:[--normal-border:color-mix(in_oklab,var(--color-orange-500)_50%,var(--popover))] dark:[--normal-text:var(--color-orange-200)]",
   success:
     "[--normal-bg:var(--color-green-50)] [--normal-border:var(--color-green-300)] [--normal-text:var(--color-green-950)] dark:[--normal-bg:var(--color-green-950)] dark:[--normal-border:var(--color-green-800)] dark:[--normal-text:var(--color-green-100)]",
   failure:

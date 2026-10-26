@@ -23,7 +23,9 @@ export default function GroupsLayout({ children }: { children: ReactNode }) {
       >
         {children}
       </PortalShell>
-      <Toaster />
+      {/* Batches and removals each keep a toast going; collapsed, the
+          newest would hide the others' progress. */}
+      <Toaster expand />
     </GroupsBatchProvider>
   )
 }
