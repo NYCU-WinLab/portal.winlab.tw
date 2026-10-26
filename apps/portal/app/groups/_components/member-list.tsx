@@ -18,7 +18,7 @@ import { Button } from "@workspace/ui/components/button"
 import { isPlainMember, type ShownMember } from "@/lib/groups/plan"
 import { mayHaveLanded } from "@/lib/groups/uncertain"
 
-import { TONE_CLASS } from "./batch-progress"
+import { settleRemovalToast, TONE_CLASS } from "./batch-progress"
 import { useGroupsBatch } from "./batch-provider"
 
 type Person = { name: string | null; email: string; labStatus: string | null }
@@ -75,13 +75,7 @@ export function MemberList({
       duration: Infinity,
     })
     const failed = (message: string) =>
-      toast.error(message, {
-        id,
-        description: groupEmail,
-        className: TONE_CLASS.failure,
-        closeButton: true,
-        duration: Infinity,
-      })
+      settleRemovalToast(id, groupEmail, "failure", message)
     let res: Awaited<ReturnType<typeof removeMember>>
     try {
       res = await removeMember(groupId, email)
@@ -101,22 +95,12 @@ export function MemberList({
     }
     const outcome = res.data.outcome
     if (outcome === "ok") {
-      toast.success(`已移除 ${email}`, {
-        id,
-        description: groupEmail,
-        className: TONE_CLASS.success,
-        duration: 5000,
-      })
+      settleRemovalToast(id, groupEmail, "success", `已移除 ${email}`)
       noteRemoved(groupId, email)
     } else if (outcome === "not_found") {
       // Our list was stale. Nothing was removed by this click, so say so and
       // re-read instead of reporting a success.
-      toast(`${email} 已不在群組中`, {
-        id,
-        description: groupEmail,
-        className: "",
-        duration: 5000,
-      })
+      settleRemovalToast(id, groupEmail, "gone", `${email} 已不在群組中`)
       noteUncertain(groupId)
     } else if (outcome === "protected") {
       failed("不能移除群組擁有者或管理者")

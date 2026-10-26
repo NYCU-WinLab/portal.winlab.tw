@@ -50,6 +50,42 @@ export function BatchProgress({
   )
 }
 
+/**
+ * End a removal's loading toast in place: green when removed, neutral when
+ * the address was already gone, red (and kept until closed) on failure.
+ */
+export function settleRemovalToast(
+  id: string | number,
+  groupEmail: string,
+  tone: "success" | "gone" | "failure",
+  message: string
+) {
+  const description = groupEmail
+  switch (tone) {
+    case "success":
+      toast.success(message, {
+        id,
+        description,
+        className: TONE_CLASS.success,
+        duration: 5000,
+      })
+      return
+    case "gone":
+      // Not plain toast(): that keeps the loading type, which never closes.
+      toast.info(message, { id, description, className: "", duration: 5000 })
+      return
+    case "failure":
+      toast.error(message, {
+        id,
+        description,
+        className: TONE_CLASS.failure,
+        closeButton: true,
+        duration: Infinity,
+      })
+      return
+  }
+}
+
 /** Show a batch's toast, or update it in place: one toast per batch. */
 export function showBatchToast(
   job: BatchJob,
