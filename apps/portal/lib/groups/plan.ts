@@ -194,12 +194,21 @@ export function onFreshList(
   return prunePending(members, p)
 }
 
-/** The overlay, and whether its give-up is waiting for a good read. */
-export type Overlay = { pending: PendingChanges; giveUpDeferred: boolean }
+/**
+ * The overlay, whether its give-up is waiting for a good read, and whether
+ * an uncertain outcome came in while no page for the group was open to
+ * re-read it: the next one to open owes those re-reads.
+ */
+export type Overlay = {
+  pending: PendingChanges
+  giveUpDeferred: boolean
+  recheckOwed: boolean
+}
 
 export const NO_OVERLAY: Overlay = {
   pending: NO_PENDING,
   giveUpDeferred: false,
+  recheckOwed: false,
 }
 
 // A new action starts a fresh consistency window, so it also cancels a
@@ -207,16 +216,32 @@ export const NO_OVERLAY: Overlay = {
 // along with the old ones, while Google may still be catching up on it.
 
 export function overlayAdded(o: Overlay, emails: string[]): Overlay {
-  return { pending: withAdded(o.pending, emails), giveUpDeferred: false }
+  return {
+    ...o,
+    pending: withAdded(o.pending, emails),
+    giveUpDeferred: false,
+  }
 }
 
 export function overlayRemoved(o: Overlay, email: string): Overlay {
-  return { pending: withRemoved(o.pending, email), giveUpDeferred: false }
+  return { ...o, pending: withRemoved(o.pending, email), giveUpDeferred: false }
 }
 
-/** An uncertain outcome (timeout, a batch stopped part-way): re-read afresh. */
-export function overlayRetry(o: Overlay): Overlay {
-  return { pending: o.pending, giveUpDeferred: false }
+/**
+ * An uncertain outcome (timeout, a batch stopped part-way): re-read afresh.
+ * `unheard` when no page for the group is open to run those re-reads.
+ */
+export function overlayRetry(o: Overlay, unheard: boolean): Overlay {
+  return {
+    pending: o.pending,
+    giveUpDeferred: false,
+    recheckOwed: o.recheckOwed || unheard,
+  }
+}
+
+/** A page opened and runs the re-reads it was owed. Same object if none. */
+export function overlayRecheckTaken(o: Overlay): Overlay {
+  return o.recheckOwed ? { ...o, recheckOwed: false } : o
 }
 
 /** A list arrived from the server; a good one ends any deferral. */
@@ -231,6 +256,7 @@ export function overlayOnList(
       stale,
     }),
     giveUpDeferred: stale && o.giveUpDeferred,
+    recheckOwed: o.recheckOwed,
   }
 }
 
@@ -238,7 +264,7 @@ export function overlayOnList(
 export function overlayGiveUp(o: Overlay, stale: boolean): Overlay {
   return onRetriesExhausted(stale) === "clear"
     ? NO_OVERLAY
-    : { pending: o.pending, giveUpDeferred: true }
+    : { ...o, giveUpDeferred: true }
 }
 
 // ── Re-read polling ─────────────────────────────────────────────────────────
