@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { UnrecognizedActionError } from "next/dist/client/components/unrecognized-action-error"
 
 import { UNAUTHORIZED } from "@/lib/groups/messages"
 import {
@@ -11,6 +12,7 @@ import {
   nextChunk,
   pickNext,
   stopJob,
+  thrownReply,
   waitingRows,
   type BatchJob,
   type ChunkReply,
@@ -179,13 +181,27 @@ describe("classifyChunk", () => {
     expect(o).toMatchObject({ unknown: chunk, stop: "global", recheck: true })
   })
 
-  test("the action threw: global, unknown", () => {
-    expect(classifyChunk(chunk, { status: "thrown" })).toMatchObject({
+  test("the action threw: global, unknown, reload advised", () => {
+    const reply = thrownReply(new TypeError("Failed to fetch"))
+    expect(classifyChunk(chunk, reply)).toMatchObject({
       unknown: chunk,
       unsent: [],
       stop: "global",
       recheck: true,
-      detail: "連線中斷",
+      detail: "連線中斷，請重新整理頁面後再試",
+    })
+  })
+
+  // What Next.js throws when a deploy since the page loaded took the action
+  // away: the server ran nothing, and only a reload gets the new one.
+  test("the action is gone after a deploy: global, unsent, reload advised", () => {
+    const gone = new UnrecognizedActionError('Server Action "x" was not found')
+    expect(classifyChunk(chunk, thrownReply(gone))).toMatchObject({
+      unknown: [],
+      unsent: chunk,
+      stop: "global",
+      recheck: false,
+      detail: "網站已更新，請重新整理頁面後再試",
     })
   })
 })
@@ -376,6 +392,27 @@ describe("jobView", () => {
       retry: ["u1@x.org", "u2@x.org", "u3@x.org", ...addrs(8).slice(4)],
     })
   })
+
+  // Nothing failed outright, but some addresses never got an answer or were
+  // never sent: that is no success.
+  for (const [field, word] of [
+    ["unknown", "結果未知"],
+    ["unsent", "未送出"],
+  ] as const)
+    test(`only ${field} addresses left over: a failure that retries them`, () => {
+      const j: BatchJob = {
+        ...job(1, "A", 3),
+        dispatched: 3,
+        added: 2,
+        [field]: ["u2@x.org"],
+        done: true,
+      }
+      expect(jobView(j, [j])).toMatchObject({
+        tone: "failure",
+        title: `已加入 2 人，${word} 1 人`,
+        retry: ["u2@x.org"],
+      })
+    })
 
   test("200 failures: 5 address lines plus a count of the rest", () => {
     const j = step(job(1, "A", 200), (chunk) => ({

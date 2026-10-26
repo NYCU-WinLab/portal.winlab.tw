@@ -53,6 +53,7 @@ export function useBatchRunner(opts: {
         },
         onLanded: (groupId, emails) => latest.current.onLanded(groupId, emails),
         onUncertain: (groupId) => latest.current.onUncertain(groupId),
+        onError: (error) => console.error("groups: an add chunk failed", error),
       }
     )
     runner.current = r

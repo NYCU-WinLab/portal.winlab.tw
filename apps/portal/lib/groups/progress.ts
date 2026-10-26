@@ -39,7 +39,24 @@ export type BatchJob = {
 /** What one chunk's call came back with; "thrown" when the action rejected. */
 export type ChunkReply =
   | GroupsResult<MemberChangeResult[]>
-  | { status: "thrown" }
+  | {
+      status: "thrown"
+      /** The server no longer has the action, so it ran nothing. */
+      missingAction: boolean
+    }
+
+/**
+ * A chunk's call rejected. Next.js names the error it throws when a deploy
+ * since the page loaded took the action away; anything else (the network,
+ * a session that expired into a redirect) may have reached the server.
+ */
+export function thrownReply(error: unknown): ChunkReply {
+  return {
+    status: "thrown",
+    missingAction:
+      error instanceof Error && error.name === "UnrecognizedActionError",
+  }
+}
 
 /**
  * How far a refusal reaches. "global" is about the caller or the service
@@ -120,7 +137,9 @@ function stopDetailOf(reply: ChunkReply): string | null {
     case "unconfigured":
       return "Google 群組整合尚未設定"
     case "thrown":
-      return "連線中斷"
+      return reply.missingAction
+        ? "網站已更新，請重新整理頁面後再試"
+        : "連線中斷，請重新整理頁面後再試"
     case "forbidden":
       return reply.detail
     case "error":
@@ -162,8 +181,11 @@ export function classifyChunk(
     return out
   }
   if (reply.status === "thrown") {
-    out.unknown = [...chunk]
-    out.recheck = true
+    if (reply.missingAction) out.unsent = [...chunk]
+    else {
+      out.unknown = [...chunk]
+      out.recheck = true
+    }
     return out
   }
   out.recheck = mayHaveLanded(reply)

@@ -7,7 +7,8 @@
 // open still marks its addresses, and coming back shows them. Each open
 // group page subscribes for its own group and runs the re-reads
 // (hooks/groups/use-pending-members.ts); with no page subscribed a note only
-// updates the overlay, and the page starts reading when it mounts.
+// updates the overlay (an uncertain one marks the re-reads as owed), and the
+// page starts reading when it mounts.
 
 import { useRouter } from "next/navigation"
 import {
@@ -77,8 +78,11 @@ export function GroupsBatchProvider({
         return next === prev ? all : { ...all, [groupId]: next }
       })
     }
-    function notify(groupId: string, forced: boolean) {
-      for (const listener of listeners.get(groupId) ?? []) listener(forced)
+    /** Tell the group's open page, if any; false when nobody heard. */
+    function notify(groupId: string, forced: boolean): boolean {
+      const subscribed = listeners.get(groupId)
+      for (const listener of subscribed ?? []) listener(forced)
+      return !!subscribed?.size
     }
     return {
       updateOverlay,
@@ -102,8 +106,8 @@ export function GroupsBatchProvider({
         notify(groupId, false)
       },
       noteUncertain(groupId: string) {
-        updateOverlay(groupId, overlayRetry)
-        notify(groupId, true)
+        const heard = notify(groupId, true)
+        updateOverlay(groupId, (o) => overlayRetry(o, !heard))
       },
     }
   }, [listeners])

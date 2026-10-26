@@ -21,8 +21,9 @@
 //
 // The overlay itself is kept by the /groups provider
 // (app/groups/_components/batch-provider.tsx), so a change that finishes
-// while this page is closed is still shown when it opens; this hook runs
-// the re-reads for the one group on screen.
+// while this page is closed is still shown when it opens, and an uncertain
+// outcome from then still gets its re-reads; this hook runs the re-reads for
+// the one group on screen.
 
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useTransition } from "react"
@@ -33,6 +34,7 @@ import {
   nextPollStep,
   overlayGiveUp,
   overlayOnList,
+  overlayRecheckTaken,
   POLL_IDLE,
   pollCompleted,
   pollGaveUp,
@@ -153,16 +155,20 @@ export function usePendingMembers(
   }
 
   // A change noted for this group starts a fresh window; one still unsettled
-  // from before the page opened gets one too.
+  // from before the page opened gets one too, and an uncertain outcome that
+  // came in meanwhile gets the re-reads it was owed.
   useEffect(() => {
     const unsubscribe = subscribe(groupId, (forced) =>
       startWindow(forced ? FORCED_READS : 0)
     )
-    if (!settled(latest.current.pending)) startWindow(0)
+    const owed = latest.current.recheckOwed
+    if (owed) updateOverlay(groupId, overlayRecheckTaken)
+    if (owed || !settled(latest.current.pending))
+      startWindow(owed ? FORCED_READS : 0)
     return unsubscribe
     // startWindow reads only refs; re-running on its identity would be wrong.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, subscribe])
+  }, [groupId, subscribe, updateOverlay])
 
   return { shown: applyPending(members, overlay.pending) }
 }

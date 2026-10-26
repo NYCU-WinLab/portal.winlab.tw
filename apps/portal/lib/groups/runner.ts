@@ -11,6 +11,7 @@ import {
   nextChunk,
   pickNext,
   stopJob,
+  thrownReply,
   type BatchJob,
   type ChunkReply,
   type NewBatch,
@@ -26,6 +27,8 @@ export type RunnerEvents = {
   onChange: (jobs: readonly BatchJob[]) => void
   onLanded: (groupId: string, emails: string[]) => void
   onUncertain: (groupId: string) => void
+  /** A chunk's call rejected; the batch reports it, this is for the log. */
+  onError: (error: unknown) => void
 }
 
 export type BatchRunner = {
@@ -78,8 +81,9 @@ export function createBatchRunner(
         let reply: ChunkReply
         try {
           reply = await dispatch(groupId, chunk)
-        } catch {
-          reply = { status: "thrown" }
+        } catch (error) {
+          events.onError(error)
+          reply = thrownReply(error)
         }
         if (stopped) return
 

@@ -31,6 +31,7 @@ function harness(
   const changes: (readonly BatchJob[])[] = []
   const landed: [string, string[]][] = []
   const uncertain: string[] = []
+  const errors: unknown[] = []
   const runner = createBatchRunner(
     async (groupId, emails) => {
       calls.push([groupId, emails.length])
@@ -40,9 +41,10 @@ function harness(
       onChange: (jobs) => changes.push(jobs),
       onLanded: (groupId, emails) => landed.push([groupId, emails]),
       onUncertain: (groupId) => uncertain.push(groupId),
+      onError: (error) => errors.push(error),
     }
   )
-  return { runner, calls, changes, landed, uncertain }
+  return { runner, calls, changes, landed, uncertain, errors }
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -122,6 +124,30 @@ describe("createBatchRunner", () => {
       15,
     ])
     expect([b!.done, b!.unsent.length]).toEqual([true, 5])
+  })
+
+  test("a chunk that throws reaches onError instead of vanishing", async () => {
+    const boom = new Error("network down")
+    const h = harness(() => {
+      throw boom
+    })
+    h.runner.enqueue(batch("A", 3))
+    await h.runner.idle()
+    expect(h.errors).toEqual([boom])
+  })
+
+  test("a chunk that stops its batch still reports what landed", async () => {
+    const h = harness(() => ({
+      status: "error",
+      detail: "期限已到",
+      sent: true,
+      results: [{ email: "u0@x.org", outcome: "ok" }],
+    }))
+    h.runner.enqueue(batch("A", 3))
+    await h.runner.idle()
+    expect(h.landed).toEqual([["A", ["u0@x.org"]]])
+    expect(h.uncertain).toEqual(["A"])
+    expect(h.changes.at(-1)![0]!.unsent).toEqual(["u1@x.org", "u2@x.org"])
   })
 
   test("stop() halts: no dispatch after, no onChange when the in-flight reply lands", async () => {

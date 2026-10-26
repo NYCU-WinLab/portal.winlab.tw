@@ -24,8 +24,10 @@ export default function GroupsLayout({ children }: { children: ReactNode }) {
         {children}
       </PortalShell>
       {/* Batches and removals each keep a toast going; collapsed, the
-          newest would hide the others' progress. */}
-      <Toaster expand />
+          newest would hide the others' progress. Past visibleToasts (3 by
+          default) sonner hides the oldest, whose timers keep running: a
+          finished batch could close unseen. */}
+      <Toaster expand visibleToasts={10} />
     </GroupsBatchProvider>
   )
 }

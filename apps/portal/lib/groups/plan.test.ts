@@ -14,6 +14,7 @@ import {
   overlayAdded,
   overlayGiveUp,
   overlayOnList,
+  overlayRecheckTaken,
   overlayRemoved,
   overlayRetry,
   planAdditions,
@@ -248,10 +249,30 @@ describe("the overlay across actions", () => {
   test("a removal or an uncertain outcome also resets a deferral", () => {
     const deferred = overlayGiveUp(overlayAdded(NO_OVERLAY, ["a@x.com"]), true)
     expect(overlayRemoved(deferred, "b@x.com").giveUpDeferred).toBe(false)
-    expect(overlayRetry(deferred)).toEqual({
+    expect(overlayRetry(deferred, false)).toEqual({
       pending: deferred.pending,
       giveUpDeferred: false,
+      recheckOwed: false,
     })
+  })
+
+  // An uncertain outcome for a group whose page isn't open has nobody to run
+  // its re-reads; the page owes them when it next opens.
+  test("an uncertain outcome nobody heard is owed until a page takes it", () => {
+    let o = overlayRetry(NO_OVERLAY, true)
+    expect(o.recheckOwed).toBe(true)
+    o = overlayAdded(o, ["a@x.com"])
+    o = overlayRemoved(o, "b@x.com")
+    o = overlayOnList(o, [], false)
+    expect(o.recheckOwed).toBe(true)
+    // A later outcome that a page did hear doesn't cancel the debt.
+    expect(overlayRetry(o, false).recheckOwed).toBe(true)
+    expect(overlayRecheckTaken(o)).toEqual({ ...o, recheckOwed: false })
+  })
+
+  test("taking a recheck nobody owes changes nothing", () => {
+    const o = overlayAdded(NO_OVERLAY, ["a@x.com"])
+    expect(overlayRecheckTaken(o)).toBe(o)
   })
 
   test("without a new action the first good read after a deferral clears the rest", () => {
@@ -267,6 +288,7 @@ describe("the overlay across actions", () => {
     expect(overlayOnList(deferred, [member("a@x.com")], true)).toEqual({
       pending: { added: ["b@x.com"], removed: [] },
       giveUpDeferred: true,
+      recheckOwed: false,
     })
   })
 

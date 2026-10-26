@@ -317,16 +317,18 @@ The first outside address added to a group makes Google switch the group to
 
 An add is split by the browser into chunks of 10 addresses
 (`lib/groups/progress.ts`), and each chunk is one complete `addGroupMembers`
-call, so every check, deadline and audit row above applies to each chunk.
+call, so every check and audit row above, and the deadline below, applies
+to each chunk.
 The runner (`lib/groups/runner.ts`) lives in the provider of the `/groups`
 layout: the dialog closes at once, a toast per batch shows k/N, groups take
 turns one chunk at a time, and the member can move between groups while it
 runs. Leaving `/groups` or closing the tab stops it; the chunk in flight
 finishes on the server and the rest is never sent (the tab warns before
 closing). A refusal stops the batch instead of sending chunk after chunk
-into the same `denied` row: one about the caller or the service account
-(unconfigured, signed out, `google_permission`, a dropped connection) stops
-every batch, any other stops that group's.
+to be refused, each into another `denied` row: one about the caller or the
+service account (unconfigured, signed out, `google_permission`, a dropped
+connection, a deploy since the page loaded) stops every batch, any other
+stops that group's.
 
 Every Google call shares one action deadline (60 s, `BATCH_BUDGET_MS`, set
 where the api is built in `groupsApiFromEnv`, the group listing included; both
