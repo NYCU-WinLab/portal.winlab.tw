@@ -8,6 +8,7 @@ import { readFailureNotice, retainLastGood } from "@/lib/groups/view"
 import type { KeycloakGroupMember } from "@/lib/rooms/keycloak-groups"
 
 import { AddMembersDialog } from "./add-members-dialog"
+import { useGroupsBatch } from "./batch-provider"
 import { MemberList } from "./member-list"
 
 type Person = {
@@ -75,10 +76,8 @@ function Loaded({
 }) {
   const { group, members, people, cohorts, profilesLoaded } = data
   const domain = group.email.slice(group.email.lastIndexOf("@") + 1)
-  const { shown, markAdded, markRemoved, refreshSoon } = usePendingMembers(
-    members,
-    stale
-  )
+  const { shown } = usePendingMembers(groupId, members, stale)
+  const { noteAdded, noteRemoved, noteUncertain } = useGroupsBatch()
 
   return (
     <section className="flex flex-col gap-2">
@@ -98,8 +97,8 @@ function Loaded({
           people={people}
           cohorts={cohorts}
           profilesLoaded={profilesLoaded}
-          onAdded={markAdded}
-          onFailed={refreshSoon}
+          onAdded={(emails) => noteAdded(groupId, emails)}
+          onFailed={() => noteUncertain(groupId)}
         />
       </div>
       <MemberList
@@ -107,8 +106,8 @@ function Loaded({
         members={shown}
         people={people}
         profilesLoaded={profilesLoaded}
-        onRemoved={markRemoved}
-        onFailed={refreshSoon}
+        onRemoved={(email) => noteRemoved(groupId, email)}
+        onFailed={() => noteUncertain(groupId)}
       />
     </section>
   )

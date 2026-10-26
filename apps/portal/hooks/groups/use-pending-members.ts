@@ -18,25 +18,26 @@
 // (no more polling) and the first successful read after that settles it. A
 // new action starts a fresh window, deferral included. The decisions live in
 // lib/groups/plan.ts.
+//
+// The overlay itself is kept by the /groups provider
+// (app/groups/_components/batch-provider.tsx), so a change that finishes
+// while this page is closed is still shown when it opens; this hook runs
+// the re-reads for the one group on screen.
 
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useTransition } from "react"
 
+import { useGroupsBatch } from "@/app/groups/_components/batch-provider"
 import {
   applyPending,
   nextPollStep,
-  NO_OVERLAY,
-  overlayAdded,
   overlayGiveUp,
   overlayOnList,
-  overlayRemoved,
-  overlayRetry,
   POLL_IDLE,
   pollCompleted,
   pollGaveUp,
   pollIssued,
   pollNewWindow,
-  type Overlay,
   type PendingChanges,
   type ShownMember,
 } from "@/lib/groups/plan"
@@ -51,44 +52,35 @@ const settled = (p: PendingChanges) =>
   p.added.length === 0 && p.removed.length === 0
 
 export function usePendingMembers(
+  groupId: string,
   members: GroupMember[],
   /** The latest read of Google failed; `members` is the last good one. */
   stale: boolean
-): {
-  shown: ShownMember[]
-  markAdded: (emails: string[]) => void
-  markRemoved: (email: string) => void
-  /**
-   * Re-read soon even with nothing pending, after an outcome that may have
-   * landed (a timeout, a batch that stopped part-way). Reads a bounded
-   * number of times over the consistency window, then stops.
-   */
-  refreshSoon: () => void
-} {
+): { shown: ShownMember[] } {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [overlay, setOverlay] = useState<Overlay>(NO_OVERLAY)
-
-  // A fresh list from the server (router.refresh) settles whatever it now
-  // agrees with. Adjusting state while rendering, React's documented
-  // pattern for "state derived from a changed prop". A failed read keeps
-  // the same `members`, so only a good one lands here.
-  const [seen, setSeen] = useState(members)
-  if (seen !== members) {
-    setSeen(members)
-    setOverlay((o) => overlayOnList(o, members, stale))
-  }
+  const { overlayOf, updateOverlay, subscribe } = useGroupsBatch()
+  const overlay = overlayOf(groupId)
 
   // Timers and effects act long after the render that set them up, so they
   // read the overlay and the stale flag through refs brought up to date
-  // after each commit. Declared before the completion effect below, so it
-  // sees this commit's values.
+  // after each commit. Declared before the effects below, so they see this
+  // commit's values.
   const latest = useRef(overlay)
   const latestStale = useRef(stale)
   useEffect(() => {
     latest.current = overlay
     latestStale.current = stale
   }, [overlay, stale])
+
+  // A fresh list from the server (router.refresh, or the page opening)
+  // settles whatever it now agrees with. The provider's state only catches
+  // up on the next render, so the ref is settled here too: a re-read that
+  // completes in this same commit must decide from the settled overlay.
+  useEffect(() => {
+    latest.current = overlayOnList(latest.current, members, stale)
+    updateOverlay(groupId, (o) => overlayOnList(o, members, stale))
+  }, [groupId, members, stale, updateOverlay])
 
   // One timer at a time; leaving the page cancels it, so no refresh lands on
   // whatever route comes next.
@@ -128,7 +120,7 @@ export function usePendingMembers(
       case "give-up-defer": {
         poll.current = pollGaveUp(poll.current)
         const wasStale = next === "give-up-defer"
-        setOverlay((o) => overlayGiveUp(o, wasStale))
+        updateOverlay(groupId, (o) => overlayGiveUp(o, wasStale))
         return
       }
     }
@@ -160,20 +152,17 @@ export function usePendingMembers(
     if (poll.current.inFlight === null) advance()
   }
 
-  return {
-    shown: applyPending(members, overlay.pending),
-    markAdded(emails) {
-      if (emails.length === 0) return
-      setOverlay((o) => overlayAdded(o, emails))
-      startWindow(0)
-    },
-    markRemoved(email) {
-      setOverlay((o) => overlayRemoved(o, email))
-      startWindow(0)
-    },
-    refreshSoon() {
-      setOverlay(overlayRetry)
-      startWindow(FORCED_READS)
-    },
-  }
+  // A change noted for this group starts a fresh window; one still unsettled
+  // from before the page opened gets one too.
+  useEffect(() => {
+    const unsubscribe = subscribe(groupId, (forced) =>
+      startWindow(forced ? FORCED_READS : 0)
+    )
+    if (!settled(latest.current.pending)) startWindow(0)
+    return unsubscribe
+    // startWindow reads only refs; re-running on its identity would be wrong.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, subscribe])
+
+  return { shown: applyPending(members, overlay.pending) }
 }
