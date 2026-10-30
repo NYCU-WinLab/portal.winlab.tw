@@ -18,11 +18,7 @@ import {
 } from "@/lib/rooms/attendee-groups"
 import type { BookingResult, ConfirmBookingInput } from "@/lib/rooms/confirm"
 import { fetchAttendeeGroups } from "@/lib/rooms/keycloak-groups"
-import {
-  composeTopic,
-  DEFAULT_TOPIC_SUFFIX,
-  topicPrefix,
-} from "@/lib/rooms/meeting-topic"
+import { DEFAULT_TOPIC_SUFFIX } from "@/lib/rooms/meeting-topic"
 import {
   slotTier,
   suggestRoom,
@@ -461,10 +457,6 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           )
         }
 
-        const prefix = topicPrefix({
-          groupName,
-          firstAttendeeUsername: attendees.find((a) => a.username)?.username,
-        })
         return json({
           booked: true,
           booking_id: result.bookingId ?? null,
@@ -474,7 +466,7 @@ export function registerRoomsTools(server: McpServer, hooks: RoomsHooks = {}) {
           date: args.date,
           start_time: args.start_time,
           end_time: args.end_time,
-          title: composeTopic(prefix, args.title),
+          title: result.title ?? args.title,
           attendees: attendees.map((a) => ({ name: a.name, email: a.email })),
           invites: result.inviteError
             ? `not sent: ${result.inviteError}`

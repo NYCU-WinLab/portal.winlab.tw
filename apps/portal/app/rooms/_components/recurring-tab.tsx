@@ -43,6 +43,7 @@ import {
 } from "@/lib/rooms/duration"
 import { DAY_WINDOW } from "@/lib/rooms/fetch"
 import { DEFAULT_TOPIC_SUFFIX, topicPrefix } from "@/lib/rooms/meeting-topic"
+import { useAuth } from "@/hooks/use-auth"
 import { endTimeOf } from "@/lib/rooms/recurrence"
 
 import { AttendeeSelect } from "./attendee-select"
@@ -95,6 +96,7 @@ function NextOccurrence({ meeting }: { meeting: RecurringMeeting }) {
 export function RecurringTab() {
   const { data: meetings, isLoading } = useRecurringMeetings()
   const { data: labUsers } = useLabUsers()
+  const { user } = useAuth()
   const groupsQuery = useAttendeeGroups()
   const create = useCreateRecurring()
   const setActive = useSetRecurringActive()
@@ -152,6 +154,7 @@ export function RecurringTab() {
   // trusting this.
   const prefix = topicPrefix({
     groupName,
+    bookerUsername: labUsers?.find((u) => u.id === user?.id)?.username,
     firstAttendeeUsername: attendees.find((a) => a.username)?.username,
   })
 

@@ -43,6 +43,7 @@ import { catchUpNewSeries } from "@/lib/rooms/recurring-run"
 import { composeTopic, topicPrefix } from "@/lib/rooms/meeting-topic"
 import { todayInTaipei } from "@/lib/rooms/date"
 import {
+  bookerUsername,
   cancelBookingFor,
   confirmBookingFor,
   failureText,
@@ -385,8 +386,10 @@ export async function createRecurringMeeting(
   // rebuilt each week from whoever is in the group by then, someone joining
   // or leaving would silently start filing the series' recordings under a
   // different name halfway through a term.
+  const supabase = await createClient()
   const prefix = topicPrefix({
     groupName: input.groupName,
+    bookerUsername: await bookerUsername(supabase, user.id),
     firstAttendeeUsername: input.attendees.find((a) => a.username)?.username,
   })
   const title = composeTopic(prefix, input.titleSuffix)
@@ -415,7 +418,6 @@ export async function createRecurringMeeting(
     return { booked: 0, failed: 0, errors: [], error: failureText(err) }
   }
 
-  const supabase = await createClient()
   const { data: created, error } = await supabase
     .from("rooms_recurring_meetings")
     .insert({
